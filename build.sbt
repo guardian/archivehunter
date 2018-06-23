@@ -8,6 +8,7 @@ lazy val commonSettings = Seq(
   libraryDependencies := Seq("org.apache.logging.log4j" % "log4j-core" % "2.8.2",
     "org.apache.logging.log4j" % "log4j-api" % "2.8.2",
     "org.scala-lang.modules" %% "scala-java8-compat" % "0.8.0",
+    "com.amazonaws" % "aws-java-sdk-s3" % "1.11.346",
     specs2 % Test)
 )
 
@@ -37,7 +38,7 @@ lazy val common = (project in file("common"))
       "com.sksamuel.elastic4s" %% "elastic4s-http" % elastic4sVersion,
       "com.sksamuel.elastic4s" %% "elastic4s-testkit" % elastic4sVersion % "test",
       "com.sksamuel.elastic4s" %% "elastic4s-embedded" % elastic4sVersion % "test",
-      "software.amazon.awssdk" % "s3" % awsversion
+      "com.amazonaws" % "aws-java-sdk-s3" % "1.11.346"
     )
   )
 
@@ -47,12 +48,12 @@ lazy val inputLambda = (project in file("lambda/input"))
   name:="ArchiveImportLambda",
   // https://mvnrepository.com/artifact/com.amazonaws/aws-java-sdk-lambda
   libraryDependencies := Seq(
-//    "com.amazonaws" % "aws-java-sdk-lambda" % "1.11.346",
+    "com.amazonaws" % "aws-java-sdk-lambda" % "1.11.346",
+    "com.amazonaws" % "aws-lambda-java-events" % "2.1.0",
+    "com.amazonaws" % "aws-lambda-java-core" % "1.0.0",
+//    "software.amazon.awssdk" % "lambda" % awsversion,
+//    "software.amazon.awssdk" % "core" % awsversion,
 //    "com.amazonaws" % "aws-lambda-java-events" % "2.1.0",
-//    "com.amazonaws" % "aws-lambda-java-core" % "1.0.0",
-    "software.amazon.awssdk" % "lambda" % awsversion,
-    "software.amazon.awssdk" % "core" % awsversion,
-    "com.amazonaws" % "aws-lambda-java-events" % "2.1.0"
     "org.scala-lang.modules" %% "scala-java8-compat" % "0.8.0"
   ),
   assemblyJarName in assembly := "inputLambda.jar"
