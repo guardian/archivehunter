@@ -6,25 +6,26 @@ import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
 import scala.concurrent.ExecutionContext.Implicits.global
 import com.sksamuel.elastic4s.http.{HttpClient, RequestFailure}
+import com.sksamuel.elastic4s.mappings.FieldType._
+
 import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.Logger
 
-class Indexer(indexName:String) {
+
+class Indexer(indexName:String) extends ArchiveEntryEncoder {
   import com.sksamuel.elastic4s.http.ElasticDsl._
+  import com.sksamuel.elastic4s.circe._
 
   /**
     * Requests that a single item be added to the index
-    * @param s3Bucket
-    * @param s3Path
-    * @param etagString
-    * @param size
-    * @param contentType
-    * @param client
+    * @param entryId ID of the archive entry for upsert
+    * @param entry [[ArchiveEntry]] object to index
+    * @param client implicitly provided elastic4s HttpClient object
     * @return a Future containing a Try with either the ID of the new item or a RuntimeException containing the failure
     */
-  def indexSingleItem(s3Bucket: String, s3Path: String, etagString: String, size:Long, contentType: MimeType, refreshPolicy: RefreshPolicy=RefreshPolicy.WAIT_UNTIL)(implicit client:HttpClient):Future[Try[String]] =
+  def indexSingleItem(entryId: String, entry:ArchiveEntry, refreshPolicy: RefreshPolicy=RefreshPolicy.WAIT_UNTIL)(implicit client:HttpClient):Future[Try[String]] =
     client.execute {
-      indexInto(indexName / "entry").fields("bucket"->s3Bucket,"path"->s3Path, "eTag"->etagString).refresh(refreshPolicy)
+      update(entryId).in(s"$indexName/entry").docAsUpsert(entry)
     }.map({
       case Left(failure)=>Failure(new RuntimeException(failure.error.toString))
       case Right(success)=>Success(success.result.id)
@@ -32,13 +33,15 @@ class Indexer(indexName:String) {
 
   /**
     * Creates a new index, based on the name that has been provided
-    * @param client
+    * @param shards number of shards to create with
+    * @param replicas number of replicas of each shard to maintain
+    * @param client implicitly provided elastic4s HttpClient object
     * @return
     */
-//  def createIndex(implicit client:HttpClient):Future[Try[String]] = client.execute {
-//
-//  }.map({
-//    case Left(failure)=>Failure(new RuntimeException(failure.error.toString))
-//    case Right(success)=>Success(success.toString)
-//  })
+  def newIndex(shards:Int, replicas:Int)(implicit client:HttpClient):Future[Try[String]] = client.execute {
+      createIndex(indexName) shards 3 replicas 2
+  }.map({
+    case Left(failure)=>Failure(new RuntimeException(failure.error.toString))
+    case Right(success)=>Success(success.toString)
+  })
 }

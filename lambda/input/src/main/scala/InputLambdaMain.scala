@@ -1,12 +1,14 @@
 import com.amazonaws.services.lambda.runtime.{Context, RequestHandler}
 import com.amazonaws.services.lambda.runtime.events.S3Event
 import com.amazonaws.services.s3.AmazonS3ClientBuilder
-import com.theguardian.multimedia.archivehunter.common.{Indexer, MimeType}
+import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer, MimeType}
 import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.Logger
 import com.amazonaws.services.s3.model.S3ObjectSummary
 import com.sksamuel.elastic4s.ElasticsearchClientUri
 import com.sksamuel.elastic4s.http.HttpClient
+
+import scala.util.{Failure, Success}
 
 class InputLambdaMain extends RequestHandler[S3Event, Unit]{
   private final val logger = LogManager.getLogger(getClass)
@@ -43,7 +45,12 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit]{
           logger.debug(s"MIME type for s3://${rec.getS3.getBucket.getName}/${rec.getS3.getObject.getKey} is ${mt.toString}")
           mt
       }
-      i.indexSingleItem(rec.getS3.getBucket.getName,s3ObjectRef.getKey,s3ObjectRef.geteTag(),s3ObjectRef.getSizeAsLong.longValue(),mimeType)
+
+      val newEntry = ArchiveEntry.fromS3(rec.getS3.getBucket.getName, s3ObjectRef.getKey).map({
+        case Success(entry)=>i.indexSingleItem(newEntry)
+        case Failure(error)=>logger.error(s"Could not look up metadata for s3://${rec.getS3.getBucket.getName}/${rec.getS3.getObject.getKey} in ${rec.getAwsRegion}", error)
+      })
+
 
 //      logger.info("Looking up mime type...")
 //      MimeType.fromS3Object(rec.getS3.getBucket.getName, s3ObjectRef.getKey).map(mimeType=>{

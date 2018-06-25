@@ -30,15 +30,21 @@ val awsversion = "2.0.0-preview-10"
 val lambdaDeps = Seq(
   "com.amazonaws" % "aws-lambda-java-log4j2" % "1.0.0"
 )
+val circeVersion = "0.9.3"
 
 lazy val common = (project in file("common"))
   .settings(commonSettings,
     name:="ArchiveHunterCommon",
     libraryDependencies ++= Seq(
       "com.sksamuel.elastic4s" %% "elastic4s-http" % elastic4sVersion,
+      "com.sksamuel.elastic4s" %% "elastic4s-circe" % elastic4sVersion,
       "com.sksamuel.elastic4s" %% "elastic4s-testkit" % elastic4sVersion % "test",
       "com.sksamuel.elastic4s" %% "elastic4s-embedded" % elastic4sVersion % "test",
-      "com.amazonaws" % "aws-java-sdk-s3" % "1.11.346"
+      "com.amazonaws" % "aws-java-sdk-s3" % "1.11.346",
+      "io.circe" %% "circe-core" % circeVersion,
+      "io.circe" %% "circe-generic" % circeVersion,
+      "io.circe" %% "circe-parser" % circeVersion,
+      "io.circe" %% "circe-java8" % circeVersion
     )
   )
 
