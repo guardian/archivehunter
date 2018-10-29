@@ -3,15 +3,20 @@ package com.theguardian.multimedia.archivehunter.common
 import java.time.{ZoneId, ZonedDateTime}
 
 import com.amazonaws.services.s3.AmazonS3Client
+
 import scala.concurrent.Future
 import scala.util.Try
 import scala.concurrent.ExecutionContext.Implicits.global
-import io.circe._, io.circe.generic.semiauto._
+import io.circe._
+import io.circe.generic.semiauto._
+import org.apache.logging.log4j.LogManager
 //needed to serialize/deserialize ZonedDateTime, even if Intellij says it's not
 import io.circe.java8.time._
 import java.util.Base64
 
-object ArchiveEntry {
+object ArchiveEntry extends ((String, String, String, Option[String], Long, ZonedDateTime, String, MimeType, Boolean)=>ArchiveEntry){
+  private val logger = LogManager.getLogger(getClass)
+
   private def getFileExtension(str: String):Option[String] = {
     val tokens = str.split("\\.(?=[^\\.]+$)")
     if(tokens.length==2){
@@ -53,15 +58,21 @@ object ArchiveEntry {
   def fromS3(bucket: String, key: String)(implicit client:AmazonS3Client):Future[Try[ArchiveEntry]] = Future {
     Try {
       val meta = client.getObjectMetadata(bucket,key)
-
-      ArchiveEntry(makeDocId(bucket, key), bucket, key, getFileExtension(key), meta.getContentLength, ZonedDateTime.ofInstant(meta.getLastModified.toInstant, ZoneId.systemDefault()), meta.getETag, false)
+      val mimeType = Option(meta.getContentType) match {
+        case Some(mimeTypeString) =>
+          MimeType.fromString(mimeTypeString) match {
+            case Right(mt) => mt
+            case Left(error) =>
+              logger.warn(error)
+              MimeType("application", "octet-stream")
+          }
+        case None =>
+          logger.warn(s"received no content type from S3 for s3://$bucket/$key")
+          MimeType("application","octet-stream")
+      }
+      ArchiveEntry(makeDocId(bucket, key), bucket, key, getFileExtension(key), meta.getContentLength, ZonedDateTime.ofInstant(meta.getLastModified.toInstant, ZoneId.systemDefault()), meta.getETag, mimeType, false)
     }
   }
 }
 
-case class ArchiveEntry(id:String, bucket: String, path: String, file_extension: Option[String], size: scala.Long, last_modified: ZonedDateTime, etag: String, proxied: Boolean)
-
-trait ArchiveEntryEncoder {
-  implicit val archiveEntryEncoder: Encoder[ArchiveEntry] = deriveEncoder[ArchiveEntry]
-  implicit val archiveEntryDecoder: Decoder[ArchiveEntry] = deriveDecoder[ArchiveEntry]
-}
+case class ArchiveEntry(id:String, bucket: String, path: String, file_extension: Option[String], size: scala.Long, last_modified: ZonedDateTime, etag: String, mimeType: MimeType, proxied: Boolean)

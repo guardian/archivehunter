@@ -19,15 +19,6 @@ object MimeType {
     * @param client
     * @return
     */
-//  def fromS3Object(bucketName: String, key: String)(implicit client:S3AsyncClient):Future[MimeType] = {
-//    val rq = GetObjectRequest.builder().bucket(bucketName).key(key).build()
-//
-//    FutureConverters.toScala(client.getObject(rq, AsyncResponseTransformer.toBytes[GetObjectResponse]))
-//      .map(result=>{
-//        val majorMinor = result.response().metadata().get("Content-Type").split("/")
-//        MimeType(majorMinor.head,majorMinor(1))
-//    })
-//  }
 
   def fromString(mimeString: String):Either[String, MimeType] = {
     val majorMinor = mimeString.split("/")
