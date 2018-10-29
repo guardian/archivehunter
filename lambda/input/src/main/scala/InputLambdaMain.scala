@@ -23,12 +23,21 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit]{
   override def handleRequest(event:S3Event, context:Context): Unit = {
     val indexName = sys.env.get("INDEX_NAME") match {
       case Some(name)=>name
-      case None=>throw new RuntimeException("You must specify an INDEX_NAME in the environment")
+      case None=>
+        Option(System.getProperty("INDEX_NAME")) match {
+          case Some(name)=>name
+          case None=>throw new RuntimeException("You must specify an INDEX_NAME in the environment")
+        }
     }
 
     val clusterEndpoint = sys.env.get("ELASTICSEARCH") match {
       case Some(name)=>name
-      case None=>throw new RuntimeException("You must specify an Elastic Search cluster endpoint in ELASTICSEARCH in the environment")
+      case None=>
+        Option(System.getProperty("ELASTICSEARCH")) match {
+          case Some(name) => name
+          case None =>
+            throw new RuntimeException("You must specify an Elastic Search cluster endpoint in ELASTICSEARCH in the environment")
+        }
     }
 
     implicit val s3Client:AmazonS3 = getS3Client
