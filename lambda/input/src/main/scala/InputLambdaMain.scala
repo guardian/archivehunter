@@ -1,17 +1,24 @@
 import com.amazonaws.services.lambda.runtime.{Context, RequestHandler}
 import com.amazonaws.services.lambda.runtime.events.S3Event
-import com.amazonaws.services.s3.AmazonS3ClientBuilder
+import com.amazonaws.services.s3.{AmazonS3, AmazonS3ClientBuilder}
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer, MimeType}
 import org.apache.logging.log4j.LogManager
-import org.apache.logging.log4j.Logger
-import com.amazonaws.services.s3.model.S3ObjectSummary
 import com.sksamuel.elastic4s.ElasticsearchClientUri
 import com.sksamuel.elastic4s.http.HttpClient
 
 import scala.util.{Failure, Success}
+import scala.concurrent.ExecutionContext.Implicits.global
 
 class InputLambdaMain extends RequestHandler[S3Event, Unit]{
   private final val logger = LogManager.getLogger(getClass)
+
+  /**
+    * these are extracted out as individual accessors to make over-riding them easier in unit tests
+    * @return
+    */
+  protected def getS3Client = AmazonS3ClientBuilder.defaultClient()
+  protected def getElasticClient(clusterEndpoint:String) = HttpClient(ElasticsearchClientUri(clusterEndpoint))
+  protected def getIndexer(indexName: String) = new Indexer(indexName)
 
   override def handleRequest(event:S3Event, context:Context): Unit = {
     val indexName = sys.env.get("INDEX_NAME") match {
@@ -24,9 +31,9 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit]{
       case None=>throw new RuntimeException("You must specify an Elastic Search cluster endpoint in ELASTICSEARCH in the environment")
     }
 
-    val s3Client = AmazonS3ClientBuilder.defaultClient()
-    implicit val elasticClient:HttpClient = HttpClient(ElasticsearchClientUri(clusterEndpoint))
-    val i = new Indexer(indexName)
+    implicit val s3Client:AmazonS3 = getS3Client
+    implicit val elasticClient:HttpClient = getElasticClient(clusterEndpoint)
+    val i = getIndexer(indexName)
 
     println(s"Lambda was triggered with $event")
     event.getRecords.forEach(rec=>{
@@ -46,19 +53,14 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit]{
           mt
       }
 
-      val newEntry = ArchiveEntry.fromS3(rec.getS3.getBucket.getName, s3ObjectRef.getKey).map({
-        case Success(entry)=>i.indexSingleItem(newEntry)
+      ArchiveEntry.fromS3(rec.getS3.getBucket.getName, s3ObjectRef.getKey).map({
+        case Success(entry)=>i.indexSingleItem(entry)
         case Failure(error)=>logger.error(s"Could not look up metadata for s3://${rec.getS3.getBucket.getName}/${rec.getS3.getObject.getKey} in ${rec.getAwsRegion}", error)
+      }).recover({
+        case ex:Throwable=>
+          logger.error(s"Unable to index ${rec.toString}: ", ex)
+          throw ex
       })
-
-
-//      logger.info("Looking up mime type...")
-//      MimeType.fromS3Object(rec.getS3.getBucket.getName, s3ObjectRef.getKey).map(mimeType=>{
-//        logger.info(s"MIME type for s3://${rec.getS3.getBucket.getName}/${rec.getS3.getObject.getKey} is $mimeType, indexing...")
-//        i.indexSingleItem(rec.getS3.getBucket.getName,s3ObjectRef.getKey,s3ObjectRef.geteTag(),s3ObjectRef.getSizeAsLong.longValue(),mimeType)
-//      })
-
-
     })
   }
 }

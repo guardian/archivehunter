@@ -1,6 +1,10 @@
 import sbt._
 import Keys._
 
+enablePlugins(RiffRaffArtifact, JDebPackaging)
+
+libraryDependencies += "org.vafer" % "jdeb" % "1.3" artifacts (Artifact("jdeb", "jar", "jar"))
+
 lazy val commonSettings = Seq(
   name := "ArchiveHunter",
   version := "1.0",
@@ -53,7 +57,7 @@ lazy val inputLambda = (project in file("lambda/input"))
   .settings(commonSettings,
   name:="ArchiveImportLambda",
   // https://mvnrepository.com/artifact/com.amazonaws/aws-java-sdk-lambda
-  libraryDependencies := Seq(
+  libraryDependencies ++= Seq(
     "com.amazonaws" % "aws-java-sdk-lambda" % "1.11.346",
     "com.amazonaws" % "aws-lambda-java-events" % "2.1.0",
     "com.amazonaws" % "aws-lambda-java-core" % "1.0.0",
@@ -62,7 +66,22 @@ lazy val inputLambda = (project in file("lambda/input"))
 //    "com.amazonaws" % "aws-lambda-java-events" % "2.1.0",
     "org.scala-lang.modules" %% "scala-java8-compat" % "0.8.0"
   ),
-  assemblyJarName in assembly := "inputLambda.jar"
+  assemblyJarName in assembly := "inputLambda.jar",
+)
+
+val jsTargetDir = "target/riffraff/packages"
+
+riffRaffUploadArtifactBucket := Option("riffraff-artifact")
+riffRaffUploadManifestBucket := Option("riffraff-builds")
+riffRaffManifestProjectName := "multimedia:ArchiveHunter"
+riffRaffArtifactResources := Seq(
+  (packageBin in Debian in archivehunter).value -> s"${(name in archivehunter).value}.deb",
+  (assembly in Universal in inputLambda).value -> s"inputLambda/${(assembly in Universal in inputLambda).value.getName}",
+//  (packageBin in Universal in expirer).value -> s"${(name in expirer).value}/${(packageBin in Universal in expirer).value.getName}",
+//  (packageBin in Universal in scheduler).value -> s"${(name in scheduler).value}/${(packageBin in Universal in scheduler).value.getName}",
+//  (baseDirectory in Global in app).value / s"$plutoMessageIngestion/$jsTargetDir/$plutoMessageIngestion/$plutoMessageIngestion.zip" -> s"$plutoMessageIngestion/$plutoMessageIngestion.zip",
+//  (baseDirectory in Global in app).value / "conf/riff-raff.yaml" -> "riff-raff.yaml",
+//  (resourceManaged in Compile in uploader).value / "media-atom-pipeline.yaml" -> "media-atom-pipeline-cloudformation/media-atom-pipeline.yaml"
 )
 
 lazy val removalLambda = (project in file("lambda/output")).settings(commonSettings, name:="ArchiveRemovedLambda")

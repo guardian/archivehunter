@@ -8,11 +8,9 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import com.sksamuel.elastic4s.http.{HttpClient, RequestFailure}
 import com.sksamuel.elastic4s.mappings.FieldType._
 
-import org.apache.logging.log4j.LogManager
-import org.apache.logging.log4j.Logger
+import io.circe.generic.auto._, io.circe.syntax._
 
-
-class Indexer(indexName:String) extends ArchiveEntryEncoder {
+class Indexer(indexName:String) extends ZonedDateTimeEncoder {
   import com.sksamuel.elastic4s.http.ElasticDsl._
   import com.sksamuel.elastic4s.circe._
 
@@ -23,13 +21,19 @@ class Indexer(indexName:String) extends ArchiveEntryEncoder {
     * @param client implicitly provided elastic4s HttpClient object
     * @return a Future containing a Try with either the ID of the new item or a RuntimeException containing the failure
     */
-  def indexSingleItem(entryId: String, entry:ArchiveEntry, refreshPolicy: RefreshPolicy=RefreshPolicy.WAIT_UNTIL)(implicit client:HttpClient):Future[Try[String]] =
+  def indexSingleItem(entry:ArchiveEntry, entryId: Option[String]=None, refreshPolicy: RefreshPolicy=RefreshPolicy.WAIT_UNTIL)(implicit client:HttpClient):Future[Try[String]] = {
+    val idToUse = entryId match {
+      case None => entry.id
+      case Some(userSpecifiedId)=> userSpecifiedId
+    }
+
     client.execute {
-      update(entryId).in(s"$indexName/entry").docAsUpsert(entry)
+      update(idToUse).in(s"$indexName/entry").docAsUpsert(entry)
     }.map({
-      case Left(failure)=>Failure(new RuntimeException(failure.error.toString))
-      case Right(success)=>Success(success.result.id)
+      case Left(failure) => Failure(new RuntimeException(failure.error.toString))
+      case Right(success) => Success(success.result.id)
     })
+  }
 
   /**
     * Creates a new index, based on the name that has been provided

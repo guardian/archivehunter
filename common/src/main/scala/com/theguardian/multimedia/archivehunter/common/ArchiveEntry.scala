@@ -2,13 +2,11 @@ package com.theguardian.multimedia.archivehunter.common
 
 import java.time.{ZoneId, ZonedDateTime}
 
-import com.amazonaws.services.s3.AmazonS3Client
+import com.amazonaws.services.s3.{AmazonS3, AmazonS3Client}
 
 import scala.concurrent.Future
 import scala.util.Try
 import scala.concurrent.ExecutionContext.Implicits.global
-import io.circe._
-import io.circe.generic.semiauto._
 import org.apache.logging.log4j.LogManager
 //needed to serialize/deserialize ZonedDateTime, even if Intellij says it's not
 import io.circe.java8.time._
@@ -55,7 +53,7 @@ object ArchiveEntry extends ((String, String, String, Option[String], Long, Zone
     * @param client implicitly provided instance of AmazonS3Client to use
     * @return a (blocking) Future, containing a Try which contains an [[ArchiveEntry]] if successful
     */
-  def fromS3(bucket: String, key: String)(implicit client:AmazonS3Client):Future[Try[ArchiveEntry]] = Future {
+  def fromS3(bucket: String, key: String)(implicit client:AmazonS3):Future[Try[ArchiveEntry]] = Future {
     Try {
       val meta = client.getObjectMetadata(bucket,key)
       val mimeType = Option(meta.getContentType) match {
