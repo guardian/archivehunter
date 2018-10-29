@@ -17,5 +17,5 @@ deployments:
     template: lambda
     parameters:
       functionNames: [archivehunter-input-]
-      fileName: inputLambda/inputLambda.jar
+      fileName: inputLambda.jar
 

@@ -75,8 +75,8 @@ riffRaffUploadArtifactBucket := Option("riffraff-artifact")
 riffRaffUploadManifestBucket := Option("riffraff-builds")
 riffRaffManifestProjectName := "multimedia:ArchiveHunter"
 riffRaffArtifactResources := Seq(
-  (packageBin in Debian in archivehunter).value -> s"${(name in archivehunter).value}.deb",
-  (assembly in Universal in inputLambda).value -> s"inputLambda/${(assembly in Universal in inputLambda).value.getName}",
+  (packageBin in Debian in archivehunter).value -> s"ArchiveHunterApp/${(name in archivehunter).value}.deb",
+  (assembly in Universal in inputLambda).value -> s"archivehunter-input-lambda/${(assembly in Universal in inputLambda).value.getName}",
 //  (packageBin in Universal in expirer).value -> s"${(name in expirer).value}/${(packageBin in Universal in expirer).value.getName}",
 //  (packageBin in Universal in scheduler).value -> s"${(name in scheduler).value}/${(packageBin in Universal in scheduler).value.getName}",
 //  (baseDirectory in Global in app).value / s"$plutoMessageIngestion/$jsTargetDir/$plutoMessageIngestion/$plutoMessageIngestion.zip" -> s"$plutoMessageIngestion/$plutoMessageIngestion.zip",
