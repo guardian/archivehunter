@@ -3,16 +3,23 @@ import Keys._
 
 enablePlugins(RiffRaffArtifact, JDebPackaging)
 
-libraryDependencies += "org.vafer" % "jdeb" % "1.3" artifacts (Artifact("jdeb", "jar", "jar"))
+//libraryDependencies += "org.vafer" % "jdeb" % "1.3" artifacts (Artifact("jdeb", "jar", "jar"))
+
+val elastic4sVersion = "6.0.4"
+
 
 lazy val commonSettings = Seq(
-  name := "ArchiveHunter",
   version := "1.0",
   scalaVersion := "2.12.2",
-  libraryDependencies := Seq("org.apache.logging.log4j" % "log4j-core" % "2.8.2",
+  libraryDependencies ++= Seq("org.apache.logging.log4j" % "log4j-core" % "2.8.2",
     "org.apache.logging.log4j" % "log4j-api" % "2.8.2",
     "org.scala-lang.modules" %% "scala-java8-compat" % "0.8.0",
     "com.amazonaws" % "aws-java-sdk-s3" % "1.11.346",
+    "com.dripower" %% "play-circe" % "2610.0",
+    "com.sksamuel.elastic4s" %% "elastic4s-http" % elastic4sVersion,
+    "com.sksamuel.elastic4s" %% "elastic4s-circe" % elastic4sVersion,
+    "com.sksamuel.elastic4s" %% "elastic4s-testkit" % elastic4sVersion % "test",
+    "com.sksamuel.elastic4s" %% "elastic4s-embedded" % elastic4sVersion % "test",
     specs2 % Test)
 )
 
@@ -20,15 +27,20 @@ scalaVersion := "2.12.2"
 
 lazy val `archivehunter` = (project in file("."))
   .enablePlugins(PlayScala)
-  .aggregate(inputLambda,removalLambda,common)
+  .dependsOn(common)
   .settings(commonSettings,
-    name:="ArchiveHunterApp",
     libraryDependencies ++= Seq(
+      "com.typesafe.play" %% "play-guice" % "2.6.15",
       "org.scala-lang.modules" %% "scala-java8-compat" % "0.8.0",
+      "com.dripower" %% "play-circe" % "2610.0",
+      "com.sksamuel.elastic4s" %% "elastic4s-http" % elastic4sVersion,
+      "com.sksamuel.elastic4s" %% "elastic4s-circe" % elastic4sVersion,
+      "com.sksamuel.elastic4s" %% "elastic4s-testkit" % elastic4sVersion % "test",
+      "com.sksamuel.elastic4s" %% "elastic4s-embedded" % elastic4sVersion % "test",
       jdbc, ehcache, ws)
   )
 
-val elastic4sVersion = "6.0.4"
+
 val awsversion = "2.0.0-preview-10"
 
 val lambdaDeps = Seq(
@@ -38,12 +50,7 @@ val circeVersion = "0.9.3"
 
 lazy val common = (project in file("common"))
   .settings(commonSettings,
-    name:="ArchiveHunterCommon",
     libraryDependencies ++= Seq(
-      "com.sksamuel.elastic4s" %% "elastic4s-http" % elastic4sVersion,
-      "com.sksamuel.elastic4s" %% "elastic4s-circe" % elastic4sVersion,
-      "com.sksamuel.elastic4s" %% "elastic4s-testkit" % elastic4sVersion % "test",
-      "com.sksamuel.elastic4s" %% "elastic4s-embedded" % elastic4sVersion % "test",
       "com.amazonaws" % "aws-java-sdk-s3" % "1.11.346",
       "io.circe" %% "circe-core" % circeVersion,
       "io.circe" %% "circe-generic" % circeVersion,
@@ -55,7 +62,6 @@ lazy val common = (project in file("common"))
 lazy val inputLambda = (project in file("lambda/input"))
   .dependsOn(common)
   .settings(commonSettings,
-  name:="ArchiveImportLambda",
   // https://mvnrepository.com/artifact/com.amazonaws/aws-java-sdk-lambda
   libraryDependencies ++= Seq(
     "com.amazonaws" % "aws-java-sdk-lambda" % "1.11.346",
