@@ -4,12 +4,14 @@ import com.amazonaws.services.s3.{AmazonS3, AmazonS3ClientBuilder}
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer, MimeType}
 import org.apache.logging.log4j.LogManager
 import com.sksamuel.elastic4s.ElasticsearchClientUri
-import com.sksamuel.elastic4s.http.HttpClient
+import com.sksamuel.elastic4s.http.{HttpClient, HttpRequestClient}
+import org.apache.http.HttpHost
+import org.elasticsearch.client.RestClient
 
 import scala.util.{Failure, Success}
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class InputLambdaMain extends RequestHandler[S3Event, Unit]{
+class InputLambdaMain extends RequestHandler[S3Event, Unit] {
   private final val logger = LogManager.getLogger(getClass)
 
   /**
@@ -17,7 +19,11 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit]{
     * @return
     */
   protected def getS3Client = AmazonS3ClientBuilder.defaultClient()
-  protected def getElasticClient(clusterEndpoint:String) = HttpClient(ElasticsearchClientUri(clusterEndpoint))
+  protected def getElasticClient(clusterEndpoint:String) = {
+    val esClient = RestClient.builder(HttpHost.create(clusterEndpoint)).build()
+    HttpClient.fromRestClient(esClient)
+  }
+
   protected def getIndexer(indexName: String) = new Indexer(indexName)
 
   override def handleRequest(event:S3Event, context:Context): Unit = {
