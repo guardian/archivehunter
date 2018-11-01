@@ -48,7 +48,7 @@ Resources:
               - ":443"
       Handler: InputLambdaMain
       FunctionName: !Sub archivehunter-input-${Stage}
-      MemorySize: 256
+      MemorySize: 512
       Role: !GetAtt MonitorLambdaRole.Arn
       Runtime: java8
       Timeout: 30

@@ -79,16 +79,16 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] {
           mt
       }
 
-      val result=ArchiveEntry.fromS3(rec.getS3.getBucket.getName, s3ObjectRef.getKey).map(entry=>{
+      val result=ArchiveEntry.fromS3(rec.getS3.getBucket.getName, s3ObjectRef.getKey).flatMap(entry=>{
           println(s"Going to index $entry")
-          i.indexSingleItem(entry).map({
-            case Success(indexid)=>
-              println(s"Document indexed with ID $indexid")
-            case Failure(exception)=>
-              println(s"Could not index document: ${exception.toString}")
-              exception.printStackTrace()
-              throw exception //fail this future so we enter the recover block below
-          })
+          i.indexSingleItem(entry)
+      }).map({
+        case Success(indexid)=>
+          println(s"Document indexed with ID $indexid")
+        case Failure(exception)=>
+          println(s"Could not index document: ${exception.toString}")
+          exception.printStackTrace()
+          throw exception //fail this future so we enter the recover block below
       }).recover({
         case ex:Throwable=>
           println(s"Unable to index ${rec.toString}: ", ex)
