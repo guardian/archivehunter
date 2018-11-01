@@ -1,0 +1,21 @@
+stacks: [multimedia]
+regions: [eu-west-1]
+templates:
+  lambda:
+    type: aws-lambda
+    parameters:
+      bucket: gnm-multimedia-rr-deployables
+      prefixStack: false
+
+deployments:
+  archivehunter-webapp:
+    type: autoscaling
+    parameters:
+      bucket: gnm-multimedia-rr-deployables
+
+  archivehunter-input-lambda:
+    template: lambda
+    parameters:
+      functionNames: [archivehunter-input-]
+      fileName: inputLambda.jar
+

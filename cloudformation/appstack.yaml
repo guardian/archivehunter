@@ -1,0 +1,120 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Indexing, search, proxying and retrieval for glacier-backed S3
+Parameters:
+  App:
+    Type: String
+    Description: Application identifier for RiffRaff
+    Default: archivehunter
+  Stack:
+    Type: String
+    Description: Stack identifier for RiffRaff
+    Default: multimedia
+  Stage:
+    Type: String
+    AllowedValues:
+    - CODE
+    - DEV
+    - PROD
+    Description: Deployment stage
+  AmiId:
+    Type: String
+    Description: ID of the base image to build instances from.  Build this with Amigo.
+  OfficeIpRange:
+    Type: String
+    Description: CIDR block of ip addresses to be allowed SSH access
+  InstanceType:
+    Type: String
+    Description: What type of instance to launch
+    AllowedValues:
+    - t2.nano
+    - t2.micro
+    - t2.small
+    Default: t2.nano
+  KeyPair:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: Root access keypair
+  VPCID:
+    Description: Virtual Private Cloud to deploy into
+    Type: AWS::EC2::VPC::Id
+  DeploySubnets:
+    Description: Subnets to deploy into.
+    Type: List<AWS::EC2::Subnet::Id>
+  ESVolumeSize:
+    Description: Size of storage volume to provision, for each node in the elasticsearch cluster
+    Type: Number
+  ESVolumeType:
+    Description: Type of storage to provision for elasticsearch.  Choose sc1 for cheap dev, or gp2 for prod
+    Type: String
+    AllowedValues:
+      - standard
+      - gp2
+      - io1
+    Default: gp2
+  ESSubnet:
+    Description: Subnet within which to deploy elasticsearch. Currently only one is supported.
+    Type: AWS::EC2::Subnet::Id
+  ESInstanceCount:
+    Description: Number of instances to provision for elasticsearch
+    Type: Number
+  ESInstanceType:
+    Description: Type of instance to deploy for elasticsearch
+    Type: String
+    AllowedValues:
+      - t2.small.elasticsearch
+      - t2.medium.elasticsearch
+      - r4.large.elasticsearch
+      - r4.xlarge.elasticsearch
+    Default: t2.small.elasticsearch
+Resources:
+  AccessorSG: #this group is exported and used by bucketmonitor yaml. defined here so that it can be marked for access to ES
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: SG for lambdas to access ArchiveHunter search index
+      VpcId: !Ref VPCID
+  ESSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: SG for access to the ArchiveHunter search index
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          SourceSecurityGroupId: !GetAtt AccessorSG.GroupId
+          FromPort: 443
+          ToPort: 443
+      VpcId: !Ref VPCID
+
+  SearchDomain:
+    Type: AWS::Elasticsearch::Domain
+    Properties:
+      EBSOptions:
+        EBSEnabled: true
+        VolumeSize: !Ref ESVolumeSize
+        VolumeType: !Ref ESVolumeType
+      ElasticsearchClusterConfig:
+        DedicatedMasterEnabled: false
+        InstanceCount: !Ref ESInstanceCount
+        InstanceType: !Ref ESInstanceType
+        ZoneAwarenessEnabled: false #FIXME: defaulting to this for dev, update with appropriate safeguards for prod
+      ElasticsearchVersion: 6.3
+      Tags:
+        - Key: App
+          Value: !Ref App
+        - Key: Stack
+          Value: !Ref Stack
+        - Key: Stage
+          Value: !Ref Stage
+      VPCOptions:
+        SecurityGroupIds:
+          - !GetAtt ESSecurityGroup.GroupId
+        SubnetIds:
+          - !Ref ESSubnet
+Outputs:
+  ElasticSearchEndpoint:
+    Description: ES endpoint for ArchiveHunter lambdas
+    Value: !GetAtt SearchDomain.DomainEndpoint
+    Export:
+      Name: !Sub ${AWS::StackName}-ESEndpoint
+  AccessorSG:
+    Description: Security group for accessing the index
+    Value: !GetAtt AccessorSG.GroupId
+    Export:
+      Name: !Sub ${AWS::StackName}-AccessorSG

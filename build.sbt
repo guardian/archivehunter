@@ -20,7 +20,7 @@ scalaVersion := "2.12.2"
 
 lazy val `archivehunter` = (project in file("."))
   .enablePlugins(PlayScala)
-  .aggregate(inputLambda,removalLambda)
+  .aggregate(inputLambda,removalLambda,common)
   .settings(commonSettings,
     name:="ArchiveHunterApp",
     libraryDependencies ++= Seq(
@@ -75,12 +75,12 @@ riffRaffUploadArtifactBucket := Option("riffraff-artifact")
 riffRaffUploadManifestBucket := Option("riffraff-builds")
 riffRaffManifestProjectName := "multimedia:ArchiveHunter"
 riffRaffArtifactResources := Seq(
-  (packageBin in Debian in archivehunter).value -> s"${(name in archivehunter).value}.deb",
-  (assembly in Universal in inputLambda).value -> s"inputLambda/${(assembly in Universal in inputLambda).value.getName}",
+  (packageBin in Debian in archivehunter).value -> s"${(name in archivehunter).value}/${(name in archivehunter).value}.deb",
+  (assembly in Universal in inputLambda).value -> s"archivehunter-input-lambda/${(assembly in Universal in inputLambda).value.getName}",
 //  (packageBin in Universal in expirer).value -> s"${(name in expirer).value}/${(packageBin in Universal in expirer).value.getName}",
 //  (packageBin in Universal in scheduler).value -> s"${(name in scheduler).value}/${(packageBin in Universal in scheduler).value.getName}",
 //  (baseDirectory in Global in app).value / s"$plutoMessageIngestion/$jsTargetDir/$plutoMessageIngestion/$plutoMessageIngestion.zip" -> s"$plutoMessageIngestion/$plutoMessageIngestion.zip",
-//  (baseDirectory in Global in app).value / "conf/riff-raff.yaml" -> "riff-raff.yaml",
+  (baseDirectory in Global in archivehunter).value / "riff-raff.yaml" -> "riff-raff.yaml",
 //  (resourceManaged in Compile in uploader).value / "media-atom-pipeline.yaml" -> "media-atom-pipeline-cloudformation/media-atom-pipeline.yaml"
 )
 

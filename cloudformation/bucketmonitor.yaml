@@ -1,0 +1,109 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Bucket monitoring lambda for ArchiveHunter
+Parameters:
+  App:
+    Type: String
+    Description: Application identifier for RiffRaff
+    Default: archivehunter
+  Stack:
+    Type: String
+    Description: Stack identifier for RiffRaff
+    Default: multimedia
+  Stage:
+    Type: String
+    AllowedValues:
+    - CODE
+    - DEV
+    - PROD
+    Description: Deployment stage
+  BucketName:
+    Type: String
+    Description: Name of the bucket to monitor (lambda will receive read-only access to this)
+  DeploymentBucket:
+    Type: String
+    Description: Name of the bucket where the deployment is stored
+  ArchiveHunterAppStack:
+    Type: String
+    Description: Name of the main deployment to link to
+  DeploySubnets:
+    Description: Subnets to deploy into.  These should be the same as where the main stack lives.
+    Type: List<AWS::EC2::Subnet::Id>
+
+Resources:
+  BucketMonitorLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        S3Bucket: !Ref DeploymentBucket
+        S3Key: !Sub ${Stack}/${Stage}/archivehunter-input-lambda/inputLambda.jar
+      Environment:
+        Variables:
+          INDEX_NAME: ArchiveHunter
+          ELASTICSEARCH:
+            Fn::Join:
+            - ""
+            -
+              - "https://"
+              - Fn::ImportValue: !Sub ${ArchiveHunterAppStack}-ESEndpoint
+              - ":443"
+      Handler: InputLambdaMain
+      FunctionName: !Sub archivehunter-input-${Stage}
+      MemorySize: 256
+      Role: !GetAtt MonitorLambdaRole.Arn
+      Runtime: java8
+      Timeout: 30
+      VpcConfig:
+        SecurityGroupIds:
+          - Fn::ImportValue: !Sub ${ArchiveHunterAppStack}-AccessorSG
+        SubnetIds: !Ref DeploySubnets
+      Tags:
+        - Key: App
+          Value: !Ref App
+        - Key: Stack
+          Value: !Ref Stack
+        - Key: Stage
+          Value: !Ref Stage
+
+  BucketInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref BucketMonitorLambda
+      Principal: s3.amazonaws.com
+      SourceArn: !Sub arn:aws:s3:::${BucketName}
+
+  MonitorLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          Effect: Allow
+          Principal:
+            Service: lambda.amazonaws.com
+          Action: sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: AccessBucket
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:ListBucket
+              Resource:
+                - !Sub arn:aws:s3:::${BucketName}
+                - !Sub arn:aws:s3:::${BucketName}/*
+            - Effect: Allow
+              Action:
+                - ec2:CreateNetworkInterface
+                - ec2:DescribeNetworkInterfaces
+                - ec2:DeleteNetworkInterface
+              Resource: "*"
+            - Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource: "*"
