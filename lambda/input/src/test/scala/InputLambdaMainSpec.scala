@@ -25,7 +25,7 @@ class InputLambdaMainSpec extends Specification with Mockito {
   "InputLambdaMain" should {
     "call to index an item delivered via an S3Event" in {
       val fakeEvent = new S3Event(Seq(
-        new S3EventNotificationRecord("aws-fake-region","SomeEvent","unit_test",
+        new S3EventNotificationRecord("aws-fake-region","ObjectCreated:Put","unit_test",
         "2018-01-01T11:12:13.000Z","1",
           new RequestParametersEntity("localhost"),
           new ResponseElementsEntity("none","fake-req-id"),

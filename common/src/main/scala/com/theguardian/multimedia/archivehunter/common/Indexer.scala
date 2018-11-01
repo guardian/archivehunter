@@ -37,6 +37,22 @@ class Indexer(indexName:String) extends ZonedDateTimeEncoder {
   }
 
   /**
+    * Requests that a single item be removed from the index
+    * @param entryId ID of the archive entry to remove
+    * @param refreshPolicy
+    * @param client
+    * @return a Future contianing a String with summary info.  Future will fail on error, pick this up in the usual ways.
+    */
+  def removeSingleItem(entryId:String, refreshPolicy: RefreshPolicy=RefreshPolicy.WAIT_UNTIL)(implicit client:HttpClient):Future[String] = {
+    client.execute {
+      delete(entryId).from(s"$indexName/entry")
+    }.map({
+      case Left(failure)=> throw new RuntimeException(failure.error.toString) //fail the future, this is handled by caller
+      case Right(success) => success.result.toString
+    })
+  }
+
+  /**
     * Creates a new index, based on the name that has been provided
     * @param shardCount number of shards to create with
     * @param replicaCount number of replicas of each shard to maintain

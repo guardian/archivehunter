@@ -38,7 +38,7 @@ Resources:
         S3Key: !Sub ${Stack}/${Stage}/archivehunter-input-lambda/inputLambda.jar
       Environment:
         Variables:
-          INDEX_NAME: ArchiveHunter
+          INDEX_NAME: archivehunter
           ELASTICSEARCH:
             Fn::Join:
             - ""
@@ -48,10 +48,10 @@ Resources:
               - ":443"
       Handler: InputLambdaMain
       FunctionName: !Sub archivehunter-input-${Stage}
-      MemorySize: 512
+      MemorySize: 768
       Role: !GetAtt MonitorLambdaRole.Arn
       Runtime: java8
-      Timeout: 30
+      Timeout: 60
       VpcConfig:
         SecurityGroupIds:
           - Fn::ImportValue: !Sub ${ArchiveHunterAppStack}-AccessorSG
