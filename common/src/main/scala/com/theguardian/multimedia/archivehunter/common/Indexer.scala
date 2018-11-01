@@ -1,14 +1,15 @@
 package com.theguardian.multimedia.archivehunter.common
 
 import com.sksamuel.elastic4s.RefreshPolicy
+import com.sksamuel.elastic4s.http.index.CreateIndexResponse
 
 import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
 import scala.concurrent.ExecutionContext.Implicits.global
 import com.sksamuel.elastic4s.http.{HttpClient, RequestFailure}
 import com.sksamuel.elastic4s.mappings.FieldType._
-
-import io.circe.generic.auto._, io.circe.syntax._
+import io.circe.generic.auto._
+import io.circe.syntax._
 
 class Indexer(indexName:String) extends ZonedDateTimeEncoder {
   import com.sksamuel.elastic4s.http.ElasticDsl._
@@ -36,16 +37,32 @@ class Indexer(indexName:String) extends ZonedDateTimeEncoder {
   }
 
   /**
+    * Requests that a single item be removed from the index
+    * @param entryId ID of the archive entry to remove
+    * @param refreshPolicy
+    * @param client
+    * @return a Future contianing a String with summary info.  Future will fail on error, pick this up in the usual ways.
+    */
+  def removeSingleItem(entryId:String, refreshPolicy: RefreshPolicy=RefreshPolicy.WAIT_UNTIL)(implicit client:HttpClient):Future[String] = {
+    client.execute {
+      delete(entryId).from(s"$indexName/entry")
+    }.map({
+      case Left(failure)=> throw new RuntimeException(failure.error.toString) //fail the future, this is handled by caller
+      case Right(success) => success.result.toString
+    })
+  }
+
+  /**
     * Creates a new index, based on the name that has been provided
-    * @param shards number of shards to create with
-    * @param replicas number of replicas of each shard to maintain
+    * @param shardCount number of shards to create with
+    * @param replicaCount number of replicas of each shard to maintain
     * @param client implicitly provided elastic4s HttpClient object
     * @return
     */
-  def newIndex(shards:Int, replicas:Int)(implicit client:HttpClient):Future[Try[String]] = client.execute {
-      createIndex(indexName) shards 3 replicas 2
+  def newIndex(shardCount:Int, replicaCount:Int)(implicit client:HttpClient):Future[Try[CreateIndexResponse]] = client.execute {
+      createIndex(indexName) shards shardCount replicas replicaCount
   }.map({
     case Left(failure)=>Failure(new RuntimeException(failure.error.toString))
-    case Right(success)=>Success(success.toString)
+    case Right(success)=>Success(success.result)
   })
 }

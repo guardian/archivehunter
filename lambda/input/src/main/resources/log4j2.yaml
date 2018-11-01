@@ -1,0 +1,28 @@
+Configuration:
+  name: Default
+  Appenders:
+    Console:
+      name: LambdaAppender
+      target: SYSTEM_OUT
+      PatternLayout:
+        pattern: "[%-5level] %d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %c{1} - %msg%n"
+  Loggers:
+    Root:
+      level: info
+      AppenderRef:
+      - ref: LambdaAppender
+    InputLambdaMain:
+      name: InputLambdaMain
+      level: debug
+      AppenderRef:
+      - ref: LambdaAppender
+    ArchiveEntry:
+      name: com.theguardian.multimedia.archivehunter.ArchiveEntry
+      level: debug
+      AppenderRef:
+      - ref: LambdaAppender
+    Indexer:
+      name: com.theguardian.multimedia.archivehunter.Indexer
+      level: debug
+      AppenderRef:
+      - ref: LambdaAppender

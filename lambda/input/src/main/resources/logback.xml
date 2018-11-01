@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<configuration>
+
+    <conversionRule conversionWord="coloredLevel" converterClass="play.api.libs.logback.ColoredLevel" />
+
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%coloredLevel %logger{15} - %message%n%xException{20}</pattern>
+        </encoder>
+    </appender>
+
+    <logger name="InputLambdaMain" level="DEBUG"/>
+    <logger name="com.theguardian.multimedia.archivehunter.Indexer" level="DEBUG"/>
+    <logger name="com.theguardian.multimedia.archivehunter.ArchiveEntry" level="DEBUG"/>
+
+    <root level="INFO">
+        <appender-ref ref="STDOUT" />
+    </root>
+
+</configuration>

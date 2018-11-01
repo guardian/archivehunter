@@ -51,25 +51,23 @@ object ArchiveEntry extends ((String, String, String, Option[String], Long, Zone
     * @param bucket bucket that the item resides in
     * @param key path to the item within `bucket`
     * @param client implicitly provided instance of AmazonS3Client to use
-    * @return a (blocking) Future, containing a Try which contains an [[ArchiveEntry]] if successful
+    * @return a (blocking) Future, containing an [[ArchiveEntry]] if successful
     */
-  def fromS3(bucket: String, key: String)(implicit client:AmazonS3):Future[Try[ArchiveEntry]] = Future {
-    Try {
-      val meta = client.getObjectMetadata(bucket,key)
-      val mimeType = Option(meta.getContentType) match {
-        case Some(mimeTypeString) =>
-          MimeType.fromString(mimeTypeString) match {
-            case Right(mt) => mt
-            case Left(error) =>
-              logger.warn(error)
-              MimeType("application", "octet-stream")
-          }
-        case None =>
-          logger.warn(s"received no content type from S3 for s3://$bucket/$key")
-          MimeType("application","octet-stream")
-      }
-      ArchiveEntry(makeDocId(bucket, key), bucket, key, getFileExtension(key), meta.getContentLength, ZonedDateTime.ofInstant(meta.getLastModified.toInstant, ZoneId.systemDefault()), meta.getETag, mimeType, false)
+  def fromS3(bucket: String, key: String)(implicit client:AmazonS3):Future[ArchiveEntry] = Future {
+    val meta = client.getObjectMetadata(bucket,key)
+    val mimeType = Option(meta.getContentType) match {
+      case Some(mimeTypeString) =>
+        MimeType.fromString(mimeTypeString) match {
+          case Right(mt) => mt
+          case Left(error) =>
+            logger.warn(error)
+            MimeType("application", "octet-stream")
+        }
+      case None =>
+        logger.warn(s"received no content type from S3 for s3://$bucket/$key")
+        MimeType("application","octet-stream")
     }
+    ArchiveEntry(makeDocId(bucket, key), bucket, key, getFileExtension(key), meta.getContentLength, ZonedDateTime.ofInstant(meta.getLastModified.toInstant, ZoneId.systemDefault()), meta.getETag, mimeType, false)
   }
 }
 
