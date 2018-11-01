@@ -7,7 +7,11 @@ import com.sksamuel.elastic4s.ElasticsearchClientUri
 import com.sksamuel.elastic4s.http.{HttpClient, HttpRequestClient}
 import org.apache.http.HttpHost
 import org.elasticsearch.client.RestClient
+
 import collection.JavaConverters._
+import scala.concurrent.Await
+import scala.concurrent.duration._
+
 import scala.util.{Failure, Success}
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -75,7 +79,7 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] {
           mt
       }
 
-      ArchiveEntry.fromS3(rec.getS3.getBucket.getName, s3ObjectRef.getKey).map(entry=>{
+      val result=ArchiveEntry.fromS3(rec.getS3.getBucket.getName, s3ObjectRef.getKey).map(entry=>{
           println(s"Going to index $entry")
           i.indexSingleItem(entry).map({
             case Success(indexid)=>
@@ -90,6 +94,8 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] {
           println(s"Unable to index ${rec.toString}: ", ex)
           throw ex
       })
+
+      Await.result(result, 30 seconds)
     })
   }
 }
