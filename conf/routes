@@ -5,5 +5,9 @@
 # Home page
 GET     /                           controllers.Application.index
 
+POST    /scanTarget                 @controllers.ScanTargetController.newTarget
+DELETE  /scanTarget/:id             @controllers.ScanTargetController.removeTarget(id)
+GET     /scanTarget                 @controllers.ScanTargetController.listScanTargets
+
 # Map static resources from the /public folder to the /assets URL path
 GET     /assets/*file               controllers.Assets.at(path="/public", file)

@@ -37,6 +37,9 @@ lazy val `archivehunter` = (project in file("."))
       "com.sksamuel.elastic4s" %% "elastic4s-circe" % elastic4sVersion,
       "com.sksamuel.elastic4s" %% "elastic4s-testkit" % elastic4sVersion % "test",
       "com.sksamuel.elastic4s" %% "elastic4s-embedded" % elastic4sVersion % "test",
+      "com.gu" %% "scanamo" % "1.0.0-M8",
+      "com.lightbend.akka" %% "akka-stream-alpakka-dynamodb" % "0.20",
+      "com.gu" %% "scanamo-alpakka" % "1.0.0-M8",
       jdbc, ehcache, ws)
   )
 
