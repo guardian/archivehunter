@@ -40,8 +40,14 @@ Resources:
         Variables:
           INDEX_NAME: ArchiveHunter
           ELASTICSEARCH:
-            Fn::Join: ["", ["https://", Fn::ImportValue: !Sub ${ArchiveHunterAppStack}-ESEndpoint, ":443"]]
+            Fn::Join:
+            - ""
+            -
+              - "https://"
+              - Fn::ImportValue: !Sub ${ArchiveHunterAppStack}-ESEndpoint
+              - ":443"
       Handler: InputLambdaMain
+      FunctionName: !Sub archivehunter-input-${Stage}
       MemorySize: 256
       Role: !GetAtt MonitorLambdaRole.Arn
       Runtime: java8
@@ -58,6 +64,13 @@ Resources:
         - Key: Stage
           Value: !Ref Stage
 
+  BucketInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref BucketMonitorLambda
+      Principal: s3.amazonaws.com
+      SourceArn: !Sub arn:aws:s3:::${BucketName}
 
   MonitorLambdaRole:
     Type: AWS::IAM::Role
