@@ -41,36 +41,49 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] {
 
   /**
     * deal with an item created notification by adding it to the index
-    * @param rec
-    * @param s3ObjectRef
-    * @param i
-    * @param s3Client
-    * @param elasticHttpClient
-    * @return
+    * @param rec S3EventNotification record describing the event
+    * @param i implicitly provided [[Indexer]] instance
+    * @param s3Client implicitly provided AmazonS3 client instance
+    * @param elasticHttpClient implicitly provided HttpClient instance for Elastic Search
+    * @return a Future, containing the ID of the new/updated record as a String.  If the operation fails, the Future will fail; pick this up with .onComplete or .recover
     */
-  def handleCreated(rec:S3EventNotification.S3EventNotificationRecord, s3ObjectRef:S3ObjectEntity)(implicit i:Indexer, s3Client:AmazonS3, elasticHttpClient:HttpClient):Future[String] =
-    ArchiveEntry.fromS3(rec.getS3.getBucket.getName, rec.getS3.getObject.getKey).flatMap(entry=>{
+  def handleCreated(rec:S3EventNotification.S3EventNotificationRecord)(implicit i:Indexer, s3Client:AmazonS3, elasticHttpClient:HttpClient):Future[String] = {
+    val md = s3Client.getObjectMetadata(rec.getS3.getBucket.getName, rec.getS3.getObject.getKey)
+
+    val mimeType = MimeType.fromString(md.getContentType) match {
+      case Left(error) =>
+        println(s"Could not get MIME type for s3://${rec.getS3.getBucket.getName}/${rec.getS3.getObject.getKey}: $error")
+        MimeType("application", "octet-stream")
+      case Right(mt) =>
+        println(s"MIME type for s3://${rec.getS3.getBucket.getName}/${rec.getS3.getObject.getKey} is ${mt.toString}")
+        mt
+    }
+
+    ArchiveEntry.fromS3(rec.getS3.getBucket.getName, rec.getS3.getObject.getKey).flatMap(entry => {
       println(s"Going to index $entry")
       i.indexSingleItem(entry)
     }).map({
-      case Success(indexid)=>
+      case Success(indexid) =>
         println(s"Document indexed with ID $indexid")
         indexid
-      case Failure(exception)=>
+      case Failure(exception) =>
         println(s"Could not index document: ${exception.toString}")
         exception.printStackTrace()
         throw exception //fail this future so we enter the recover block below
     })
+  }
 
   /**
     * deal with an item deleted notification by removing it from the index
-    * @param rec
-    * @param i
-    * @param elasticHttpClient
-    * @return
+    * @param rec S3EventNotificationRecord describing the event
+    * @param i implictly provided [[Indexer]] instance
+    * @param elasticHttpClient implicitly provided HttpClient instance for ElasticSearch
+    * @return a Future, containing a summary string if successful. The Future fails if the operation fails.
     */
   def handleRemoved(rec: S3EventNotification.S3EventNotificationRecord)(implicit i:Indexer, elasticHttpClient:HttpClient):Future[String] = {
-    i.removeSingleItem(ArchiveEntry.makeDocId(rec.getS3.getBucket.getName, rec.getS3.getObject.getKey))
+    val docId = ArchiveEntry.makeDocId(rec.getS3.getBucket.getName, rec.getS3.getObject.getKey)
+    println(s"Going to remove $docId")
+    i.removeSingleItem(docId)
   }
 
   override def handleRequest(event:S3Event, context:Context): Unit = {
@@ -95,38 +108,27 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] {
 
     implicit val s3Client:AmazonS3 = getS3Client
     implicit val elasticClient:HttpClient = getElasticClient(clusterEndpoint)
-    implicit val i = getIndexer(indexName)
+    implicit val i:Indexer = getIndexer(indexName)
 
     println(s"Lambda was triggered with: \n${dumpEventData(event, Some("\t"))}")
     val resultList = event.getRecords.asScala.map(rec=>{
-      val s3ObjectRef = rec.getS3.getObject
-
-      val md = s3Client.getObjectMetadata(rec.getS3.getBucket.getName, rec.getS3.getObject.getKey)
 
       println(s"Source object is s3://${rec.getS3.getBucket.getName}/${rec.getS3.getObject.getKey} in ${rec.getAwsRegion}")
       println(s"Event was sent by ${rec.getUserIdentity.getPrincipalId}")
 
-      val mimeType = MimeType.fromString(md.getContentType) match {
-        case Left(error)=>
-          println(s"Could not get MIME type for s3://${rec.getS3.getBucket.getName}/${rec.getS3.getObject.getKey}: $error")
-          MimeType("application","octet-stream")
-        case Right(mt)=>
-          println(s"MIME type for s3://${rec.getS3.getBucket.getName}/${rec.getS3.getObject.getKey} is ${mt.toString}")
-          mt
-      }
-
       rec.getEventName match {
         case "ObjectCreated:Put"=>
-          handleCreated(rec,s3ObjectRef)
+          handleCreated(rec)
         case "ObjectRemoved:Delete"=>
           handleRemoved(rec)
         case other:String=>
           println(s"ERROR: received unknown event $other")
           throw new RuntimeException(s"unknown event $other received")
       }
-
     })
 
+    //need to block here, AWS terminates the lambda as soon as the function returns.
+    //as a bonus, if any of the operations fail this raises an exception and therefore is reported as a run failure
     Await.result(Future.sequence(resultList), 45 seconds)
   }
 }
