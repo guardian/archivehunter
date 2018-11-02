@@ -107,6 +107,27 @@ Resources:
           - !GetAtt ESSecurityGroup.GroupId
         SubnetIds:
           - !Ref ESSubnet
+
+  ScanTargetsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: bucketName
+          AttributeType: S
+      KeySchema:
+        - AttributeName: bucketName
+          KeyType: HASH
+      ProvisionedThroughput:
+        WriteCapacityUnits: 1
+        ReadCapacityUnits: 1
+      Tags:
+        - Key: App
+          Value: !Ref App
+        - Key: Stack
+          Value: !Ref Stack
+        - Key: Stage
+          Value: !Ref Stage
+
 Outputs:
   ElasticSearchEndpoint:
     Description: ES endpoint for ArchiveHunter lambdas
