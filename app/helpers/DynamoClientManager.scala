@@ -12,7 +12,16 @@ import play.api.Configuration
 
 @Singleton
 class DynamoClientManager @Inject() (config:Configuration){
-  def getNewDynamoClient() = AmazonDynamoDBAsyncClientBuilder.defaultClient()
+
+  def getNewDynamoClient(profileName:Option[String]=None) = {
+    val provider = new AWSCredentialsProviderChain(
+      new ProfileCredentialsProvider(profileName.getOrElse("default")),
+      new ContainerCredentialsProvider(),
+      new InstanceProfileCredentialsProvider()
+    )
+
+    AmazonDynamoDBAsyncClientBuilder.standard().withCredentials(provider).build()
+  }
 
   def getNewAlpakkaDynamoClient(profileName:Option[String]=None)(implicit system:ActorSystem, mat:Materializer) = {
     val provider = new AWSCredentialsProviderChain(

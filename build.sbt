@@ -40,6 +40,10 @@ lazy val `archivehunter` = (project in file("."))
       "com.gu" %% "scanamo" % "1.0.0-M8",
       "com.lightbend.akka" %% "akka-stream-alpakka-dynamodb" % "0.20",
       "com.gu" %% "scanamo-alpakka" % "1.0.0-M8",
+      "com.typesafe.akka" %% "akka-cluster-tools" % "2.5.11",
+      "com.lightbend.akka.discovery" %% "akka-discovery-aws-api" % "0.18.0",
+      "com.typesafe.akka" %% "akka-cluster" % "2.5.11",
+      "com.typesafe.akka" %% "akka-cluster-metrics" % "2.5.11",
       jdbc, ehcache, ws)
   )
 
