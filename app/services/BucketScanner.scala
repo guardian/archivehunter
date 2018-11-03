@@ -3,7 +3,7 @@ package services
 import java.time.ZonedDateTime
 import java.time.temporal.{ChronoUnit, IsoFields, TemporalUnit}
 
-import akka.actor.{Actor, ActorSystem}
+import akka.actor.{Actor, ActorSystem, Timers}
 import akka.stream.{ActorMaterializer, Materializer}
 import com.gu.scanamo.{ScanamoAlpakka, Table}
 import helpers.{DynamoClientManager, S3ClientManager, ZonedTimeFormat}
@@ -13,10 +13,13 @@ import play.api.{Configuration, Logger}
 import services.BucketScanner.{PerformTargetScan, RegularScanTrigger, ScanTargetsUpdated}
 
 import scala.concurrent.ExecutionContext
+import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
 object BucketScanner {
   trait BSMsg
+
+  case object TickKey
 
   case class ScanTargetsUpdated() extends BSMsg
   case class PerformTargetScan(record:ScanTarget) extends BSMsg
@@ -25,13 +28,18 @@ object BucketScanner {
 
 
 class BucketScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientManager, s3ClientMgr:S3ClientManager)(implicit system:ActorSystem)
-  extends Actor with ZonedTimeFormat{
+  extends Actor with ZonedTimeFormat with Timers{
+  import BucketScanner._
+
   private val logger=Logger(getClass)
 
   implicit val mat = ActorMaterializer.create(system)
   implicit val ec:ExecutionContext = system.dispatcher
 
   val table = Table[ScanTarget](config.get[String]("externalData.scanTargets"))
+
+  //actor-local timer - https://doc.akka.io/docs/akka/2.5/actors.html#actors-timers
+  timers.startPeriodicTimer(TickKey, RegularScanTrigger, Duration(config.get[Long]("scanner.masterSchedule"),SECONDS))
 
   def listScanTargets() = {
     val alpakkaClient = ddbClientMgr.getNewAlpakkaDynamoClient(config.getOptional[String]("externalData.awsProfile"))

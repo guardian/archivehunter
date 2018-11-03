@@ -1,5 +1,7 @@
 package services
 
+import java.time.ZonedDateTime
+
 import akka.actor.{Actor, ActorRef, ActorSystem, Cancellable}
 import javax.inject.{Inject, Named}
 import play.api.Logger
@@ -23,6 +25,7 @@ class ScanTimerSingleton @Inject() (@Named("bucketScannerActor") bucketScanner:A
   implicit val ec=system.dispatcher
   var amStarted=false
   var cancellable:Option[Cancellable] = None
+  var lastRunAt:Option[ZonedDateTime] = None
 
   override def receive: Receive = {
     case End=>
