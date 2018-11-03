@@ -15,7 +15,7 @@ import java.util.Base64
 object ArchiveEntry extends ((String, String, String, Option[String], Long, ZonedDateTime, String, MimeType, Boolean)=>ArchiveEntry){
   private val logger = LogManager.getLogger(getClass)
 
-  private def getFileExtension(str: String):Option[String] = {
+  def getFileExtension(str: String):Option[String] = {
     val tokens = str.split("\\.(?=[^\\.]+$)")
     if(tokens.length==2){
       Some(tokens(1))
