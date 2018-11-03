@@ -27,6 +27,7 @@
     <logger name="services.AppStartup" level="DEBUG"/>
     <logger name="services.BucketScanner" level="DEBUG"/>
     <logger name="services.ScanTimerSingleton" level="DEBUG"/>
+    <logger name="akka.cluster" level="DEBUG"/>
 
     <root level="DEBUG">
         <appender-ref ref="STDOUT" />

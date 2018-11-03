@@ -39,11 +39,10 @@ class ScanTargetController @Inject() (config:Configuration,cc:ControllerComponen
         InternalServerError(GenericErrorResponse("error",writeError.toString).asJson)
       case Right(createdScanTarget)=>
         Ok(ObjectCreatedResponse[String]("created","scan_target",createdScanTarget.bucketName).asJson)
-    }).getOrElse(InternalServerError(GenericErrorResponse("error","Nothing was created").asJson))
+    }).getOrElse(Ok(ObjectCreatedResponse[Option[String]]("created","scan_target",None).asJson))
   }
 
   def removeTarget(targetName:String) = Action {
-
     val r = Scanamo.exec(ddbClientMgr.getNewDynamoClient(profileName))(table.delete('bucketName -> targetName))
     Ok(ObjectCreatedResponse[String]("deleted","scan_target",targetName).asJson)
   }

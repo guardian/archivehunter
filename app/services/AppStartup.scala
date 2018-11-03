@@ -6,8 +6,13 @@ import javax.inject.{Inject, Named}
 import play.api.{Configuration, Logger}
 import services.ScanTimerSingleton.Startup
 
+import scala.concurrent.ExecutionContext
+import scala.concurrent.duration._
+
 class AppStartup @Inject() (@Named("bucketScannerActor") bucketScanner:ActorRef, config:Configuration)(implicit system:ActorSystem){
   private val logger = Logger(getClass)
+
+  implicit val ec:ExecutionContext = system.dispatcher
 
   logger.info("AppStartup")
   /**
@@ -30,10 +35,11 @@ class AppStartup @Inject() (@Named("bucketScannerActor") bucketScanner:ActorRef,
     ),
     name = "scanTimerSingleton")
 
-  val proxy = system.actorOf(
-    ClusterSingletonProxy.props(
-     singletonManagerPath = "/user/scanTimerSingleton",
-     settings = ClusterSingletonProxySettings(system)),
-   name = "scanTimerSingletonProxy")
-  proxy ! Startup
+  system.scheduler.scheduleOnce(5 seconds){
+    val proxy = system.actorOf(
+      ClusterSingletonProxy.props(
+        singletonManagerPath = "/user/scanTimerSingleton",
+        settings = ClusterSingletonProxySettings(system)))
+    proxy ! Startup
+  }
 }
