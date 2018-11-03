@@ -4,15 +4,19 @@ import java.time.ZonedDateTime
 import java.time.temporal.{ChronoUnit, IsoFields, TemporalUnit}
 
 import akka.actor.{Actor, ActorSystem, Timers}
+import akka.stream.scaladsl.{Keep, Sink}
 import akka.stream.{ActorMaterializer, Materializer}
+import com.google.inject.Injector
 import com.gu.scanamo.{ScanamoAlpakka, Table}
-import helpers.{DynamoClientManager, S3ClientManager, ZonedTimeFormat}
+import helpers._
 import javax.inject.Inject
-import models.ScanTarget
+import models.{ScanTarget, ScanTargetDAO}
 import play.api.{Configuration, Logger}
-import services.BucketScanner.{PerformTargetScan, RegularScanTrigger, ScanTargetsUpdated}
+import com.sksamuel.elastic4s.streams.ReactiveElastic._
+import com.sksamuel.elastic4s.streams.RequestBuilder
+import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ArchiveEntryRequestBuilder}
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
@@ -27,8 +31,9 @@ object BucketScanner {
 }
 
 
-class BucketScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientManager, s3ClientMgr:S3ClientManager)(implicit system:ActorSystem)
-  extends Actor with ZonedTimeFormat with Timers{
+class BucketScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientManager, s3ClientMgr:S3ClientManager,
+                              esClientMgr:ESClientManager, scanTargetDAO: ScanTargetDAO, injector:Injector)(implicit system:ActorSystem)
+  extends Actor with Timers with ZonedTimeFormat with ArchiveEntryRequestBuilder{
   import BucketScanner._
 
   private val logger=Logger(getClass)
@@ -37,6 +42,8 @@ class BucketScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientMan
   implicit val ec:ExecutionContext = system.dispatcher
 
   val table = Table[ScanTarget](config.get[String]("externalData.scanTargets"))
+
+  override val indexName: String = config.get[String]("externalData.indexName")
 
   //actor-local timer - https://doc.akka.io/docs/akka/2.5/actors.html#actors-timers
   timers.startPeriodicTimer(TickKey, RegularScanTrigger, Duration(config.get[Long]("scanner.masterSchedule"),SECONDS))
@@ -95,8 +102,32 @@ class BucketScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientMan
     }
   }
 
+  /**
+    * Performs a scan of the given target.  The scan is done asynchronously using Akka streaming, so this method returns a Promise
+    * which completes when the scan is done.
+    * @param target [[ScanTarget]] indicating bucket to process
+    * @return a Promise[Unit] which completes when the scan finishes
+    */
   def doScan(target: ScanTarget) = {
+    val completionPromise = Promise[Unit]()
 
+    val client = s3ClientMgr.getAlpakkaS3Client(config.getOptional[String]("externalData.awsProfile"))
+    val esclient = esClientMgr.getClient()
+
+    val keySource = client.listBucket(target.bucketName, None)
+    val converterFlow = injector.getInstance(classOf[S3ToArchiveEntryFlow])
+    val subscriber = esclient.subscriber[ArchiveEntry](
+      100,5,completionFn = ()=>{
+        completionPromise.complete(Success())
+        ()
+      }
+    )
+
+    val indexSink = Sink.fromSubscriber(subscriber)
+
+    keySource.via(converterFlow).log("S3ToArchiveEntryFlow").to(indexSink).run()
+
+    completionPromise
   }
 
   override def receive: Receive = {
@@ -110,6 +141,18 @@ class BucketScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientMan
           logger.error("Could not perform regular scan check", err)
       })
     case PerformTargetScan(tgt)=>
-      doScan(tgt)
+      scanTargetDAO.setInProgress(tgt, newValue=true).flatMap(updatedScanTarget=>
+        doScan(tgt).future.andThen({
+          case Success(x)=>
+            scanTargetDAO.setScanCompleted(updatedScanTarget)
+          case Failure(err)=>
+            scanTargetDAO.setScanCompleted(updatedScanTarget,error=Some(err))
+        })
+      ).onComplete({
+        case Success(result)=>
+          logger.info(s"Completed periodic scan of ${tgt.bucketName}")
+        case Failure(err)=>
+          logger.error(s"Could not scan ${tgt.bucketName}: ", err)
+      })
   }
 }
