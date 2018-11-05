@@ -3,6 +3,10 @@ import PropTypes from 'prop-types';
 import axios from 'axios';
 import SortableTable from 'react-sortable-table';
 
+import TimeIntervalComponent from '../common/TimeIntervalComponent.jsx';
+import TimestampFormatter from '../common/TimestampFormatter.jsx';
+import ErrorViewComponent from '../common/ErrorViewComponent.jsx';
+
 class ScanTargetsList extends React.Component {
     constructor(props){
         super(props);
@@ -23,41 +27,56 @@ class ScanTargetsList extends React.Component {
                 header: "Bucket",
                 key: "bucketName",
                 defaultSorting: "desc",
-                headerProps: "dashboardheader"
+                //headerProps: {className: "dashboardheader"}
             },
             {
                 header: "Enabled",
                 key: "enabled",
-                headerProps: "dashboardheader"
+                //headerProps: {className: "dashboardheader"},
+                render: value=> value ? "yes" : "no"
             },
             {
                 header: "Last Scan",
                 key: "lastScanned",
-                headerProps: "dashboardheader",
+                //headerProps: {className: "dashboardheader"},
                 render: value=><TimestampFormatter relative={true} value={value}/>
             },
             {
                 header: "Scan Interval",
                 key: "scanInterval",
-                headerProps: "dashboardheader",
-                render: value=><TimeIntervalComponent editable={false}/>
+                //headerProps: {className: "dashboardheader"},
+                render: value=><TimeIntervalComponent editable={false} value={value}/>
             },
             {
                 header: "Currently scanning",
                 key: "scanInProgress",
-                headerProps: "dashboardheader"
+                //headerProps: {className: "dashboardheader"},
+                render: value=> value ? "yes" : "no"
             },
             {
                 header: "Last scan error",
                 key: "lastError",
-                headerProps: "dashboardheader"
+                //headerProps: {className: "dashboardheader"},
+                render: value=>value ? value : "-"
             }
-        ]
+        ];
+        this.style = {
+            backgroundColor: '#eee',
+            border: '1px solid black',
+            borderCollapse: 'collapse'
+        };
+
+        this.iconStyle = {
+            color: '#aaa',
+            paddingLeft: '5px',
+            paddingRight: '5px'
+        };
+
     }
 
     componentWillMount(){
         this.setState({loading: true}, ()=>axios.get("/api/scanTarget").then(response=>{
-            this.setState({loading: false, lastError: null, scanTargets: response.entries});
+            this.setState({loading: false, lastError: null, scanTargets: response.data.entries});
         }).catch(err=>{
             console.error(err);
             this.setState({loading: false, lastError: err});
@@ -65,11 +84,16 @@ class ScanTargetsList extends React.Component {
     }
 
     render(){
-        return <SortableTable data={this.state.data}
+        if(this.state.error){
+            return <ErrorViewComponent error={this.state.error}/>
+        }
+
+        return <SortableTable
+            data={this.state.scanTargets}
             columns={this.columns}
             style={this.style}
             iconStyle={this.iconStyle}
-            tableProps={ {className: "dashboardpanel"} }
+            //tableProps={ {className: "dashboardpanel"} }
         />
     }
 }

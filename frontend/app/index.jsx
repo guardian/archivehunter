@@ -8,6 +8,8 @@ import ScanTargetEdit from './ScanTargets/ScanTargetEdit.jsx';
 import ScanTargetsList from './ScanTargets/ScanTargetsList.jsx';
 import NotFoundComponent from './NotFoundComponent.jsx';
 
+window.React = require('react');
+
 class App extends React.Component {
     constructor(props){
         super(props);
