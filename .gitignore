@@ -17,3 +17,4 @@ dist
 node_modules
 /public/javascripts/bundle.js
 /frontend/yarn-error.log
+/frontend/junit.xml
