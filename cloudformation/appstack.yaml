@@ -252,6 +252,11 @@ Resources:
         FromPort: 22
         ToPort: 22
         IpProtocol: tcp
+      - CidrIp: !Ref OfficeIpRange #FIXME: need to use a SecurityGroupIngres to avoid circular dependency
+        FromPort: 2552
+        ToPort: 2552
+        IpProtocol: tcp
+
   LaunchConfig:
     Type: AWS::AutoScaling::LaunchConfiguration
     Properties:
@@ -273,14 +278,10 @@ Resources:
           mkdir -p /usr/share/archivehunter/conf
           chown archivehunter /usr/share/archivehunter
 
+          declare -x HOSTNAME=`hostname`
           cat > /usr/share/archivehunter/conf/application.conf << EOF
           play.http.secret.key = "${AppSecretString}"
           play.filters {
-
-            # Enabled filters are run automatically against Play.
-            # CSRFFilter, AllowedHostFilters, and SecurityHeadersFilters are enabled by default.
-            enabled += filters.ExampleFilter
-
             hosts {
               allowed = [".${AWS::Region}.elb.amazonaws.com","localhost:9000"]
             }
@@ -329,6 +330,7 @@ Resources:
           akka.remote {
             log-remote-lifecycle-events = off
             netty.tcp {
+              hostname = "${!HOSTNAME}"
               port = 2552
             }
           }
@@ -346,20 +348,17 @@ Resources:
           akka.discovery {
           # Set the following in your application.conf if you want to use this discovery mechanism:
           method = aws-api-ec2-tag-based
+            aws-api-ec2-tag-based {
+              class = akka.discovery.awsapi.ec2.Ec2TagBasedSimpleServiceDiscovery
+              tag-key = "service"
 
-          aws-api-ec2-tag-based {
+              # filters have to be in key=value format, separated by semi-colon
+              filters = ""
 
-            class = akka.discovery.awsapi.ec2.Ec2TagBasedSimpleServiceDiscovery
-
-            tag-key = "service"
-
-            # filters have to be in key=value format, separated by semi-colon
-            filters = ""
-
-            # If you want multiple akka nodes (i.e. JVMs) per EC2 instance, set the following
-            # to the list of Akka Management port numbers
-            ports = []
-
+              # If you want multiple akka nodes (i.e. JVMs) per EC2 instance, set the following
+              # to the list of Akka Management port numbers
+              ports = []
+            }
           }
           EOF
 
