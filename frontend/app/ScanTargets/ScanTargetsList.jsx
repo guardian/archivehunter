@@ -2,10 +2,11 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import axios from 'axios';
 import SortableTable from 'react-sortable-table';
-
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import TimeIntervalComponent from '../common/TimeIntervalComponent.jsx';
 import TimestampFormatter from '../common/TimestampFormatter.jsx';
 import ErrorViewComponent from '../common/ErrorViewComponent.jsx';
+import BreadcrumbComponent from "../common/BreadcrumbComponent.jsx";
 
 class ScanTargetsList extends React.Component {
     constructor(props){
@@ -27,36 +28,36 @@ class ScanTargetsList extends React.Component {
                 header: "Bucket",
                 key: "bucketName",
                 defaultSorting: "desc",
-                //headerProps: {className: "dashboardheader"}
+                headerProps: {className: "dashboardheader"}
             },
             {
                 header: "Enabled",
                 key: "enabled",
-                //headerProps: {className: "dashboardheader"},
-                render: value=> value ? "yes" : "no"
+                headerProps: {className: "dashboardheader"},
+                render: value=> value ? <span><FontAwesomeIcon icon="check-circle" className="inline-icon" style={{color:"green"}}/>yes</span> : <span><FontAwesomeIcon icon="times-circle" className="far inline-icon" style={{color: "darkred"}}/>no</span>
             },
             {
                 header: "Last Scan",
                 key: "lastScanned",
-                //headerProps: {className: "dashboardheader"},
+                headerProps: {className: "dashboardheader"},
                 render: value=><TimestampFormatter relative={true} value={value}/>
             },
             {
                 header: "Scan Interval",
                 key: "scanInterval",
-                //headerProps: {className: "dashboardheader"},
+                headerProps: {className: "dashboardheader"},
                 render: value=><TimeIntervalComponent editable={false} value={value}/>
             },
             {
                 header: "Currently scanning",
                 key: "scanInProgress",
-                //headerProps: {className: "dashboardheader"},
+                headerProps: {className: "dashboardheader"},
                 render: value=> value ? "yes" : "no"
             },
             {
                 header: "Last scan error",
                 key: "lastError",
-                //headerProps: {className: "dashboardheader"},
+                headerProps: {className: "dashboardheader"},
                 render: value=>value ? value : "-"
             }
         ];
@@ -87,14 +88,16 @@ class ScanTargetsList extends React.Component {
         if(this.state.error){
             return <ErrorViewComponent error={this.state.error}/>
         }
-
-        return <SortableTable
+//
+        return <div>
+            <BreadcrumbComponent path={this.props.location.pathname}/>
+            <SortableTable
             data={this.state.scanTargets}
             columns={this.columns}
             style={this.style}
             iconStyle={this.iconStyle}
-            //tableProps={ {className: "dashboardpanel"} }
-        />
+            tableProps={ {className: "dashboardpanel"} }
+        /></div>
     }
 }
 
