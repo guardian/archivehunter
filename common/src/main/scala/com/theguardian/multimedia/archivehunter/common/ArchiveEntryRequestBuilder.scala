@@ -13,6 +13,9 @@ trait ArchiveEntryRequestBuilder extends ZonedDateTimeEncoder {
 
   implicit val indexRequestBuilder = new RequestBuilder[ArchiveEntry] {
     // the request returned doesn't have to be an index - it can be anything supported by the bulk api
-    def request(t: ArchiveEntry) = update(t.id).in(s"$indexName/entry").docAsUpsert(t)
+    def request(t: ArchiveEntry) = {
+      println(s"indexRequestBuilder - building request from $t")
+      update(t.id).in(s"$indexName/entry").docAsUpsert(t)
+    }
   }
 }
