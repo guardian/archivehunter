@@ -4,7 +4,7 @@
 
 # Home page
 GET     /                           controllers.Application.index
-
+GET     /is-online                  controllers.Application.healthcheck
 POST    /scanTarget                 @controllers.ScanTargetController.newTarget
 DELETE  /scanTarget/:id             @controllers.ScanTargetController.removeTarget(id)
 GET     /scanTarget                 @controllers.ScanTargetController.listScanTargets
