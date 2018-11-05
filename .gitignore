@@ -16,3 +16,4 @@ dist
 !/frontend/yarn.lock
 node_modules
 /public/javascripts/bundle.js
+/frontend/yarn-error.log
