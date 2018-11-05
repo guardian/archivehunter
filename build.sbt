@@ -1,7 +1,7 @@
 import sbt._
 import Keys._
 
-enablePlugins(RiffRaffArtifact, JDebPackaging)
+enablePlugins(RiffRaffArtifact, JDebPackaging, SystemdPlugin)
 
 //libraryDependencies += "org.vafer" % "jdeb" % "1.3" artifacts (Artifact("jdeb", "jar", "jar"))
 
@@ -18,6 +18,7 @@ lazy val commonSettings = Seq(
     "com.dripower" %% "play-circe" % "2610.0",
     "com.sksamuel.elastic4s" %% "elastic4s-http" % elastic4sVersion,
     "com.sksamuel.elastic4s" %% "elastic4s-circe" % elastic4sVersion,
+    "com.sksamuel.elastic4s" %% "elastic4s-http-streams" % elastic4sVersion,
     "com.sksamuel.elastic4s" %% "elastic4s-testkit" % elastic4sVersion % "test",
     "com.sksamuel.elastic4s" %% "elastic4s-embedded" % elastic4sVersion % "test",
     specs2 % Test)
@@ -37,6 +38,14 @@ lazy val `archivehunter` = (project in file("."))
       "com.sksamuel.elastic4s" %% "elastic4s-circe" % elastic4sVersion,
       "com.sksamuel.elastic4s" %% "elastic4s-testkit" % elastic4sVersion % "test",
       "com.sksamuel.elastic4s" %% "elastic4s-embedded" % elastic4sVersion % "test",
+      "com.gu" %% "scanamo" % "1.0.0-M8",
+      "com.lightbend.akka" %% "akka-stream-alpakka-dynamodb" % "0.20",
+      "com.lightbend.akka" %% "akka-stream-alpakka-s3" % "0.20",
+      "com.gu" %% "scanamo-alpakka" % "1.0.0-M8",
+      "com.typesafe.akka" %% "akka-cluster-tools" % "2.5.11",
+      "com.lightbend.akka.discovery" %% "akka-discovery-aws-api" % "0.18.0",
+      "com.typesafe.akka" %% "akka-cluster" % "2.5.11",
+      "com.typesafe.akka" %% "akka-cluster-metrics" % "2.5.11",
       jdbc, ehcache, ws)
   )
 
@@ -81,7 +90,7 @@ riffRaffUploadArtifactBucket := Option("riffraff-artifact")
 riffRaffUploadManifestBucket := Option("riffraff-builds")
 riffRaffManifestProjectName := "multimedia:ArchiveHunter"
 riffRaffArtifactResources := Seq(
-  (packageBin in Debian in archivehunter).value -> s"${(name in archivehunter).value}/${(name in archivehunter).value}.deb",
+  (packageBin in Debian in archivehunter).value -> s"archivehunter-webapp/${(name in archivehunter).value}.deb",
   (assembly in Universal in inputLambda).value -> s"archivehunter-input-lambda/${(assembly in Universal in inputLambda).value.getName}",
 //  (packageBin in Universal in expirer).value -> s"${(name in expirer).value}/${(packageBin in Universal in expirer).value.getName}",
 //  (packageBin in Universal in scheduler).value -> s"${(name in scheduler).value}/${(packageBin in Universal in scheduler).value.getName}",

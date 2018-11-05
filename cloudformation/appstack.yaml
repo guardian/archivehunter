@@ -65,6 +65,14 @@ Parameters:
       - r4.large.elasticsearch
       - r4.xlarge.elasticsearch
     Default: t2.small.elasticsearch
+  LoadBalancerCert:
+    Description: ARN of an SSL certificate to allow https access to loadbalancer
+    Type: String
+  AppSecretString:
+    Description: Long random string used as an app secret to secure cookies etc.
+    Type: String
+    NoEcho: True
+
 Resources:
   AccessorSG: #this group is exported and used by bucketmonitor yaml. defined here so that it can be marked for access to ES
     Type: AWS::EC2::SecurityGroup
@@ -107,6 +115,314 @@ Resources:
           - !GetAtt ESSecurityGroup.GroupId
         SubnetIds:
           - !Ref ESSubnet
+
+  ScanTargetsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: bucketName
+          AttributeType: S
+      KeySchema:
+        - AttributeName: bucketName
+          KeyType: HASH
+      ProvisionedThroughput:
+        WriteCapacityUnits: 1
+        ReadCapacityUnits: 1
+      Tags:
+        - Key: App
+          Value: !Ref App
+        - Key: Stack
+          Value: !Ref Stack
+        - Key: Stage
+          Value: !Ref Stage
+
+  LoadBalancerSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Load-balancer security group for launchdetector
+      SecurityGroupIngress:
+      - CidrIp: !Ref OfficeIpRange
+        FromPort: 9000
+        ToPort: 9000
+        IpProtocol: tcp
+      - CidrIp: !Ref OfficeIpRange
+        FromPort: 443
+        ToPort: 443
+        IpProtocol: tcp
+      VpcId: !Ref VPCID
+
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancing::LoadBalancer
+    Properties:
+      CrossZone: true
+      HealthCheck:
+        HealthyThreshold: "3"
+        Interval: "10"
+        Target: "HTTP:9000/is-online"
+        Timeout: "3"
+        UnhealthyThreshold: "2"
+      Listeners:
+      - InstancePort: "9000"
+        InstanceProtocol: "http"
+        LoadBalancerPort: "443"
+        Protocol: "https"
+        SSLCertificateId: !Ref LoadBalancerCert
+      - InstancePort: "2552"
+        InstanceProtocol: "tcp"
+        LoadBalancerPort: "2552"
+        Protocol: "tcp"
+
+      Scheme: internal
+      SecurityGroups:
+      - !GetAtt LoadBalancerSG.GroupId
+      Subnets: !Ref DeploySubnets
+      Tags:
+      - Key: App
+        Value: !Ref App
+      - Key: Stack
+        Value: !Ref Stack
+      - Key: Stage
+        Value: !Ref Stage
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: ec2.amazonaws.com
+          Action: sts:AssumeRole
+      Path: "/"
+      Policies:
+      - PolicyName: DataAccess
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+            Effect: Allow
+            Action:
+            - dynamodb:DescribeTable
+            - dynamodb:GetItem
+            - dynamodb:GetRecords
+            - dynamodb:Query
+            - dynamodb:Scan
+            Resource:
+            - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/ScanTargetsTable
+
+      - PolicyName: DeployablesAccess
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+            Effect: Allow
+            Action:
+            - s3:ListBucket
+            - s3:GetObject
+            Resource:
+            - arn:aws:s3:::gnm-multimedia-rr-deployables
+            - arn:aws:s3:::gnm-multimedia-rr-deployables/*
+
+      - PolicyName: ElasticSearchAccess
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+          - Effect: Allow
+            Action: es:*
+            Resource: !Sub arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/${SearchDomain}
+          - Effect: Deny
+            Action: es:DeleteElasticSearchDomain
+            Resource: !Sub arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/${SearchDomain}
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+      - !Ref InstanceRole
+
+  InstanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Instance security group for archive hunter
+      VpcId: !Ref VPCID
+      SecurityGroupIngress:
+      - SourceSecurityGroupId: !GetAtt LoadBalancerSG.GroupId
+        FromPort: 9000
+        ToPort: 9000
+        IpProtocol: tcp
+      - CidrIp: !Ref OfficeIpRange
+        FromPort: 22
+        ToPort: 22
+        IpProtocol: tcp
+      - CidrIp: !Ref OfficeIpRange #FIXME: need to use a SecurityGroupIngres to avoid circular dependency
+        FromPort: 2552
+        ToPort: 2552
+        IpProtocol: tcp
+
+  LaunchConfig:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      IamInstanceProfile: !Ref InstanceProfile
+      ImageId: !Ref AmiId
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyPair
+      SecurityGroups:
+      - !Ref InstanceSecurityGroup
+      UserData: !Base64
+        "Fn::Sub": |
+          #!/bin/bash -e
+
+          mkdir -p /tmp/install
+          aws s3 cp s3://gnm-multimedia-rr-deployables/${Stack}/${Stage}/archivehunter-webapp/archivehunter.deb /tmp/install
+
+          dpkg --install /tmp/install/archivehunter.deb
+
+          mkdir -p /usr/share/archivehunter/conf
+          chown archivehunter /usr/share/archivehunter
+
+          mkdir -p /var/log/archivehunter
+          chown archivehunter /var/log/archivehunter
+
+          declare -x HOSTNAME=`hostname`
+          declare -x LOCAL_IP=`curl http://169.254.169.254/latest/meta-data/local-ipv4`
+
+          echo "$LOCAL_IP  $HOSTNAME" >> /etc/hosts
+
+          cat > /usr/share/archivehunter/conf/application.conf << EOF
+          play.http.secret.key = "${AppSecretString}"
+          play.filters {
+            hosts {
+              allowed = [".${AWS::Region}.elb.amazonaws.com","localhost:9000"]
+            }
+
+            # Disabled filters remove elements from the enabled list.
+            disabled += play.filters.headers.SecurityHeadersFilter
+            disabled += play.filters.hosts.AllowedHostsFilter
+            disabled += play.filters.csrf.CSRFFilter
+          }
+          application.langs="en"
+
+          externalData {
+          awsRegion="${AWS::Region}"
+          scanTargets="${ScanTargetsTable}"
+          //ddbHost="localhost"
+          ddbHost="dynamodb.${AWS::Region}.amazonaws.com"
+          indexName = "archivehunter"
+          }
+
+          scanner {
+            masterSchedule = 300 #in seconds
+          }
+
+          elasticsearch {
+            hostname = "${SearchDomain.DomainEndpoint}"
+            port = 443
+          }
+
+          akka.actor {
+          provider = "cluster"
+
+          serializers {
+          akka-cluster-client = "akka.cluster.client.protobuf.ClusterClientMessageSerializer"
+          akka-singleton = "akka.cluster.singleton.protobuf.ClusterSingletonMessageSerializer"
+          }
+          serialization-bindings {
+          "akka.cluster.client.ClusterClientMessage" = akka-cluster-client
+          "akka.cluster.singleton.ClusterSingletonMessage" = akka-singleton
+          }
+          serialization-identifiers {
+          "akka.cluster.client.protobuf.ClusterClientMessageSerializer" = 15
+          "akka.cluster.singleton.protobuf.ClusterSingletonMessageSerializer" = 14
+          }
+          }
+
+          akka.remote {
+            log-remote-lifecycle-events = off
+            netty.tcp {
+              hostname = "${!HOSTNAME}"
+              port = 2552
+            }
+          }
+
+          akka.cluster {
+            seed-nodes = []
+
+            bootstrap = {
+              contact-point-discovery = {
+                service-name: ${Stack}-${App}-${Stage}
+              }
+            }
+          }
+
+          akka.discovery {
+          # Set the following in your application.conf if you want to use this discovery mechanism:
+          method = aws-api-ec2-tag-based
+            aws-api-ec2-tag-based {
+              class = akka.discovery.awsapi.ec2.Ec2TagBasedSimpleServiceDiscovery
+              tag-key = "service"
+
+              # filters have to be in key=value format, separated by semi-colon
+              filters = ""
+
+              # If you want multiple akka nodes (i.e. JVMs) per EC2 instance, set the following
+              # to the list of Akka Management port numbers
+              ports = []
+            }
+          }
+          EOF
+
+          cat > /etc/default/archivehunter << EOF
+          #exiting on out of memory error should cause either systemd or autoscaling group to restart us
+          JAVA_OPTS="-XX:+ExitOnOutOfMemoryError -Dconfig.file=/usr/share/archivehunter/conf/application.conf"
+          EOF
+
+          systemctl restart archivehunter
+          systemctl enable archivehunter
+
+#          cat > /etc/filebeat/filebeat.yml << EOF
+#          filebeat.prospectors:
+#          - type: log
+#            enabled: true
+#            paths:
+#            - /var/log/mmplasmadash/*.log
+#            fields:
+#              App: ${App}
+#              Stack: ${Stack}
+#              Stage: ${Stage}
+#
+#            multiline:
+#              pattern: '^\s+'
+#              negate: false
+#              match: after
+#
+#          output.logstash:
+#            hosts: ["${LogstashEndpoint}"]
+#          EOF
+
+  AutoScaleGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      DesiredCapacity: "1"
+      HealthCheckGracePeriod: 300
+      HealthCheckType: ELB
+      LaunchConfigurationName: !Ref LaunchConfig
+      LoadBalancerNames:
+      - !Ref LoadBalancer
+      MaxSize: "8"
+      MinSize: "1"
+      Tags:
+      - Key: App
+        Value: !Ref App
+        PropagateAtLaunch: true
+      - Key: Stack
+        Value: !Ref Stack
+        PropagateAtLaunch: true
+      - Key: Stage
+        Value: !Ref Stage
+        PropagateAtLaunch: true
+      - Key: Service
+        Value: !Sub ${Stack}-${App}-${Stage}
+        PropagateAtLaunch: true
+      VPCZoneIdentifier: !Ref DeploySubnets
+
 Outputs:
   ElasticSearchEndpoint:
     Description: ES endpoint for ArchiveHunter lambdas
