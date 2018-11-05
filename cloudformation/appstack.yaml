@@ -278,7 +278,14 @@ Resources:
           mkdir -p /usr/share/archivehunter/conf
           chown archivehunter /usr/share/archivehunter
 
+          mkdir -p /var/log/archivehunter
+          chown archivehunter /var/log/archivehunter
+
           declare -x HOSTNAME=`hostname`
+          declare -x LOCAL_IP=`curl http://169.254.169.254/latest/meta-data/local-ipv4`
+
+          echo "$LOCAL_IP  $HOSTNAME" >> /etc/hosts
+
           cat > /usr/share/archivehunter/conf/application.conf << EOF
           play.http.secret.key = "${AppSecretString}"
           play.filters {
