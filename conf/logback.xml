@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!--
+  ~ Copyright (C) 2009-2016 Lightbend Inc. <https://www.lightbend.com>
+  -->
+<!-- The default logback configuration that Play uses in dev mode if no other configuration is provided -->
+<configuration>
+
+    <conversionRule conversionWord="coloredLevel" converterClass="play.api.libs.logback.ColoredLevel" />
+
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%coloredLevel %logger{15} - %message%n%xException{20}</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="FILE" class="ch.qos.logback.core.FileAppender">
+        <file>/var/log/archivehunter/application.log</file>
+        <encoder>
+            <pattern>%date [%level] from %logger in %thread - %message%n%xException</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="ASYNCFILE" class="ch.qos.logback.classic.AsyncAppender">
+        <appender-ref ref="FILE" />
+    </appender>
+
+    <!-- Configure the Sentry appender, overriding the logging threshold to the WARN level -->
+    <!--<appender name="Sentry" class="io.sentry.logback.SentryAppender">
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>ERROR</level>
+        </filter>
+    </appender>-->
+
+    <logger name="play" level="INFO" />
+    <logger name="application" level="ERROR" />
+
+    <logger name="services.AppStartup" level="DEBUG"/>
+    <logger name="services.BucketScanner" level="DEBUG"/>
+    <logger name="services.ScanTimerSingleton" level="DEBUG"/>
+    <logger name="akka.cluster" level="DEBUG"/>
+    <logger name="helpers.S3ToArchiveEntryFlow" level="DEBUG"/>
+    <logger name="com.sksamuel.elastic4s.streams" level="DEBUG"/>
+
+    <root level="WARN">
+        <appender-ref ref="STDOUT" />
+        <appender-ref ref="ASYNCFILE"/>
+        <!-- <appender-ref ref="Sentry" />-->
+    </root>
+
+</configuration>
