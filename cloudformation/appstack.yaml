@@ -301,11 +301,11 @@ Resources:
           application.langs="en"
 
           externalData {
-          awsRegion="${AWS::Region}"
-          scanTargets="${ScanTargetsTable}"
-          //ddbHost="localhost"
-          ddbHost="dynamodb.${AWS::Region}.amazonaws.com"
-          indexName = "archivehunter"
+            awsRegion="${AWS::Region}"
+            scanTargets="${ScanTargetsTable}"
+            //ddbHost="localhost"
+            ddbHost="dynamodb.${AWS::Region}.amazonaws.com"
+            indexName = "archivehunter"
           }
 
           scanner {
@@ -318,20 +318,20 @@ Resources:
           }
 
           akka.actor {
-          provider = "cluster"
+            provider = "cluster"
 
-          serializers {
-          akka-cluster-client = "akka.cluster.client.protobuf.ClusterClientMessageSerializer"
-          akka-singleton = "akka.cluster.singleton.protobuf.ClusterSingletonMessageSerializer"
-          }
-          serialization-bindings {
-          "akka.cluster.client.ClusterClientMessage" = akka-cluster-client
-          "akka.cluster.singleton.ClusterSingletonMessage" = akka-singleton
-          }
-          serialization-identifiers {
-          "akka.cluster.client.protobuf.ClusterClientMessageSerializer" = 15
-          "akka.cluster.singleton.protobuf.ClusterSingletonMessageSerializer" = 14
-          }
+            serializers {
+              akka-cluster-client = "akka.cluster.client.protobuf.ClusterClientMessageSerializer"
+              akka-singleton = "akka.cluster.singleton.protobuf.ClusterSingletonMessageSerializer"
+            }
+            serialization-bindings {
+              "akka.cluster.client.ClusterClientMessage" = akka-cluster-client
+              "akka.cluster.singleton.ClusterSingletonMessage" = akka-singleton
+            }
+              serialization-identifiers {
+              "akka.cluster.client.protobuf.ClusterClientMessageSerializer" = 15
+              "akka.cluster.singleton.protobuf.ClusterSingletonMessageSerializer" = 14
+            }
           }
 
           akka.remote {
