@@ -9,12 +9,12 @@ import akka.stream.stage.{AbstractInHandler, AbstractOutHandler, GraphStage, Gra
 import com.amazonaws.services.s3.{AmazonS3, AmazonS3Client}
 import com.theguardian.multimedia.archivehunter.common.ArchiveEntry
 import javax.inject.Inject
-import play.api.Logger
+import play.api.{Configuration, Logger}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
-class S3ToArchiveEntryFlow @Inject() (s3ClientMgr: S3ClientManager) extends GraphStage[FlowShape[ListBucketResultContents, ArchiveEntry]] {
+class S3ToArchiveEntryFlow @Inject() (s3ClientMgr: S3ClientManager, config:Configuration) extends GraphStage[FlowShape[ListBucketResultContents, ArchiveEntry]] {
   final val in:Inlet[ListBucketResultContents] = Inlet.create("S3ToArchiveEntry.in")
   final val out:Outlet[ArchiveEntry] = Outlet.create("S3ToArchiveEntry.out")
 
@@ -24,24 +24,28 @@ class S3ToArchiveEntryFlow @Inject() (s3ClientMgr: S3ClientManager) extends Grap
 
   override def createLogic(inheritedAttributes: Attributes): GraphStageLogic =
     new GraphStageLogic(shape) {
-      implicit val s3Client:AmazonS3 = s3ClientMgr.getS3Client()
+      implicit val s3Client:AmazonS3 = s3ClientMgr.getS3Client(config.getOptional[String]("externalData.awsProfile"))
+      private val logger=Logger(getClass)
 
-
+      logger.debug("initialised new instance")
       setHandler(in, new AbstractInHandler {
         override def onPush(): Unit = {
           val elem = grab(in)
-          val logger=Logger(this.getClass)
 
           //we need to do a metadata lookup to get the MIME type anyway, so we may as well just call out here.
+          logger.debug(s"got element $elem")
           ArchiveEntry.fromS3(elem.bucketName, elem.key).map(entry=>{
+            logger.debug(s"Mapped $elem to $entry")
             push(out, entry)
             pull(in)
+
           }).recoverWith({
             case err:Throwable=>
               logger.error("Could not convert S3 listing entry to ArchiveEntry", err)
               pull(in)
               Future()
           })
+
 //          ArchiveEntry(ArchiveEntry.makeDocId(elem.bucketName, elem.key),elem.bucketName,elem.key,ArchiveEntry.getFileExtension(elem.key),
 //            elem.size,ZonedDateTime.ofInstant(elem.lastModified, ZoneId.systemDefault()),elem.eTag,MimeType)
 
@@ -51,6 +55,7 @@ class S3ToArchiveEntryFlow @Inject() (s3ClientMgr: S3ClientManager) extends Grap
 
       setHandler(out, new AbstractOutHandler {
         override def onPull(): Unit = {
+          logger.debug("pull from downstream")
           pull(in)
         }
       })
