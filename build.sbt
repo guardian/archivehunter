@@ -1,7 +1,7 @@
 import sbt._
 import Keys._
 
-enablePlugins(RiffRaffArtifact, JDebPackaging)
+enablePlugins(RiffRaffArtifact, JDebPackaging, SystemdPlugin)
 
 //libraryDependencies += "org.vafer" % "jdeb" % "1.3" artifacts (Artifact("jdeb", "jar", "jar"))
 
