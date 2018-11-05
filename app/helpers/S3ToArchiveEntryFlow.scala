@@ -12,7 +12,9 @@ import javax.inject.Inject
 import play.api.{Configuration, Logger}
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
+import scala.concurrent.duration._
+
+import scala.concurrent.{Await, Future}
 
 class S3ToArchiveEntryFlow @Inject() (s3ClientMgr: S3ClientManager, config:Configuration) extends GraphStage[FlowShape[ListBucketResultContents, ArchiveEntry]] {
   final val in:Inlet[ListBucketResultContents] = Inlet.create("S3ToArchiveEntry.in")
@@ -34,21 +36,26 @@ class S3ToArchiveEntryFlow @Inject() (s3ClientMgr: S3ClientManager, config:Confi
 
           //we need to do a metadata lookup to get the MIME type anyway, so we may as well just call out here.
           logger.debug(s"got element $elem")
-          ArchiveEntry.fromS3(elem.bucketName, elem.key).map(entry=>{
-            logger.debug(s"Mapped $elem to $entry")
-            push(out, entry)
-            pull(in)
+//          ArchiveEntry.fromS3(elem.bucketName, elem.key).map(entry=>{
+//            logger.debug(s"Mapped $elem to $entry")
+//            push(out, entry)  //the downstream then pulls us for next record
+//          }).recoverWith({
+//            case err:Throwable=>
+//              logger.error("Could not convert S3 listing entry to ArchiveEntry", err)
+//              pull(in)
+//              Future()
+//          })
+          val mappedElem = Await.result(ArchiveEntry.fromS3(elem.bucketName, elem.key), 3.seconds)
+          logger.debug(s"Mapped $elem to $mappedElem")
 
-          }).recoverWith({
-            case err:Throwable=>
-              logger.error("Could not convert S3 listing entry to ArchiveEntry", err)
-              pull(in)
-              Future()
-          })
+          while(!isAvailable(out)){
+            logger.debug("waiting for output port to be available")
+            Thread.sleep(500L)
+          }
+          push(out, mappedElem)
 
 //          ArchiveEntry(ArchiveEntry.makeDocId(elem.bucketName, elem.key),elem.bucketName,elem.key,ArchiveEntry.getFileExtension(elem.key),
 //            elem.size,ZonedDateTime.ofInstant(elem.lastModified, ZoneId.systemDefault()),elem.eTag,MimeType)
-
 
         }
       })
