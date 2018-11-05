@@ -3,13 +3,13 @@ package controllers
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 
-import akka.actor.ActorSystem
+import akka.actor.{ActorRef, ActorSystem}
 import akka.stream.{ActorMaterializer, Materializer}
 import com.gu.scanamo._
 import com.gu.scanamo.syntax._
 import com.theguardian.multimedia.archivehunter.common.ZonedDateTimeEncoder
 import helpers.{DynamoClientManager, ZonedTimeFormat}
-import javax.inject.Inject
+import javax.inject.{Inject, Named}
 import play.api.Configuration
 import play.api.mvc.{AbstractController, ControllerComponents}
 import io.circe.generic.auto._
@@ -20,11 +20,13 @@ import responses.{GenericErrorResponse, ObjectCreatedResponse, ObjectListRespons
 import akka.stream.alpakka.dynamodb.scaladsl._
 import akka.stream.alpakka.dynamodb.impl._
 import com.amazonaws.auth.{AWSStaticCredentialsProvider, InstanceProfileCredentialsProvider}
+import services.BucketScanner
 
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class ScanTargetController @Inject() (config:Configuration,cc:ControllerComponents,ddbClientMgr:DynamoClientManager)(implicit system:ActorSystem)
+class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner:ActorRef, config:Configuration,
+                                      cc:ControllerComponents,ddbClientMgr:DynamoClientManager)(implicit system:ActorSystem)
   extends AbstractController(cc) with Circe with ZonedDateTimeEncoder with ZonedTimeFormat {
 
   implicit val mat:Materializer = ActorMaterializer.create(system)
@@ -64,6 +66,15 @@ class ScanTargetController @Inject() (config:Configuration,cc:ControllerComponen
         InternalServerError(GenericErrorResponse("error", errors.map(_.toString).mkString(",")).asJson)
       }
     })
+  }
 
+  def manualTrigger(targetName:String) = Action {
+    Scanamo.exec(ddbClientMgr.getNewDynamoClient(profileName))(table.get('bucketName -> targetName )).map({
+      case Left(error)=>
+        InternalServerError(GenericErrorResponse("error", error.toString).asJson)
+      case Right(tgt)=>
+        bucketScanner ! new BucketScanner.PerformTargetScan(tgt)
+        Ok(GenericErrorResponse("ok", "scan started").asJson)
+    }).getOrElse(NotFound(ObjectCreatedResponse[String]("not_found","scan_target",targetName).asJson))
   }
 }

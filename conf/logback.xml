@@ -28,6 +28,8 @@
     <logger name="services.BucketScanner" level="DEBUG"/>
     <logger name="services.ScanTimerSingleton" level="DEBUG"/>
     <logger name="akka.cluster" level="DEBUG"/>
+    <logger name="helpers.S3ToArchiveEntryFlow" level="DEBUG"/>
+    <logger name="com.sksamuel.elastic4s.streams.BulkIndexingSubscriber" level="DEBUG"/>
 
     <root level="WARN">
         <appender-ref ref="STDOUT" />
