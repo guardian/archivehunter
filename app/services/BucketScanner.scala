@@ -77,6 +77,7 @@ class BucketScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientMan
     target.lastScanned match {
       case None=>true
       case Some(lastScanned)=>
+        logger.info(s"${target.bucketName}: Next scan is due at ${lastScanned.plus(target.scanInterval,ChronoUnit.SECONDS)}")
         lastScanned.plus(target.scanInterval,ChronoUnit.SECONDS).isBefore(ZonedDateTime.now())
     }
   }
@@ -98,6 +99,7 @@ class BucketScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientMan
         self ! PerformTargetScan(scanTarget)
         true
       } else {
+        logger.info(s"Not scanning ${scanTarget.bucketName} as it is not due yet")
         false
       }
     }
@@ -115,12 +117,6 @@ class BucketScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientMan
     val client = s3ClientMgr.getAlpakkaS3Client(config.getOptional[String]("externalData.awsProfile"))
     val esclient = esClientMgr.getClient()
 
-    val checkFuture = esclient.client.async("GET","http://localhost:9200/_cat/indices").map(resp=>{
-      logger.info(resp.entity.getOrElse("no body returned").toString)
-    })
-
-    Await.ready(checkFuture, 10.seconds)
-
     val keySource = client.listBucket(target.bucketName, None)
     val converterFlow = injector.getInstance(classOf[S3ToArchiveEntryFlow])
 
@@ -132,26 +128,16 @@ class BucketScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientMan
       override def onFailure(resp: BulkResponseItem, original: ArchiveEntry): Unit = {
         logger.debug(s"ES subscriber failed on $original")
       }
-    },batchSize=10,concurrentRequests=5,completionFn = ()=>{
+    },batchSize=100,concurrentRequests=5,completionFn = ()=>{
               completionPromise.complete(Success())
               ()
             },errorFn = (err:Throwable)=>{
               logger.error("Could not send to elasticsearch", err)
               completionPromise.failure(err)
               ()
-            },failureWait= 1.seconds, maxAttempts=1
+            },failureWait= 5.seconds, maxAttempts=10
     )
 
-//    val subscriber = esclient.subscriber[ArchiveEntry](
-//      1,1,completionFn = ()=>{
-//        completionPromise.complete(Success())
-//        ()
-//      },errorFn = (err:Throwable)=>{
-//        logger.error("Could not send to elasticsearch", err)
-//        completionPromise.failure(err)
-//        ()
-//      },failureWait= 1.seconds, maxAttempts=1
-//    )
     val subscriber = esclient.subscriber[ArchiveEntry](esSubscriberConfig)
 
     val indexSink = Sink.fromSubscriber(subscriber)
