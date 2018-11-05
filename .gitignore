@@ -13,3 +13,6 @@ dist
 /.project
 /RUNNING_PID
 /.settings
+!/frontend/yarn.lock
+node_modules
+/public/javascripts/bundle.js
