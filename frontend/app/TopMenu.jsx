@@ -1,5 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
+import { Link } from 'react-router-dom';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 
 class TopMenu extends React.Component {
     static propTypes = {
@@ -9,10 +11,10 @@ class TopMenu extends React.Component {
 
     render(){
         return <div style={{display: this.props.visible ? "block" : "none"}} className="top-menu">
-            <span className="top-menu-spacer"><img className="smallicon inline-icon" src="images/search.png"/>Search</span>
-            <span className="top-menu-spacer"><img className="smallicon inline-icon" src="images/browse.png"/>Browse</span>
-            <span className="top-menu-spacer"><img className="smallicon inline-icon" src="images/lightbox.png"/>My Lightbox</span>
-            <span className="top-menu-spacer" style={{display: this.props.visible ? "inline" : "none"}}><img className="smallicon inline-icon" src="images/admin.png"/>Admin</span>
+            <Link className="top-menu-spacer" to="/search"><FontAwesomeIcon className="smallicon inline-icon highlight" icon="search"/>Search</Link>
+            <Link className="top-menu-spacer" to="/browse"><FontAwesomeIcon className="smallicon inline-icon highlight" icon="th-list"/>Browse</Link>
+            <Link className="top-menu-spacer" to="/lightbox"><FontAwesomeIcon className="smallicon inline-icon highlight" icon="lightbulb"/>My Lightbox</Link>
+            <Link className="top-menu-spacer" to="/admin" style={{display: this.props.visible ? "inline" : "none"}}><FontAwesomeIcon className="smallicon inline-icon highlight" icon="wrench"/>Admin</Link>
         </div>
     }
 }
