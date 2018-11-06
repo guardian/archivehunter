@@ -5,6 +5,8 @@ import play.api._
 import play.api.mvc._
 
 class Application @Inject() (cc:ControllerComponents) extends AbstractController(cc) {
+  def rootIndex() = index("")
+
   def index(path:String) = Action {
     Ok(views.html.index("Archive Hunter")("fake-cachebuster"))
   }

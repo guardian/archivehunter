@@ -3,6 +3,7 @@
 # ~~~~
 
 GET     /is-online                  controllers.Application.healthcheck
+GET     /                           @controllers.Application.rootIndex()
 
 POST    /api/scanTarget                 @controllers.ScanTargetController.newTarget
 DELETE  /api/scanTarget/:id             @controllers.ScanTargetController.removeTarget(id)
@@ -12,3 +13,4 @@ POST    /api/scanTarget/:id/trigger     @controllers.ScanTargetController.manual
 # Map static resources from the /public folder to the /assets URL path
 GET     /assets/*file               controllers.Assets.at(path="/public", file)
 GET     /*tail                      @controllers.Application.index(tail)
+

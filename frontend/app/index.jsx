@@ -7,12 +7,14 @@ import axios from 'axios';
 import ScanTargetEdit from './ScanTargets/ScanTargetEdit.jsx';
 import ScanTargetsList from './ScanTargets/ScanTargetsList.jsx';
 import NotFoundComponent from './NotFoundComponent.jsx';
+import FrontPage from './FrontPage.jsx';
+import TopMenu from './TopMenu.jsx';
+import AdminFront from './admin/AdminFront.jsx';
 
 import { library } from '@fortawesome/fontawesome-svg-core'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faStroopwafel, faCheckCircle, faTimesCircle } from '@fortawesome/free-solid-svg-icons'
-library.add(faStroopwafel, faCheckCircle, faTimesCircle);
-library.add(faCheckCircle);
+import { faStroopwafel, faCheckCircle, faTimesCircle, faRoad, faSearch,faThList,faWrench, faLightbulb } from '@fortawesome/free-solid-svg-icons'
+library.add(faStroopwafel, faCheckCircle, faTimesCircle, faRoad,faSearch,faThList,faWrench, faLightbulb);
 
 window.React = require('react');
 
@@ -31,11 +33,16 @@ class App extends React.Component {
     }
 
     render(){
-        return <Switch>
-            <Route path="/admin/scanTargets" component={ScanTargetsList}/>
-            <Route path="/admin/scanTargets/:id" component={ScanTargetEdit}/> /*this also handles "new" */
-            <Route default component={NotFoundComponent}/>
-        </Switch>
+        return <div>
+            <TopMenu visible={true} isAdmin={true}/>
+            <Switch>
+                <Route path="/admin/scanTargets" component={ScanTargetsList}/>
+                <Route path="/admin/scanTargets/:id" component={ScanTargetEdit}/> /*this also handles "new" */
+                <Route path="/admin" exact={true} component={AdminFront}/>
+                <Route path="/" exact={true} component={FrontPage}/>
+                <Route default component={NotFoundComponent}/>
+            </Switch>
+        </div>
     }
 }
 
