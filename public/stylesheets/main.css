@@ -1,11 +1,17 @@
 html, body, p, th, td, li, dd, dt, pre {
     font: 1em Verdana, Arial, Helvetica, sans-serif;
+    background-color: #666666;
+    color: white;
 }
 
+a {
+    color: #AAAAAA;
+}
 tr.dashboardheader, th.dashboardheader {
     text-transform: inherit;
     font-weight: inherit;
     background-color: lavender;
+    color: black;
 }
 
 td {
@@ -67,4 +73,11 @@ a.breadcrumb:link {
 
 a.breadcrumb:hover {
     text-decoration: underline;
+}
+
+div.top-menu {
+    margin-left: auto;
+    margin-right: auto;
+    width: 66%;
+    height: 1em;
 }
