@@ -78,6 +78,7 @@ a.breadcrumb:hover {
 div.top-menu {
     margin-left: auto;
     margin-right: auto;
+    margin-bottom: 2em;
     width: 30%;
     height: 1em;
 }
@@ -107,4 +108,26 @@ div.top-menu {
 
 .top-menu-spacer {
     margin-right: 1em;
+}
+
+div.entry-view {
+    border: 1px solid black;
+    overflow: hidden;
+    width: 140px;
+    height: 140px;
+    border-radius: 10px;
+    background-color: white;
+    display:inline-block;
+    margin-right: 2em;
+    margin-bottom: 2em;
+}
+
+div.search-results-container {
+    overflow-x: scroll;
+    overflow-y: hidden;
+}
+
+.entry-title {
+    margin-top: 0;
+    margin-bottom: 0.2em;
 }
