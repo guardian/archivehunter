@@ -1,0 +1,110 @@
+html, body, p, th, td, li, dd, dt, pre {
+    font: 1em Verdana, Arial, Helvetica, sans-serif;
+    background-color: #666666;
+    color: white;
+}
+
+a {
+    color: #AAAAAA;
+}
+tr.dashboardheader, th.dashboardheader {
+    text-transform: inherit;
+    font-weight: inherit;
+    background-color: lavender;
+    color: black;
+}
+
+td {
+    border: 1px solid black;
+    border-collapse: collapse;
+    text-align: center;
+}
+
+table.table {
+    border-radius: 3px;
+    margin-right: 5%;
+    margin-left: auto;
+    width: 85%;
+}
+
+img.smallicon {
+    width: 32px;
+}
+
+img.tinyicon {
+    width: 16px;
+}
+
+.inline-icon {
+    margin-right: 0.4em;
+}
+
+.error-text {
+    color: darkred;
+    font-weight: bold;
+}
+
+div.inline-dialog {
+    border: 2px solid black;
+    width: 30%;
+    overflow:hidden;
+    margin-top:5em;
+    margin-left: auto;
+    margin-right:auto;
+    border-radius: 30px;
+}
+
+h2.inline-dialog-title {
+    background-color: lavender;
+    border-top-right-radius: 30px;
+    padding: 0.1em;
+    padding-left: 0.5em;
+    border-top-left-radius: 30px;
+}
+
+span.breadcrumb {
+    text-transform: capitalize;
+    margin-bottom: 1em;
+}
+
+a.breadcrumb:link {
+    text-decoration: none;
+}
+
+a.breadcrumb:hover {
+    text-decoration: underline;
+}
+
+div.top-menu {
+    margin-left: auto;
+    margin-right: auto;
+    width: 30%;
+    height: 1em;
+}
+
+.centered {
+    margin-left: auto;
+    margin-right: auto;
+    width: 66%;
+}
+
+.login-icon{
+    display:inherit;
+    font-size: 40px;
+    line-height: 50px;
+    margin-left: auto;
+    margin-right: auto;
+    color:white;
+    width: 50px;
+    height: 50px;
+    text-align: center;
+    vertical-align: bottom;
+}
+
+.highlight {
+    color: white;
+}
+
+.top-menu-spacer {
+    margin-right: 1em;
+}
