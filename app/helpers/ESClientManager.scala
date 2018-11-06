@@ -12,5 +12,6 @@ trait ESClientManager {
 class ESClientManagerImpl @Inject()(config:Configuration) extends ESClientManager {
   val esHost:String = config.get[String]("elasticsearch.hostname")
   val esPort:Int = config.get[Int]("elasticsearch.port")
-  def getClient() = HttpClient(s"elasticsearch://$esHost:$esPort?ssl=true")
+  val sslFlag:Boolean = config.getOptional[Boolean]("elasticsearch.ssl").getOrElse(false)
+  def getClient() = HttpClient(s"elasticsearch://$esHost:$esPort?ssl=$sslFlag")
 }

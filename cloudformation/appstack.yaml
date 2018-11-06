@@ -333,6 +333,7 @@ Resources:
           elasticsearch {
             hostname = "${SearchDomain.DomainEndpoint}"
             port = 443
+            ssl = true
           }
 
           akka.actor {
