@@ -10,6 +10,7 @@ import NotFoundComponent from './NotFoundComponent.jsx';
 import FrontPage from './FrontPage.jsx';
 import TopMenu from './TopMenu.jsx';
 import AdminFront from './admin/AdminFront.jsx';
+import BasicSearchComponent from './search/BasicSearchComponent.jsx';
 
 import { library } from '@fortawesome/fontawesome-svg-core'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
@@ -39,6 +40,7 @@ class App extends React.Component {
                 <Route path="/admin/scanTargets" component={ScanTargetsList}/>
                 <Route path="/admin/scanTargets/:id" component={ScanTargetEdit}/> /*this also handles "new" */
                 <Route path="/admin" exact={true} component={AdminFront}/>
+                <Route path="/search" exact={true} component={BasicSearchComponent}/>
                 <Route path="/" exact={true} component={FrontPage}/>
                 <Route default component={NotFoundComponent}/>
             </Switch>
