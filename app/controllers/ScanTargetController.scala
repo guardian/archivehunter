@@ -11,7 +11,7 @@ import com.theguardian.multimedia.archivehunter.common.ZonedDateTimeEncoder
 import helpers.{DynamoClientManager, ZonedTimeFormat}
 import javax.inject.{Inject, Named}
 import play.api.Configuration
-import play.api.mvc.{AbstractController, ControllerComponents}
+import play.api.mvc._
 import io.circe.generic.auto._
 import io.circe.syntax._
 import models.ScanTarget
@@ -68,13 +68,24 @@ class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner
     })
   }
 
+  private def withLookup(targetName:String)(block: ScanTarget=>Result) = Scanamo.exec(ddbClientMgr.getNewDynamoClient(profileName))(table.get('bucketName -> targetName )).map({
+    case Left(error)=>
+      InternalServerError(GenericErrorResponse("error", error.toString).asJson)
+    case Right(tgt)=>
+      block(tgt)
+  }).getOrElse(NotFound(ObjectCreatedResponse[String]("not_found","scan_target",targetName).asJson))
+
   def manualTrigger(targetName:String) = Action {
-    Scanamo.exec(ddbClientMgr.getNewDynamoClient(profileName))(table.get('bucketName -> targetName )).map({
-      case Left(error)=>
-        InternalServerError(GenericErrorResponse("error", error.toString).asJson)
-      case Right(tgt)=>
-        bucketScanner ! new BucketScanner.PerformTargetScan(tgt)
-        Ok(GenericErrorResponse("ok", "scan started").asJson)
-    }).getOrElse(NotFound(ObjectCreatedResponse[String]("not_found","scan_target",targetName).asJson))
+    withLookup(targetName) { tgt=>
+      bucketScanner ! new BucketScanner.PerformTargetScan(tgt)
+      Ok(GenericErrorResponse("ok", "scan started").asJson)
+    }
+  }
+
+  def manualTriggerDeletionScan(targetName:String) = Action {
+    withLookup(targetName) { tgt=>
+      bucketScanner ! new BucketScanner.PerformDeletionScan(tgt)
+      Ok(GenericErrorResponse("ok","scan started").asJson)
+    }
   }
 }

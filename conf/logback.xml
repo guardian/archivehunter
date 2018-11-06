@@ -40,6 +40,8 @@
     <logger name="services.ScanTimerSingleton" level="DEBUG"/>
     <logger name="akka.cluster" level="DEBUG"/>
     <logger name="helpers.S3ToArchiveEntryFlow" level="DEBUG"/>
+    <logger name="helpers.SearchHitToArchiveEntryFlow" level="DEBUG"/>
+    <logger name="helpers.ArchiveEntryVerifyFlow" level="DEBUG"/>
     <logger name="com.sksamuel.elastic4s.streams" level="DEBUG"/>
 
     <root level="WARN">

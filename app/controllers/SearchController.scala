@@ -10,12 +10,12 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import io.circe.generic.auto._
 import io.circe.syntax._
 import com.sksamuel.elastic4s.circe._
-import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ArchiveEntryHitReader, ZonedDateTimeEncoder}
+import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ArchiveEntryHitReader, StorageClassEncoder, ZonedDateTimeEncoder}
 import play.api.libs.circe.Circe
 
 @Singleton
 class SearchController @Inject()(config:Configuration,cc:ControllerComponents,esClientManager:ESClientManager)
-  extends AbstractController(cc) with ArchiveEntryHitReader with ZonedDateTimeEncoder with Circe {
+  extends AbstractController(cc) with ArchiveEntryHitReader with ZonedDateTimeEncoder with StorageClassEncoder with Circe {
   val indexName = config.getOptional[String]("elasticsearch.index").getOrElse("ArchiveHunter")
 
   import com.sksamuel.elastic4s.http.ElasticDsl._

@@ -2,6 +2,7 @@ package com.theguardian.multimedia.archivehunter.common
 
 import com.sksamuel.elastic4s.RefreshPolicy
 import com.sksamuel.elastic4s.http.index.CreateIndexResponse
+import com.sksamuel.elastic4s.http.search.SearchHit
 
 import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
@@ -11,7 +12,7 @@ import com.sksamuel.elastic4s.mappings.FieldType._
 import io.circe.generic.auto._
 import io.circe.syntax._
 
-class Indexer(indexName:String) extends ZonedDateTimeEncoder {
+class Indexer(indexName:String) extends ZonedDateTimeEncoder with StorageClassEncoder with ArchiveEntryHitReader {
   import com.sksamuel.elastic4s.http.ElasticDsl._
   import com.sksamuel.elastic4s.circe._
 
@@ -64,5 +65,23 @@ class Indexer(indexName:String) extends ZonedDateTimeEncoder {
   }.map({
     case Left(failure)=>Failure(new RuntimeException(failure.error.toString))
     case Right(success)=>Success(success.result)
+  })
+
+  /**
+    * Perform an index lookup by ID
+    * @param docId document ID to find
+    * @param client implicitly provided index client
+    * @return a Future containing an ArchiveEntry.  The future is cancelled if anything fails - use .recover or .recoverWith to pick this up.
+    */
+  def getById(docId:String)(implicit client:HttpClient):Future[ArchiveEntry] = client.execute {
+    get(indexName, "entry", docId)
+  }.map({
+    case Left(failure)=>
+      throw new RuntimeException(failure.toString)
+    case Right(success)=>
+      ArchiveEntryHR.read(success.result) match {
+        case Left(err)=>throw err
+        case Right(entry)=>entry
+      }
   })
 }

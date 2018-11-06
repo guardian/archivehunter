@@ -5,7 +5,7 @@ import com.sksamuel.elastic4s.streams.RequestBuilder
 /**
   * mix in this class to be able to use the streaming API in Elastic4s
   */
-trait ArchiveEntryRequestBuilder extends ZonedDateTimeEncoder {
+trait ArchiveEntryRequestBuilder extends ZonedDateTimeEncoder with StorageClassEncoder{
   val indexName:String  //anyone extending this class must set the index name
   import com.sksamuel.elastic4s.http.ElasticDsl._
   import com.sksamuel.elastic4s.circe._
