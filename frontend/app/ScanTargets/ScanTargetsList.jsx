@@ -2,11 +2,12 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import axios from 'axios';
 import SortableTable from 'react-sortable-table';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import TimeIntervalComponent from '../common/TimeIntervalComponent.jsx';
 import TimestampFormatter from '../common/TimestampFormatter.jsx';
 import ErrorViewComponent from '../common/ErrorViewComponent.jsx';
 import BreadcrumbComponent from "../common/BreadcrumbComponent.jsx";
+import Dialog from 'react-dialog';
 
 class ScanTargetsList extends React.Component {
     constructor(props){
@@ -15,7 +16,9 @@ class ScanTargetsList extends React.Component {
         this.state = {
             loading: false,
             lastError: null,
-            scanTargets: []
+            scanTargets: [],
+            showingDeleteConfirm: false,
+            deletionTarget:null
         };
 
         /*
@@ -24,7 +27,15 @@ class ScanTargetsList extends React.Component {
          scanInterval:Long, scanInProgress:Boolean, lastError:Option[String])
 
          */
-        this.columns = [{
+        this.deleteClicked = this.deleteClicked.bind(this);
+        this.columns = [
+            {
+                header: "Delete",
+                key: "bucketName",
+                headerProps: {className: "dashboardheader"},
+                render: value=><FontAwesomeIcon icon="trash-alt" className="inline-icon clickable" onClick={()=>this.deleteClicked(value)}/>
+            },
+            {
                 header: "Bucket",
                 key: "bucketName",
                 defaultSorting: "desc",
@@ -75,6 +86,10 @@ class ScanTargetsList extends React.Component {
 
     }
 
+    deleteClicked(targetId){
+        this.setState({deletionTarget: targetId, showingDeleteConfirm: true});
+    }
+
     componentWillMount(){
         this.setState({loading: true}, ()=>axios.get("/api/scanTarget").then(response=>{
             this.setState({loading: false, lastError: null, scanTargets: response.data.entries});
@@ -84,11 +99,26 @@ class ScanTargetsList extends React.Component {
         }));
     }
 
+    handleModalClose(){
+        this.setState({deletionTarget:null, showingDeleteConfirm: false});
+    }
+
+    doDelete(){
+        this.setState({loading: true}, ()=>axios.delete("/api/scanTarget/" + this.state.deletionTarget)
+            .then(response=>{
+                console.log("Delete request successful");
+                this.setState({loading: false, deletionTarget: null, showingDeleteConfirm: false, scanTargets:[]}, ()=>this.componentWillMount())
+            }).catch(err=>{
+                console.error(err);
+                this.setState({loading: false, deletionTarget: null, showingDeleteConfirm: false, lastError: err});
+            }))
+    }
+
     render(){
         if(this.state.error){
             return <ErrorViewComponent error={this.state.error}/>
         }
-//
+
         return <div>
             <BreadcrumbComponent path={this.props.location.pathname}/>
             <SortableTable
@@ -97,7 +127,30 @@ class ScanTargetsList extends React.Component {
             style={this.style}
             iconStyle={this.iconStyle}
             tableProps={ {className: "dashboardpanel"} }
-        /></div>
+        />
+            {
+                this.state.showingDeleteConfirm && <Dialog modal={true}
+                                                           title="Delete Scan Target"
+                                                           onClose={this.handleModalClose}
+                                                           closeOnEscape={true}
+                                                           hasCloseIcon={true}
+                                                           isDraggable={true}
+                                                           position={{x: window.innerWidth/2-250, y:0}}
+                                                           buttons={
+                                                               [{
+                                                                   text: "Cancel",
+                                                                   onClick: ()=>this.handleModalClose()
+                                                               },{
+                                                                   text: "Delete",
+                                                                   onClick: ()=>this.doDelete()
+                                                               }
+                                                               ]
+                                                           }
+                >
+                    <p style={{height:"200px"}} className="centered">Are you sure you want to delete the scan target for {this.state.deletionTarget}?</p>
+                </Dialog>
+            }
+        </div>
     }
 }
 

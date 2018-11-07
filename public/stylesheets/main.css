@@ -4,6 +4,10 @@ html, body, p, th, td, li, dd, dt, pre {
     color: white;
 }
 
+.ui-dialog-content {
+    background-color: #666666;
+}
+
 a {
     color: #AAAAAA;
 }
@@ -159,4 +163,35 @@ li.suggestions-list {
     padding-left: 4px;
     padding-right: 4px;
     margin-right: 1em;
+}
+
+.form-errors {
+    display: inline;
+}
+
+.clickable {
+    cursor: pointer;
+}
+
+.title {
+    background-color: lavender;
+    color: black;
+    font-weight: bold;
+    font-size: 1.1em;
+    padding: 0.1em;
+    padding-left: 0.5em;
+}
+
+.ui-dialog {
+    border: 2px solid white;
+}
+
+.ui-dialog-buttonset {
+    margin-left: auto;
+    margin-right:auto;
+    width: 300px;
+}
+
+.ui-dialog-buttonset.button {
+    margin-right: 1.5em;
 }
