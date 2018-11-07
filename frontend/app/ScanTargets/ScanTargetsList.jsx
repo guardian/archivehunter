@@ -70,6 +70,16 @@ class ScanTargetsList extends React.Component {
                 key: "lastError",
                 headerProps: {className: "dashboardheader"},
                 render: value=>value ? value : "-"
+            },
+            {
+                header: "Trigger",
+                key: "bucketName",
+                headerProps: {className: "dashboardheader"},
+                render: value=><span>
+                    <FontAwesomeIcon icon="folder-plus" className="clickable button-row" onClick={()=>this.triggerAddedScan(value)}/>
+                    <FontAwesomeIcon icon="folder-minus" className="clickable button-row" onClick={()=>this.triggerRemovedScan(value)}/>
+                    <FontAwesomeIcon icon="folder" className="clickablebutton-row " onClick={()=>this.triggerFullScan(value)}/>
+                </span>
             }
         ];
         this.style = {
@@ -84,6 +94,27 @@ class ScanTargetsList extends React.Component {
             paddingRight: '5px'
         };
 
+    }
+
+    triggerAddedScan(targetId){
+        return this.generalScanTrigger(targetId,"addedScan")
+    }
+    triggerRemovedScan(targetId){
+        return this.generalScanTrigger(targetId,"deletionScan")
+    }
+    triggerFullScan(targetId){
+        return this.generalScanTrigger(targetId,"scan")
+    }
+    generalScanTrigger(targetId,type){
+        this.setState({loading: true},()=>axios.post("/api/scanTarget/" + encodeURIComponent(targetId) + "/" + type)
+            .then(result=>{
+                console.log("Manual rescan has been triggered");
+                this.setState({loading:false, lastError:null, scanTargets:[]}, ()=>setTimeout(()=>this.componentWillMount(),1000));
+            })
+            .catch(err=>{
+                console.error(err);
+                this.setState({loading: false, lastError: err});
+            }))
     }
 
     deleteClicked(targetId){
