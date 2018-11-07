@@ -86,6 +86,13 @@ class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner
 
   def manualTrigger(targetName:String) = Action {
     withLookup(targetName) { tgt=>
+      bucketScanner ! new BucketScanner.PerformDeletionScan(tgt,thenScanForNew=true)
+      Ok(GenericErrorResponse("ok", "scan started").asJson)
+    }
+  }
+
+  def manualTriggerAdditionScan(targetName:String) = Action {
+    withLookup(targetName) { tgt=>
       bucketScanner ! new BucketScanner.PerformTargetScan(tgt)
       Ok(GenericErrorResponse("ok", "scan started").asJson)
     }
