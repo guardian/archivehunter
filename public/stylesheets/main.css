@@ -62,6 +62,11 @@ h2.inline-dialog-title {
     border-top-left-radius: 30px;
 }
 
+h4 {
+    margin: 0 0 0.5em 0.5em;
+    display: inline;
+}
+
 span.breadcrumb {
     text-transform: capitalize;
     margin-bottom: 1em;
@@ -87,6 +92,10 @@ div.top-menu {
     margin-left: auto;
     margin-right: auto;
     width: 66%;
+}
+
+p.centered {
+    text-align: center;
 }
 
 .login-icon{
@@ -130,4 +139,20 @@ div.search-results-container {
 .entry-title {
     margin-top: 0;
     margin-bottom: 0.2em;
+}
+
+.suggestions-list {
+    display: inline;
+    alignment: center;
+}
+
+li.suggestions-list {
+    background-color: lavender;
+    border-radius: 10px;
+    color: black;
+    padding-top: 1px;
+    padding-bottom: 1px;
+    padding-left: 4px;
+    padding-right: 4px;
+    margin-right: 1em;
 }

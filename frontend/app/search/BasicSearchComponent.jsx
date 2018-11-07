@@ -2,6 +2,8 @@ import React from 'react';
 import axios from 'axios';
 import ErrorViewComponent from '../common/ErrorViewComponent.jsx';
 import SearchResultsComponent from './SearchResultsComponent.jsx';
+import SearchSuggestionsComponent from './SearchSuggestionsComponent.jsx';
+
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 
 class BasicSearchComponent extends React.Component {
@@ -14,7 +16,7 @@ class BasicSearchComponent extends React.Component {
             searchTerms: "",
             error:null,
             searchResults: [],
-            totalHits: -1
+            totalHits: -1,
         };
 
         this.cancelTokenSource = axios.CancelToken.source();
@@ -28,6 +30,11 @@ class BasicSearchComponent extends React.Component {
     runSearch(startAt){
         const tok=this.cancelTokenSource.token;
         const encodedParamString = encodeURIComponent(this.state.searchTerms);
+
+        if(this.state.searchTerms===""){
+            this.setState({searching: false, currentSearch:null, searchResults:[], totalHits: -1});
+            return;
+        }
 
         this.setState({searching: true, currentSearch:tok},()=>
             axios.get("/api/search/basic?q=" + encodedParamString + "&start=" + startAt + "&length=" + this.defaultPageSize).then(result=>{
@@ -47,7 +54,7 @@ class BasicSearchComponent extends React.Component {
                 if(axios.isCancel(err)){
                     console.log("cancelled ongoing search");
                 } else {
-                    this.setState({error: err});
+                    this.setState({error: err, searching: false});
                 }
             })  //axios.get
         );  //this.setState
@@ -60,10 +67,32 @@ class BasicSearchComponent extends React.Component {
         this.setState({searchTerms: newString, searchResults: []},()=>this.runSearch(0));
     }
 
+    renderMainBody(){
+        if(this.state.error){
+            return <ErrorViewComponent error={this.state.error}/>
+        } else if(this.state.totalHits!==-1){
+            return <SearchResultsComponent entries={this.state.searchResults}/>
+        } else if(this.state.searching) {
+            return <img style={{marginLeft:"auto",marginRight:"auto",width:"200px"}} src="/assets/images/Spinner-1s-200px.gif"/>
+        } else {
+            return <span/>
+        }
+    }
+
     render(){
         return <div>
-            <div className="centered" style={{marginBottom: "2em"}}><FontAwesomeIcon icon="search" className="inline-icon"/><input style={{width: "95%"}} onChange={event=>this.updateSearchTerms(event.target.value)} value={this.state.searchTerms}/></div>
-            {this.state.error ? <ErrorViewComponent error={this.state.error}/> : <SearchResultsComponent entries={this.state.searchResults}/>}
+            <div className="centered" style={{height: "2em"}}>
+                <FontAwesomeIcon icon="search" className="inline-icon"/>
+                <input style={{width: "90%"}} onChange={event=>this.updateSearchTerms(event.target.value)} value={this.state.searchTerms}/>
+                <img src="/assets/images/Spinner-1s-44px.svg" style={{display: this.state.searching ? "inline-block":"none", verticalAlign: "bottom", height: "1.9em"}}/>
+            </div>
+            <div className="centered">
+                <SearchSuggestionsComponent terms={this.state.searchTerms} autoHide={true}/>
+            </div>
+            <div className="centered" style={{marginBottom: "2em",height: "2em", display: this.state.totalHits===-1 ? "none":"block"}}>
+                <p className="centered">Found a total of {this.state.totalHits} results{ this.state.searching ? "so far" : ""}.</p>
+            </div>
+            {this.renderMainBody()}
         </div>
     }
 }

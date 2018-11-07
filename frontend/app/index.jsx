@@ -15,7 +15,9 @@ import BasicSearchComponent from './search/BasicSearchComponent.jsx';
 import { library } from '@fortawesome/fontawesome-svg-core'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faStroopwafel, faCheckCircle, faTimesCircle, faRoad, faSearch,faThList,faWrench, faLightbulb } from '@fortawesome/free-solid-svg-icons'
-library.add(faStroopwafel, faCheckCircle, faTimesCircle, faRoad,faSearch,faThList,faWrench, faLightbulb);
+import { faChevronCircleDown,faChevronCircleRight } from '@fortawesome/free-solid-svg-icons'
+
+library.add(faStroopwafel, faCheckCircle, faTimesCircle, faRoad,faSearch,faThList,faWrench, faLightbulb, faChevronCircleDown, faChevronCircleRight);
 
 window.React = require('react');
 
