@@ -3,6 +3,8 @@ import PropTypes from 'prop-types';
 import TimestampFormatter from '../common/TimestampFormatter.jsx';
 import TimeIntervalComponent from '../common/TimeIntervalComponent.jsx';
 import axios from 'axios';
+import {Redirect} from 'react-router-dom';
+import ErrorViewComponent from "../common/ErrorViewComponent.jsx";
 
 class ScanTargetEdit extends React.Component {
     constructor(props){
@@ -20,7 +22,9 @@ class ScanTargetEdit extends React.Component {
         this.state = {
             entry: defaultValues,
             loading: false,
-            error: null
+            error: null,
+            formValidationErrors: [],
+            completed: false
         };
 
         this.updateBucketname = this.updateBucketname.bind(this);
@@ -55,6 +59,7 @@ class ScanTargetEdit extends React.Component {
     }
 
     updateBucketname(evt){
+        console.log("updateBucketname: ", evt.target);
         const newEntry = Object.assign({bucketName: evt.target.value}, this.state.entry);
         this.setState({entry: newEntry});
     }
@@ -64,14 +69,49 @@ class ScanTargetEdit extends React.Component {
         this.setState({entry: newEntry});
     }
 
-    formSubmit(evt){
+    clearErrorLog(evt){
+        const newEntry = Object.assign({lastError: null}, this.state.entry);
+        this.setState({entry: newEntry});
+    }
 
+    formSubmit(evt){
         evt.preventDefault();
+
+        let errorList=[];
+
+        const idToSave = this.state.entry.bucketName;
+        if(idToSave===null || idToSave===""){
+            errorList.concat(["You must specify a valid bucket name"]);
+        }
+
+        if(errorList.length>0){
+            this.setState({formValidationErrors: errorList});
+            return;
+        }
+
+        this.setState({loading: true}, ()=>axios.post("/api/scanTarget",this.state.entry)
+            .then(result=> {
+                    console.log("Saved result successfully");
+                    this.setState({loading: false, completed: true});
+                })
+            .catch(err=>{
+                console.error(err);
+                this.setState({loading: false, error: err});
+            })
+        );
     }
 
     render(){
+        if(this.state.completed) return <Redirect to="/admin/scanTargets"/>;
         return <form onSubmit={this.formSubmit}>
             <h2>Edit scan target <img src="/assets/images/Spinner-1s-44px.svg" style={{display: this.state.loading ? "inline" : "none"}}/></h2>
+            <div className="centered" style={{display: this.state.formValidationErrors.length>0 ? "block" : "none"}}>
+                <ul className="form-errors">
+                    {
+                        this.state.formValidationErrors.map(entry=><li className="form-errors error-text">{entry}</li>)
+                    }
+                </ul>
+            </div>
             <table className="table">
                 <tbody>
                 <tr>
@@ -92,13 +132,14 @@ class ScanTargetEdit extends React.Component {
                 </tr>
                 <tr>
                     <td>Last Error</td>
-                    <td><textarea contentEditable={false} value={this.state.entry.lastError ? this.state.entry.lastError : ""} style={{width: "85%", verticalAlign:"middle"}}/>
+                    <td><textarea contentEditable={false} readOnly={true} value={this.state.entry.lastError ? this.state.entry.lastError : ""} style={{width: "85%", verticalAlign:"middle"}}/>
                         <button type="button" onClick={this.clearErrorLog} style={{marginLeft: "0.5em", verticalAlign: "middle"}}>Clear</button></td>
                 </tr>
                 </tbody>
             </table>
             <input type="submit" value="Save"/>
             <button type="button">Back</button>
+            {this.state.error ? <ErrorViewComponent error={this.state.error}/> : <span/>}
         </form>
     }
 }
