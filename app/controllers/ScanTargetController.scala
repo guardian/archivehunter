@@ -16,7 +16,7 @@ import io.circe.generic.auto._
 import io.circe.syntax._
 import models.ScanTarget
 import play.api.libs.circe.Circe
-import responses.{GenericErrorResponse, ObjectCreatedResponse, ObjectListResponse}
+import responses.{GenericErrorResponse, ObjectCreatedResponse, ObjectGetResponse, ObjectListResponse}
 import akka.stream.alpakka.dynamodb.scaladsl._
 import akka.stream.alpakka.dynamodb.impl._
 import com.amazonaws.auth.{AWSStaticCredentialsProvider, InstanceProfileCredentialsProvider}
@@ -47,6 +47,15 @@ class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner
   def removeTarget(targetName:String) = Action {
     val r = Scanamo.exec(ddbClientMgr.getNewDynamoClient(profileName))(table.delete('bucketName -> targetName))
     Ok(ObjectCreatedResponse[String]("deleted","scan_target",targetName).asJson)
+  }
+
+  def get(targetName:String) = Action {
+    Scanamo.exec(ddbClientMgr.getNewDynamoClient(profileName))(table.get('bucketName -> targetName)).map({
+      case Left(err)=>
+        InternalServerError(GenericErrorResponse("database_error", err.toString).asJson)
+      case Right(result)=>
+        Ok(ObjectGetResponse[ScanTarget]("ok", "scan_target", result).asJson)
+    }).getOrElse(NotFound(ObjectCreatedResponse[String]("not_found","scan_target",targetName).asJson))
   }
 
   def listScanTargets = Action.async {

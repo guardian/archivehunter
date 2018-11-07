@@ -7,6 +7,8 @@ GET     /                           @controllers.Application.rootIndex()
 
 POST    /api/scanTarget                 @controllers.ScanTargetController.newTarget
 DELETE  /api/scanTarget/:id             @controllers.ScanTargetController.removeTarget(id)
+GET     /api/scanTarget/:id             @controllers.ScanTargetController.get(id)
+
 GET     /api/scanTarget                 @controllers.ScanTargetController.listScanTargets
 POST    /api/scanTarget/:id/scan        @controllers.ScanTargetController.manualTrigger(id)
 POST    /api/scanTarget/:id/deletionScan  @controllers.ScanTargetController.manualTriggerDeletionScan(id)

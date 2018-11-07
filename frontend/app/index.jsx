@@ -39,8 +39,8 @@ class App extends React.Component {
         return <div>
             <TopMenu visible={true} isAdmin={true}/>
             <Switch>
-                <Route path="/admin/scanTargets" component={ScanTargetsList}/>
                 <Route path="/admin/scanTargets/:id" component={ScanTargetEdit}/> /*this also handles "new" */
+                <Route path="/admin/scanTargets" component={ScanTargetsList}/>
                 <Route path="/admin" exact={true} component={AdminFront}/>
                 <Route path="/search" exact={true} component={BasicSearchComponent}/>
                 <Route path="/" exact={true} component={FrontPage}/>
