@@ -30,8 +30,6 @@ class SearchSuggestionsComponent extends React.Component {
     }
 
     reloadData(){
-        console.log(this);
-
         this.setState({
             loading: true,
             error: null,
@@ -39,7 +37,6 @@ class SearchSuggestionsComponent extends React.Component {
         }, ()=> {
             axios.put("/api/search/suggestions", this.props.terms, {headers: {'Content-Type': 'text/plain'}})
                 .then(result => {
-                    console.log(result);
                     this.setState({loading: true, error: null, suggestionsList: result.data.suggestions})
                 })
                 .catch(err => {

@@ -127,6 +127,9 @@ p.centered {
     margin-right: 1em;
 }
 
+/*
+Search entries
+ */
 div.entry-view {
     border: 1px solid black;
     overflow: hidden;
@@ -137,6 +140,56 @@ div.entry-view {
     display:inline-block;
     margin-right: 2em;
     margin-bottom: 2em;
+    padding: 0.4em;
+    padding-top: 0.2em;
+}
+
+.entry-title {
+    margin-top: 0;
+    margin-bottom: 0.2em;
+    color: blue;
+    font-size: 0.8em;
+    font-weight: bold;
+    background-color: inherit;
+    margin-left:0.2em;
+    margin-right:0.2em;
+    height: 2.5em;
+    overflow: hidden;
+}
+
+.entry-icon {
+    color: #333333;
+}
+
+.entry-deep-archive {
+    background-color: #2676b5 !important;
+    color: white !important;
+}
+
+.entry-shallow-archive {
+    background-color: #cceeff !important;
+}
+
+.entry-gone-missing {
+    background-color: darkred !important;
+    color: white !important;
+}
+
+.entry-date {
+    font-size: 0.6em;
+    font-style: italic;
+    background-color: inherit;
+}
+
+.entry-thumbnail {
+    color: inherit;
+    margin-left: auto;
+    margin-right: auto;
+    overflow: hidden;
+    width: 150px !important;
+    margin-top: auto;
+    margin-bottom: auto;
+    height: 80px;
 }
 
 div.search-results-container {
@@ -144,10 +197,7 @@ div.search-results-container {
     overflow-y: hidden;
 }
 
-.entry-title {
-    margin-top: 0;
-    margin-bottom: 0.2em;
-}
+
 
 .suggestions-list {
     display: inline;

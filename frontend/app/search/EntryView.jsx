@@ -1,18 +1,48 @@
 import React from 'react';
 import PropTypes from 'prop-types';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import TimestampFormatter from "../common/TimestampFormatter.jsx";
+import EntryThumbnail from "./EntryThumbnail.jsx";
 
 class EntryView extends React.Component {
     static propTypes = {
-        entry: PropTypes.object.isRequired
+        entry: PropTypes.object.isRequired,
+        itemOpenRequest: PropTypes.func.isRequired
     };
+
+    entryClicked(){
+        if(this.itemOpenRequest) this.itemOpenRequest(this.props.entry.id);
+    }
 
     filename(){
         const fnParts = this.props.entry.path.split("/");
         return fnParts.slice(-1);
     }
+
+    classForStorageClass(storageClass){
+        if(storageClass==="STANDARD") return "";
+        if(storageClass==="STANDARD_IA") return "entry-shallow-archive";
+        if(storageClass==="GLACIER") return "entry-deep-archive";
+        console.warn("Unrecognised storage class for " + this.props.entry.path + ": " + storageClass);
+        return "";
+    }
+
+    /*
+    ArchiveEntry(id:String, bucket: String, path: String, file_extension: Option[String],
+    size: scala.Long, last_modified: ZonedDateTime, etag: String, mimeType: MimeType,
+     proxied: Boolean, storageClass:StorageClass, beenDeleted:Boolean=false)
+
+     */
     render(){
-        return <div className="entry-view">
-            <p className="entry-title">{this.filename()}</p>
+        let classList = ["entry-view", this.classForStorageClass(this.props.entry.storageClass)];
+        if(this.props.entry.beenDeleted) classList = classList.concat("entry-gone-missing");
+
+        return <div className={classList.join(" ")} onClick={this.entryClicked}>
+            <p className="entry-title"><FontAwesomeIcon icon="folder" className="entry-icon"/>{this.filename()}</p>
+            <EntryThumbnail mimeType={this.props.entry.mimeType} entryId={this.props.entry.id}/>
+            <p className="entry-date"><TimestampFormatter relative={false}
+                                                          value={this.props.entry.last_modified}
+                                                          formatString="Do MMM YYYY, h:mm a"/></p>
         </div>
     }
 }
