@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import axios from 'axios';
 import SortableTable from 'react-sortable-table';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { Link } from 'react-router-dom';
 import TimeIntervalComponent from '../common/TimeIntervalComponent.jsx';
 import TimestampFormatter from '../common/TimestampFormatter.jsx';
 import ErrorViewComponent from '../common/ErrorViewComponent.jsx';
@@ -39,7 +40,8 @@ class ScanTargetsList extends React.Component {
                 header: "Bucket",
                 key: "bucketName",
                 defaultSorting: "desc",
-                headerProps: {className: "dashboardheader"}
+                headerProps: {className: "dashboardheader"},
+                render: value=><Link to={"scanTargets/" + value}>{value}</Link>
             },
             {
                 header: "Enabled",
