@@ -10,7 +10,7 @@ import com.gu.scanamo.syntax._
 import com.theguardian.multimedia.archivehunter.common.ZonedDateTimeEncoder
 import helpers.{DynamoClientManager, ZonedTimeFormat}
 import javax.inject.{Inject, Named}
-import play.api.Configuration
+import play.api.{Configuration, Logger}
 import play.api.mvc._
 import io.circe.generic.auto._
 import io.circe.syntax._
@@ -28,7 +28,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner:ActorRef, config:Configuration,
                                       cc:ControllerComponents,ddbClientMgr:DynamoClientManager)(implicit system:ActorSystem)
   extends AbstractController(cc) with Circe with ZonedDateTimeEncoder with ZonedTimeFormat {
-
+  private val logger=Logger(getClass)
   implicit val mat:Materializer = ActorMaterializer.create(system)
 
   val table = Table[ScanTarget](config.get[String]("externalData.scanTargets"))
@@ -36,6 +36,7 @@ class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner
   private val profileName = config.getOptional[String]("externalData.awsProfile")
 
   def newTarget = Action(circe.json[ScanTarget]) { scanTarget=>
+    logger.debug(scanTarget.body.toString)
     Scanamo.exec(ddbClientMgr.getNewDynamoClient(profileName))(table.put(scanTarget.body)).map({
       case Left(writeError)=>
         InternalServerError(GenericErrorResponse("error",writeError.toString).asJson)

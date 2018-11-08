@@ -29,6 +29,8 @@ class ScanTargetsList extends React.Component {
 
          */
         this.deleteClicked = this.deleteClicked.bind(this);
+        this.newButtonClicked = this.newButtonClicked.bind(this);
+
         this.columns = [
             {
                 header: "Delete",
@@ -99,7 +101,7 @@ class ScanTargetsList extends React.Component {
     }
 
     triggerAddedScan(targetId){
-        return this.generalScanTrigger(targetId,"addedScan")
+        return this.generalScanTrigger(targetId,"additionScan")
     }
     triggerRemovedScan(targetId){
         return this.generalScanTrigger(targetId,"deletionScan")
@@ -147,6 +149,10 @@ class ScanTargetsList extends React.Component {
             }))
     }
 
+    newButtonClicked(){
+        this.props.history.push('/admin/scanTargets/new');
+    }
+
     render(){
         if(this.state.error){
             return <ErrorViewComponent error={this.state.error}/>
@@ -154,6 +160,9 @@ class ScanTargetsList extends React.Component {
 
         return <div>
             <BreadcrumbComponent path={this.props.location.pathname}/>
+            <div style={{float: "right"}}>
+                <button type="button" onClick={this.newButtonClicked}>New</button>
+            </div>
             <SortableTable
             data={this.state.scanTargets}
             columns={this.columns}
