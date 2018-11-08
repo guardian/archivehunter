@@ -393,6 +393,15 @@ Resources:
           JAVA_OPTS="-XX:+ExitOnOutOfMemoryError -Dconfig.file=/usr/share/archivehunter/conf/application.conf"
           EOF
 
+          sudo mv /lib/systemd/system/archivehunter.service /tmp
+          sudo bash -c "cat /tmp/archivehunter.service | sed s/LimitNOFILE=1024/LimitNOFILE=16384/ > /lib/systemd/system/archivehunter.service"
+          sudo systemctl daemon-reload
+
+          cat > /etc/security/limits.d/archivehunter.conf << EOF
+          archivehunter hard  nofiles unlimited
+          archivehunter soft  nofiles unlimited
+          EOF
+
           systemctl restart archivehunter
           systemctl enable archivehunter
 
@@ -437,7 +446,7 @@ Resources:
       - Key: Stage
         Value: !Ref Stage
         PropagateAtLaunch: true
-      - Key: Service
+      - Key: service
         Value: !Sub ${Stack}-${App}-${Stage}
         PropagateAtLaunch: true
       VPCZoneIdentifier: !Ref DeploySubnets
