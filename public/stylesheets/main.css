@@ -200,3 +200,8 @@ li.suggestions-list {
     height: 1em;
     margin-right: 0.2em;
 }
+
+input.time-interval {
+    margin-left: 1em;
+    width: 3em;
+}

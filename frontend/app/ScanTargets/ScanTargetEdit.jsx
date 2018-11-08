@@ -5,6 +5,7 @@ import TimeIntervalComponent from '../common/TimeIntervalComponent.jsx';
 import axios from 'axios';
 import {Redirect} from 'react-router-dom';
 import ErrorViewComponent from "../common/ErrorViewComponent.jsx";
+import BreadcrumbComponent from "../common/BreadcrumbComponent.jsx";
 
 class ScanTargetEdit extends React.Component {
     constructor(props){
@@ -29,6 +30,8 @@ class ScanTargetEdit extends React.Component {
 
         this.updateBucketname = this.updateBucketname.bind(this);
         this.toggleEnabled = this.toggleEnabled.bind(this);
+        this.timeIntervalUpdate = this.timeIntervalUpdate.bind(this);
+
         this.formSubmit = this.formSubmit.bind(this);
 
 
@@ -59,18 +62,24 @@ class ScanTargetEdit extends React.Component {
     }
 
     updateBucketname(evt){
-        console.log("updateBucketname: ", evt.target);
-        const newEntry = Object.assign({bucketName: evt.target.value}, this.state.entry);
-        this.setState({entry: newEntry});
+        //this is annoying, but a necessity to avoid modifying this.state.entry directly and selectively over-write the key.
+        const newEntry = Object.assign({}, this.state.entry, {bucketName: evt.target.value});
+        this.setState({entry: newEntry},()=>console.log("state has been set"));
     }
 
     toggleEnabled(evt){
-        const newEntry = Object.assign({enabled: !this.state.entry.enabled}, this.state.entry);
+        const newEntry = Object.assign({}, this.state.entry, {enabled: !this.state.entry.enabled});
         this.setState({entry: newEntry});
     }
 
     clearErrorLog(evt){
         const newEntry = Object.assign({lastError: null}, this.state.entry);
+        this.setState({entry: newEntry});
+    }
+
+    timeIntervalUpdate(newValue){
+        console.log("time interval updated to " + newValue + " seconds");
+        const newEntry = Object.assign({}, this.state.entry, {scanInterval: newValue});
         this.setState({entry: newEntry});
     }
 
@@ -104,6 +113,7 @@ class ScanTargetEdit extends React.Component {
     render(){
         if(this.state.completed) return <Redirect to="/admin/scanTargets"/>;
         return <form onSubmit={this.formSubmit}>
+            <BreadcrumbComponent path={this.props.location.pathname}/>
             <h2>Edit scan target <img src="/assets/images/Spinner-1s-44px.svg" style={{display: this.state.loading ? "inline" : "none"}}/></h2>
             <div className="centered" style={{display: this.state.formValidationErrors.length>0 ? "block" : "none"}}>
                 <ul className="form-errors">
@@ -128,7 +138,7 @@ class ScanTargetEdit extends React.Component {
                 </tr>
                 <tr>
                     <td>Scan Interval</td>
-                    <td><TimeIntervalComponent editable={true} value={this.state.entry.scanInterval}/></td>
+                    <td><TimeIntervalComponent editable={true} value={this.state.entry.scanInterval} didUpdate={this.timeIntervalUpdate}/></td>
                 </tr>
                 <tr>
                     <td>Last Error</td>
@@ -138,7 +148,7 @@ class ScanTargetEdit extends React.Component {
                 </tbody>
             </table>
             <input type="submit" value="Save"/>
-            <button type="button">Back</button>
+            <button type="button" onClick={()=>window.location="/admin/scanTargets"}>Back</button>
             {this.state.error ? <ErrorViewComponent error={this.state.error}/> : <span/>}
         </form>
     }
