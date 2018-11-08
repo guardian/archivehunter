@@ -16,15 +16,21 @@ class TimeIntervalComponent extends React.Component {
         this.state = {
             hoursSet: 0,
             minutesSet: 0,
-            secondsSet:0
+            secondsSet:0,
+            moment: null
         }
 
+    }
+
+    componentWillMount(){
+        //trigger a "fake" update when mounting
+        this.componentDidUpdate({value: null}, this.state);
     }
 
     componentDidUpdate(oldProps,oldState){
         if(oldProps.value!==this.props.value){
             const d = moment.duration(this.props.value,"seconds");
-            this.setState({hoursSet: d.hours(), minutesSet: d.minutes(), secondsSet: d.seconds()})
+            this.setState({moment: d, hoursSet: d.hours(), minutesSet: d.minutes(), secondsSet: d.seconds()})
         }
         if(oldState.hoursSet!==this.state.hoursSet || oldState.minutesSet!==this.state.minutesSet || oldState.secondsSet!==this.state.secondsSet){
             if(this.props.didUpdate) this.props.didUpdate(this.state.hoursSet*3600+this.state.minutesSet*60+this.state.minutesSet)
@@ -41,11 +47,11 @@ class TimeIntervalComponent extends React.Component {
         } else {
             let fmtStringParts = [];
             if (this.state.hoursSet > 0) fmtStringParts = fmtStringParts.concat(["h [hours]"]);
-            if (this.state.minutesSet() > 0) fmtStringParts = fmtStringParts.concat(["m [minutes]"]);
-            if (this.state.secondsSet() > 0) fmtStringParts = fmtStringParts.concat(["s [seconds]"]);
+            if (this.state.minutesSet > 0) fmtStringParts = fmtStringParts.concat(["m [minutes]"]);
+            if (this.state.secondsSet > 0) fmtStringParts = fmtStringParts.concat(["s [seconds]"]);
             const formatString = fmtStringParts.join(", ");
 
-            return <span className="duration">{d.format(formatString)}</span>
+            return <span className="duration">{this.state.moment.format(formatString)}</span>
         }
     }
 }
