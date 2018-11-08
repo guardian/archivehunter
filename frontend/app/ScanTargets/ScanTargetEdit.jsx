@@ -98,7 +98,10 @@ class ScanTargetEdit extends React.Component {
             return;
         }
 
-        this.setState({loading: true}, ()=>axios.post("/api/scanTarget",this.state.entry)
+        let entryToSend = this.state.entry;
+        if(entryToSend.lastError==="") entryToSend.lastError = null;
+
+        this.setState({loading: true}, ()=>axios.post("/api/scanTarget",entryToSend)
             .then(result=> {
                     console.log("Saved result successfully");
                     this.setState({loading: false, completed: true});
