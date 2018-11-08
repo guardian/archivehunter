@@ -36,14 +36,14 @@
     <logger name="application" level="ERROR" />
 
     <logger name="services.AppStartup" level="DEBUG"/>
-    <logger name="services.BucketScanner" level="DEBUG"/>
+    <logger name="services.BucketScanner" level="INFO"/>
     <logger name="akka.cluster" level="DEBUG"/>
     <logger name="helpers.S3ToArchiveEntryFlow" level="WARN"/>
     <logger name="helpers.SearchHitToArchiveEntryFlow" level="WARN"/>
     <logger name="helpers.ArchiveEntryVerifyFlow" level="WARN"/>
-    <logger name="com.sksamuel.elastic4s.streams" level="DEBUG"/>
-    <logger name="controllers.SearchController" level="DEBUG"/>
-    <logger name="controllers.ScanTargetController" level="DEBUG"/>
+    <logger name="com.sksamuel.elastic4s.streams" level="WARN"/>
+    <logger name="controllers.SearchController" level="INFO"/>
+    <logger name="controllers.ScanTargetController" level="INFO"/>
 
 
     <root level="WARN">
