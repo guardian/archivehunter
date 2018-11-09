@@ -4,10 +4,12 @@ import java.time.ZonedDateTime
 import java.time.temporal.{ChronoUnit, IsoFields, TemporalUnit}
 
 import akka.actor.{Actor, ActorSystem, Timers}
-import akka.stream.scaladsl.{Keep, Sink}
-import akka.stream.{ActorMaterializer, Materializer}
+import akka.stream.scaladsl.{Keep, Sink, Source}
+import akka.stream.{ActorMaterializer, KillSwitches, Materializer}
 import com.google.inject.Injector
 import com.gu.scanamo.{ScanamoAlpakka, Table}
+import com.sksamuel.elastic4s.{Index, Indexes}
+import com.sksamuel.elastic4s.http.HttpClient
 import com.sksamuel.elastic4s.http.bulk.BulkResponseItem
 import helpers._
 import javax.inject.Inject
@@ -28,6 +30,7 @@ object BucketScanner {
 
   case class ScanTargetsUpdated() extends BSMsg
   case class PerformTargetScan(record:ScanTarget) extends BSMsg
+  case class PerformDeletionScan(record:ScanTarget, thenScanForNew: Boolean=false) extends BSMsg
   case object RegularScanTrigger extends BSMsg
 }
 
@@ -36,6 +39,9 @@ class BucketScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientMan
                               esClientMgr:ESClientManager, scanTargetDAO: ScanTargetDAO, injector:Injector)(implicit system:ActorSystem)
   extends Actor with Timers with ZonedTimeFormat with ArchiveEntryRequestBuilder{
   import BucketScanner._
+
+  import com.sksamuel.elastic4s.http.ElasticDsl._
+  import com.sksamuel.elastic4s.streams.ReactiveElastic._
 
   private val logger=Logger(getClass)
 
@@ -96,13 +102,38 @@ class BucketScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientMan
       false
     } else {
       if(scanIsScheduled(scanTarget)){
-        self ! PerformTargetScan(scanTarget)
+        self ! PerformDeletionScan(scanTarget, thenScanForNew = true)
         true
       } else {
         logger.info(s"Not scanning ${scanTarget.bucketName} as it is not due yet")
         false
       }
     }
+  }
+
+  protected def getElasticSearchSink(esclient:HttpClient, completionPromise:Promise[Unit]) = {
+    val esSubscriberConfig = SubscriberConfig[ArchiveEntry](listener = new ResponseListener[ArchiveEntry] {
+      override def onAck(resp: BulkResponseItem, original: ArchiveEntry): Unit = {
+        logger.debug(s"ES subscriber ACK: ${resp.toString} for $original")
+      }
+
+      override def onFailure(resp: BulkResponseItem, original: ArchiveEntry): Unit = {
+        logger.debug(s"ES subscriber failed on $original")
+      }
+    },batchSize=100,concurrentRequests=5,completionFn = ()=>{
+      //the promise may have already been completed by the errorFn below
+      if(!completionPromise.isCompleted) completionPromise.complete(Success())
+      ()
+    },errorFn = (err:Throwable)=>{
+      logger.error("Could not send to elasticsearch", err)
+      completionPromise.failure(err)
+      ()
+    },failureWait= 5.seconds, maxAttempts=10
+    )
+
+    val subscriber = esclient.subscriber[ArchiveEntry](esSubscriberConfig)
+
+    Sink.fromSubscriber(subscriber)
   }
 
   /**
@@ -120,31 +151,32 @@ class BucketScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientMan
     val keySource = client.listBucket(target.bucketName, None)
     val converterFlow = injector.getInstance(classOf[S3ToArchiveEntryFlow])
 
-    val esSubscriberConfig = SubscriberConfig[ArchiveEntry](listener = new ResponseListener[ArchiveEntry] {
-      override def onAck(resp: BulkResponseItem, original: ArchiveEntry): Unit = {
-        logger.debug(s"ES subscriber ACK: ${resp.toString} for $original")
-      }
-
-      override def onFailure(resp: BulkResponseItem, original: ArchiveEntry): Unit = {
-        logger.debug(s"ES subscriber failed on $original")
-      }
-    },batchSize=100,concurrentRequests=5,completionFn = ()=>{
-              //the promise may have already been completed by the errorFn belows
-              if(!completionPromise.isCompleted) completionPromise.complete(Success())
-              ()
-            },errorFn = (err:Throwable)=>{
-              logger.error("Could not send to elasticsearch", err)
-              completionPromise.failure(err)
-              ()
-            },failureWait= 5.seconds, maxAttempts=10
-    )
-
-    val subscriber = esclient.subscriber[ArchiveEntry](esSubscriberConfig)
-
-    val indexSink = Sink.fromSubscriber(subscriber)
+    val indexSink = getElasticSearchSink(esclient, completionPromise)
 
     keySource.via(converterFlow).log("S3ToArchiveEntryFlow").to(indexSink).run()
 
+    completionPromise
+  }
+
+  def doScanDeleted(target:ScanTarget):Promise[Unit] = {
+    val completionPromise = Promise[Unit]()
+
+    val client = s3ClientMgr.getAlpakkaS3Client(config.getOptional[String]("externalData.awsProfile"))
+    val esclient = esClientMgr.getClient()
+
+    val esSource = Source.fromPublisher(esclient.publisher(search(indexName) query s"bucket:${target.bucketName} AND beenDeleted:false" scroll "1m"))
+
+    val verifyFlow = injector.getInstance(classOf[ArchiveEntryVerifyFlow])
+    val indexSink = getElasticSearchSink(esclient, completionPromise)
+
+    val killSwitch = esSource.via(new SearchHitToArchiveEntryFlow).via(verifyFlow).log("ArchiveEntryVerifyFlow").viaMat(KillSwitches.single)(Keep.right).to(indexSink).run()
+
+    completionPromise.future.onComplete({
+      case Success(_)=>logger.info("Deletion scan completed")
+      case Failure(err)=>
+        logger.warn("Scan failure detected, shutting down pipeline")
+        killSwitch.abort(err)
+    })
     completionPromise
   }
 
@@ -171,6 +203,24 @@ class BucketScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientMan
           logger.info(s"Completed periodic scan of ${tgt.bucketName}")
         case Failure(err)=>
           logger.error(s"Could not scan ${tgt.bucketName}: ", err)
+      })
+    case PerformDeletionScan(tgt, thenScanForNew)=>
+      scanTargetDAO.setInProgress(tgt, newValue = true).flatMap(updatedScanTarget=>
+        doScanDeleted(updatedScanTarget).future.andThen({
+          case Success(_)=>
+            scanTargetDAO.setScanCompleted(updatedScanTarget)
+          case Failure(err)=>
+            scanTargetDAO.setScanCompleted(updatedScanTarget, error=Some(err))
+        })
+      ).onComplete({
+        case Success(result)=>
+          logger.info(s"Completed deletion scan of ${tgt.bucketName}")
+          if(thenScanForNew){
+            logger.info(s"Scheduling scan for new items in ${tgt.bucketName}")
+            self ! PerformTargetScan(tgt)
+          }
+        case Failure(err)=>
+          logger.error(s"Could not scan ${tgt.bucketName}", err)
       })
   }
 }
