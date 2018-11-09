@@ -136,6 +136,30 @@ Resources:
         - Key: Stage
           Value: !Ref Stage
 
+  ProxyLocationTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: fileId
+          AttributeType: S
+        - AttributeName: proxyType
+          AttributeType: S
+      KeySchema:
+        - AttributeName: fileId
+          KeyType: HASH
+        - AttributeName: proxyType
+          AttributeType: RANGE
+      ProvisionedThroughput:
+        WriteCapacityUnits: 4
+        ReadCapacityUnits: 10
+      Tags:
+        - Key: App
+          Value: !Sub ${App}-webapp
+        - Key: Stack
+          Value: !Ref Stack
+        - Key: Stage
+          Value: !Ref Stage
+
   LoadBalancerSG:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -215,6 +239,7 @@ Resources:
             - dynamodb:GetRecords
             Resource:
             - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ScanTargetsTable}
+            - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ProxyLocationTable}
       - PolicyName: EC2InstanceDiscovery
         PolicyDocument:
           Version: 2012-10-17

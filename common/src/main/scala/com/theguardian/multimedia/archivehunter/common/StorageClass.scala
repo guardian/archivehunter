@@ -1,4 +1,5 @@
 package com.theguardian.multimedia.archivehunter.common
+import com.gu.scanamo.DynamoFormat
 import io.circe.{Decoder, Encoder}
 
 object StorageClass extends Enumeration {
@@ -9,4 +10,10 @@ object StorageClass extends Enumeration {
 trait StorageClassEncoder {
   implicit val storageClassEncoder = Encoder.enumEncoder(StorageClass)
   implicit val storageClassDecoder = Decoder.enumDecoder(StorageClass)
+
+  implicit val storageClassFormat = DynamoFormat.coercedXmap[StorageClass.Value, String, IllegalArgumentException](
+    input=>StorageClass.withName(input)
+  )(
+    sc=>sc.toString
+  )
 }

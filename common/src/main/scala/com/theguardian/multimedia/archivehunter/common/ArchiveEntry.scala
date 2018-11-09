@@ -2,6 +2,7 @@ package com.theguardian.multimedia.archivehunter.common
 
 import java.time.{ZoneId, ZonedDateTime}
 
+import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsync
 import com.amazonaws.services.s3.{AmazonS3, AmazonS3Client}
 import com.sksamuel.elastic4s.http.HttpClient
 import com.theguardian.multimedia.archivehunter.common.StorageClass.StorageClass
@@ -86,4 +87,6 @@ object ArchiveEntry extends ((String, String, String, Option[String], Long, Zone
 
 }
 
-case class ArchiveEntry(id:String, bucket: String, path: String, file_extension: Option[String], size: scala.Long, last_modified: ZonedDateTime, etag: String, mimeType: MimeType, proxied: Boolean, storageClass:StorageClass, beenDeleted:Boolean=false)
+case class ArchiveEntry(id:String, bucket: String, path: String, file_extension: Option[String], size: scala.Long, last_modified: ZonedDateTime, etag: String, mimeType: MimeType, proxied: Boolean, storageClass:StorageClass, beenDeleted:Boolean=false) {
+  def getProxy(proxyType: ProxyType.Value)(implicit proxyLocationDAO:ProxyLocationDAO, client:AmazonDynamoDBAsync) = proxyLocationDAO.getProxy(id,proxyType)
+}

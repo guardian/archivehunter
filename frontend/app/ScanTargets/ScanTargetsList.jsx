@@ -76,6 +76,11 @@ class ScanTargetsList extends React.Component {
                 render: value=>value ? value : "-"
             },
             {
+                header: "Proxy Bucket",
+                key: "proxyBucket",
+                headerProps: {className: "dashboardheader"}
+            },
+            {
                 header: "Trigger",
                 key: "bucketName",
                 headerProps: {className: "dashboardheader"},
