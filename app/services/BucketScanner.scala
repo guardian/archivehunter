@@ -145,6 +145,7 @@ class BucketScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientMan
   def doScan(target: ScanTarget) = {
     val completionPromise = Promise[Unit]()
 
+    logger.info(s"Started scan for $target")
     val client = s3ClientMgr.getAlpakkaS3Client(config.getOptional[String]("externalData.awsProfile"))
     val esclient = esClientMgr.getClient()
 
@@ -200,7 +201,7 @@ class BucketScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientMan
         })
       ).onComplete({
         case Success(result)=>
-          logger.info(s"Completed periodic scan of ${tgt.bucketName}")
+          logger.info(s"Completed addition scan of ${tgt.bucketName}")
         case Failure(err)=>
           logger.error(s"Could not scan ${tgt.bucketName}: ", err)
       })
