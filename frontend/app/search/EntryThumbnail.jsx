@@ -52,6 +52,8 @@ class EntryThumbnail extends React.Component {
      * deliver a "sensible" icon based on file extension, if the index does not provide us with an adequate MIME type
      */
     iconFromExtension(){
+        //no file extension at all=>default icon
+        if(!this.props.fileExtension) return <FontAwesomeIcon icon="file" size="4x" className="entry-thumbnail"/>;
         const lcXtn = this.props.fileExtension.toLowerCase();
 
         if(EntryThumbnail.knownAudioExtensions.includes(lcXtn)) return <FontAwesomeIcon icon="volume-up" size="4x" className="entry-thumbnail"/>;
@@ -62,6 +64,8 @@ class EntryThumbnail extends React.Component {
 
     render(){
         if(this.state.thumbnailUri) return <img src={this.state.thumbnailUri} className="entry-thumbnail"/>;
+
+        if(!this.props.mimeType) return this.iconFromExtension();
 
         if(this.props.mimeType.major==="application" && this.props.mimeType.minor==="octet-stream") return this.iconFromExtension();
         if(this.props.mimeType.major==="video") return <FontAwesomeIcon icon="film" size="4x" className="entry-thumbnail"/>;

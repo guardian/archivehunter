@@ -43,4 +43,14 @@ describe("EntryThumbnail", ()=>{
         const rendered=shallow(<EntryThumbnail mimeType={{major: "application", minor: "octet-stream"}} fileExtension="xxx" entryId="1234"/>);
         expect(rendered.find('FontAwesomeIcon').prop('icon')).toEqual("file");
     });
+
+    it("should not crash on a null file extension", ()=>{
+        const rendered=shallow(<EntryThumbnail mimeType={{major: "application", minor: "octet-stream"}} fileExtension={null} entryId="1234"/>);
+        expect(rendered.find('FontAwesomeIcon').prop('icon')).toEqual("file");
+    });
+
+    it("should not crash on a null mimeType", ()=>{
+        const rendered=shallow(<EntryThumbnail mimeType={null} fileExtension="xxx" entryId="1234"/>);
+        expect(rendered.find('FontAwesomeIcon').prop('icon')).toEqual("file");
+    })
 });
