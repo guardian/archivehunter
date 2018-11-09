@@ -13,7 +13,7 @@ GET     /api/scanTarget                 @controllers.ScanTargetController.listSc
 POST    /api/scanTarget/:id/scan        @controllers.ScanTargetController.manualTrigger(id)
 POST    /api/scanTarget/:id/deletionScan  @controllers.ScanTargetController.manualTriggerDeletionScan(id)
 POST    /api/scanTarget/:id/additionScan  @controllers.ScanTargetController.manualTriggerAdditionScan(id)
-
+POST    /api/scanTarget/:id/legacyProxiesScan @controllers.ScanTargetController.scanForLegacyProxies(id)
 
 GET     /api/search/basic      @controllers.SearchController.simpleStringSearch(q:Option[String],start:Option[Int],length:Option[Int])
 PUT     /api/search/suggestions         @controllers.SearchController.suggestions

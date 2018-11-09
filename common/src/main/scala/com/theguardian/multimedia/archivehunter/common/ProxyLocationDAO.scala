@@ -8,12 +8,7 @@ import com.gu.scanamo.syntax._
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class ProxyLocationDAO (tableName:String) extends StorageClassEncoder {
-  implicit val proxyTypeFormat = DynamoFormat.coercedXmap[ProxyType.Value,String,IllegalArgumentException](
-    input=>ProxyType.withName(input)
-  )(
-    pt=>pt.toString
-  )
+class ProxyLocationDAO (tableName:String) extends ProxyLocationEncoder {
 
   val table = Table[ProxyLocation](tableName)
 
