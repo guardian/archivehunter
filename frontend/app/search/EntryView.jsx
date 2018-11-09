@@ -11,7 +11,7 @@ class EntryView extends React.Component {
     };
 
     entryClicked(){
-        if(this.itemOpenRequest) this.itemOpenRequest(this.props.entry.id);
+        if(this.itemOpenRequest) this.itemOpenRequest(this.props.entry);
     }
 
     filename(){
