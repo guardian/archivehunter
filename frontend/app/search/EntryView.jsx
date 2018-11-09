@@ -39,7 +39,7 @@ class EntryView extends React.Component {
 
         return <div className={classList.join(" ")} onClick={this.entryClicked}>
             <p className="entry-title"><FontAwesomeIcon icon="folder" className="entry-icon"/>{this.filename()}</p>
-            <EntryThumbnail mimeType={this.props.entry.mimeType} entryId={this.props.entry.id}/>
+            <EntryThumbnail mimeType={this.props.entry.mimeType} entryId={this.props.entry.id} fileExtension={this.props.entry.file_extension}/>
             <p className="entry-date"><TimestampFormatter relative={false}
                                                           value={this.props.entry.last_modified}
                                                           formatString="Do MMM YYYY, h:mm a"/></p>
