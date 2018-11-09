@@ -4,6 +4,10 @@ html, body, p, th, td, li, dd, dt, pre {
     color: white;
 }
 
+.ui-dialog-content {
+    background-color: #666666;
+}
+
 a {
     color: #AAAAAA;
 }
@@ -14,8 +18,12 @@ tr.dashboardheader, th.dashboardheader {
     color: black;
 }
 
+tr {
+    border-collapse: collapse;
+}
+
 td {
-    border: 1px solid black;
+    border: 1px solid white;
     border-collapse: collapse;
     text-align: center;
 }
@@ -62,6 +70,11 @@ h2.inline-dialog-title {
     border-top-left-radius: 30px;
 }
 
+h4 {
+    margin: 0 0 0.5em 0.5em;
+    display: inline;
+}
+
 span.breadcrumb {
     text-transform: capitalize;
     margin-bottom: 1em;
@@ -78,6 +91,7 @@ a.breadcrumb:hover {
 div.top-menu {
     margin-left: auto;
     margin-right: auto;
+    margin-bottom: 2em;
     width: 30%;
     height: 1em;
 }
@@ -86,6 +100,10 @@ div.top-menu {
     margin-left: auto;
     margin-right: auto;
     width: 66%;
+}
+
+p.centered {
+    text-align: center;
 }
 
 .login-icon{
@@ -107,4 +125,83 @@ div.top-menu {
 
 .top-menu-spacer {
     margin-right: 1em;
+}
+
+div.entry-view {
+    border: 1px solid black;
+    overflow: hidden;
+    width: 140px;
+    height: 140px;
+    border-radius: 10px;
+    background-color: white;
+    display:inline-block;
+    margin-right: 2em;
+    margin-bottom: 2em;
+}
+
+div.search-results-container {
+    overflow-x: scroll;
+    overflow-y: hidden;
+}
+
+.entry-title {
+    margin-top: 0;
+    margin-bottom: 0.2em;
+}
+
+.suggestions-list {
+    display: inline;
+    alignment: center;
+}
+
+li.suggestions-list {
+    background-color: lavender;
+    border-radius: 10px;
+    color: black;
+    padding-top: 1px;
+    padding-bottom: 1px;
+    padding-left: 4px;
+    padding-right: 4px;
+    margin-right: 1em;
+}
+
+.form-errors {
+    display: inline;
+}
+
+.clickable {
+    cursor: pointer;
+}
+
+.title {
+    background-color: lavender;
+    color: black;
+    font-weight: bold;
+    font-size: 1.1em;
+    padding: 0.1em;
+    padding-left: 0.5em;
+}
+
+.ui-dialog {
+    border: 2px solid white;
+}
+
+.ui-dialog-buttonset {
+    margin-left: auto;
+    margin-right:auto;
+    width: 300px;
+}
+
+.ui-dialog-buttonset.button {
+    margin-right: 1.5em;
+}
+
+.button-row {
+    height: 1em;
+    margin-right: 0.2em;
+}
+
+input.time-interval {
+    margin-left: 1em;
+    width: 3em;
 }

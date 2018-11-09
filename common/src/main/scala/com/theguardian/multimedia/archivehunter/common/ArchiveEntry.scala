@@ -3,6 +3,8 @@ package com.theguardian.multimedia.archivehunter.common
 import java.time.{ZoneId, ZonedDateTime}
 
 import com.amazonaws.services.s3.{AmazonS3, AmazonS3Client}
+import com.sksamuel.elastic4s.http.HttpClient
+import com.theguardian.multimedia.archivehunter.common.StorageClass.StorageClass
 
 import scala.concurrent.Future
 import scala.util.Try
@@ -12,7 +14,9 @@ import org.apache.logging.log4j.LogManager
 import io.circe.java8.time._
 import java.util.Base64
 
-object ArchiveEntry extends ((String, String, String, Option[String], Long, ZonedDateTime, String, MimeType, Boolean)=>ArchiveEntry){
+import io.circe.generic.semiauto._
+
+object ArchiveEntry extends ((String, String, String, Option[String], Long, ZonedDateTime, String, MimeType, Boolean, StorageClass, Boolean)=>ArchiveEntry){
   private val logger = LogManager.getLogger(getClass)
 
   def getFileExtension(str: String):Option[String] = {
@@ -67,8 +71,19 @@ object ArchiveEntry extends ((String, String, String, Option[String], Long, Zone
         logger.warn(s"received no content type from S3 for s3://$bucket/$key")
         MimeType("application","octet-stream")
     }
-    ArchiveEntry(makeDocId(bucket, key), bucket, key, getFileExtension(key), meta.getContentLength, ZonedDateTime.ofInstant(meta.getLastModified.toInstant, ZoneId.systemDefault()), meta.getETag, mimeType, false)
+
+    val storageClass = Option(meta.getStorageClass) match {
+      case Some(sc)=>sc
+      case None=>
+        logger.warn(s"s3://$bucket/$key has no storage class! Assuming STANDARD.")
+        "STANDARD"
+    }
+    ArchiveEntry(makeDocId(bucket, key), bucket, key, getFileExtension(key), meta.getContentLength, ZonedDateTime.ofInstant(meta.getLastModified.toInstant, ZoneId.systemDefault()), meta.getETag, mimeType, proxied = false, StorageClass.withName(storageClass), beenDeleted = false)
   }
+
+  def fromIndex(bucket:String, key:String)(implicit indexer:Indexer, httpClient: HttpClient):Future[ArchiveEntry] =
+    indexer.getById(makeDocId(bucket, key))
+
 }
 
-case class ArchiveEntry(id:String, bucket: String, path: String, file_extension: Option[String], size: scala.Long, last_modified: ZonedDateTime, etag: String, mimeType: MimeType, proxied: Boolean)
+case class ArchiveEntry(id:String, bucket: String, path: String, file_extension: Option[String], size: scala.Long, last_modified: ZonedDateTime, etag: String, mimeType: MimeType, proxied: Boolean, storageClass:StorageClass, beenDeleted:Boolean=false)

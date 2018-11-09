@@ -81,9 +81,16 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] {
     * @return a Future, containing a summary string if successful. The Future fails if the operation fails.
     */
   def handleRemoved(rec: S3EventNotification.S3EventNotificationRecord)(implicit i:Indexer, elasticHttpClient:HttpClient):Future[String] = {
-    val docId = ArchiveEntry.makeDocId(rec.getS3.getBucket.getName, rec.getS3.getObject.getKey)
-    println(s"Going to remove $docId")
-    i.removeSingleItem(docId)
+//    val docId = ArchiveEntry.makeDocId(rec.getS3.getBucket.getName, rec.getS3.getObject.getKey)
+//    println(s"Going to remove $docId")
+//    i.removeSingleItem(docId)
+    ArchiveEntry.fromIndex(rec.getS3.getBucket.getName, rec.getS3.getObject.getKey).flatMap(entry=>{
+      println(s"$entry has been removed, updating record to tombstone")
+      i.indexSingleItem(entry.copy(beenDeleted = true),Some(entry.id)).map({
+        case Success(result)=>result
+        case Failure(err)=> throw err
+      })
+    })
   }
 
   override def handleRequest(event:S3Event, context:Context): Unit = {

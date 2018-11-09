@@ -10,11 +10,14 @@ import NotFoundComponent from './NotFoundComponent.jsx';
 import FrontPage from './FrontPage.jsx';
 import TopMenu from './TopMenu.jsx';
 import AdminFront from './admin/AdminFront.jsx';
+import BasicSearchComponent from './search/BasicSearchComponent.jsx';
 
 import { library } from '@fortawesome/fontawesome-svg-core'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faStroopwafel, faCheckCircle, faTimesCircle, faRoad, faSearch,faThList,faWrench, faLightbulb } from '@fortawesome/free-solid-svg-icons'
-library.add(faStroopwafel, faCheckCircle, faTimesCircle, faRoad,faSearch,faThList,faWrench, faLightbulb);
+import { faStroopwafel, faCheckCircle, faTimesCircle, faRoad, faSearch,faThList,faWrench, faLightbulb, faFolderPlus, faFolderMinus, faFolder } from '@fortawesome/free-solid-svg-icons'
+import { faChevronCircleDown,faChevronCircleRight,faTrashAlt } from '@fortawesome/free-solid-svg-icons'
+
+library.add(faStroopwafel, faCheckCircle, faTimesCircle, faRoad,faSearch,faThList,faWrench, faLightbulb, faChevronCircleDown, faChevronCircleRight, faTrashAlt, faFolderPlus, faFolderMinus, faFolder);
 
 window.React = require('react');
 
@@ -36,9 +39,10 @@ class App extends React.Component {
         return <div>
             <TopMenu visible={true} isAdmin={true}/>
             <Switch>
-                <Route path="/admin/scanTargets" component={ScanTargetsList}/>
                 <Route path="/admin/scanTargets/:id" component={ScanTargetEdit}/> /*this also handles "new" */
+                <Route path="/admin/scanTargets" component={ScanTargetsList}/>
                 <Route path="/admin" exact={true} component={AdminFront}/>
+                <Route path="/search" exact={true} component={BasicSearchComponent}/>
                 <Route path="/" exact={true} component={FrontPage}/>
                 <Route default component={NotFoundComponent}/>
             </Switch>
