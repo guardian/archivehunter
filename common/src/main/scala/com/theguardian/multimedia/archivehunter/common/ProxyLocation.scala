@@ -34,8 +34,8 @@ object ProxyLocation extends DocId {
     * @param client implicitly provided instance of AmazonS3Client to use
     * @return a (blocking) Future, containing an [[ArchiveEntry]] if successful
     */
-  def fromS3(bucket: String, key: String, proxyType:Option[ProxyType.Value] = None)(implicit client:AmazonS3):Future[ProxyLocation] = Future {
-    val meta = client.getObjectMetadata(bucket,key)
+  def fromS3(proxyBucket: String, key: String, mainMediaBucket: String, proxyType:Option[ProxyType.Value] = None)(implicit client:AmazonS3):Future[ProxyLocation] = Future {
+    val meta = client.getObjectMetadata(proxyBucket,key)
     val mimeType = Option(meta.getContentType) match {
       case Some(mimeTypeString) =>
         MimeType.fromString(mimeTypeString) match {
@@ -45,14 +45,14 @@ object ProxyLocation extends DocId {
             MimeType("application", "octet-stream")
         }
       case None =>
-        logger.warn(s"received no content type from S3 for s3://$bucket/$key")
+        logger.warn(s"received no content type from S3 for s3://$proxyBucket/$key")
         MimeType("application","octet-stream")
     }
 
     val storageClass = Option(meta.getStorageClass) match {
       case Some(sc)=>sc
       case None=>
-        logger.warn(s"s3://$bucket/$key has no storage class! Assuming STANDARD.")
+        logger.warn(s"s3://$proxyBucket/$key has no storage class! Assuming STANDARD.")
         "STANDARD"
     }
     val pt = proxyType match {
@@ -60,12 +60,13 @@ object ProxyLocation extends DocId {
         proxyTypeForMime(mimeType) match {
           case Success(pt)=>pt
           case Failure(err)=>
-            logger.error(s"Could not determine proxy type for s3://${bucket}/$key: ${err.toString}")
+            logger.error(s"Could not determine proxy type for s3://$proxyBucket/$key: ${err.toString}")
             ProxyType.UNKNOWN
         }
       case Some(value)=>value
     }
-    new ProxyLocation(makeDocId(bucket, key), pt, bucket, key, StorageClass.withName(meta.getStorageClass))
+    logger.debug(s"doc ID is ${makeDocId(mainMediaBucket, key)} from $mainMediaBucket and $key")
+    new ProxyLocation(makeDocId(mainMediaBucket, key), pt, proxyBucket, key, StorageClass.safeWithName(meta.getStorageClass))
   }
 
 }

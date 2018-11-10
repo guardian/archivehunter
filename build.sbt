@@ -64,6 +64,7 @@ lazy val common = (project in file("common"))
   .settings(commonSettings,
     libraryDependencies ++= Seq(
       "com.amazonaws" % "aws-java-sdk-s3" % "1.11.346",
+      "com.gu" %% "scanamo-alpakka" % "1.0.0-M8",
       "io.circe" %% "circe-core" % circeVersion,
       "io.circe" %% "circe-generic" % circeVersion,
       "io.circe" %% "circe-parser" % circeVersion,

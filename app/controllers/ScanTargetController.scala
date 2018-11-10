@@ -111,7 +111,7 @@ class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner
 
   def scanForLegacyProxies(targetName:String) = Action {
     withLookup(targetName) { tgt=>
-      proxyScanner ! new LegacyProxiesScanner.ScanBucket(tgt.proxyBucket)
+      proxyScanner ! new LegacyProxiesScanner.ScanBucket(tgt)
       Ok(GenericErrorResponse("ok","scan started").asJson)
     }
   }
