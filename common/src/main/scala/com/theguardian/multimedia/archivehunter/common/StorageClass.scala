@@ -5,6 +5,19 @@ import io.circe.{Decoder, Encoder}
 object StorageClass extends Enumeration {
   type StorageClass = Value
   val STANDARD,STANDARD_IA,GLACIER,REDUCED_REDUNDANCY = Value
+
+  /**
+    * just like the `withName` method but null-safe.
+    * @param name
+    * @return
+    */
+  def safeWithName(name:String) = {
+    if(name==null){
+      STANDARD
+    } else {
+      super.withName(name)
+    }
+  }
 }
 
 trait StorageClassEncoder {
@@ -16,4 +29,5 @@ trait StorageClassEncoder {
   )(
     sc=>sc.toString
   )
+
 }

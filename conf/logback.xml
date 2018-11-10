@@ -45,6 +45,9 @@
     <logger name="controllers.SearchController" level="INFO"/>
     <logger name="controllers.ScanTargetController" level="INFO"/>
 
+    <logger name="helpers.DDBSink" level="DEBUG"/>
+    <logger name="helpers.S3ToProxyLocationFlow" level="DEBUG"/>
+    <logger name="services.LegacyProxiesScanner" level="DEBUG"/>
 
     <logger name="S3LocationSpec" level="DEBUG"/>
     <logger name="helpers.ParanoidS3Source" level="DEBUG"/>

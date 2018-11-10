@@ -148,9 +148,9 @@ Resources:
         - AttributeName: fileId
           KeyType: HASH
         - AttributeName: proxyType
-          AttributeType: RANGE
+          KeyType: RANGE
       ProvisionedThroughput:
-        WriteCapacityUnits: 4
+        WriteCapacityUnits: 100
         ReadCapacityUnits: 10
       Tags:
         - Key: App

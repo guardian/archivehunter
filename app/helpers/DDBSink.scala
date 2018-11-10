@@ -25,7 +25,7 @@ final class DDBSink @Inject()(clientMgr: DynamoClientManager,config:Configuratio
 
       implicit val mat = ActorMaterializer.create(system)
       val flushFrequency = config.getOptional[Int]("dynamodb.flushFrequency").getOrElse(100)
-      val client = clientMgr.getNewAlpakkaDynamoClient()
+      val client = clientMgr.getNewAlpakkaDynamoClient(config.getOptional[String]("externalData.awsProfile"))
       val tableName = config.getOptional[String]("proxies.tableName").getOrElse("archiveHunterProxies")
 
       val table = Table[ProxyLocation](tableName)
