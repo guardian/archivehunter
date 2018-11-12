@@ -4,11 +4,11 @@ import java.time.ZonedDateTime
 import java.time.temporal.{ChronoUnit, IsoFields, TemporalUnit}
 
 import akka.actor.{Actor, ActorSystem, Timers}
+import akka.http.scaladsl.Http
 import akka.stream.scaladsl.{Keep, Sink, Source}
 import akka.stream.{ActorMaterializer, KillSwitches, Materializer}
 import com.google.inject.Injector
 import com.gu.scanamo.{ScanamoAlpakka, Table}
-import com.sksamuel.elastic4s.{Index, Indexes}
 import com.sksamuel.elastic4s.http.HttpClient
 import com.sksamuel.elastic4s.http.bulk.BulkResponseItem
 import helpers._
@@ -158,6 +158,21 @@ class BucketScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientMan
 
     completionPromise
   }
+
+  /**
+    * Performs a scan in "paranoid" mode, i.e. assume that S3 will return invalid XML that will break the standard SDK (it does sometimes....)
+    * @param target [[ScanTarget]] indicating bucket to process
+    * @return a Promise[Unit] which completes when the scan finishes
+    */
+//  def doScanParanoid(target:ScanTarget):Promise[Unit] = {
+//    val region = config.get[String]("externalData.awsRegion")
+//    val hostname = s"s3-$region.amazonaws.com"
+//    val urlString = s"https://$hostname/${target.bucketName}"
+//
+//    val connectionFlow = Http().cachedHostConnectionPoolHttps(hostname,443)
+//
+//
+//  }
 
   def doScanDeleted(target:ScanTarget):Promise[Unit] = {
     val completionPromise = Promise[Unit]()

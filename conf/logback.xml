@@ -46,6 +46,8 @@
     <logger name="controllers.ScanTargetController" level="INFO"/>
 
 
+    <logger name="S3LocationSpec" level="DEBUG"/>
+
     <root level="WARN">
         <appender-ref ref="STDOUT" />
         <appender-ref ref="ASYNCFILE"/>
