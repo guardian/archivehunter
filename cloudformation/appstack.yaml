@@ -228,6 +228,7 @@ Resources:
             Action:
             - dynamodb:BatchWriteItem
             - dynamodb:PutItem
+            - dynamodb:BatchWriteItem
             - dynamodb:DescribeTable
             - dynamodb:DeleteItem
             - dynamodb:RestoreTableFromBackup
@@ -360,6 +361,10 @@ Resources:
 
           scanner {
             masterSchedule = 300 #in seconds
+          }
+
+          proxies {
+            tableName = "${ProxyLocationTable}"
           }
 
           elasticsearch {
