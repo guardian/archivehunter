@@ -8,7 +8,7 @@ import java.time.format.DateTimeFormatter
 import akka.http.scaladsl.model.HttpHeader.ParsingResult.{Error, Ok}
 import akka.http.scaladsl.model.{HttpHeader, HttpRequest}
 import akka.stream.Materializer
-import akka.stream.scaladsl.{Flow, Sink}
+import akka.stream.scaladsl.{Flow, Keep, Sink}
 import akka.util.ByteString
 import com.amazonaws.auth.AWSCredentialsProvider
 import com.amazonaws.regions.Region
@@ -85,15 +85,23 @@ trait S3Signer {
     val requestTime = timestamp.getOrElse(OffsetDateTime.now(ZoneOffset.UTC))
 
     val contentHashFuture = if(req.entity.isKnownEmpty()) {
+      logger.debug("request entity is empty")
       Future(ByteString(checksummer.digest("".getBytes("UTF-8"))))
     } else {
+      logger.debug("request entity has data")
       req.entity.getDataBytes()
         .via(new ContentHashingFlow("SHA-256"))
         .runWith(Sink.reduce[ByteString](_.concat(_)), mat)
+//      req.entity.getDataBytes()
+//        .runWith(new ContentHashingFlow("SHA-256"), mat)
     }
 
     val contentHashHexFuture = contentHashFuture.map(bs=>bs.map("%02x".format(_)).mkString)
 
+    contentHashHexFuture.onComplete({
+      case Success(string)=>logger.debug(s"content hash string is $string")
+      case Failure(err)=>logger.error(s"failed to generate content hash", err)
+    })
     val updatedHeadersFuture = contentHashHexFuture.map(hash=>
       req.headers ++ Seq(
         makeHttpHeader("x-amz-date",requestTime.format(aws_compatible_datetime)),

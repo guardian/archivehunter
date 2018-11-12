@@ -2,11 +2,11 @@ package helpers
 
 import java.security.MessageDigest
 
-import akka.stream.{Attributes, FlowShape, Inlet, Outlet}
+import akka.stream._
 import akka.stream.stage.{AbstractInHandler, AbstractOutHandler, GraphStage, GraphStageLogic}
 import akka.util.ByteString
 
-class ContentHashingFlow(algo:String) extends GraphStage[FlowShape[ByteString,ByteString]]{
+class ContentHashingFlow(algo:String) extends GraphStage[FlowShape[ByteString, ByteString]]{
   final val in:Inlet[ByteString] = Inlet.create("ContentHashingFlow.in")
   final val out:Outlet[ByteString] = Outlet.create("ContentHashingFlow.out")
 
@@ -21,19 +21,26 @@ class ContentHashingFlow(algo:String) extends GraphStage[FlowShape[ByteString,By
         digester.update(elem.toArray)
         pull(in)
       }
-    })
 
-    setHandler(out, new AbstractOutHandler {
-      override def onPull(): Unit = {
-        pull(in)
+      override def onUpstreamFinish(): Unit = {
+        val result = digester.digest()
+        push(out, ByteString(result))
       }
     })
 
-    override def postStop(): Unit = {
-      super.postStop()
-      val result = digester.digest()
-      push(out, ByteString(result))
-    }
+
+    setHandler(out, new AbstractOutHandler {
+      override def onPull(): Unit = {
+        if(!isClosed(in)) {
+          pull(in)
+        } else {
+          completeStage()
+        }
+
+      }
+    })
+
+
   }
 
 }
