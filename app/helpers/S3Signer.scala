@@ -29,16 +29,20 @@ trait S3Signer {
 
   val aws_compatible_date = DateTimeFormatter.ofPattern("uuuuMMdd")
   val aws_compatible_datetime = DateTimeFormatter.ofPattern("uuuuMMdd'T'HHmmss'Z'")
+
   protected def digestString(str:String) = {
     val checksummer = MessageDigest.getInstance("SHA-256")
     checksummer.digest(str.getBytes("UTF-8")).map("%02x".format(_)).mkString
   }
 
-  protected def hmacString(key:String,str:String) = {
-    val secretKeySpec = new SecretKeySpec(key.getBytes("UTF-8"),"SHA-256")
+  protected def hmacString(key:Array[Byte],str:String) = hmacBinary(key,str).map("%02x".format(_)).mkString
+  protected def hmacString(key:String,str:String) = hmacBinary(key.getBytes("UTF-8"),str).map("%02x".format(_)).mkString
+
+  protected def hmacBinary(key:Array[Byte],str:String) = {
+    val secretKeySpec = new SecretKeySpec(key,"SHA-256")
     val hmaccer = Mac.getInstance("HmacSHA256")
     hmaccer.init(secretKeySpec)
-    hmaccer.doFinal(str.getBytes("UTF-8")).map("%02x".format(_)).mkString
+    hmaccer.doFinal(str.getBytes("UTF-8"))
   }
 
   /**
@@ -48,8 +52,13 @@ trait S3Signer {
     */
   protected def convertQueryString(queryString:Option[String]):Map[String,String] = {
     def makeTuple(str:String):(String,String) = {
-      val parts = str.split("=")
-      Tuple2(parts.head, parts(1))
+      try {
+        val parts = str.split("=")
+        Tuple2(parts.head, parts(1))
+      } catch {
+        case ex:ArrayIndexOutOfBoundsException=>
+          Tuple2(str, "")
+      }
     }
 
     queryString.map(_.split("&").map(el=>makeTuple(el)).toMap).getOrElse(Map())
@@ -137,8 +146,12 @@ trait S3Signer {
   protected def calculateCanonicalString(httpMethod:String, uriPath: String, uriQueryParams:Map[String,String],
                                headers:Map[String,String], payloadHash:Option[String]) = {
     val checksummer = MessageDigest.getInstance("SHA-256")
-
-    val canonicalUrl = uriPath.split("/").map(section=>URLEncoder.encode(section,"UTF-8")).mkString("/")
+    logger.debug(s"uriPath is $uriPath ${uriPath.length}")
+    val canonicalUrl = if(uriPath.length<=1) {
+      "/"
+    } else {
+      uriPath.split("/").map(section=>URLEncoder.encode(section,"UTF-8")).mkString("/")
+    }
     logger.debug(s"encodedUrl: $canonicalUrl")
 
     val canonicalQueryString = uriQueryParams.map(entry=>URLEncoder.encode(entry._1,"UTF-8")+"="+URLEncoder.encode(entry._2,"UTF-8")).mkString("&")
@@ -201,14 +214,14 @@ trait S3Signer {
   protected def signingKey(secretAccessKey:String, serviceName:String, awsRegion:String, requestTime:OffsetDateTime) = {
     val dateValue = requestTime.format(aws_compatible_date)
     logger.debug(s"dateValue is $dateValue")
-    val dateKey = hmacString("AWS4" + secretAccessKey, dateValue)
-    logger.debug(s"dateKey is $dateKey")
-    val dateRegionKey = hmacString(dateKey, awsRegion)
-    logger.debug(s"dateRegionKey is $dateRegionKey")
-    val dateRegionServiceKey = hmacString(dateRegionKey, serviceName)
-    logger.debug(s"dateRegionServiceKey is $dateRegionServiceKey")
+    val dateKey = hmacBinary(("AWS4" + secretAccessKey).getBytes("UTF-8"), dateValue)
+    logger.debug(s"dateKey is $dateKey from $secretAccessKey and $dateValue")
+    val dateRegionKey = hmacBinary(dateKey, awsRegion)
+    logger.debug(s"dateRegionKey is $dateRegionKey from $awsRegion")
+    val dateRegionServiceKey = hmacBinary(dateRegionKey, serviceName)
+    logger.debug(s"dateRegionServiceKey is $dateRegionServiceKey from $serviceName")
 
-    hmacString(dateRegionServiceKey, "aws4_request")
+    hmacBinary(dateRegionServiceKey, "aws4_request")
   }
 
   /**
@@ -217,7 +230,7 @@ trait S3Signer {
     * @param stringToSign provided from step two
     * @return
     */
-  protected def finalSignature(signingKey:String, stringToSign:String) = {
+  protected def finalSignature(signingKey:Array[Byte], stringToSign:String) = {
     hmacString(signingKey, stringToSign)
   }
 }
