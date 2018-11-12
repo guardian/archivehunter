@@ -26,6 +26,8 @@ lazy val commonSettings = Seq(
 
 scalaVersion := "2.12.2"
 
+val akkaVersion = "2.5.18"
+
 lazy val `archivehunter` = (project in file("."))
   .enablePlugins(PlayScala)
   .dependsOn(common)
@@ -42,15 +44,17 @@ lazy val `archivehunter` = (project in file("."))
       "com.lightbend.akka" %% "akka-stream-alpakka-dynamodb" % "0.20",
       "com.lightbend.akka" %% "akka-stream-alpakka-s3" % "0.20",
       "com.gu" %% "scanamo-alpakka" % "1.0.0-M8",
-      "com.typesafe.akka" %% "akka-cluster-tools" % "2.5.11",
+      "com.typesafe.akka" %% "akka-cluster-tools" % akkaVersion,
       "com.lightbend.akka.discovery" %% "akka-discovery-aws-api" % "0.18.0",
-      "com.typesafe.akka" %% "akka-cluster" % "2.5.11",
-      "com.typesafe.akka" %% "akka-cluster-metrics" % "2.5.11",
+      "com.typesafe.akka" %% "akka-cluster" % akkaVersion,
+      "com.typesafe.akka" %% "akka-cluster-metrics" % akkaVersion,
+      "com.typesafe.akka" %% "akka-actor" % akkaVersion,
+      "com.typesafe.akka" %% "akka-stream" % akkaVersion,
+      "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
+      // Only if you are using Akka Testkit
+      "com.typesafe.akka" %% "akka-testkit" % akkaVersion,
       jdbc, ehcache, ws)
   )
-
-
-val awsversion = "2.0.0-preview-10"
 
 val lambdaDeps = Seq(
   "com.amazonaws" % "aws-lambda-java-log4j2" % "1.0.0"
