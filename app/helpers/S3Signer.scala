@@ -10,7 +10,7 @@ import akka.http.scaladsl.model.{HttpHeader, HttpRequest}
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Flow, Keep, Sink}
 import akka.util.ByteString
-import com.amazonaws.auth.AWSCredentialsProvider
+import com.amazonaws.auth.{AWSCredentialsProvider, AWSSessionCredentials}
 import com.amazonaws.regions.Region
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
@@ -92,8 +92,6 @@ trait S3Signer {
       req.entity.getDataBytes()
         .via(new ContentHashingFlow("SHA-256"))
         .runWith(Sink.reduce[ByteString](_.concat(_)), mat)
-//      req.entity.getDataBytes()
-//        .runWith(new ContentHashingFlow("SHA-256"), mat)
     }
 
     val contentHashHexFuture = contentHashFuture.map(bs=>bs.map("%02x".format(_)).mkString)
@@ -102,11 +100,20 @@ trait S3Signer {
       case Success(string)=>logger.debug(s"content hash string is $string")
       case Failure(err)=>logger.error(s"failed to generate content hash", err)
     })
+
+    val credentials = credsProvider.getCredentials
+
+    val sessionTokenHeaders = if(credentials.isInstanceOf[AWSSessionCredentials]){
+      Seq(makeHttpHeader("x-amz-security-token", credentials.asInstanceOf[AWSSessionCredentials].getSessionToken))
+    } else {
+      Seq()
+    }
+
     val updatedHeadersFuture = contentHashHexFuture.map(hash=>
       req.headers ++ Seq(
         makeHttpHeader("x-amz-date",requestTime.format(aws_compatible_datetime)),
         makeHttpHeader("x-amz-content-sha256",hash)
-      )
+      ) ++ sessionTokenHeaders
     )
 
     val canonStringFuture = updatedHeadersFuture.map(headers=> {
@@ -125,7 +132,7 @@ trait S3Signer {
       case Success(str)=>logger.debug(s"stringToSign is $str")
       case Failure(err)=>logger.error(s"stringToSign failed", err)
     })
-    val credentials = credsProvider.getCredentials
+
     val signingKeyResult = signingKey(credentials.getAWSSecretKey, serviceName, region.getName, requestTime)
     val sig = stringToSignFuture.map(sts=>finalSignature(signingKeyResult, sts))
 

@@ -36,7 +36,6 @@ class ContentHashingFlow(algo:String) extends GraphStage[FlowShape[ByteString, B
         } else {
           completeStage()
         }
-
       }
     })
 

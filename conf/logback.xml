@@ -47,6 +47,8 @@
 
 
     <logger name="S3LocationSpec" level="DEBUG"/>
+    <logger name="helpers.ParanoidS3Source" level="DEBUG"/>
+    <logger name="helpers.S3XMLProcessor" level="INFO"/>
 
     <root level="WARN">
         <appender-ref ref="STDOUT" />
