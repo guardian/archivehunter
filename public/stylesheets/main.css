@@ -1,4 +1,4 @@
-html, body, p, th, td, li, dd, dt, pre {
+html, body, p, th, td, li, dd, dt, pre .ui-dialog-buttonset{
     font: 1em Verdana, Arial, Helvetica, sans-serif;
     background-color: #666666;
     color: white;
@@ -254,4 +254,21 @@ li.suggestions-list {
 input.time-interval {
     margin-left: 1em;
     width: 3em;
+}
+
+.metadata-table {
+    border: none;
+}
+
+td.metadata-heading {
+    font-weight: bold;
+    border: none;
+    text-align: right;
+    padding-right: 0.8em;
+}
+
+td.metadata-entry {
+    border: none;
+    text-align: left;
+
 }

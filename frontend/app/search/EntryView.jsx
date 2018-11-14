@@ -2,7 +2,7 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import TimestampFormatter from "../common/TimestampFormatter.jsx";
-import EntryThumbnail from "./EntryThumbnail.jsx";
+import EntryThumbnail from "../Entry/EntryThumbnail.jsx";
 
 class EntryView extends React.Component {
     static propTypes = {
@@ -10,8 +10,13 @@ class EntryView extends React.Component {
         itemOpenRequest: PropTypes.func.isRequired
     };
 
+    constructor(props){
+        super(props);
+        this.entryClicked = this.entryClicked.bind(this);
+    }
+
     entryClicked(){
-        if(this.itemOpenRequest) this.itemOpenRequest(this.props.entry);
+        if(this.props.itemOpenRequest) this.props.itemOpenRequest(this.props.entry);
     }
 
     filename(){
