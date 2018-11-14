@@ -73,6 +73,7 @@ class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner
         })
         Ok(ObjectListResponse[List[ScanTarget]]("ok","scan_target",success,success.length).asJson)
       } else {
+        errors.foreach(err=>logger.error(err.toString))
         InternalServerError(GenericErrorResponse("error", errors.map(_.toString).mkString(",")).asJson)
       }
     })

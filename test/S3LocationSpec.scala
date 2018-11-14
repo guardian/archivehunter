@@ -15,14 +15,6 @@ import scala.concurrent.{Await, ExecutionContext}
 import scala.concurrent.duration._
 import scala.collection.immutable.Seq
 
-/* A tiny class that can be used as a Specs2 ‘context’. */
-abstract class AkkaTestkitSpecs2Support extends TestKit(ActorSystem())
-  with After
-  with ImplicitSender {
-  // make sure we shut down the actor system after all tests have run
-  def after = Await.result(system.terminate(), 30 seconds)
-}
-
 class S3LocationSpec extends Specification {
   sequential
   class TestClass(loggerval:Logger, m:Materializer, ecval:ExecutionContext) extends S3Signer {
@@ -127,7 +119,7 @@ class S3LocationSpec extends Specification {
 
       val testData = HttpEntity("Welcome to Amazon S3.")
 
-      val testInput = HttpRequest(HttpMethod.custom("PUT"),
+      val testInput = HttpRequest(HttpMethods.PUT,
         Uri("https://examplebucket.s3.amazonaws.com/test$file.text"),
         headers,
         entity = testData
