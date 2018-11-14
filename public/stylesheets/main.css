@@ -190,6 +190,7 @@ div.entry-view {
     margin-top: auto;
     margin-bottom: auto;
     height: 80px;
+    display: block;
 }
 
 div.search-results-container {
@@ -258,6 +259,7 @@ input.time-interval {
 }
 
 .metadata-table {
+    margin-top: 1em;
     border: none;
 }
 
