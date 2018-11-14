@@ -9,20 +9,17 @@ class EntryDetails extends React.Component {
     };
 
     render(){
+        if(!this.props.entry){
+            return <div className="entry-details">
+            </div>
+        }
         return <div className="entry-details">
-            <div style={{display: "inline-flex"}}>
                 <EntryPreview entryId={this.props.entry.id}
                               hasProxy={this.props.entry.proxied}
                               fileExtension={this.props.entry.file_extension}
                               mimeType={this.props.entry.mimeType}
                 />
-                {/*<ul className="entry-details-list">*/}
-                    {/*<li className="entry-details-list">{this.props.entry.bucket}</li>*/}
-                    {/*<li className="entry-details-list">{this.props.entry.path}</li>*/}
-                    {/*<li className="entry-details-list">{this.props.entry.size}</li>*/}
-                    {/*<li className="entry-details-list">{this.props.entry.mimeType.major}/{this.props.entry.mimeType.minor}</li>*/}
-                    {/*<li className="entry-details-list">{this.props.entry.storageClass}</li>*/}
-                {/*</ul>*/}
+
                 <table className="metadata-table">
                     <tbody>
                     <tr>
@@ -47,7 +44,6 @@ class EntryDetails extends React.Component {
                     </tr>
                     </tbody>
                 </table>
-            </div>
         </div>
     }
 }

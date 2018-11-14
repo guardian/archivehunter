@@ -101,30 +101,13 @@ class BasicSearchComponent extends React.Component {
                 <input style={{width: "90%"}} onChange={event=>this.updateSearchTerms(event.target.value)} value={this.state.searchTerms}/>
                 <img src="/assets/images/Spinner-1s-44px.svg" style={{display: this.state.searching ? "inline-block":"none", verticalAlign: "bottom", height: "1.9em"}}/>
             </div>
-            {
-                this.state.showingPreview && <Dialog
-                    modal={true}
-                    onClose={this.onItemClose}
-                    closeOnEscape={true}
-                    hasCloseIcon={true}
-                    isDraggable={true}
-                    style={{float: "left" }}
-                    position={{x: window.innerWidth/2-250, y:0}}
-                    buttons={
-                        [{
-                            text: "Close",
-                            onClick: () => this.onItemClose()
-                        }]
-                    }>
-                    <EntryDetails entry={this.state.showingPreview}/>
-                </Dialog>
-            }
             <div className="centered">
                 <SearchSuggestionsComponent terms={this.state.searchTerms} autoHide={true}/>
             </div>
             <div className="centered" style={{marginBottom: "2em",height: "2em", display: this.state.totalHits===-1 ? "none":"block"}}>
                 <p className="centered">Found a total of {this.state.totalHits} results{ this.state.searching ? "so far" : ""}.</p>
             </div>
+            <EntryDetails entry={this.state.showingPreview}/>
             {this.renderMainBody()}
         </div>
     }

@@ -193,8 +193,9 @@ div.entry-view {
 }
 
 div.search-results-container {
-    overflow-x: scroll;
-    overflow-y: hidden;
+    overflow-y: scroll;
+    overflow-x: hidden;
+    height: 80vh;
 }
 
 
@@ -270,5 +271,12 @@ td.metadata-heading {
 td.metadata-entry {
     border: none;
     text-align: left;
+}
 
+.entry-details {
+    float: right;
+    height: 100%;
+    width: 20%;
+    overflow: hidden;
+    border-left: 1px solid white;
 }
