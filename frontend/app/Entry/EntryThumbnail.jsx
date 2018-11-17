@@ -2,12 +2,14 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import axios from 'axios';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import ReactTooltip from 'react-tooltip';
 
 class EntryThumbnail extends React.Component {
     static propTypes = {
         mimeType: PropTypes.object.isRequired,
         fileExtension: PropTypes.string.isRequired,
-        entryId: PropTypes.string.isRequired
+        entryId: PropTypes.string.isRequired,
+        dataTip: PropTypes.string
     };
 
     static knownAudioExtensions = [

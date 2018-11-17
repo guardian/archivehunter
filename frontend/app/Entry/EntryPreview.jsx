@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import axios from 'axios';
 import EntryThumbnail from './EntryThumbnail.jsx';
 import ErrorViewComponent from '../common/ErrorViewComponent.jsx';
+import ReactTooltip from 'react-tooltip';
 
 class EntryPreview extends React.Component {
     static propTypes = {
@@ -32,9 +33,16 @@ class EntryPreview extends React.Component {
         );
     }
 
+    controlBody(){
+        if(!this.state.previewData) return <EntryThumbnail mimeType={this.props.mimeType} fileExtension={this.props.fileExtension} entryId={this.props.entryId}/>;
+    }
+
     render(){
         if(this.state.lastError) return <ErrorViewComponent error={this.state.lastError}/>;
-        if(!this.state.previewData) return <EntryThumbnail mimeType={this.props.mimeType} fileExtension={this.props.fileExtension} entryId={this.props.entryId}/>;
+
+        const tooltip = this.state.previewData ? "" : "No preview available";
+
+        return <span data-tip={tooltip}>{this.controlBody()}<ReactTooltip/></span>
     }
 }
 
