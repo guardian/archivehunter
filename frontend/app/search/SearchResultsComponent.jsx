@@ -1,8 +1,6 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import EntryView from './EntryView.jsx';
-import Dialog from 'react-dialog';
-import EntryDetails from '../Entry/EntryDetails.jsx'
 
 class SearchResultsComponent extends React.Component {
     static propTypes = {
