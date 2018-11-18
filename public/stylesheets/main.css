@@ -1,4 +1,4 @@
-html, body, p, th, td, li, dd, dt, pre {
+html, body, p, th, td, li, dd, dt, pre .ui-dialog-buttonset{
     font: 1em Verdana, Arial, Helvetica, sans-serif;
     background-color: #666666;
     color: white;
@@ -127,6 +127,9 @@ p.centered {
     margin-right: 1em;
 }
 
+/*
+Search entries
+ */
 div.entry-view {
     border: 1px solid black;
     overflow: hidden;
@@ -137,17 +140,66 @@ div.entry-view {
     display:inline-block;
     margin-right: 2em;
     margin-bottom: 2em;
-}
-
-div.search-results-container {
-    overflow-x: scroll;
-    overflow-y: hidden;
+    padding: 0.4em;
+    padding-top: 0.2em;
 }
 
 .entry-title {
     margin-top: 0;
     margin-bottom: 0.2em;
+    color: blue;
+    font-size: 0.8em;
+    font-weight: bold;
+    background-color: inherit;
+    margin-left:0.2em;
+    margin-right:0.2em;
+    height: 2.5em;
+    overflow: hidden;
 }
+
+.entry-icon {
+    color: #333333;
+}
+
+.entry-deep-archive {
+    background-color: #2676b5 !important;
+    color: white !important;
+}
+
+.entry-shallow-archive {
+    background-color: #cceeff !important;
+}
+
+.entry-gone-missing {
+    background-color: darkred !important;
+    color: white !important;
+}
+
+.entry-date {
+    font-size: 0.6em;
+    font-style: italic;
+    background-color: inherit;
+}
+
+.entry-thumbnail {
+    color: inherit;
+    margin-left: auto;
+    margin-right: auto;
+    overflow: hidden;
+    width: 150px !important;
+    margin-top: auto;
+    margin-bottom: auto;
+    height: 80px;
+    display: block;
+}
+
+div.search-results-container {
+    overflow-y: scroll;
+    overflow-x: hidden;
+    height: 80vh;
+}
+
+
 
 .suggestions-list {
     display: inline;
@@ -204,4 +256,29 @@ li.suggestions-list {
 input.time-interval {
     margin-left: 1em;
     width: 3em;
+}
+
+.metadata-table {
+    margin-top: 1em;
+    border: none;
+}
+
+td.metadata-heading {
+    font-weight: bold;
+    border: none;
+    text-align: right;
+    padding-right: 0.8em;
+}
+
+td.metadata-entry {
+    border: none;
+    text-align: left;
+}
+
+.entry-details {
+    float: right;
+    height: 100%;
+    width: 20%;
+    overflow: hidden;
+    border-left: 1px solid white;
 }
