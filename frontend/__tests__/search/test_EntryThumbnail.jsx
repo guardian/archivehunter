@@ -1,6 +1,6 @@
 import React from 'react';
 import {shallow,mount} from 'enzyme';
-import EntryThumbnail from '../../app/search/EntryThumbnail.jsx';
+import EntryThumbnail from '../../app/Entry/EntryThumbnail.jsx';
 import {BrowserRouter} from 'react-router-dom';
 
 describe("EntryThumbnail", ()=>{
