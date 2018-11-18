@@ -5,6 +5,8 @@ import SearchResultsComponent from './SearchResultsComponent.jsx';
 import SearchSuggestionsComponent from './SearchSuggestionsComponent.jsx';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import Dialog from "react-dialog";
+import EntryDetails from "../Entry/EntryDetails.jsx";
 
 class BasicSearchComponent extends React.Component {
     constructor(props){
@@ -17,10 +19,15 @@ class BasicSearchComponent extends React.Component {
             error:null,
             searchResults: [],
             totalHits: -1,
+            limit: 100,
+            showingPreview: null
         };
 
         this.cancelTokenSource = axios.CancelToken.source();
-        this.defaultPageSize = 100
+        this.defaultPageSize = 100;
+
+        this.onItemOpen = this.onItemOpen.bind(this);
+        this.onItemClose = this.onItemClose.bind(this);
     }
 
     componentWillMount(){
@@ -38,7 +45,7 @@ class BasicSearchComponent extends React.Component {
 
         this.setState({searching: true, currentSearch:tok},()=>
             axios.get("/api/search/basic?q=" + encodedParamString + "&start=" + startAt + "&length=" + this.defaultPageSize).then(result=>{
-                if(result.data.entries.length===0) {  //we've run out of results
+                if(result.data.entries.length===0 || this.state.searchResults.length>=this.state.limit) {  //we've run out of results
                     this.setState({
                         currentSearch: null,
                         searching: false,
@@ -67,11 +74,19 @@ class BasicSearchComponent extends React.Component {
         this.setState({searchTerms: newString, searchResults: []},()=>this.runSearch(0));
     }
 
+    onItemOpen(newTarget){
+        this.setState({showingPreview: newTarget})
+    }
+
+    onItemClose(){
+        this.setState({showingPreview: null});
+    }
+
     renderMainBody(){
         if(this.state.error){
             return <ErrorViewComponent error={this.state.error}/>
         } else if(this.state.totalHits!==-1){
-            return <SearchResultsComponent entries={this.state.searchResults}/>
+            return <SearchResultsComponent entries={this.state.searchResults} onItemOpen={this.onItemOpen} onItemClose={this.onItemClose}/>
         } else if(this.state.searching) {
             return <img style={{marginLeft:"auto",marginRight:"auto",width:"200px"}} src="/assets/images/Spinner-1s-200px.gif"/>
         } else {
@@ -92,6 +107,7 @@ class BasicSearchComponent extends React.Component {
             <div className="centered" style={{marginBottom: "2em",height: "2em", display: this.state.totalHits===-1 ? "none":"block"}}>
                 <p className="centered">Found a total of {this.state.totalHits} results{ this.state.searching ? "so far" : ""}.</p>
             </div>
+            <EntryDetails entry={this.state.showingPreview}/>
             {this.renderMainBody()}
         </div>
     }
