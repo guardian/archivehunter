@@ -1,5 +1,6 @@
 package helpers
 
+import java.net.URLDecoder
 import java.time.Instant
 
 import akka.stream.{Attributes, FlowShape, Inlet, Outlet}
@@ -11,11 +12,12 @@ import akka.util.ByteString
 import scala.xml.pull.XMLEventReader
 import play.api.Logger
 
+import scala.collection.mutable
 import scala.io.Source
 import scala.util.{Failure, Success, Try}
 import scala.xml.pull._
 
-class S3XMLProcessor extends GraphStage[FlowShape[ByteString,ListBucketResultContents]]{
+class S3XMLProcessor (skipZeroLength:Boolean=true) extends GraphStage[FlowShape[ByteString,ListBucketResultContents]]{
   private val in:Inlet[ByteString] = Inlet.create("S3XMLProcessor.in")
   private val out:Outlet[ListBucketResultContents] = Outlet.create("S3XMLProcessor.out")
 
@@ -23,9 +25,25 @@ class S3XMLProcessor extends GraphStage[FlowShape[ByteString,ListBucketResultCon
 
   override def shape: FlowShape[ByteString, ListBucketResultContents] = FlowShape.of(in, out)
 
+  def makeProperPath(str: String):String = {
+    val decoded = str.split("/").map(URLDecoder.decode(_, "UTF-8")).mkString("/")
+    if (decoded.slice(0, 1) == "/") {
+      decoded.substring(1)
+    } else {
+      decoded
+    }
+    decoded
+  }
+
+  /**
+    * generate a ListBucketContentsResult based on a Map of content from the raw S3 XML output
+    * @param captures Map of (key->value) corresponding to the <Contents> structure of the S3 cml
+    * @param bucketName bucket name that this relates to
+    * @return a ListBucketContents result if we could coerce the map into its structure, or None (with an error output via the logger)
+    */
   def listBucketResultFor(captures: Map[String, String], bucketName:String): Option[ListBucketResultContents] = try {
     val lastModTime = Instant.parse(captures("LastModified"))
-    Some(ListBucketResultContents(bucketName, captures("Key"), captures("ETag"), captures("Size").toLong, lastModTime, captures("StorageClass")))
+    Some(ListBucketResultContents(bucketName, makeProperPath(captures("Key")), captures("ETag"), captures("Size").toLong, lastModTime, captures("StorageClass")))
   } catch {
     case ex:Throwable=>
       logger.error(s"Could not convert $captures into ListbucketResultContents: ", ex)
@@ -134,7 +152,7 @@ class S3XMLProcessor extends GraphStage[FlowShape[ByteString,ListBucketResultCon
   override def createLogic(inheritedAttributes: Attributes): GraphStageLogic = new GraphStageLogic(shape) {
     private val logger = Logger(getClass)
 
-    var processingDoc:Boolean = false
+    var entriesQueue:mutable.Queue[ListBucketResultContents] = mutable.Queue()
 
     setHandler(in, new AbstractInHandler {
       override def onPush(): Unit = {
@@ -144,27 +162,33 @@ class S3XMLProcessor extends GraphStage[FlowShape[ByteString,ListBucketResultCon
         logger.info(elem.utf8String)
 
         val xml = new XMLEventReader(Source.fromBytes(elem.toByteBuffer.array(), "UTF-8"))
-        processingDoc = true
-        parseDoc(xml)(entryOrError=>{
-          while(!isAvailable(out)) {
-            logger.debug("output not available, waiting...")
-            Thread.sleep(500L)
-          }
-          entryOrError match {
-            case Right(entry)=>push(out, entry)
-            case Left(s3error)=>
-              logger.error(s"Got an error from S3: ${s3error.toString}")
-              failStage(new RuntimeException(s3error.toString))
-          }
-
+        parseDoc(xml)({
+          case Right(entry)=>
+            if(skipZeroLength){
+              if(entry.size>0) entriesQueue.enqueue(entry)
+            } else {
+              entriesQueue.enqueue(entry)
+            }
+          case Left(s3error)=>
+            logger.error(s"Got an error from S3: ${s3error.toString}")
+            failStage(new RuntimeException(s3error.toString))
         })
-        processingDoc = false
+        if(entriesQueue.nonEmpty){
+          push(out, entriesQueue.dequeue())
+        } else {
+          completeStage()
+        }
       }
     })
 
     setHandler(out, new AbstractOutHandler {
       override def onPull(): Unit = {
-        if(!processingDoc) pull(in)
+        logger.debug("pull from downstream")
+        if(entriesQueue.nonEmpty){
+          push(out, entriesQueue.dequeue())
+        } else {
+          pull(in)
+        }
       }
     })
   }

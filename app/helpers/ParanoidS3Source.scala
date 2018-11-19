@@ -1,5 +1,6 @@
 package helpers
 
+import java.net.URLEncoder
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 
@@ -101,7 +102,7 @@ class ParanoidS3Source(bucketName:String, region:Region, credsProvider: AWSCrede
         val baseParams = "list-type=2&encoding-type=url"
         //val baseParams = "delimiter=/&encoding-type=url&prefix"
         val qParams = continuationToken match {
-          case Some(token)=>baseParams + s"&$token"
+          case Some(token)=>baseParams + s"&continuationToken=${URLEncoder.encode(token)}"
           case None=>baseParams
         }
         val request = HttpRequest(HttpMethods.GET,
