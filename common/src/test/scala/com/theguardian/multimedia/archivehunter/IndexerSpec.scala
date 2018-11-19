@@ -5,7 +5,7 @@ import java.time.ZonedDateTime
 import com.sksamuel.elastic4s.embedded.LocalNode
 import com.sksamuel.elastic4s.http.HttpClient
 import com.sksamuel.elastic4s.http.index.CreateIndexResponse
-import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer, MimeType}
+import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer, MimeType, StorageClass}
 import org.elasticsearch.client.ElasticsearchClient
 import org.specs2.mutable._
 import org.specs2.specification.AfterAll
@@ -42,7 +42,8 @@ class IndexerSpec extends Specification with AfterAll {
         ZonedDateTime.now(),
         "etag_here",
         MimeType("application","octet-stream"),
-        proxied=false
+        proxied=false,
+        storageClass = StorageClass.STANDARD
       )
 
       val i = new Indexer("testindex")
