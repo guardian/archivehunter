@@ -172,27 +172,30 @@ class BucketScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientMan
 //    val hostname = s"s3-$region.amazonaws.com"
 //    val urlString = s"https://$hostname/${target.bucketName}"
 //
-    val promise = Promise[Unit]() //this Promise will get completed when the stream ends, and contain any error.
+    val completionPromise = Promise[Unit]() //this promise will get fulfilled when the stream ends.
+
+    val esclient = esClientMgr.getClient()
 
     val source = new ParanoidS3Source(target.bucketName,region, s3ClientMgr.credentialsProvider(config.getOptional[String]("externalData.awsProfile")))(system)
     val processor = new S3XMLProcessor()
+    val converterFlow = injector.getInstance(classOf[S3ToArchiveEntryFlow])
+
+    val indexSink = getElasticSearchSink(esclient, completionPromise)
 
     val graph = RunnableGraph.fromGraph(GraphDSL.create(){ implicit builder:GraphDSL.Builder[NotUsed]=>
       import GraphDSL.Implicits._
       val src = builder.add(source)
       val proc = builder.add(processor)
-      val notify = builder.add(Sink.onComplete({
-        case Success(done)=>promise.complete(Success(()))
-        case Failure(exception)=>promise.failure(exception)
-      }))
+      val converter = builder.add(converterFlow)
+      val sink = builder.add(indexSink)
 
-      src ~> proc ~> notify
+      src ~> proc ~> converter ~> sink
       ClosedShape
     })
 
     graph.run()
 
-    promise
+    completionPromise
   }
 
   def doScanDeleted(target:ScanTarget):Promise[Unit] = {

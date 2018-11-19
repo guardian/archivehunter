@@ -38,17 +38,17 @@
     <logger name="services.AppStartup" level="DEBUG"/>
     <logger name="services.BucketScanner" level="INFO"/>
     <logger name="akka.cluster" level="DEBUG"/>
-    <logger name="helpers.S3ToArchiveEntryFlow" level="WARN"/>
+    <logger name="helpers.S3ToArchiveEntryFlow" level="DEBUG"/>
     <logger name="helpers.SearchHitToArchiveEntryFlow" level="WARN"/>
     <logger name="helpers.ArchiveEntryVerifyFlow" level="WARN"/>
-    <logger name="com.sksamuel.elastic4s.streams" level="WARN"/>
+    <logger name="com.sksamuel.elastic4s.streams" level="DEBUG"/>
     <logger name="controllers.SearchController" level="INFO"/>
     <logger name="controllers.ScanTargetController" level="INFO"/>
 
 
     <logger name="S3LocationSpec" level="DEBUG"/>
     <logger name="helpers.ParanoidS3Source" level="DEBUG"/>
-    <logger name="helpers.S3XMLProcessor" level="INFO"/>
+    <logger name="helpers.S3XMLProcessor" level="DEBUG"/>
 
     <root level="WARN">
         <appender-ref ref="STDOUT" />
