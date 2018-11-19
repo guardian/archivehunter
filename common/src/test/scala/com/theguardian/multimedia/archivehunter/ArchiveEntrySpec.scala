@@ -4,7 +4,7 @@ import java.util.Date
 
 import com.amazonaws.services.s3.AmazonS3Client
 import com.amazonaws.services.s3.model.ObjectMetadata
-import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, MimeType}
+import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, MimeType, StorageClass}
 import org.specs2.mock.Mockito
 import org.specs2.mutable.Specification
 
@@ -25,7 +25,7 @@ class ArchiveEntrySpec extends Specification with Mockito {
 
       val newEntry = Await.result(ArchiveEntry.fromS3("test-bucket","test/path/to/file.ext"), 5 seconds)
 
-      newEntry mustEqual ArchiveEntry(ArchiveEntry.makeDocId("test-bucket","test/path/to/file.ext"),"test-bucket","test/path/to/file.ext",Some("ext"),123456L,ZonedDateTime.of(2018,1,1,23,21,0,0,ZoneId.systemDefault()),"test-etag", MimeType("application","octet-stream"), false)
+      newEntry mustEqual ArchiveEntry(ArchiveEntry.makeDocId("test-bucket","test/path/to/file.ext"),"test-bucket","test/path/to/file.ext",Some("ext"),123456L,ZonedDateTime.of(2018,1,1,23,21,0,0,ZoneId.systemDefault()),"test-etag", MimeType("application","octet-stream") ,false, StorageClass.STANDARD)
     }
 
     "return any exception in the AWS SDK as a failed Try" in {

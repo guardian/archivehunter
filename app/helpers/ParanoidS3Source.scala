@@ -105,13 +105,12 @@ class ParanoidS3Source(bucketName:String, region:Region, credsProvider: AWSCrede
           case None=>baseParams
         }
         val request = HttpRequest(HttpMethods.GET,
-          Uri(s"https://$bucketName.s3.${region.getName}.amazonaws.com/?$qParams"),
-          headerSequence,
-          HttpEntity.Empty,
-          HttpProtocol("HTTP/1.1"))
+          Uri(s"https://$bucketName.s3.${region.getName}.amazonaws.com?$qParams"),
+          headerSequence)
 
-        val signedRequest = signHttpRequest(request, region,"s3", credsProvider)
-        val response = Await.result(Http().singleRequest(request), 10 seconds)
+        val signedRequest = Await.result(signHttpRequest(request, region,"s3", credsProvider), 10 seconds)
+        logger.debug(s"Signed request is ${signedRequest.toString()}")
+        val response = Await.result(Http().singleRequest(signedRequest), 10 seconds)
 
         //we are in paranoid mode, so can't assume that this is valid xml (yet). So, we buffer the content and manually scan for
         //the continuationToken and isTruncated flags we require.

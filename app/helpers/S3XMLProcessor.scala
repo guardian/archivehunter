@@ -140,8 +140,8 @@ class S3XMLProcessor extends GraphStage[FlowShape[ByteString,ListBucketResultCon
       override def onPush(): Unit = {
         val elem = grab(in)
         //elem is an XML document, that can't necessarily be trusted...
-        logger.debug("xml document:")
-        logger.debug(elem.utf8String)
+        logger.info("xml document:")
+        logger.info(elem.utf8String)
 
         val xml = new XMLEventReader(Source.fromBytes(elem.toByteBuffer.array(), "UTF-8"))
         processingDoc = true
