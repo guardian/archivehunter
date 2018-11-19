@@ -102,9 +102,14 @@ class ParanoidS3Source(bucketName:String, region:Region, credsProvider: AWSCrede
         val baseParams = "list-type=2&encoding-type=url"
         //val baseParams = "delimiter=/&encoding-type=url&prefix"
         val qParams = continuationToken match {
-          case Some(token)=>baseParams + s"&continuationToken=${URLEncoder.encode(token)}"
-          case None=>baseParams
+          case Some(token)=>
+            logger.debug(s"continuation token is $token")
+            baseParams + s"&continuation-token=${URLEncoder.encode(token)}"
+          case None=>
+            logger.debug("no continuation token")
+            baseParams
         }
+
         val request = HttpRequest(HttpMethods.GET,
           Uri(s"https://$bucketName.s3.${region.getName}.amazonaws.com?$qParams"),
           headerSequence)

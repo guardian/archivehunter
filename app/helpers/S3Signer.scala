@@ -170,7 +170,7 @@ trait S3Signer {
     logger.debug(s"encodedUrl: $canonicalUrl")
 
     val canonicalQueryString = uriQueryParams
-      .map(entry=>URLEncoder.encode(entry._1,"UTF-8")+"="+URLEncoder.encode(entry._2,"UTF-8"))
+      .map(entry=>URLEncoder.encode(entry._1,"UTF-8")+"=" + entry._2)
       .toList.sorted
       .mkString("&")
     logger.debug(s"canonicalQueryString: $canonicalQueryString")
