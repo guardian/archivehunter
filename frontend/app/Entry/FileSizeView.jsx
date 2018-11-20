@@ -22,7 +22,7 @@ class FileSizeView extends React.Component {
     }
 
     getPostfix(thousands){
-        const postfixes = ["b", "Kb", "Mb", "Gb", "Tb", "Pb", "Eb"];
+        const postfixes = ["bytes", "Kb", "Mb", "Gb", "Tb", "Pb", "Eb"];
         if(thousands>postfixes.length) return "ridiculous";
         return postfixes[thousands];
     }

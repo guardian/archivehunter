@@ -2,6 +2,7 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import EntryPreview from './EntryPreview.jsx';
 import EntryThumbnail from './EntryThumbnail.jsx';
+import FileSizeView from './FileSizeView.jsx';
 
 class EntryDetails extends React.Component {
     static propTypes = {
@@ -54,7 +55,7 @@ class EntryDetails extends React.Component {
                     </tr>
                     <tr>
                         <td className="metadata-heading">File size</td>
-                        <td className="metadata-entry">{this.props.entry.size}</td>
+                        <td className="metadata-entry"><FileSizeView rawSize={this.props.entry.size}/></td>
                     </tr>
                     <tr>
                         <td className="metadata-heading">Data type</td>
