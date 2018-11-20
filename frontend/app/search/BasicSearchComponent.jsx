@@ -19,7 +19,7 @@ class BasicSearchComponent extends React.Component {
             error:null,
             searchResults: [],
             totalHits: -1,
-            limit: 100,
+            limit: 1000,
             showingPreview: null
         };
 
