@@ -8,11 +8,29 @@ class EntryDetails extends React.Component {
         entry: PropTypes.object.isRequired
     };
 
+    extractFileInfo(fullpath){
+        const parts = fullpath.split("/");
+        const len = parts.length;
+        if(len===0){
+            return {
+                filename: parts[0],
+                filepath: ""
+            }
+        }
+
+        return {
+            filename: parts[len-1],
+            filepath: parts.slice(0,len-1).join("/")
+        }
+    }
+
     render(){
         if(!this.props.entry){
             return <div className="entry-details">
             </div>
         }
+        const fileinfo = this.extractFileinfo(this.props.entry.path);
+
         return <div className="entry-details">
                 <EntryPreview entryId={this.props.entry.id}
                               hasProxy={this.props.entry.proxied}
@@ -23,8 +41,12 @@ class EntryDetails extends React.Component {
                 <table className="metadata-table">
                     <tbody>
                     <tr>
+                        <td className="metadata-heading">Name</td>
+                        <td className="metadata-entry">{fileinfo.filename}</td>
+                    </tr>
+                    <tr>
                         <td className="metadata-heading">File path</td>
-                        <td className="metadata-entry">{this.props.entry.path}</td>
+                        <td className="metadata-entry">{fileinfo.filepath}</td>
                     </tr>
                     <tr>
                         <td className="metadata-heading">Catalogue</td>
