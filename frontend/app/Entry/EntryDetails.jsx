@@ -30,7 +30,7 @@ class EntryDetails extends React.Component {
             return <div className="entry-details">
             </div>
         }
-        const fileinfo = this.extractFileinfo(this.props.entry.path);
+        const fileinfo = this.extractFileInfo(this.props.entry.path);
 
         return <div className="entry-details">
                 <EntryPreview entryId={this.props.entry.id}
