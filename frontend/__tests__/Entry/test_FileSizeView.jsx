@@ -32,4 +32,16 @@ describe("FileSizeView", ()=>{
         const rendered = mount(<FileSizeView rawSize={value}/>);
         expect(rendered.find('span').text()).toEqual("2 Tb");
     });
+
+    it("should round to 3sf by default",()=>{
+        const value = 2.0123*1000*1000*1000*1000;
+        const rendered = mount(<FileSizeView rawSize={value}/>);
+        expect(rendered.find('span').text()).toEqual("2.01 Tb");
+    });
+
+    it("should round to the provided precision",()=>{
+        const value = 2.0123*1000*1000*1000*1000;
+        const rendered = mount(<FileSizeView rawSize={value} precision={1}/>);
+        expect(rendered.find('span').text()).toEqual("2 Tb");
+    });
 });
