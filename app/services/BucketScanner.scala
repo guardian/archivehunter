@@ -3,12 +3,14 @@ package services
 import java.time.ZonedDateTime
 import java.time.temporal.{ChronoUnit, IsoFields, TemporalUnit}
 
+import akka.NotUsed
 import akka.actor.{Actor, ActorSystem, Timers}
-import akka.stream.scaladsl.{Keep, Sink, Source}
-import akka.stream.{ActorMaterializer, KillSwitches, Materializer}
+import akka.http.scaladsl.Http
+import akka.stream.scaladsl.{GraphDSL, Keep, RunnableGraph, Sink, Source}
+import akka.stream.{ActorMaterializer, ClosedShape, KillSwitches, Materializer}
+import com.amazonaws.regions.{Region, Regions}
 import com.google.inject.Injector
 import com.gu.scanamo.{ScanamoAlpakka, Table}
-import com.sksamuel.elastic4s.{Index, Indexes}
 import com.sksamuel.elastic4s.http.HttpClient
 import com.sksamuel.elastic4s.http.bulk.BulkResponseItem
 import helpers._
@@ -159,6 +161,43 @@ class BucketScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientMan
     completionPromise
   }
 
+  /**
+    * Performs a scan in "paranoid" mode, i.e. assume that S3 will return invalid XML that will break the standard SDK (it does sometimes....)
+    * @param target [[ScanTarget]] indicating bucket to process
+    * @return a Promise[Unit] which completes when the scan finishes
+    */
+  def doScanParanoid(target:ScanTarget):Promise[Unit] = {
+    logger.warn(s"Configured to do paranoid scan on $target")
+    val region = Region.getRegion(Regions.fromName(config.get[String]("externalData.awsRegion")))
+//    val hostname = s"s3-$region.amazonaws.com"
+//    val urlString = s"https://$hostname/${target.bucketName}"
+//
+    val completionPromise = Promise[Unit]() //this promise will get fulfilled when the stream ends.
+
+    val esclient = esClientMgr.getClient()
+
+    val source = new ParanoidS3Source(target.bucketName,region, s3ClientMgr.credentialsProvider(config.getOptional[String]("externalData.awsProfile")))(system)
+    val processor = new S3XMLProcessor()
+    val converterFlow = injector.getInstance(classOf[S3ToArchiveEntryFlow])
+
+    val indexSink = getElasticSearchSink(esclient, completionPromise)
+
+    val graph = RunnableGraph.fromGraph(GraphDSL.create(){ implicit builder:GraphDSL.Builder[NotUsed]=>
+      import GraphDSL.Implicits._
+      val src = builder.add(source)
+      val proc = builder.add(processor)
+      val converter = builder.add(converterFlow)
+      val sink = builder.add(indexSink)
+
+      src ~> proc ~> converter ~> sink
+      ClosedShape
+    })
+
+    graph.run()
+
+    completionPromise
+  }
+
   def doScanDeleted(target:ScanTarget):Promise[Unit] = {
     val completionPromise = Promise[Unit]()
 
@@ -192,14 +231,20 @@ class BucketScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientMan
           logger.error("Could not perform regular scan check", err)
       })
     case PerformTargetScan(tgt)=>
-      scanTargetDAO.setInProgress(tgt, newValue=true).flatMap(updatedScanTarget=>
-        doScan(tgt).future.andThen({
-          case Success(x)=>
+      scanTargetDAO.setInProgress(tgt, newValue=true).flatMap(updatedScanTarget=> {
+        val promise = tgt.paranoid match {
+          case Some(value) =>
+            if (value) doScanParanoid(tgt) else doScan(tgt)
+          case None => doScan(tgt)
+        }
+
+        promise.future.andThen({
+          case Success(x) =>
             scanTargetDAO.setScanCompleted(updatedScanTarget)
-          case Failure(err)=>
-            scanTargetDAO.setScanCompleted(updatedScanTarget,error=Some(err))
+          case Failure(err) =>
+            scanTargetDAO.setScanCompleted(updatedScanTarget, error = Some(err))
         })
-      ).onComplete({
+      }).onComplete({
         case Success(result)=>
           logger.info(s"Completed addition scan of ${tgt.bucketName}")
         case Failure(err)=>

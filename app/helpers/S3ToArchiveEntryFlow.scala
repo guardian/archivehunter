@@ -49,6 +49,7 @@ class S3ToArchiveEntryFlow @Inject() (s3ClientMgr: S3ClientManager, config:Confi
           } catch {
             case ex:Throwable=>
               logger.error(s"Could not create ArchiveEntry: ", ex)
+              //failStage(ex) //temp for debugging
               pull(in)
           }
         }
