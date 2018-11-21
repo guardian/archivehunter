@@ -40,7 +40,6 @@ lazy val `archivehunter` = (project in file("."))
       "com.sksamuel.elastic4s" %% "elastic4s-circe" % elastic4sVersion,
       "com.sksamuel.elastic4s" %% "elastic4s-testkit" % elastic4sVersion % "test",
       "com.sksamuel.elastic4s" %% "elastic4s-embedded" % elastic4sVersion % "test",
-      "com.gu" %% "scanamo" % "1.0.0-M8",
       "com.lightbend.akka" %% "akka-stream-alpakka-dynamodb" % "0.20",
       "com.lightbend.akka" %% "akka-stream-alpakka-s3" % "0.20",
       "com.gu" %% "scanamo-alpakka" % "1.0.0-M8",
@@ -65,10 +64,12 @@ lazy val common = (project in file("common"))
   .settings(commonSettings,
     libraryDependencies ++= Seq(
       "com.amazonaws" % "aws-java-sdk-s3" % "1.11.346",
+      "com.gu" %% "scanamo-alpakka" % "1.0.0-M8",
       "io.circe" %% "circe-core" % circeVersion,
       "io.circe" %% "circe-generic" % circeVersion,
       "io.circe" %% "circe-parser" % circeVersion,
-      "io.circe" %% "circe-java8" % circeVersion
+      "io.circe" %% "circe-java8" % circeVersion,
+      "com.gu" %% "scanamo" % "1.0.0-M8",
     )
   )
 

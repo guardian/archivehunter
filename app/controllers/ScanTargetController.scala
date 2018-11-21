@@ -20,12 +20,14 @@ import responses.{GenericErrorResponse, ObjectCreatedResponse, ObjectGetResponse
 import akka.stream.alpakka.dynamodb.scaladsl._
 import akka.stream.alpakka.dynamodb.impl._
 import com.amazonaws.auth.{AWSStaticCredentialsProvider, InstanceProfileCredentialsProvider}
-import services.BucketScanner
+import services.{BucketScanner, LegacyProxiesScanner}
 
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner:ActorRef, config:Configuration,
+class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner:ActorRef,
+                                      @Named("legacyProxiesScannerActor") proxyScanner:ActorRef,
+                                      config:Configuration,
                                       cc:ControllerComponents,ddbClientMgr:DynamoClientManager)(implicit system:ActorSystem)
   extends AbstractController(cc) with Circe with ZonedDateTimeEncoder with ZonedTimeFormat {
   private val logger=Logger(getClass)
@@ -103,6 +105,13 @@ class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner
   def manualTriggerDeletionScan(targetName:String) = Action {
     withLookup(targetName) { tgt=>
       bucketScanner ! new BucketScanner.PerformDeletionScan(tgt)
+      Ok(GenericErrorResponse("ok","scan started").asJson)
+    }
+  }
+
+  def scanForLegacyProxies(targetName:String) = Action {
+    withLookup(targetName) { tgt=>
+      proxyScanner ! new LegacyProxiesScanner.ScanBucket(tgt)
       Ok(GenericErrorResponse("ok","scan started").asJson)
     }
   }

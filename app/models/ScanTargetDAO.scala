@@ -2,8 +2,11 @@ package models
 
 import java.time.ZonedDateTime
 
+import akka.actor.ActorSystem
+import akka.stream.{ActorMaterializer, Materializer}
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsync
-import com.gu.scanamo.{Scanamo, Table}
+import com.gu.scanamo.error.DynamoReadError
+import com.gu.scanamo.{Scanamo, ScanamoAlpakka, Table}
 import com.theguardian.multimedia.archivehunter.common.ZonedDateTimeEncoder
 import helpers.{DynamoClientManager, ZonedTimeFormat}
 import javax.inject.Inject
@@ -15,13 +18,16 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.math._
 import io.circe.generic.auto._
 import io.circe.syntax._
+import com.gu.scanamo.syntax._
 
-class ScanTargetDAO @Inject() (config:Configuration, ddbClientMgr: DynamoClientManager) extends ZonedDateTimeEncoder with ZonedTimeFormat {
+class ScanTargetDAO @Inject() (config:Configuration, ddbClientMgr: DynamoClientManager)(implicit actorSystem:ActorSystem) extends ZonedDateTimeEncoder with ZonedTimeFormat {
   private val logger = Logger(getClass)
   val table = Table[ScanTarget](config.get[String]("externalData.scanTargets"))
   val maxRetries = config.getOptional[Int]("externalData.maxRetries").getOrElse(10)
   val initialRetryDelay = config.getOptional[Int]("externalData.initialRetryDelay").getOrElse(2)
   val retryDelayFactor = config.getOptional[Double]("externalData.retryDelayFactor").getOrElse(1.5)
+
+  implicit private val materializer:Materializer = ActorMaterializer.create(actorSystem)
 
   /**
     * synchronously attempts to make the update, doing exponential delay via sleep until successful.
@@ -80,5 +86,18 @@ class ScanTargetDAO @Inject() (config:Configuration, ddbClientMgr: DynamoClientM
       case Success(scanTarget)=>scanTarget
       case Failure(err)=>throw err
     }
+  }
+
+  /**
+    * gets the [[ScanTarget]] record for the given bucket name
+    * @param bucketName bucket name to search for
+    * @return a Future, which contains None if no record was found, Left(DynamoReadError) if an error occurred or Right(ScanTarget) if a record was found.
+    */
+  def targetForBucket(bucketName:String):Future[Option[Either[DynamoReadError,ScanTarget]]] = {
+    val client = ddbClientMgr.getNewAlpakkaDynamoClient(config.getOptional[String]("externalData.awsProfile"))
+
+    ScanamoAlpakka.exec(client)(
+      table.get('bucketName->bucketName)
+    )
   }
 }

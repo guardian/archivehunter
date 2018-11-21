@@ -2,12 +2,15 @@ package com.theguardian.multimedia.archivehunter.common
 
 import java.time.{ZoneId, ZonedDateTime}
 
+import akka.stream.alpakka.dynamodb.scaladsl.DynamoClient
+import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsync
 import com.amazonaws.services.s3.{AmazonS3, AmazonS3Client}
 import com.sksamuel.elastic4s.http.HttpClient
+import com.theguardian.multimedia.archivehunter.common.ArchiveEntry.getClass
 import com.theguardian.multimedia.archivehunter.common.StorageClass.StorageClass
 
 import scala.concurrent.Future
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 import scala.concurrent.ExecutionContext.Implicits.global
 import org.apache.logging.log4j.LogManager
 //needed to serialize/deserialize ZonedDateTime, even if Intellij says it's not
@@ -16,7 +19,7 @@ import java.util.Base64
 
 import io.circe.generic.semiauto._
 
-object ArchiveEntry extends ((String, String, String, Option[String], Long, ZonedDateTime, String, MimeType, Boolean, StorageClass, Boolean)=>ArchiveEntry){
+object ArchiveEntry extends ((String, String, String, Option[String], Long, ZonedDateTime, String, MimeType, Boolean, StorageClass, Boolean)=>ArchiveEntry) with DocId {
   private val logger = LogManager.getLogger(getClass)
 
   def getFileExtension(str: String):Option[String] = {
@@ -25,28 +28,6 @@ object ArchiveEntry extends ((String, String, String, Option[String], Long, Zone
       Some(tokens(1))
     } else {
       None
-    }
-  }
-
-  /**
-    * Calculates an ID unique to this bucket/path combination, that is not longer than the elasticsearch limit
-    * @param bucket bucket that the file is coming from
-    * @param key path to the file in `bucket`
-    */
-  def makeDocId(bucket: String, key:String):String = {
-    val maxIdLength=512
-    val encoder = java.util.Base64.getEncoder
-
-    val initialString = bucket + ":" + key
-    if(initialString.length<=maxIdLength){
-      encoder.encodeToString(initialString.toCharArray.map(_.toByte))
-    } else {
-      /* I figure that the best way to get something that should be unique for a long path is to chop out the middle */
-      val chunkLength = initialString.length/3
-      val stringParts = initialString.grouped(chunkLength).toList
-      val midSectionLength = maxIdLength - chunkLength*2  //FIXME: what if chunkLength*2>512??
-      val finalString = stringParts.head + stringParts(1).substring(0, midSectionLength) + stringParts(2)
-      encoder.encodeToString(finalString.toCharArray.map(_.toByte))
     }
   }
 
@@ -86,4 +67,34 @@ object ArchiveEntry extends ((String, String, String, Option[String], Long, Zone
 
 }
 
-case class ArchiveEntry(id:String, bucket: String, path: String, file_extension: Option[String], size: scala.Long, last_modified: ZonedDateTime, etag: String, mimeType: MimeType, proxied: Boolean, storageClass:StorageClass, beenDeleted:Boolean=false)
+case class ArchiveEntry(id:String, bucket: String, path: String, file_extension: Option[String], size: scala.Long, last_modified: ZonedDateTime, etag: String, mimeType: MimeType, proxied: Boolean, storageClass:StorageClass, beenDeleted:Boolean=false) {
+  private val logger = LogManager.getLogger(getClass)
+  def getProxy(proxyType: ProxyType.Value)(implicit proxyLocationDAO:ProxyLocationDAO, client:AmazonDynamoDBAsync) = proxyLocationDAO.getProxy(id,proxyType)
+
+  /**
+    * register a new proxy against this item.  This operation consists of saving the given proxy id to the proxies table,
+    * updating the "hasProxy" flag and saving this to the index
+    * @param proxy [[ProxyLocation]] object to register
+    * @param proxyLocationDAO implicitly provided [[ProxyLocationDAO]] object to access save functions
+    * @param indexer implicitly provided [[Indexer]] object to access indexing save
+    * @param client implicitly provided Alpakka DynamoClient object to allow db access
+    * @param httpClient implicitly provided elastic4s HttpClient object to allow index save access
+    * @return a Future, containing an [[ArchiveEntry]] representing the updated record.  This future fails on error.
+    */
+  def registerNewProxy(proxy: ProxyLocation)(implicit proxyLocationDAO: ProxyLocationDAO, indexer:Indexer, client:DynamoClient, httpClient: HttpClient):Future[ArchiveEntry] = {
+    proxyLocationDAO.saveProxy(proxy)
+      .map({
+        case Some(Right(result))=>
+          logger.info(s"Saved proxy info $proxy")
+          val updated = this.copy(proxied = true)
+          indexer.indexSingleItem(updated)
+          updated
+        case None=>
+          logger.info(s"Saved proxy info $proxy (no result data)")
+          val updated = this.copy(proxied = true)
+          indexer.indexSingleItem(updated)
+          updated
+        case Some(Left(err))=>throw new RuntimeException(err.toString)
+      })
+  }
+}
