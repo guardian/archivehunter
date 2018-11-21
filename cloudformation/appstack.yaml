@@ -142,6 +142,8 @@ Resources:
       AttributeDefinitions:
         - AttributeName: fileId
           AttributeType: S
+        - AttributeName: proxyId
+          AttributeType: S
         - AttributeName: proxyType
           AttributeType: S
       KeySchema:
@@ -149,8 +151,18 @@ Resources:
           KeyType: HASH
         - AttributeName: proxyType
           KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: proxyIdIndex
+          KeySchema:
+          - AttributeName: proxyId
+            KeyType: HASH
+          Projection:
+            ProjectionType: KEYS_ONLY
+          ProvisionedThroughput:
+            WriteCapacityUnits: 1
+            ReadCapacityUnits: 1
       ProvisionedThroughput:
-        WriteCapacityUnits: 100
+        WriteCapacityUnits: 10
         ReadCapacityUnits: 10
       Tags:
         - Key: App

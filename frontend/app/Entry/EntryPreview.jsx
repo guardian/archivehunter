@@ -23,8 +23,8 @@ class EntryPreview extends React.Component {
         }
     }
 
-    componentWillMount(){
-        if(this.props.hasProxy) this.setState({lastError: null, loading: true}, ()=>axios.get("/api/proxy/" + this.props.entryId + "/best")
+    updatePreview(){
+        this.setState({lastError: null, previewData:null, loading: true}, ()=>axios.get("/api/proxy/" + this.props.entryId)
             .then(result=>{
                 this.setState({previewData: result.data.entry, loading:false, lastError: null});
             }).catch(err=>{
@@ -33,12 +33,20 @@ class EntryPreview extends React.Component {
         );
     }
 
+    componentWillMount(){
+        this.updatePreview();
+    }
+
+    componentDidUpdate(oldProps, oldState){
+        if(oldProps.entryId!==this.props.entryId) this.updatePreview();
+    }
+
     controlBody(){
         if(!this.state.previewData) return <EntryThumbnail mimeType={this.props.mimeType} fileExtension={this.props.fileExtension} entryId={this.props.entryId}/>;
     }
 
     render(){
-        if(this.state.lastError) return <ErrorViewComponent error={this.state.lastError}/>;
+        //if(this.state.lastError) return <ErrorViewComponent error={this.state.lastError}/>;
 
         const tooltip = this.state.previewData ? "" : "No preview available";
 
