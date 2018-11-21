@@ -13,6 +13,7 @@ class ScanTargetEdit extends React.Component {
 
         const defaultValues = {
             bucketName: "",
+            proxyBucket: "",
             enabled: false,
             lastScanned: null,
             scanInterval: 7200,
@@ -29,12 +30,11 @@ class ScanTargetEdit extends React.Component {
         };
 
         this.updateBucketname = this.updateBucketname.bind(this);
+        this.updateProxyBucket = this.updateProxyBucket.bind(this);
         this.toggleEnabled = this.toggleEnabled.bind(this);
         this.timeIntervalUpdate = this.timeIntervalUpdate.bind(this);
 
         this.formSubmit = this.formSubmit.bind(this);
-
-
     }
 
     loadData(idToLoad){
@@ -65,6 +65,11 @@ class ScanTargetEdit extends React.Component {
         //this is annoying, but a necessity to avoid modifying this.state.entry directly and selectively over-write the key.
         const newEntry = Object.assign({}, this.state.entry, {bucketName: evt.target.value});
         this.setState({entry: newEntry},()=>console.log("state has been set"));
+    }
+
+    updateProxyBucket(evt){
+        const newEntry = Object.assign({}, this.state.entry, {proxyBucket: evt.target.value});
+        this.setState({entry:newEntry},()=>console.log("state has been set"));
     }
 
     toggleEnabled(evt){
@@ -130,6 +135,10 @@ class ScanTargetEdit extends React.Component {
                 <tr>
                     <td>Bucket name</td>
                     <td><input value={this.state.entry.bucketName} onChange={this.updateBucketname} style={{width:"95%"}}/></td>
+                </tr>
+                <tr>
+                    <td>Proxy bucket</td>
+                    <td><input value={this.state.entry.proxyBucket} onChange={this.updateProxyBucket} style={{width: "95%"}}/></td>
                 </tr>
                 <tr>
                     <td>Enabled</td>

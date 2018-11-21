@@ -20,7 +20,8 @@ class BasicSearchComponent extends React.Component {
             searchResults: [],
             totalHits: -1,
             limit: 1000,
-            showingPreview: null
+            showingPreview: null,
+            autoPlay: true
         };
 
         this.cancelTokenSource = axios.CancelToken.source();
@@ -107,7 +108,7 @@ class BasicSearchComponent extends React.Component {
             <div className="centered" style={{marginBottom: "2em",height: "2em", display: this.state.totalHits===-1 ? "none":"block"}}>
                 <p className="centered">Found a total of {this.state.totalHits} results{ this.state.searching ? "so far" : ""}.</p>
             </div>
-            <EntryDetails entry={this.state.showingPreview}/>
+            <EntryDetails entry={this.state.showingPreview} autoPlay={this.state.autoPlay}/>
             {this.renderMainBody()}
         </div>
     }

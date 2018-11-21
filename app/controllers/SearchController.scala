@@ -33,7 +33,7 @@ class SearchController @Inject()(config:Configuration,cc:ControllerComponents,es
     q match {
       case Some(searchTerms) =>
         val responseFuture = cli.execute {
-          search(indexName) query searchTerms from actualStart size actualLength
+          search(indexName) query searchTerms from actualStart size actualLength sortBy fieldSort("path.keyword")
         }
 
         responseFuture.map({
