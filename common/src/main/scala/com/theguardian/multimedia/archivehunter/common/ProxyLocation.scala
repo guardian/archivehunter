@@ -1,10 +1,9 @@
 package com.theguardian.multimedia.archivehunter.common
 
-import java.time.{ZoneId, ZonedDateTime}
-
 import com.amazonaws.services.s3.AmazonS3
 import com.gu.scanamo.DynamoFormat
 import com.theguardian.multimedia.archivehunter.common.ArchiveEntry.{getClass, getFileExtension, logger, makeDocId}
+import io.circe.{Decoder, Encoder}
 import org.apache.logging.log4j.LogManager
 
 import scala.concurrent.Future
@@ -28,13 +27,13 @@ object ProxyLocation extends DocId {
   }
 
   /**
-    * Looks up the metadata of a given item in S3 and returns an ArchiveEntry for it.
+    * Looks up the metadata of a given item in S3 and returns a ProxyLocation
     * @param bucket bucket that the item resides in
     * @param key path to the item within `bucket`
     * @param client implicitly provided instance of AmazonS3Client to use
-    * @return a (blocking) Future, containing an [[ArchiveEntry]] if successful
+    * @return a (blocking) Future, containing a [[ProxyLocation]] if successful
     */
-  def fromS3(proxyBucket: String, key: String, mainMediaBucket: String, proxyType:Option[ProxyType.Value] = None)(implicit client:AmazonS3):Future[ProxyLocation] = Future {
+  def fromS3(proxyBucket: String, key: String, mainMediaBucket: String, mediaItemKey:String, proxyType:Option[ProxyType.Value] = None)(implicit client:AmazonS3):Future[ProxyLocation] = Future {
     val meta = client.getObjectMetadata(proxyBucket,key)
     val mimeType = Option(meta.getContentType) match {
       case Some(mimeTypeString) =>
@@ -65,15 +64,17 @@ object ProxyLocation extends DocId {
         }
       case Some(value)=>value
     }
-    logger.debug(s"doc ID is ${makeDocId(mainMediaBucket, key)} from $mainMediaBucket and $key")
-    new ProxyLocation(makeDocId(mainMediaBucket, key), pt, proxyBucket, key, StorageClass.safeWithName(meta.getStorageClass))
+    logger.debug(s"doc ID is ${makeDocId(mainMediaBucket, mediaItemKey)} from $mainMediaBucket and $key")
+    new ProxyLocation(makeDocId(mainMediaBucket, mediaItemKey), makeDocId(proxyBucket, key), pt, proxyBucket, key, StorageClass.safeWithName(meta.getStorageClass))
   }
 
 }
 
-case class ProxyLocation (fileId:String, proxyType: ProxyType.Value, bucketName:String, bucketPath:String, storageClass: StorageClass.Value)
-
+case class ProxyLocation (fileId:String, proxyId: String, proxyType: ProxyType.Value, bucketName:String, bucketPath:String, storageClass: StorageClass.Value) {}
 trait ProxyLocationEncoder extends StorageClassEncoder {
+  implicit val proxyTypeEncoder = Encoder.enumEncoder(ProxyType)
+  implicit val proxyTypeDecoder = Decoder.enumDecoder(ProxyType)
+
   implicit val proxyTypeFormat = DynamoFormat.coercedXmap[ProxyType.Value,String,IllegalArgumentException](
     input=>ProxyType.withName(input)
   )(

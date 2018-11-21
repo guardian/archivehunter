@@ -8,10 +8,11 @@ import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ProxyLocat
 import javax.inject.Inject
 import play.api.{Configuration, Logger}
 
-import scala.concurrent.Await
+import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
+import scala.concurrent.ExecutionContext.Implicits.global
 
-class S3ToProxyLocationFlow (s3ClientMgr: S3ClientManager, config:Configuration, mainMediaBucket:String) extends GraphStage[FlowShape[ListBucketResultContents, ProxyLocation]] {
+class S3ToProxyLocationFlow (s3ClientMgr: S3ClientManager, config:Configuration, mainMediaBucket:String, potentialMediaBuckets:Seq[String]) extends GraphStage[FlowShape[ListBucketResultContents, ProxyLocation]] {
   final val in:Inlet[ListBucketResultContents] = Inlet.create("S3ToProxyLocationFlow.in")
   final val out:Outlet[ProxyLocation] = Outlet.create("S3ToProxyLocationFlow.out")
 
@@ -33,7 +34,9 @@ class S3ToProxyLocationFlow (s3ClientMgr: S3ClientManager, config:Configuration,
           try {
             //we need to do a metadata lookup to get the MIME type anyway, so we may as well just call out here.
             //it appears that you can't push() to a port from in a Future thread, so doing it the crappy way and blocking here.
-            val mappedElem = Await.result(ProxyLocation.fromS3(elem.bucketName, elem.key, mainMediaBucket), 3.seconds)
+            throw new RuntimeException("FIXME: no media item key at this point so can't work.")
+            val proxyLocationFuture = ProxyLocation.fromS3(elem.bucketName, elem.key, mainMediaBucket, "INVALIDMEDIAITEM")
+            val mappedElem = Await.result(proxyLocationFuture, 3.seconds)
             logger.debug(s"Mapped $elem to $mappedElem")
 
             while (!isAvailable(out)) {
