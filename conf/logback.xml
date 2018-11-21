@@ -52,6 +52,8 @@
     <logger name="S3LocationSpec" level="DEBUG"/>
     <logger name="helpers.ParanoidS3Source" level="DEBUG"/>
     <logger name="helpers.S3XMLProcessor" level="INFO"/>
+    <logger name="helpers.ProxyLocatorFlow" level="DEBUG"/>
+    <logger name="services.LegacyProxiesScanner" level="DEBUG"/>
 
     <root level="WARN">
         <appender-ref ref="STDOUT" />
