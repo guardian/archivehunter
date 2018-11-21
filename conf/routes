@@ -20,6 +20,7 @@ PUT     /api/search/suggestions         @controllers.SearchController.suggestion
 
 GET     /api/proxy/searchForFile        @controllers.ProxiesController.searchFor(id:String)
 GET     /api/proxy/:id/associate        @controllers.ProxiesController.associate(fileId:Option[String],id)
+GET     /api/proxy/:id/playable         @controllers.ProxiesController.getPlayable(id, proxyType:Option[String])
 GET     /api/proxy/:id                  @controllers.ProxiesController.proxyForId(id, proxyType:Option[String])
 
 # Map static resources from the /public folder to the /assets URL path

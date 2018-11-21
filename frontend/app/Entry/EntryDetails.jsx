@@ -6,7 +6,8 @@ import FileSizeView from './FileSizeView.jsx';
 
 class EntryDetails extends React.Component {
     static propTypes = {
-        entry: PropTypes.object.isRequired
+        entry: PropTypes.object.isRequired,
+        autoPlay: PropTypes.boolean
     };
 
     extractFileInfo(fullpath){
@@ -37,6 +38,7 @@ class EntryDetails extends React.Component {
                               hasProxy={this.props.entry.proxied}
                               fileExtension={this.props.entry.file_extension}
                               mimeType={this.props.entry.mimeType}
+                              autoPlay={this.props.autoPlay}
                 />
 
                 <table className="metadata-table">
