@@ -2,6 +2,8 @@ package controllers
 
 import akka.actor.ActorSystem
 import akka.stream.{ActorMaterializer, Materializer}
+import com.amazonaws.HttpMethod
+import com.amazonaws.services.s3.model.GeneratePresignedUrlRequest
 import com.gu.scanamo.{ScanamoAlpakka, Table}
 import com.theguardian.multimedia.archivehunter.common._
 import helpers.{DynamoClientManager, ESClientManager, ProxyLocator, S3ClientManager}
@@ -9,7 +11,7 @@ import javax.inject.{Inject, Singleton}
 import play.api.{Configuration, Logger}
 import play.api.libs.circe.Circe
 import play.api.mvc.{AbstractController, ControllerComponents}
-import responses.{GenericErrorResponse, ObjectCreatedResponse, ObjectGetResponse, ObjectListResponse}
+import responses._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import io.circe.generic.auto._
@@ -59,6 +61,39 @@ class ProxiesController @Inject()(config:Configuration, cc:ControllerComponents,
     }
   }
 
+  def getPlayable(fileId:String, proxyType:Option[String]) = Action.async {
+    try {
+      val ddbClient = ddbClientMgr.getNewAlpakkaDynamoClient(awsProfile)
+      val s3client = s3ClientMgr.getS3Client(awsProfile)
+      val actualType = proxyType match {
+        case None=>"VIDEO"
+        case Some(t)=>t.toUpperCase
+      }
+
+      ScanamoAlpakka.exec(ddbClient)(
+        table.get('fileId->fileId and ('proxyType->actualType))
+      ).map({
+        case None=>
+          NotFound(GenericErrorResponse("not_found",s"no $proxyType proxy found for $fileId").asJson)
+        case Some(Right(proxyLocation))=>
+          val expiration = new java.util.Date()
+          expiration.setTime(expiration.getTime + (1000 * 60 * 60)) //expires in 1 hour
+
+          val meta = s3client.getObjectMetadata(proxyLocation.bucketName, proxyLocation.bucketPath)
+          val mimeType = MimeType.fromString(meta.getContentType) match {
+            case Left(str)=>
+              logger.warn(s"Could not get MIME type for s3://${proxyLocation.bucketName}/${proxyLocation.bucketPath}: $str")
+              MimeType("application","octet-stream")
+            case Right(t)=>t
+          }
+          val rq = new GeneratePresignedUrlRequest(proxyLocation.bucketName, proxyLocation.bucketPath)
+            .withMethod(HttpMethod.GET)
+            .withExpiration(expiration)
+          val result = s3client.generatePresignedUrl(rq)
+          Ok(PlayableProxyResponse("ok",result.toString,mimeType).asJson)
+      })
+    }
+  }
   /**
     * endpoint that performs a scan for potential proxies for the given file.
     * if there is only one result, it is automatically associated.
