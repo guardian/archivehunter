@@ -72,6 +72,10 @@ Parameters:
     Description: Long random string used as an app secret to secure cookies etc.
     Type: String
     NoEcho: True
+  ProxyingTaskImageRef:
+    Description: Docker path to the image used for proxying.
+    Type: String
+    Default: guardianmultimedia/archivehunter-proxying:90
 
 Resources:
   AccessorSG: #this group is exported and used by bucketmonitor yaml. defined here so that it can be marked for access to ES
@@ -220,6 +224,44 @@ Resources:
       - Key: Stage
         Value: !Ref Stage
 
+  ProxyGeneratorRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: ecs-tasks.amazonaws.com
+          Action: sts:AssumeRole
+      Path: "/"
+      Policies:
+      - PolicyName: BucketScanAccess
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+            Effect: Allow
+            Action:
+            - s3:ListBucket
+            - s3:GetObject
+            - s3:PutObject
+            Resource:
+            - arn:aws:s3:::gnm-multimedia-*
+            - arn:aws:s3:::gnm-multimedia-*/*
+            - arn:aws:s3:::mm-archive-*
+            - arn:aws:s3:::mm-archive-*/*
+      - PolicyName: LogsAccess
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+            Effect: Allow
+            Action:
+            - "logs:CreateLogGroup"
+            - "logs:CreateLogStream"
+            - "logs:PutLogEvents"
+            - "logs:DescribeLogStreams"
+            Resource:
+            - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*
   InstanceRole:
     Type: AWS::IAM::Role
     Properties:
@@ -253,6 +295,18 @@ Resources:
             Resource:
             - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ScanTargetsTable}
             - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ProxyLocationTable}
+      - PolicyName: ContainerAccess
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+            Effect: Allow
+            Action:
+              - ecs:List*
+              - ecs:Describe*
+              - ecs:*Task
+            Resource:
+            - !GetAtt ProxyingCluster.Arn
+            - !Sub arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:task/*
       - PolicyName: EC2InstanceDiscovery
         PolicyDocument:
           Version: 2012-10-17
@@ -377,6 +431,7 @@ Resources:
 
           proxies {
             tableName = "${ProxyLocationTable}"
+            ecsTaskDefinitionName = "${ProxyingTaskDefinition}"
           }
 
           elasticsearch {
@@ -492,12 +547,48 @@ Resources:
         PropagateAtLaunch: true
       VPCZoneIdentifier: !Ref DeploySubnets
 
+  ProxyingCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub ${Stack}-${App}-${Stage}
+
+  ProxyingTaskLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 5
+
+  ProxyingTaskDefinition:
+    #this is used to register the image that runs proxying tasks.  Specific commands are run via overrides.
+    # See ContainerTaskManager for details.
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      ExecutionRoleArn: !GetAtt ProxyGeneratorRole.Arn
+      ContainerDefinitions:
+        - Image: !Ref ProxyingTaskImageRef #specified in "resources"
+          MemoryReservation: 2048 #this is the limit of memory rather than the actual amount allocated
+          Name: !Sub ${Stack}-${App}Proxy-${Stage}
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref ProxyingTaskLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: ecs
+      Cpu: 1024 #1 vCPU
+      NetworkMode: awsvpc
+      Memory: 2048  #minimum allowed with 1 vCPU
+      RequiresCompatibilities:
+        - FARGATE
+      TaskRoleArn: !GetAtt ProxyGeneratorRole.Arn
+
 Outputs:
   ElasticSearchEndpoint:
     Description: ES endpoint for ArchiveHunter lambdas
     Value: !GetAtt SearchDomain.DomainEndpoint
     Export:
       Name: !Sub ${AWS::StackName}-ESEndpoint
+  Loadbalancer:
+    Description: Loadbalancer address to access service
+    Value: !GetAtt LoadBalancer.DNSName
   AccessorSG:
     Description: Security group for accessing the index
     Value: !GetAtt AccessorSG.GroupId

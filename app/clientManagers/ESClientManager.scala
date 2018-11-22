@@ -1,9 +1,8 @@
-package helpers
+package clientManagers
 
-import com.sksamuel.elastic4s.ElasticsearchClientUri
+import com.sksamuel.elastic4s.http.HttpClient
 import javax.inject.Inject
 import play.api.Configuration
-import com.sksamuel.elastic4s.http.{HttpClient, RequestFailure}
 
 trait ESClientManager {
   def getClient():HttpClient

@@ -2,6 +2,7 @@ package helpers
 
 import akka.stream.{Attributes, FlowShape, Inlet, Outlet}
 import akka.stream.stage.{AbstractInHandler, AbstractOutHandler, GraphStage, GraphStageLogic}
+import clientManagers.S3ClientManager
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ProxyLocation}
 import javax.inject.Inject
 import models.ScanTargetDAO

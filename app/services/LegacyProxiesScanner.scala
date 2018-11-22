@@ -3,6 +3,7 @@ package services
 import akka.actor.{Actor, ActorSystem, Cancellable}
 import akka.stream.scaladsl.{Keep, Source}
 import akka.stream.{ActorMaterializer, KillSwitches}
+import clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager}
 import com.amazonaws.services.dynamodbv2.model._
 import com.google.inject.Injector
 import com.theguardian.multimedia.archivehunter.common.ProxyLocation

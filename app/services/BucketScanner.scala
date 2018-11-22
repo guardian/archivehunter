@@ -8,6 +8,7 @@ import akka.actor.{Actor, ActorSystem, Timers}
 import akka.http.scaladsl.Http
 import akka.stream.scaladsl.{GraphDSL, Keep, RunnableGraph, Sink, Source}
 import akka.stream.{ActorMaterializer, ClosedShape, KillSwitches, Materializer}
+import clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager}
 import com.amazonaws.regions.{Region, Regions}
 import com.google.inject.Injector
 import com.gu.scanamo.{ScanamoAlpakka, Table}
