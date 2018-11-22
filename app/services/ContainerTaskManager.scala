@@ -12,6 +12,7 @@ class ContainerTaskManager @Inject() (config:Configuration, ecsClientManager: EC
   private val logger = Logger(getClass)
   private val profileName = config.getOptional[String]("externalData.awsProfile")
   private val taskDefinitionName = config.get[String]("proxies.ecsTaskDefinitionName")
+  private val taskContainerName = config.get[String]("proxies.taskContainerName")
   private val subnets = config.get[Seq[String]]("ecs.subnets")
 
   def runTask(command:Seq[String], environment:Map[String,String], name:String, cpu:Option[Int]=None) = {
@@ -24,7 +25,7 @@ class ContainerTaskManager @Inject() (config:Configuration, ecsClientManager: EC
       .withCommand(command.asJava)
       .withCpu(actualCpu)
       .withEnvironment(actualEnvironment)
-        .withName("multimedia-archivehunterProxy-CODE")
+        .withName(taskContainerName)
     )
 
     //external IP is needed to pull images from Docker Hub
