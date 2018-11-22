@@ -10,7 +10,7 @@ import com.gu.scanamo.error.DynamoReadError
 import com.gu.scanamo.{Scanamo, ScanamoAlpakka, Table}
 import com.theguardian.multimedia.archivehunter.common.ZonedDateTimeEncoder
 import helpers.ZonedTimeFormat
-import javax.inject.Inject
+import javax.inject.{Inject, Singleton}
 import play.api.{Configuration, Logger}
 
 import scala.concurrent.Future
@@ -21,6 +21,7 @@ import io.circe.generic.auto._
 import io.circe.syntax._
 import com.gu.scanamo.syntax._
 
+@Singleton
 class ScanTargetDAO @Inject() (config:Configuration, ddbClientMgr: DynamoClientManager)(implicit actorSystem:ActorSystem) extends ZonedDateTimeEncoder with ZonedTimeFormat {
   private val logger = Logger(getClass)
   val table = Table[ScanTarget](config.get[String]("externalData.scanTargets"))

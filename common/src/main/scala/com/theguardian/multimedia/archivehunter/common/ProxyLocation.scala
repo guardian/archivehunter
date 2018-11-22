@@ -1,5 +1,7 @@
 package com.theguardian.multimedia.archivehunter.common
 
+import java.net.URI
+
 import com.amazonaws.services.s3.AmazonS3
 import com.gu.scanamo.DynamoFormat
 import com.theguardian.multimedia.archivehunter.common.ArchiveEntry.{getClass, getFileExtension, logger, makeDocId}
@@ -12,6 +14,8 @@ import scala.util.{Failure, Success, Try}
 
 object ProxyLocation extends DocId {
   private val logger = LogManager.getLogger(getClass)
+
+  private val urlxtractor = "^([\\w\\d]+)://([^\\/]+)/(.*)$".r
 
   /**
     * return a ProxyType value that seems to fit the given MIME type
@@ -26,6 +30,22 @@ object ProxyLocation extends DocId {
     }
   }
 
+  protected def getUrlElems(str:String) = {
+    val urlxtractor(proto, host, path) = str
+    new URI(proto, host, "/"+path, "")
+  }
+
+  def fromS3(proxyUri: String, mainMediaUri: String, proxyType:Option[ProxyType.Value])(implicit client:AmazonS3):Future[Either[String, ProxyLocation]] = {
+    val proxyUriDecoded = getUrlElems(proxyUri)
+    val mainMediaUriDecoded = getUrlElems(mainMediaUri)
+
+    if(proxyUriDecoded.getScheme!="s3" || mainMediaUriDecoded.getScheme!="s3"){
+      Future(Left("either proxyUri or mainMediaUri is not an S3 url"))
+    } else {
+      fromS3(proxyUriDecoded.getHost, proxyUriDecoded.getPath, mainMediaUriDecoded.getHost, mainMediaUriDecoded.getPath, proxyType)
+    }
+  }
+
   /**
     * Looks up the metadata of a given item in S3 and returns a ProxyLocation
     * @param bucket bucket that the item resides in
@@ -33,39 +53,45 @@ object ProxyLocation extends DocId {
     * @param client implicitly provided instance of AmazonS3Client to use
     * @return a (blocking) Future, containing a [[ProxyLocation]] if successful
     */
-  def fromS3(proxyBucket: String, key: String, mainMediaBucket: String, mediaItemKey:String, proxyType:Option[ProxyType.Value] = None)(implicit client:AmazonS3):Future[ProxyLocation] = Future {
-    val meta = client.getObjectMetadata(proxyBucket,key)
-    val mimeType = Option(meta.getContentType) match {
-      case Some(mimeTypeString) =>
-        MimeType.fromString(mimeTypeString) match {
-          case Right(mt) => mt
-          case Left(error) =>
-            logger.warn(error)
-            MimeType("application", "octet-stream")
-        }
-      case None =>
-        logger.warn(s"received no content type from S3 for s3://$proxyBucket/$key")
-        MimeType("application","octet-stream")
-    }
+  def fromS3(proxyBucket: String, key: String, mainMediaBucket: String, mediaItemKey:String, proxyType:Option[ProxyType.Value] = None)(implicit client:AmazonS3):Future[Either[String, ProxyLocation]] = Future {
+    try {
+      val meta = client.getObjectMetadata(proxyBucket, key)
+      val mimeType = Option(meta.getContentType) match {
+        case Some(mimeTypeString) =>
+          MimeType.fromString(mimeTypeString) match {
+            case Right(mt) => mt
+            case Left(error) =>
+              logger.warn(error)
+              MimeType("application", "octet-stream")
+          }
+        case None =>
+          logger.warn(s"received no content type from S3 for s3://$proxyBucket/$key")
+          MimeType("application", "octet-stream")
+      }
 
-    val storageClass = Option(meta.getStorageClass) match {
-      case Some(sc)=>sc
-      case None=>
-        logger.warn(s"s3://$proxyBucket/$key has no storage class! Assuming STANDARD.")
-        "STANDARD"
+      val storageClass = Option(meta.getStorageClass) match {
+        case Some(sc) => sc
+        case None =>
+          logger.warn(s"s3://$proxyBucket/$key has no storage class! Assuming STANDARD.")
+          "STANDARD"
+      }
+      val pt = proxyType match {
+        case None =>
+          proxyTypeForMime(mimeType) match {
+            case Success(pt) => pt
+            case Failure(err) =>
+              logger.error(s"Could not determine proxy type for s3://$proxyBucket/$key: ${err.toString}")
+              ProxyType.UNKNOWN
+          }
+        case Some(value) => value
+      }
+      logger.debug(s"doc ID is ${makeDocId(mainMediaBucket, mediaItemKey)} from $mainMediaBucket and $key")
+      Right(new ProxyLocation(makeDocId(mainMediaBucket, mediaItemKey), makeDocId(proxyBucket, key), pt, proxyBucket, key, StorageClass.safeWithName(meta.getStorageClass)))
+    } catch {
+      case ex:Throwable=>
+        logger.error("could not find proxyLocation in s3: ", ex)
+        Left(ex.toString)
     }
-    val pt = proxyType match {
-      case None=>
-        proxyTypeForMime(mimeType) match {
-          case Success(pt)=>pt
-          case Failure(err)=>
-            logger.error(s"Could not determine proxy type for s3://$proxyBucket/$key: ${err.toString}")
-            ProxyType.UNKNOWN
-        }
-      case Some(value)=>value
-    }
-    logger.debug(s"doc ID is ${makeDocId(mainMediaBucket, mediaItemKey)} from $mainMediaBucket and $key")
-    new ProxyLocation(makeDocId(mainMediaBucket, mediaItemKey), makeDocId(proxyBucket, key), pt, proxyBucket, key, StorageClass.safeWithName(meta.getStorageClass))
   }
 
 }

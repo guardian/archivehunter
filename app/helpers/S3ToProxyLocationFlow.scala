@@ -44,7 +44,13 @@ class S3ToProxyLocationFlow (s3ClientMgr: S3ClientManager, config:Configuration,
               logger.debug("waiting for output port to be available")
               Thread.sleep(500L)
             }
-            push(out, mappedElem)
+            mappedElem match {
+              case Right(el)=>push(out, el)
+              case Left(err)=>
+                logger.error(s"could not map element: $err")
+                pull(in)
+            }
+
           } catch {
             case ex:Throwable=>
               logger.error(s"Could not create ProxyLocation: ", ex)

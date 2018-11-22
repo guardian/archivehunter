@@ -1,5 +1,6 @@
 package controllers
 
+import java.time.ZonedDateTime
 import java.util.UUID
 
 import akka.actor.ActorSystem
@@ -21,7 +22,7 @@ import io.circe.generic.auto._
 import io.circe.syntax._
 import com.gu.scanamo.syntax._
 import com.sun.org.apache.xerces.internal.xs.datatypes.ObjectList
-import models.ScanTargetDAO
+import models._
 import services.ContainerTaskManager
 
 import scala.concurrent.Future
@@ -30,7 +31,7 @@ import scala.util.{Failure, Success}
 @Singleton
 class ProxiesController @Inject()(config:Configuration, cc:ControllerComponents, ddbClientMgr: DynamoClientManager,
                                   esClientMgr:ESClientManager, s3ClientMgr:S3ClientManager, containerTaskMgr:ContainerTaskManager)
-                                 (implicit actorSystem:ActorSystem, scanTargetDAO:ScanTargetDAO)
+                                 (implicit actorSystem:ActorSystem, scanTargetDAO:ScanTargetDAO, jobModelDAO:JobModelDAO)
   extends AbstractController(cc) with Circe with ProxyLocationEncoder {
   implicit private val mat:Materializer = ActorMaterializer.create(actorSystem)
   private val logger=Logger(getClass)
@@ -121,6 +122,11 @@ class ProxiesController @Inject()(config:Configuration, cc:ControllerComponents,
     })
 
     resultFuture
+        .map(potentialProxiesResult=>{
+          val failures = potentialProxiesResult.collect({case Left(err)=>err})
+          if(failures.nonEmpty) throw new RuntimeException("Failed to get potential proxies")
+          potentialProxiesResult.collect({case Right(potentialProxy)=>potentialProxy})
+        })
       .map(potentialProxies=>{
         if(potentialProxies.length==1){
           //if we have an unambigous map, save it right away.
@@ -158,9 +164,9 @@ class ProxiesController @Inject()(config:Configuration, cc:ControllerComponents,
       case Some(fileId) =>
         val proxyLocationFuture = proxyLocationDAO.getProxyByProxyId(proxyId).flatMap({
           case None => //no proxy with this ID in the database yet; do an S3 scan to try to find the requested id
-            indexer.getById(fileId).flatMap(entry => {
-              ProxyLocator.findProxyLocation(entry)
-            }).map(_.find(_.proxyId == proxyId))
+            val potentialProxyOrErrorList = indexer.getById(fileId).flatMap(ProxyLocator.findProxyLocation(_))
+            potentialProxyOrErrorList.map(_.collect({case Right(loc)=>loc})).map(_.find(_.proxyId==proxyId))
+
           case Some(proxyLocation) => //found it in the database
             Future(Some(proxyLocation.copy(fileId = fileId)))
         })
@@ -200,6 +206,8 @@ class ProxiesController @Inject()(config:Configuration, cc:ControllerComponents,
         case Some(Right(target))=>Some(target.proxyBucket)
       })
 
+      val jobDesc = JobModel(UUID.randomUUID().toString,"thumbnail",Some(ZonedDateTime.now()),None,JobStatus.ST_PENDING,None,fileId,SourceType.SRC_MEDIA)
+
       val uriToProxyFuture = entry.storageClass match {
         case StorageClass.GLACIER=>
           logger.info(s"s3://${entry.bucket}/${entry.path} is in Glacier, can't proxy directly. Looking up any existing video proxy")
@@ -220,17 +228,20 @@ class ProxiesController @Inject()(config:Configuration, cc:ControllerComponents,
           Future(Some(s"s3://${entry.bucket}/${entry.path}"))
       }
 
-      Future.sequence(Seq(targetProxyBucketFuture, uriToProxyFuture)).map(results=>{
-        val targetProxyBucket = results.head.get
+      Future.sequence(Seq(targetProxyBucketFuture, uriToProxyFuture)).map(results=> {
+        logger.debug("Saving job description...")
+        results ++ Seq(jobModelDAO.putJob(jobDesc))
+      }).map(results=>{
+        val targetProxyBucket = results.head.asInstanceOf[Option[String]].get
         logger.info(s"Target proxy bucket is $targetProxyBucket")
         logger.info(s"Source media is $uriToProxyFuture")
-        results(1) match {
+        results(1).asInstanceOf[Option[String]] match {
           case None =>
             logger.error("Nothing found to proxy")
             NotFound(GenericErrorResponse("not_found", "Could not find anything to proxy").asJson)
           case Some(uriString) =>
             containerTaskMgr.runTask(
-              command = Seq("/bin/bash","/usr/local/bin/extract_thumbnail.sh", uriString, targetProxyBucket, s"$callbackUrl/intapi/job-id-here"),
+              command = Seq("/bin/bash","/usr/local/bin/extract_thumbnail.sh", uriString, targetProxyBucket, s"$callbackUrl/api/job/${jobDesc.jobId}/report"),
               environment = Map(),
               name = s"extract_thumbnail_${jobUuid.toString}",
               cpu = None
@@ -244,7 +255,10 @@ class ProxiesController @Inject()(config:Configuration, cc:ControllerComponents,
             }
         }
       })
+    }).recoverWith({
+      case err:Throwable=>
+        logger.error("Could not start proxy job: ", err)
+        Future(InternalServerError(GenericErrorResponse("error",s"Could not start proxy job: ${err.toString}").asJson))
     })
-
   }
 }
