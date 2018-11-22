@@ -44,6 +44,7 @@
     <logger name="com.sksamuel.elastic4s.streams" level="WARN"/>
     <logger name="controllers.SearchController" level="INFO"/>
     <logger name="controllers.ScanTargetController" level="INFO"/>
+    <logger name="controllers.JobController" level="DEBUG"/>
 
     <logger name="helpers.DDBSink" level="DEBUG"/>
     <logger name="helpers.S3ToProxyLocationFlow" level="DEBUG"/>
