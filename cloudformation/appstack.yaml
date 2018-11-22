@@ -384,7 +384,8 @@ Resources:
       SecurityGroups:
       - !Ref InstanceSecurityGroup
       UserData: !Base64
-        "Fn::Sub": |
+        "Fn::Sub":
+        - |
           #!/bin/bash -e
 
           mkdir -p /tmp/install
@@ -432,6 +433,13 @@ Resources:
           proxies {
             tableName = "${ProxyLocationTable}"
             ecsTaskDefinitionName = "${ProxyingTaskDefinition}"
+            taskContainerName = "multimedia-archivehunterPROXIES-CODE"
+            appServerUrl = "${LoadBalancer.DNSName}"
+          }
+
+          ecs {
+            cluster = "${ProxyingCluster}"
+            subnets = "${DeploySubnetsString}"
           }
 
           elasticsearch {
@@ -500,6 +508,7 @@ Resources:
 
           systemctl restart archivehunter
           systemctl enable archivehunter
+        - DeploySubnetsString: !Join [",",!Ref DeploySubnets]
 
 #          cat > /etc/filebeat/filebeat.yml << EOF
 #          filebeat.prospectors:

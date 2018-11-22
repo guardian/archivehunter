@@ -13,7 +13,7 @@ class ContainerTaskManager @Inject() (config:Configuration, ecsClientManager: EC
   private val profileName = config.getOptional[String]("externalData.awsProfile")
   private val taskDefinitionName = config.get[String]("proxies.ecsTaskDefinitionName")
   private val taskContainerName = config.get[String]("proxies.taskContainerName")
-  private val subnets = config.get[Seq[String]]("ecs.subnets")
+  private val subnets = config.get[String]("ecs.subnets").split(",").toSeq
 
   def runTask(command:Seq[String], environment:Map[String,String], name:String, cpu:Option[Int]=None) = {
     val client = ecsClientManager.getClient(profileName)
