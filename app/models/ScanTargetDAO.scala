@@ -4,11 +4,12 @@ import java.time.ZonedDateTime
 
 import akka.actor.ActorSystem
 import akka.stream.{ActorMaterializer, Materializer}
+import clientManagers.DynamoClientManager
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsync
 import com.gu.scanamo.error.DynamoReadError
 import com.gu.scanamo.{Scanamo, ScanamoAlpakka, Table}
 import com.theguardian.multimedia.archivehunter.common.ZonedDateTimeEncoder
-import helpers.{DynamoClientManager, ZonedTimeFormat}
+import helpers.ZonedTimeFormat
 import javax.inject.Inject
 import play.api.{Configuration, Logger}
 

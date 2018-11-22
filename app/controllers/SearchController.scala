@@ -1,9 +1,9 @@
 package controllers
 
+import clientManagers.ESClientManager
 import javax.inject.{Inject, Singleton}
 import play.api.{Configuration, Logger}
 import play.api.mvc.{AbstractController, ControllerComponents}
-import helpers.ESClientManager
 import play.api.libs.json.Json
 
 import scala.concurrent.ExecutionContext.Implicits.global

@@ -8,7 +8,7 @@ import akka.stream.{ActorMaterializer, Materializer}
 import com.gu.scanamo._
 import com.gu.scanamo.syntax._
 import com.theguardian.multimedia.archivehunter.common.ZonedDateTimeEncoder
-import helpers.{DynamoClientManager, ZonedTimeFormat}
+import helpers.ZonedTimeFormat
 import javax.inject.{Inject, Named}
 import play.api.{Configuration, Logger}
 import play.api.mvc._
@@ -19,6 +19,7 @@ import play.api.libs.circe.Circe
 import responses.{GenericErrorResponse, ObjectCreatedResponse, ObjectGetResponse, ObjectListResponse}
 import akka.stream.alpakka.dynamodb.scaladsl._
 import akka.stream.alpakka.dynamodb.impl._
+import clientManagers.DynamoClientManager
 import com.amazonaws.auth.{AWSStaticCredentialsProvider, InstanceProfileCredentialsProvider}
 import services.{BucketScanner, LegacyProxiesScanner}
 
