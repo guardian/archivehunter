@@ -97,6 +97,10 @@ class ProxiesController @Inject()(config:Configuration, cc:ControllerComponents,
           val result = s3client.generatePresignedUrl(rq)
           Ok(PlayableProxyResponse("ok",result.toString,mimeType).asJson)
       })
+    } catch {
+      case ex:Throwable=>
+        logger.error(s"Could not get playable $proxyType for $fileId", ex)
+        Future(InternalServerError(GenericErrorResponse("error",ex.toString).asJson))
     }
   }
   /**
