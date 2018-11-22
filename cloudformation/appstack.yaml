@@ -140,6 +140,56 @@ Resources:
         - Key: Stage
           Value: !Ref Stage
 
+  JobHistoryTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+      - AttributeName: jobId
+        AttributeType: S
+      - AttributeName: sourceId
+        AttributeType: S
+      - AttributeName: sourceType
+        AttributeType: S
+      - AttributeName: jobStatus
+        AttributeType: S
+      - AttributeName: startedAt
+        AttributeType: S
+      KeySchema:
+      - AttributeName: jobId
+        KeyType: HASH
+      ProvisionedThroughput:
+        WriteCapacityUnits: 2
+        ReadCapacityUnits: 10
+      GlobalSecondaryIndexes:
+        - IndexName: sourcesIndex
+          KeySchema:
+            - AttributeName: sourceId
+              KeyType: HASH
+            - AttributeName: sourceType
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+          ProvisionedThroughput:
+            WriteCapacityUnits: 2
+            ReadCapacityUnits: 10
+        - IndexName: jobStatusIndex
+          KeySchema:
+            - AttributeName: startedAt
+              KeyType: HASH
+            - AttributeName: jobStatus
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+          ProvisionedThroughput:
+            WriteCapacityUnits: 2
+            ReadCapacityUnits: 10
+      Tags:
+      - Key: App
+        Value: !Sub ${App}-webapp
+      - Key: Stack
+        Value: !Ref Stack
+      - Key: Stage
+        Value: !Ref Stage
   ProxyLocationTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -421,6 +471,7 @@ Resources:
           externalData {
             awsRegion="${AWS::Region}"
             scanTargets="${ScanTargetsTable}"
+            jobTable="${JobHistoryTable}"
             //ddbHost="localhost"
             ddbHost="dynamodb.${AWS::Region}.amazonaws.com"
             indexName = "archivehunter"
