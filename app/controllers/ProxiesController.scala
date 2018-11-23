@@ -45,20 +45,30 @@ class ProxiesController @Inject()(config:Configuration, cc:ControllerComponents,
     try {
       val ddbClient = ddbClientMgr.getNewAlpakkaDynamoClient(awsProfile)
 
-      val actualType = proxyType match {
-        case None=>"VIDEO"
-        case Some(t)=>t.toUpperCase
-      }
+      proxyType match {
+        case None=>
+          ScanamoAlpakka.exec(ddbClient)(table.query('fileId->fileId)).map(result=>{
+            val failures = result.collect({case Left(err)=>err})
+            if(failures.nonEmpty){
+              logger.error(s"Could not look up proxy for $fileId: $failures")
+              InternalServerError(GenericErrorResponse("error",failures.map(_.toString).mkString(", ")).asJson)
+            } else {
+              val output = result.collect({case Right(entry)=>entry})
 
-      ScanamoAlpakka.exec(ddbClient)(
-        table.get('fileId->fileId and ('proxyType->actualType))
-      ).map({
-        case None=>NotFound(GenericErrorResponse("not_found","No proxy was registered").asJson)
-        case Some(Left(err))=>
-          logger.error(s"Could not look up proxy for $fileId: ${err.toString}")
-          InternalServerError(GenericErrorResponse("db_error", err.toString).asJson)
-        case Some(Right(entry))=>Ok(ObjectGetResponse("ok","proxy_location",entry).asJson)
-      })
+              Ok(ObjectListResponse("ok","proxy_location",output, output.length).asJson)
+            }
+          })
+        case Some(t)=>
+          ScanamoAlpakka.exec(ddbClient)(table.get('fileId->fileId and ('proxyType->t.toUpperCase))).map({
+            case None=>
+              NotFound(GenericErrorResponse("not_found","No proxy was registered").asJson)
+            case Some(Left(err))=>
+              logger.error(s"Could not look up proxy for $fileId: ${err.toString}")
+              InternalServerError(GenericErrorResponse("db_error", err.toString).asJson)
+            case Some(Right(items))=>
+              Ok(responses.ObjectGetResponse("ok","proxy_location",items).asJson)
+          })
+      }
 
     } catch {
       case ex:Throwable=>
