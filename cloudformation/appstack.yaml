@@ -312,6 +312,19 @@ Resources:
             - "logs:DescribeLogStreams"
             Resource:
             - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*
+      - PolicyName: ImageDownloadAccess
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+            Effect: Allow
+            Action:
+              - "ecr:BatchCheckLayerAvailability"
+              - "ecr:BatchGetImage"
+              - "ecr:GetDownloadUrlForLayer"
+              - "ecr:GetAuthorizationToken"
+              - ecr:GetAuthorizationToken
+            Resource: "*"
+
   InstanceRole:
     Type: AWS::IAM::Role
     Properties:
@@ -357,6 +370,16 @@ Resources:
             Resource:
             - !GetAtt ProxyingCluster.Arn
             - !Sub arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:task/*
+            - !Sub arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:task-definition/*
+      - PolicyName: ContainerRoleAccess
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+            Effect: Allow
+            Action:
+              - iam:PassRole
+            Resource:
+            - !GetAtt ProxyGeneratorRole.Arn
       - PolicyName: EC2InstanceDiscovery
         PolicyDocument:
           Version: 2012-10-17

@@ -62,15 +62,15 @@ if [ "$FFMPEG_EXIT" == "0" ]; then
     UPLOAD_LOG=`aws s3 cp /tmp/output.jpg "$OUTPATH" 2>&1`
     if [ "$?" == "0" ]; then
         echo Informing server...
-        curl -X POST $3 -d'{"status":"success","output":"'"$OUTPATH"'","input":"'"$1"'"}' --header "Content-Type: application/json"
+        curl -k -X POST $3 -d'{"status":"success","output":"'"$OUTPATH"'","input":"'"$1"'"}' --header "Content-Type: application/json"
     else
         echo Informing server of failure...
         ENCODED_LOG=$(echo $UPLOAD_LOG | base64)
 
-        curl -X POST $3 -d'{"status":"error","log":"'$ENCODED_LOG'","input":"'"$1"'"}' --header "Content-Type: application/json"
+        curl -k -X POST $3 -d'{"status":"error","log":"'$ENCODED_LOG'","input":"'"$1"'"}' --header "Content-Type: application/json"
     fi
 else
     echo Output failed. Informing server...
     ENCODED_LOG=$(echo $OUTLOG | base64)
-    curl -X POST $3 -d'{"status":"error","log":"'$ENCODED_LOG'","input":"'"$1"'"}' --header "Content-Type: application/json"
+    curl -k -X POST $3 -d'{"status":"error","log":"'$ENCODED_LOG'","input":"'"$1"'"}' --header "Content-Type: application/json"
 fi
