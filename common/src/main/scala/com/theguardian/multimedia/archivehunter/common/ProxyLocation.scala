@@ -4,7 +4,6 @@ import java.net.URI
 
 import com.amazonaws.services.s3.AmazonS3
 import com.gu.scanamo.DynamoFormat
-import com.theguardian.multimedia.archivehunter.common.ArchiveEntry.{getClass, getFileExtension, logger, makeDocId}
 import io.circe.{Decoder, Encoder}
 import org.apache.logging.log4j.LogManager
 
@@ -42,7 +41,7 @@ object ProxyLocation extends DocId {
     if(proxyUriDecoded.getScheme!="s3" || mainMediaUriDecoded.getScheme!="s3"){
       Future(Left("either proxyUri or mainMediaUri is not an S3 url"))
     } else {
-      fromS3(proxyUriDecoded.getHost, proxyUriDecoded.getPath, mainMediaUriDecoded.getHost, mainMediaUriDecoded.getPath, proxyType)
+      fromS3(proxyUriDecoded.getHost, proxyUriDecoded.getPath.replaceAll("^\\/*",""), mainMediaUriDecoded.getHost, mainMediaUriDecoded.getPath.replaceAll("^\\/*",""), proxyType)
     }
   }
 
@@ -55,6 +54,7 @@ object ProxyLocation extends DocId {
     */
   def fromS3(proxyBucket: String, key: String, mainMediaBucket: String, mediaItemKey:String, proxyType:Option[ProxyType.Value] = None)(implicit client:AmazonS3):Future[Either[String, ProxyLocation]] = Future {
     try {
+      logger.debug(s"Looking up proxy location for s3://$proxyBucket/$key")
       val meta = client.getObjectMetadata(proxyBucket, key)
       val mimeType = Option(meta.getContentType) match {
         case Some(mimeTypeString) =>

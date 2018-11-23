@@ -95,7 +95,7 @@ class JobControllerSpec extends Specification with Mockito with MockitoMatchers 
       val fakeMd = new ObjectMetadata()
       fakeMd.setContentType("image/jpeg")
 
-      mockS3Client.getObjectMetadata("proxybucket","/path/to/output.img").returns(fakeMd)
+      mockS3Client.getObjectMetadata("proxybucket","path/to/output.img").returns(fakeMd)
 
       mockProxyLocationDAO.saveProxy(any)(any).returns(Future(None))
       val c = new JobController(mockConfig,mockCC,mockJobModelDAO,mockesClientManager, mocks3ClientManager, mockddbClientManager){

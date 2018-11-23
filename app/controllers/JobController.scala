@@ -52,10 +52,15 @@ class JobController @Inject() (config:Configuration, cc:ControllerComponents, jo
         logger.error(s"Could not get proxy location: $err")
         Future(Left(err))
       case Right(proxyLocation)=>
+        logger.info("Saving proxy location...")
         proxyLocationDAO.saveProxy(proxyLocation).map({
-          case None=>Right("Updated with no data back")
-          case Some(Left(err))=>Left(err)
-          case Some(Right(updatedLocation))=>Right(s"Updated $updatedLocation")
+          case None=>
+            Right("Updated with no data back")
+          case Some(Left(err))=>
+            Left(err.toString)
+          case Some(Right(updatedLocation))=>
+            logger.info(s"Updated location: $updatedLocation")
+            Right(s"Updated $updatedLocation")
         })
     })
 
