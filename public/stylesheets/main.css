@@ -186,11 +186,14 @@ div.entry-view {
     margin-left: auto;
     margin-right: auto;
     overflow: hidden;
-    width: 150px !important;
     margin-top: auto;
     margin-bottom: auto;
     height: 80px;
     display: block;
+}
+
+.entry-thumbnail-shadow {
+    box-shadow: 2px 2px 6px black;
 }
 
 div.search-results-container {

@@ -484,8 +484,9 @@ Resources:
           proxies {
             tableName = "${ProxyLocationTable}"
             ecsTaskDefinitionName = "${ProxyingTaskDefinition}"
-            taskContainerName = "multimedia-archivehunterPROXIES-CODE"
-            appServerUrl = "${LoadBalancer.DNSName}"
+            #this should match the container name in ProxyingTaskDefinition
+            taskContainerName = "${Stack}-${App}Proxy-${Stage}"
+            appServerUrl = "https://${LoadBalancer.DNSName}"
           }
 
           ecs {

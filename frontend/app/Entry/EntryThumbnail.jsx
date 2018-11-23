@@ -50,6 +50,17 @@ class EntryThumbnail extends React.Component {
         }
     }
 
+    componentWillMount(){
+        this.setState({loading: true, lastError: null},()=>{
+            axios.get("/api/proxy/" + this.props.entryId + "/playable?proxyType=THUMBNAIL")
+                .then(result=>{
+                    this.setState({loading: false, lastError: null, thumbnailUri: result.data.uri})
+                }).catch(err=>{
+                    this.setState({loading: false, lastError: err})
+                })
+        })
+    }
+
     /**
      * deliver a "sensible" icon based on file extension, if the index does not provide us with an adequate MIME type
      */
@@ -65,7 +76,7 @@ class EntryThumbnail extends React.Component {
     }
 
     render(){
-        if(this.state.thumbnailUri) return <img src={this.state.thumbnailUri} className="entry-thumbnail"/>;
+        if(this.state.thumbnailUri) return <img src={this.state.thumbnailUri} className="entry-thumbnail entry-thumbnail-shadow"/>;
 
         if(!this.props.mimeType) return this.iconFromExtension();
 
