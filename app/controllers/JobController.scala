@@ -7,6 +7,7 @@ import akka.stream.alpakka.dynamodb.scaladsl.DynamoClient
 import akka.stream.{ActorMaterializer, Materializer}
 import clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager}
 import com.amazonaws.services.s3.AmazonS3
+import com.gu.scanamo.error.DynamoReadError
 import com.sksamuel.elastic4s.http.HttpClient
 import com.theguardian.multimedia.archivehunter.common._
 import javax.inject.{Inject, Singleton}
@@ -16,7 +17,7 @@ import play.api.mvc.{AbstractController, ControllerComponents}
 import io.circe.generic.auto._
 import io.circe.syntax._
 import models._
-import responses.GenericErrorResponse
+import responses.{GenericErrorResponse, ObjectListResponse}
 
 import scala.util.{Failure, Success}
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -25,7 +26,7 @@ import scala.concurrent.Future
 @Singleton
 class JobController @Inject() (config:Configuration, cc:ControllerComponents, jobModelDAO: JobModelDAO,
                                esClientManager: ESClientManager, s3ClientManager: S3ClientManager,ddbClientManager:DynamoClientManager)
-                              (implicit actorSystem:ActorSystem) extends AbstractController(cc) with Circe{
+                              (implicit actorSystem:ActorSystem) extends AbstractController(cc) with Circe with JobModelEncoder with ZonedDateTimeEncoder {
   private val logger = Logger(getClass)
 
   private implicit val mat:Materializer = ActorMaterializer.create(actorSystem)
@@ -35,6 +36,29 @@ class JobController @Inject() (config:Configuration, cc:ControllerComponents, jo
 
   protected val indexer = new Indexer(indexName)
   protected val proxyLocationDAO = new ProxyLocationDAO(tableName)
+
+  def renderListAction(block: ()=>Future[List[Either[DynamoReadError, JobModel]]]) = Action.async {
+      val resultFuture = block()
+      resultFuture.recover({
+        case ex:Throwable=>
+          logger.error("Could not render list of jobs: ", ex)
+          Future(InternalServerError(GenericErrorResponse("error", ex.toString).asJson))
+      })
+
+      resultFuture.map(result => {
+        val failures = result.collect({ case Left(err) => err })
+        if (failures.nonEmpty) {
+          logger.error(s"Can't list all jobs: ${failures}")
+          InternalServerError(GenericErrorResponse("error", failures.map(_.toString).mkString(", ")).asJson)
+        } else {
+          Ok(ObjectListResponse("ok", "job", result.collect({ case Right(job) => job }), result.length).asJson)
+        }
+      })
+  }
+
+  def getAllJobs(limit:Int, scanFrom:Option[String]) = renderListAction(()=>jobModelDAO.allJobs(limit))
+
+  def jobsFor(fileId:String) = renderListAction(()=>jobModelDAO.jobsForSource(fileId))
 
   def thumbnailJobOriginalMedia(jobDesc:JobModel)(implicit esClient:HttpClient) = jobDesc.sourceType match {
     case SourceType.SRC_MEDIA=>

@@ -89,7 +89,7 @@ class BasicSearchComponent extends React.Component {
         } else if(this.state.totalHits!==-1){
             return <SearchResultsComponent entries={this.state.searchResults} onItemOpen={this.onItemOpen} onItemClose={this.onItemClose}/>
         } else if(this.state.searching) {
-            return <img style={{marginLeft:"auto",marginRight:"auto",width:"200px"}} src="/assets/images/Spinner-1s-200px.gif"/>
+            return <img style={{marginLeft:"auto",marginRight:"auto",width:"200px",display:"block"}} src="/assets/images/Spinner-1s-200px.gif"/>
         } else {
             return <span/>
         }
