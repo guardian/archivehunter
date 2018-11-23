@@ -18,7 +18,7 @@ import { faStroopwafel, faCheckCircle, faTimesCircle, faRoad, faSearch,faThList,
 import { faChevronCircleDown,faChevronCircleRight,faTrashAlt, faFilm, faVolumeUp,faImage, faFile } from '@fortawesome/free-solid-svg-icons'
 
 library.add(faStroopwafel, faCheckCircle, faTimesCircle, faRoad,faSearch,faThList,faWrench, faLightbulb, faChevronCircleDown, faChevronCircleRight, faTrashAlt, faFolderPlus, faFolderMinus, faFolder);
-library.add(faFilm, faVolumeUp, faImage, faFilm, faFile);
+library.add(faFilm, faVolumeUp, faImage, faFile);
 window.React = require('react');
 
 class App extends React.Component {

@@ -291,3 +291,36 @@ td.metadata-entry {
     margin-left: 1em;
     margin-right: 1em;
 }
+
+.entry-preview-switcher {
+    width: 50%;
+    display: block;
+    margin-top:1em;
+}
+
+.image-button-enabled {
+    padding-right: 0.4em;
+    cursor: pointer;
+}
+
+.image-button-disabled {
+    padding-right: 0.4em;
+    color: lightgray;
+}
+
+hr.partial-divider {
+    width: 70%
+}
+
+img.thumbnail-preview {
+    width: 95%;
+    margin-left: auto;
+    margin-right: auto;
+    display: block;
+}
+
+p.information {
+    text-align: center;
+    font-style: italic;
+    font-size: 0.8em;
+}

@@ -358,6 +358,7 @@ Resources:
             Resource:
             - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ScanTargetsTable}
             - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ProxyLocationTable}
+            - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${JobHistoryTable}
       - PolicyName: ContainerAccess
         PolicyDocument:
           Version: 2012-10-17
