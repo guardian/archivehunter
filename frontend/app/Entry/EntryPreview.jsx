@@ -56,13 +56,13 @@ class EntryPreview extends React.Component {
 
     updateData(){
         return new Promise((resolve,reject)=>
-            this.setState({lastError: null, proxyDefs: [], loading: true}, ()=>axios.get("/api/proxy/" + this.props.entryId)
+            this.setState({lastError: null, proxyDefs: [], loading: true, processMessage: null, didLoad: false}, ()=>axios.get("/api/proxy/" + this.props.entryId)
                 .then(result=>{
                     const proxyTypes = result.data.entries.map(entry=>entry.proxyType);
-                    this.setState({proxyTypes: proxyTypes, selectedType: this.bestAvailablePreview(proxyTypes), loading: false}, ()=>resolve());
+                    this.setState({proxyTypes: proxyTypes, selectedType: this.bestAvailablePreview(proxyTypes), loading: false, didLoad:true}, ()=>resolve());
                 }).catch(err=>{
                     console.error(err);
-                    this.setState({proxyTypes: [], loading: false, lastError: err}, ()=>reject());
+                    this.setState({proxyTypes: [], loading: false, lastError: err, didLoad: true}, ()=>reject());
                 }))
         );
     }
@@ -86,6 +86,10 @@ class EntryPreview extends React.Component {
     }
 
     controlBody(){
+        if(this.state.loading){
+            return <img style={{marginLeft:"auto",marginRight:"auto",width:"200px",display:"block"}} src="/assets/images/Spinner-1s-200px.gif"/>;
+        }
+
         if(!this.state.previewData){
             return <div>
                 <EntryThumbnail mimeType={this.props.mimeType} fileExtension={this.props.fileExtension} entryId={this.props.entryId}/>

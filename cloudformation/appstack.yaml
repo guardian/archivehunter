@@ -174,9 +174,9 @@ Resources:
             ReadCapacityUnits: 10
         - IndexName: jobStatusIndex
           KeySchema:
-            - AttributeName: startedAt
-              KeyType: HASH
             - AttributeName: jobStatus
+              KeyType: HASH
+            - AttributeName: startedAt
               KeyType: RANGE
           Projection:
             ProjectionType: ALL

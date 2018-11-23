@@ -24,6 +24,9 @@ class JobModelDAO @Inject() (config:Configuration, ddbClientMgr: DynamoClientMan
 
   private val logger = Logger(getClass)
   val table = Table[JobModel](config.get[String]("externalData.jobTable"))
+  val sourcesIndex = table.index("sourcesIndex")
+  val jobStatusIndex = table.index("jobStatusIndex")
+
   val maxRetries = config.getOptional[Int]("externalData.maxRetries").getOrElse(10)
   val initialRetryDelay = config.getOptional[Int]("externalData.initialRetryDelay").getOrElse(2)
   val retryDelayFactor = config.getOptional[Double]("externalData.retryDelayFactor").getOrElse(1.5)
@@ -37,4 +40,7 @@ class JobModelDAO @Inject() (config:Configuration, ddbClientMgr: DynamoClientMan
   def jobForId(jobId:String) = ScanamoAlpakka.exec(ddbClient)(table.get('jobId->jobId))
   def putJob(jobData:JobModel) = ScanamoAlpakka.exec(ddbClient)(table.put(jobData))
 
+  def jobsForSource(sourceId:String) = ScanamoAlpakka.exec(ddbClient)(sourcesIndex.query('sourceId->sourceId))
+
+  def allJobs(limit:Int) = ScanamoAlpakka.exec(ddbClient)(table.limit(limit).scan)
 }
