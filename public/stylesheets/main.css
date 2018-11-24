@@ -324,3 +324,17 @@ p.information {
     font-style: italic;
     font-size: 0.8em;
 }
+
+.entry-jobs-list {
+    margin-left: 1.5em;
+}
+
+.job-list {
+    padding-left: 0.5em;
+    list-style: none;
+}
+
+.job-list-entry {
+    text-transform: capitalize;
+}
+
