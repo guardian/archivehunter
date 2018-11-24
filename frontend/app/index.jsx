@@ -40,6 +40,7 @@ class App extends React.Component {
         return <div>
             <TopMenu visible={true} isAdmin={true}/>
             <Switch>
+                <Route path="/admin/jobs/:jobid" component={JobsList}/>
                 <Route path="/admin/jobs" component={JobsList}/>
                 <Route path="/admin/scanTargets/:id" component={ScanTargetEdit}/> /*this also handles "new" */
                 <Route path="/admin/scanTargets" component={ScanTargetsList}/>
