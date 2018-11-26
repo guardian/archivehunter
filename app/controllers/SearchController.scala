@@ -1,6 +1,6 @@
 package controllers
 
-import clientManagers.ESClientManager
+import com.theguardian.multimedia.archivehunter.common.clientManagers.ESClientManager
 import javax.inject.{Inject, Singleton}
 import play.api.{Configuration, Logger}
 import play.api.mvc.{AbstractController, ControllerComponents}

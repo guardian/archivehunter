@@ -8,19 +8,19 @@ import akka.stream.{ActorMaterializer, Materializer}
 import com.gu.scanamo._
 import com.gu.scanamo.syntax._
 import com.theguardian.multimedia.archivehunter.common.ZonedDateTimeEncoder
-import helpers.ZonedTimeFormat
 import javax.inject.{Inject, Named}
 import play.api.{Configuration, Logger}
 import play.api.mvc._
 import io.circe.generic.auto._
 import io.circe.syntax._
-import models.ScanTarget
 import play.api.libs.circe.Circe
 import responses.{GenericErrorResponse, ObjectCreatedResponse, ObjectGetResponse, ObjectListResponse}
 import akka.stream.alpakka.dynamodb.scaladsl._
 import akka.stream.alpakka.dynamodb.impl._
-import clientManagers.DynamoClientManager
+import com.theguardian.multimedia.archivehunter.common.clientManagers.DynamoClientManager
 import com.amazonaws.auth.{AWSStaticCredentialsProvider, InstanceProfileCredentialsProvider}
+import com.theguardian.multimedia.archivehunter.common.cmn_helpers.ZonedTimeFormat
+import com.theguardian.multimedia.archivehunter.common.cmn_models.ScanTarget
 import services.{BucketScanner, LegacyProxiesScanner}
 
 import scala.concurrent.Future

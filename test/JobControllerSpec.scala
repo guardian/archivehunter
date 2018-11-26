@@ -1,12 +1,13 @@
 import java.time.ZonedDateTime
 
 import akka.stream.alpakka.dynamodb.scaladsl.DynamoClient
-import clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager}
+import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager}
 import com.amazonaws.services.s3.AmazonS3
 import com.amazonaws.services.s3.model.ObjectMetadata
 import com.sksamuel.elastic4s.http.HttpClient
 import com.theguardian.multimedia.archivehunter.common._
 import controllers.JobController
+import cmn_models._
 import models._
 import org.specs2.mock.Mockito
 import org.specs2.mock.mockito.MockitoMatchers

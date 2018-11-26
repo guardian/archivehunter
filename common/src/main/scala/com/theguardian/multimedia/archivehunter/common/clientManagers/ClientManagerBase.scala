@@ -1,4 +1,4 @@
-package clientManagers
+package com.theguardian.multimedia.archivehunter.common.clientManagers
 
 import com.amazonaws.auth.{AWSCredentialsProviderChain, ContainerCredentialsProvider, InstanceProfileCredentialsProvider}
 import com.amazonaws.auth.profile.ProfileCredentialsProvider

@@ -3,7 +3,7 @@ package helpers
 import akka.actor.ActorSystem
 import akka.stream.{ActorMaterializer, Attributes, Inlet, SinkShape}
 import akka.stream.stage.{AbstractInHandler, AbstractOutHandler, GraphStage, GraphStageLogic}
-import clientManagers.DynamoClientManager
+import com.theguardian.multimedia.archivehunter.common.clientManagers.DynamoClientManager
 import com.gu.scanamo.{ScanamoAlpakka, Table}
 import com.theguardian.multimedia.archivehunter.common.{ProxyLocation, ProxyLocationEncoder}
 import javax.inject.Inject

@@ -1,15 +1,15 @@
-package services
+package com.theguardian.multimedia.archivehunter.common.services
 
-import clientManagers.ECSClientManager
-import com.amazonaws.services.ecs.model._
+import com.theguardian.multimedia.archivehunter.common.ArchiveHunterConfiguration
+import com.theguardian.multimedia.archivehunter.common.clientManagers.ECSClientManager
 import javax.inject.Inject
-import play.api.{Configuration, Logger}
-
-import collection.JavaConverters._
+import org.apache.logging.log4j.LogManager
+import com.amazonaws.services.ecs.model._
+import scala.collection.JavaConverters._
 import scala.util.{Failure, Success}
 
-class ContainerTaskManager @Inject() (config:Configuration, ecsClientManager: ECSClientManager){
-  private val logger = Logger(getClass)
+class ContainerTaskManager @Inject() (config:ArchiveHunterConfiguration, ecsClientManager: ECSClientManager){
+  private val logger = LogManager.getLogger(getClass)
   private val profileName = config.getOptional[String]("externalData.awsProfile")
   private val taskDefinitionName = config.get[String]("proxies.ecsTaskDefinitionName")
   private val taskContainerName = config.get[String]("proxies.taskContainerName")
