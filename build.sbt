@@ -24,7 +24,9 @@ lazy val commonSettings = Seq(
     "com.lightbend.akka" %% "akka-stream-alpakka-dynamodb" % "0.20",
     "com.lightbend.akka" %% "akka-stream-alpakka-s3" % "0.20",
     "com.gu" %% "scanamo-alpakka" % "1.0.0-M8",
-    specs2 % Test)
+    "com.fasterxml.jackson.dataformat" % "jackson-dataformat-yaml" % "2.9.7",
+    "com.fasterxml.jackson.core" % "jackson-databind" % "2.9.7",
+      specs2 % Test)
 )
 
 scalaVersion := "2.12.2"

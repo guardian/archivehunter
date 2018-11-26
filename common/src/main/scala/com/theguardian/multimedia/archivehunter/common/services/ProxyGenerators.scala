@@ -41,7 +41,7 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration, esClientMgr:
     implicit val proxyLocationDAO = new ProxyLocationDAO(tableName)
 
     val callbackUrl=config.get[String]("proxies.appServerUrl")
-
+    logger.info(s"callbackUrl is $callbackUrl")
     val jobUuid = UUID.randomUUID()
 
     indexer.getById(fileId).flatMap(entry=>{
