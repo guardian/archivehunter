@@ -60,6 +60,8 @@ echo outpath is $OUTPATH
 if [ "$FFMPEG_EXIT" == "0" ]; then
     echo Uploading thumbnail...
     UPLOAD_LOG=`aws s3 cp /tmp/output.jpg "$OUTPATH" 2>&1`
+    echo Server callback URL is $3
+
     if [ "$?" == "0" ]; then
         echo Informing server...
         curl -k -X POST $3 -d'{"status":"success","output":"'"$OUTPATH"'","input":"'"$1"'"}' --header "Content-Type: application/json"
@@ -71,6 +73,7 @@ if [ "$FFMPEG_EXIT" == "0" ]; then
     fi
 else
     echo Output failed. Informing server...
+    echo Server callback URL is $3
     ENCODED_LOG=$(echo $OUTLOG | base64)
     curl -k -X POST $3 -d'{"status":"error","log":"'$ENCODED_LOG'","input":"'"$1"'"}' --header "Content-Type: application/json"
 fi
