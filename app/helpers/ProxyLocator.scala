@@ -2,11 +2,11 @@ package helpers
 
 import com.amazonaws.services.s3.AmazonS3
 import com.amazonaws.services.s3.model.ListObjectsV2Request
+import com.theguardian.multimedia.archivehunter.common.cmn_models.ScanTargetDAO
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ProxyLocation}
-import models.ScanTargetDAO
 import play.api.Logger
-import collection.JavaConverters._
 
+import collection.JavaConverters._
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 

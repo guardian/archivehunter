@@ -5,7 +5,7 @@ import java.time.ZonedDateTime
 import akka.actor.ActorSystem
 import akka.stream.alpakka.dynamodb.scaladsl.DynamoClient
 import akka.stream.{ActorMaterializer, Materializer}
-import clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager}
+import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager}
 import com.amazonaws.services.s3.AmazonS3
 import com.gu.scanamo.error.DynamoReadError
 import com.sksamuel.elastic4s.http.HttpClient
@@ -17,6 +17,7 @@ import play.api.mvc.{AbstractController, ControllerComponents}
 import io.circe.generic.auto._
 import io.circe.syntax._
 import models._
+import com.theguardian.multimedia.archivehunter.common.cmn_models._
 import responses.{GenericErrorResponse, ObjectListResponse}
 
 import scala.util.{Failure, Success}
@@ -48,7 +49,7 @@ class JobController @Inject() (config:Configuration, cc:ControllerComponents, jo
       resultFuture.map(result => {
         val failures = result.collect({ case Left(err) => err })
         if (failures.nonEmpty) {
-          logger.error(s"Can't list all jobs: ${failures}")
+          logger.error(s"Can't list all jobs: $failures")
           InternalServerError(GenericErrorResponse("error", failures.map(_.toString).mkString(", ")).asJson)
         } else {
           Ok(ObjectListResponse("ok", "job", result.collect({ case Right(job) => job }), result.length).asJson)

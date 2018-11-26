@@ -1,14 +1,15 @@
-package clientManagers
+package com.theguardian.multimedia.archivehunter.common.clientManagers
 
 import com.sksamuel.elastic4s.http.HttpClient
-import javax.inject.Inject
-import play.api.Configuration
+import com.theguardian.multimedia.archivehunter.common.{ArchiveHunterConfiguration, ExtValueConverters}
+import javax.inject.{Inject, Singleton}
 
 trait ESClientManager {
   def getClient():HttpClient
 }
 
-class ESClientManagerImpl @Inject()(config:Configuration) extends ESClientManager {
+@Singleton
+class ESClientManagerImpl @Inject()(config:ArchiveHunterConfiguration) extends ESClientManager with ExtValueConverters {
   val esHost:String = config.get[String]("elasticsearch.hostname")
   val esPort:Int = config.get[Int]("elasticsearch.port")
   val sslFlag:Boolean = config.getOptional[Boolean]("elasticsearch.ssl").getOrElse(false)

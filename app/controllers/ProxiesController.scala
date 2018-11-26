@@ -1,16 +1,12 @@
 package controllers
 
-import java.time.ZonedDateTime
-import java.util.UUID
-
 import akka.actor.ActorSystem
 import akka.stream.{ActorMaterializer, Materializer}
-import clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager}
+import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager}
 import com.amazonaws.HttpMethod
 import com.amazonaws.services.s3.model.GeneratePresignedUrlRequest
 import com.gu.scanamo.{ScanamoAlpakka, Table}
 import com.theguardian.multimedia.archivehunter.common._
-import helpers.ProxyLocator
 import javax.inject.{Inject, Singleton}
 import play.api.{Configuration, Logger}
 import play.api.libs.circe.Circe
@@ -21,16 +17,18 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import io.circe.generic.auto._
 import io.circe.syntax._
 import com.gu.scanamo.syntax._
-import com.sun.org.apache.xerces.internal.xs.datatypes.ObjectList
+import com.theguardian.multimedia.archivehunter.common.errors.{ExternalSystemError, NothingFoundError}
+import com.theguardian.multimedia.archivehunter.common.cmn_models.{JobModelDAO, ScanTargetDAO}
+import helpers.ProxyLocator
 import models._
-import services.ContainerTaskManager
+import services.ProxyGenerators
 
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
 @Singleton
 class ProxiesController @Inject()(config:Configuration, cc:ControllerComponents, ddbClientMgr: DynamoClientManager,
-                                  esClientMgr:ESClientManager, s3ClientMgr:S3ClientManager, containerTaskMgr:ContainerTaskManager)
+                                  esClientMgr:ESClientManager, s3ClientMgr:S3ClientManager, proxyGenerators: ProxyGenerators)
                                  (implicit actorSystem:ActorSystem, scanTargetDAO:ScanTargetDAO, jobModelDAO:JobModelDAO)
   extends AbstractController(cc) with Circe with ProxyLocationEncoder {
   implicit private val mat:Materializer = ActorMaterializer.create(actorSystem)
@@ -199,76 +197,13 @@ class ProxiesController @Inject()(config:Configuration, cc:ControllerComponents,
   }
 
   def generateThumbnail(fileId:String) = Action.async {
-    implicit val indexer = new Indexer(indexName)
-    implicit val client = esClientMgr.getClient()
-    implicit val s3Client = s3ClientMgr.getS3Client(awsProfile)
-    implicit val dynamoClient = ddbClientMgr.getClient(awsProfile)
-    implicit val proxyLocationDAO = new ProxyLocationDAO(tableName)
-
-    val callbackUrl=config.get[String]("proxies.appServerUrl")
-
-    val jobUuid = UUID.randomUUID()
-
-    indexer.getById(fileId).flatMap(entry=>{
-      val targetProxyBucketFuture = scanTargetDAO.targetForBucket(entry.bucket).map({
-        case None=>throw new RuntimeException(s"Entry's source bucket ${entry.bucket} is not registered")
-        case Some(Left(err))=>throw new RuntimeException(err.toString)
-        case Some(Right(target))=>Some(target.proxyBucket)
-      })
-
-      val jobDesc = JobModel(UUID.randomUUID().toString,"thumbnail",Some(ZonedDateTime.now()),None,JobStatus.ST_PENDING,None,fileId,SourceType.SRC_MEDIA)
-
-      val uriToProxyFuture = entry.storageClass match {
-        case StorageClass.GLACIER=>
-          logger.info(s"s3://${entry.bucket}/${entry.path} is in Glacier, can't proxy directly. Looking up any existing video proxy")
-          proxyLocationDAO.getProxy(fileId,ProxyType.VIDEO).flatMap({
-            case None=>
-              proxyLocationDAO.getProxy(fileId,ProxyType.AUDIO).map({
-                case None=>None
-                case Some(proxyLocation)=>
-                  logger.info(s"Found audio proxy at s3://${proxyLocation.bucketName}/${proxyLocation.bucketPath}")
-                  Some(s"s3://${proxyLocation.bucketName}/${proxyLocation.bucketPath}")
-              })
-            case Some(proxyLocation)=>
-              logger.info(s"Found video proxy at s3://${proxyLocation.bucketName}/${proxyLocation.bucketPath}")
-              Future(Some(s"s3://${proxyLocation.bucketName}/${proxyLocation.bucketPath}"))
-          })
-        case _=>
-          logger.info(s"s3://${entry.bucket}/${entry.path} is in ${entry.storageClass}, will try to proxy directly")
-          Future(Some(s"s3://${entry.bucket}/${entry.path}"))
-      }
-
-      Future.sequence(Seq(targetProxyBucketFuture, uriToProxyFuture)).map(results=> {
-        logger.debug("Saving job description...")
-        results ++ Seq(jobModelDAO.putJob(jobDesc))
-      }).map(results=>{
-        val targetProxyBucket = results.head.asInstanceOf[Option[String]].get
-        logger.info(s"Target proxy bucket is $targetProxyBucket")
-        logger.info(s"Source media is $uriToProxyFuture")
-        results(1).asInstanceOf[Option[String]] match {
-          case None =>
-            logger.error("Nothing found to proxy")
-            NotFound(GenericErrorResponse("not_found", "Could not find anything to proxy").asJson)
-          case Some(uriString) =>
-            containerTaskMgr.runTask(
-              command = Seq("/bin/bash","/usr/local/bin/extract_thumbnail.sh", uriString, targetProxyBucket, s"$callbackUrl/api/job/${jobDesc.jobId}/report"),
-              environment = Map(),
-              name = s"extract_thumbnail_${jobUuid.toString}",
-              cpu = None
-            ) match {
-              case Success(task)=>
-                logger.info(s"Successfully launched task: ${task.getTaskArn}")
-                Ok(ObjectCreatedResponse("ok","task",task.getTaskArn).asJson)
-              case Failure(err)=>
-                logger.error("Could not launch task", err)
-                InternalServerError(GenericErrorResponse("error",s"Could not launch task: ${err.toString}").asJson)
-            }
-        }
-      })
-    }).recoverWith({
-      case err:Throwable=>
-        logger.error("Could not start proxy job: ", err)
-        Future(InternalServerError(GenericErrorResponse("error",s"Could not start proxy job: ${err.toString}").asJson))
+    proxyGenerators.createThumbnailProxy(fileId).map({
+      case Failure(NothingFoundError(objectType, msg))=>
+        NotFound(GenericErrorResponse("not_found", msg.toString).asJson)
+      case Failure(ExternalSystemError(systemName, msg))=>
+        InternalServerError(GenericErrorResponse("error",s"Could not launch task: $msg").asJson)
+      case Success(taskId)=>
+        Ok(responses.ObjectGetResponse("ok","task",taskId).asJson)
     })
   }
 }

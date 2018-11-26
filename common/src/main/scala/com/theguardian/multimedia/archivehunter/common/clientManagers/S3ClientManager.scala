@@ -1,4 +1,4 @@
-package clientManagers
+package com.theguardian.multimedia.archivehunter.common.clientManagers
 
 import akka.actor.ActorSystem
 import akka.stream.Materializer
@@ -9,11 +9,11 @@ import com.amazonaws.auth.profile.ProfileCredentialsProvider
 import com.amazonaws.auth.{AWSCredentialsProviderChain, ContainerCredentialsProvider, InstanceProfileCredentialsProvider}
 import com.amazonaws.regions.AwsRegionProvider
 import com.amazonaws.services.s3.{AmazonS3, AmazonS3ClientBuilder}
+import com.theguardian.multimedia.archivehunter.common.ArchiveHunterConfiguration
 import javax.inject.{Inject, Singleton}
-import play.api.Configuration
 
 @Singleton
-class S3ClientManager @Inject() (config:Configuration) extends ClientManagerBase[AmazonS3]{
+class S3ClientManager @Inject() (config:ArchiveHunterConfiguration) extends ClientManagerBase[AmazonS3]{
 
   override def getClient(profileName:Option[String]=None): AmazonS3 = getS3Client(profileName)
 

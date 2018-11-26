@@ -1,8 +1,8 @@
-package models
+package com.theguardian.multimedia.archivehunter.common.cmn_models
 
 import akka.actor.ActorSystem
 import akka.stream.{ActorMaterializer, Materializer}
-import clientManagers.DynamoClientManager
+import com.theguardian.multimedia.archivehunter.common.clientManagers.DynamoClientManager
 import com.gu.scanamo.{ScanamoAlpakka, Table}
 
 import scala.concurrent.Future
@@ -11,18 +11,18 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.math._
 import io.circe.generic.auto._
 import io.circe.syntax._
-import com.gu.scanamo.syntax._
-import com.theguardian.multimedia.archivehunter.common.ZonedDateTimeEncoder
-import helpers.ZonedTimeFormat
+import com.theguardian.multimedia.archivehunter.common.cmn_helpers.ZonedTimeFormat
+import com.theguardian.multimedia.archivehunter.common.{ArchiveHunterConfiguration, ExtValueConverters, ZonedDateTimeEncoder}
 import javax.inject.{Inject, Singleton}
-import play.api.{Configuration, Logger}
+import org.apache.logging.log4j.LogManager
 
 @Singleton
-class JobModelDAO @Inject() (config:Configuration, ddbClientMgr: DynamoClientManager)(implicit actorSystem:ActorSystem)
-  extends ZonedDateTimeEncoder with ZonedTimeFormat with JobModelEncoder {
+class JobModelDAO @Inject()(config:ArchiveHunterConfiguration, ddbClientMgr: DynamoClientManager)(implicit actorSystem:ActorSystem)
+  extends ZonedDateTimeEncoder with ZonedTimeFormat with JobModelEncoder with ExtValueConverters {
   import com.gu.scanamo.syntax._
 
-  private val logger = Logger(getClass)
+  private val logger = LogManager.getLogger(getClass)
+
   val table = Table[JobModel](config.get[String]("externalData.jobTable"))
   val sourcesIndex = table.index("sourcesIndex")
   val jobStatusIndex = table.index("jobStatusIndex")
