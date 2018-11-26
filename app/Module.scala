@@ -3,7 +3,7 @@ import com.google.inject.AbstractModule
 import com.theguardian.multimedia.archivehunter.common.ArchiveHunterConfiguration
 import helpers.ArchiveHunterConfigurationPlay
 import play.api.libs.concurrent.AkkaGuiceSupport
-import services.{AppStartup, BucketScanner, LegacyProxiesScanner}
+import services.{AppStartup, BucketScanner, BulkThumbnailer, LegacyProxiesScanner}
 
 class Module extends AbstractModule with AkkaGuiceSupport {
   override def configure() = {
@@ -12,6 +12,7 @@ class Module extends AbstractModule with AkkaGuiceSupport {
 
     bindActor[BucketScanner]("bucketScannerActor")
     bindActor[LegacyProxiesScanner]("legacyProxiesScannerActor")
+    bindActor[BulkThumbnailer]("bulkThumbnailerActor")
     bind(classOf[AppStartup]).asEagerSingleton() //do app startup
   }
 }
