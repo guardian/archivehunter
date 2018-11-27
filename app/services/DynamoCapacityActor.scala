@@ -200,7 +200,12 @@ class DynamoCapacityActor @Inject() (ddbClientMgr:DynamoClientManager, config:Ar
               rq
             }
 
-            val rqWithIndexUpdate = rq.withGlobalSecondaryIndexUpdates(indexUpdates.asJavaCollection)
+            val rqWithIndexUpdate = if(indexUpdates.nonEmpty){
+              rq.withGlobalSecondaryIndexUpdates(indexUpdates.asJavaCollection)
+            } else {
+              rq
+            }
+
             logger.info(s"Updating table ${tableRq.tableName} with capacity $actualReadTarget read, $actualWriteTarget write and index $indexUpdates")
 
             val updateResult = ddbClient.updateTable(rq)

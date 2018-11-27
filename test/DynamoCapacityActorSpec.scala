@@ -112,12 +112,10 @@ class DynamoCapacityActorSpec extends Specification with Mockito {
       mockClient.describeTable("testTable") returns new DescribeTableResult().withTable(mockedDescription)
       mockClient.updateTable(any[UpdateTableRequest]) returns new UpdateTableResult().withTableDescription(mockedDescription)
 
-      val expectedIndexUpdates:Seq[GlobalSecondaryIndexUpdate] = Seq()
-
       val expectedRequest = new UpdateTableRequest()
         .withTableName("testTable")
         .withProvisionedThroughput(new ProvisionedThroughput().withReadCapacityUnits(12L).withWriteCapacityUnits(12L))
-        .withGlobalSecondaryIndexUpdates(expectedIndexUpdates.asJavaCollection)
+
 
       toTest ! testRq
       Thread.sleep(2000L) //give it 2s to process
