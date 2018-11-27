@@ -8,7 +8,7 @@ import akka.stream.{ActorMaterializer, Materializer}
 import com.gu.scanamo._
 import com.gu.scanamo.syntax._
 import com.theguardian.multimedia.archivehunter.common.ZonedDateTimeEncoder
-import javax.inject.{Inject, Named}
+import javax.inject.{Inject, Named, Singleton}
 import play.api.{Configuration, Logger}
 import play.api.mvc._
 import io.circe.generic.auto._
@@ -29,7 +29,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 @Singleton
 class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner:ActorRef,
                                       @Named("legacyProxiesScannerActor") proxyScanner:ActorRef,
-                                      @Named("bulkThumbnailActor") bulkThumbnailer: ActorRef,
+                                      @Named("bulkThumbnailerActor") bulkThumbnailer: ActorRef,
                                       config:Configuration,
                                       cc:ControllerComponents,ddbClientMgr:DynamoClientManager)(implicit system:ActorSystem)
   extends AbstractController(cc) with Circe with ZonedDateTimeEncoder with ZonedTimeFormat {

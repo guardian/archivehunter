@@ -174,8 +174,8 @@ class LegacyProxiesScanner @Inject()(config:Configuration, ddbClientMgr:DynamoCl
 
         //keySource.via(converter).log("legacy-proxies-scanner").via(eosDetect).to(ddbSink).run()
         searchHitSource
-          .via(archiveEntryConverter)
-          .via(proxyLocator)
+          .via(archiveEntryConverter.async)
+          .via(proxyLocator.async)
           .via(eosDetect)
           .log("proxies-scanner")
           .to(ddbSink)

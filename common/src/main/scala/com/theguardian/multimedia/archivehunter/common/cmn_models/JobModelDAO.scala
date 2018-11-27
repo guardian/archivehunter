@@ -43,4 +43,5 @@ class JobModelDAO @Inject()(config:ArchiveHunterConfiguration, ddbClientMgr: Dyn
   def jobsForSource(sourceId:String) = ScanamoAlpakka.exec(ddbClient)(sourcesIndex.query('sourceId->sourceId))
 
   def allJobs(limit:Int) = ScanamoAlpakka.exec(ddbClient)(table.limit(limit).scan)
+  def deleteJob(jobId:String) = ScanamoAlpakka.exec(ddbClient)(table.delete('jobId->jobId))
 }

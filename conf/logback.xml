@@ -53,10 +53,12 @@
     <logger name="S3LocationSpec" level="DEBUG"/>
     <logger name="helpers.ParanoidS3Source" level="DEBUG"/>
     <logger name="helpers.S3XMLProcessor" level="INFO"/>
-    <logger name="helpers.ProxyLocatorFlow" level="DEBUG"/>
-    <logger name="services.LegacyProxiesScanner" level="DEBUG"/>
+    <logger name="helpers.HasThumbnailFilter" level="DEBUG"/>
+    <logger name="helpers.CreateProxySink" level="DEBUG"/>
+    <logger name="services.BulkThumbnailer" level="DEBUG"/>
+    <logger name="services.DynamoCapacityActor" level="INFO"/>
 
-    <root level="WARN">
+    <root level="WARN">/
         <appender-ref ref="STDOUT" />
         <appender-ref ref="ASYNCFILE"/>
         <!-- <appender-ref ref="Sentry" />-->
