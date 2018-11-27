@@ -62,7 +62,7 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration, esClientMgr:
       case Some(Right(target))=>Some(target.proxyBucket)
     })
 
-    val jobDesc = JobModel(UUID.randomUUID().toString,"thumbnail",Some(ZonedDateTime.now()),None,JobStatus.ST_PENDING,None,fileId,SourceType.SRC_MEDIA)
+    val jobDesc = JobModel(UUID.randomUUID().toString,"thumbnail",Some(ZonedDateTime.now()),None,JobStatus.ST_PENDING,None,entry.id,SourceType.SRC_MEDIA)
 
     val uriToProxyFuture = entry.storageClass match {
       case StorageClass.GLACIER=>
@@ -94,6 +94,7 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration, esClientMgr:
       results(1).asInstanceOf[Option[String]] match {
         case None =>
           logger.error("Nothing found to proxy")
+          jobModelDAO.deleteJob(jobDesc.jobId)  //ignore the result, this is non-essential but there to prevent the jobs list getting clogged up
           Failure(NothingFoundError("media", "Nothing found to proxy"))
         case Some(uriString) =>
           containerTaskMgr.runTask(
