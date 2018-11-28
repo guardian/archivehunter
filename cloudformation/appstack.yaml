@@ -661,9 +661,9 @@ Resources:
               awslogs-group: !Ref ProxyingTaskLogGroup
               awslogs-region: !Ref AWS::Region
               awslogs-stream-prefix: ecs
-      Cpu: 1024 #1 vCPU
+      Cpu: 4096 #4 vCPU
       NetworkMode: awsvpc
-      Memory: 2048  #minimum allowed with 1 vCPU
+      Memory: 8192  #minimum allowed with 4 vCPU
       RequiresCompatibilities:
         - FARGATE
       TaskRoleArn: !GetAtt ProxyGeneratorRole.Arn
