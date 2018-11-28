@@ -345,6 +345,7 @@ Resources:
             Action:
             - dynamodb:BatchWriteItem
             - dynamodb:PutItem
+            - dynamodb:UpdateTable #required for updating provisioned capacity
             - dynamodb:BatchWriteItem
             - dynamodb:DescribeTable
             - dynamodb:DeleteItem
