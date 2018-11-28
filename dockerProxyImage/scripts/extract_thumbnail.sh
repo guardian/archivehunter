@@ -36,6 +36,11 @@ elif [[ "$MIMETYPE" =~ ^video.* ]]; then
     mv /tmp/mediafile /tmp/videofile
     extract_video_thumbnail.sh "$1" "$2" "$3"
     exit $?
+elif [[ "$MIMETYPE" =~ ^image.* ]]; then
+    echo Got image file
+    mv /tmp/mediafile /tmp/imagefile
+    extract_image_thumbnail.sh "$1" "$2" "$3"
+    exit $?
 else
     echo ${MIMETYPE} files are not supported yet
     exit 1
