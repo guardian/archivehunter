@@ -41,7 +41,7 @@ object BucketScanner {
 
 class BucketScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientManager, s3ClientMgr:S3ClientManager,
                               esClientMgr:ESClientManager, scanTargetDAO: ScanTargetDAO, injector:Injector)(implicit system:ActorSystem)
-  extends Actor with Timers with ZonedTimeFormat with ArchiveEntryRequestBuilder{
+  extends Actor with ZonedTimeFormat with ArchiveEntryRequestBuilder{
   import BucketScanner._
 
   import com.sksamuel.elastic4s.http.ElasticDsl._
@@ -55,9 +55,6 @@ class BucketScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientMan
   val table = Table[ScanTarget](config.get[String]("externalData.scanTargets"))
 
   override val indexName: String = config.get[String]("externalData.indexName")
-
-  //actor-local timer - https://doc.akka.io/docs/akka/2.5/actors.html#actors-timers
-  timers.startPeriodicTimer(TickKey, RegularScanTrigger, Duration(config.get[Long]("scanner.masterSchedule"),SECONDS))
 
   def listScanTargets() = {
     val alpakkaClient = ddbClientMgr.getNewAlpakkaDynamoClient(config.getOptional[String]("externalData.awsProfile"))

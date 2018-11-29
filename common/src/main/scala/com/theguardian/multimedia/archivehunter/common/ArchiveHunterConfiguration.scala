@@ -18,4 +18,5 @@ trait ExtValueConverters {
   }
 
   implicit def StringDouble(input:String):Double = augmentString(input).toDouble
+  implicit def StringLong(input:String):Long = augmentString(input).toLong
 }

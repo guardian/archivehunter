@@ -57,6 +57,7 @@
     <logger name="helpers.CreateProxySink" level="INFO"/>
     <logger name="services.BulkThumbnailer" level="INFO"/>
     <logger name="services.DynamoCapacityActor" level="INFO"/>
+    <logger name="services.ClockSingleton" level="DEBUG"/>
 
     <root level="WARN">/
         <appender-ref ref="STDOUT" />

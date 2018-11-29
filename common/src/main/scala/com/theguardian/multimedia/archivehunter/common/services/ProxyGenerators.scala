@@ -205,32 +205,31 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration, esClientMgr:
     })
   }
 
-  def startEtsProxy(toProxy:String, presetId:String, destinationBucket:String) = {
-    val toProxyUri = URI.create(toProxy)
-
-    findPipelineFor(toProxyUri.getHost,destinationBucket) match {
-      case Success(matches)=>
-        if(matches.nonEmpty) {
-          logger.info(s"Found ${matches.length} pipelines for ${toProxyUri.getHost}->$destinationBucket, using the first")
-          matches.head
-        } else {
-          logger.info(s"Found no matching pipelines for ${toProxyUri.getHost}->$destinationBucket, requesting creation")
-          createEtsPipeline(s"archivehunter_", toProxyUri.getHost,destinationBucket)
-          Failure()
-        }
-    }
-    val jobRq = new CreateJobRequest()
-      .withInput(new JobInput().withContainer("mp4").withKey(toProxyUri.getPath))
-      .withOutput(new CreateJobOutput().withKey(makeOutputFilename(toProxyUri.getPath)).withPresetId(presetId))
-      .withPipelineId(pipelineId)
-
-    try {
-      val result = etsClient.createJob(jobRq)
-      Success(result.getJob.getId)
-    } catch {
-      case ex:Throwable=>
-        Failure(ex)
-    }
+  def startEtsProxy(toProxy:String, presetId:String, destinationBucket:String)(implicit etsClient:AmazonElasticTranscoder) = {
+//    val toProxyUri = URI.create(toProxy)
+//
+//    findPipelineFor(toProxyUri.getHost,destinationBucket) match {
+//      case Success(matches)=>
+//        if(matches.nonEmpty) {
+//          logger.info(s"Found ${matches.length} pipelines for ${toProxyUri.getHost}->$destinationBucket, using the first")
+//          matches.head
+//        } else {
+//          logger.info(s"Found no matching pipelines for ${toProxyUri.getHost}->$destinationBucket, requesting creation")
+//          createEtsPipeline(s"archivehunter_", toProxyUri.getHost,destinationBucket)
+//        }
+//    }
+//    val jobRq = new CreateJobRequest()
+//      .withInput(new JobInput().withContainer("mp4").withKey(toProxyUri.getPath))
+//      .withOutput(new CreateJobOutput().withKey(makeOutputFilename(toProxyUri.getPath)).withPresetId(presetId))
+//      .withPipelineId(pipelineId)
+//
+//    try {
+//      val result = etsClient.createJob(jobRq)
+//      Success(result.getJob.getId)
+//    } catch {
+//      case ex:Throwable=>
+//        Failure(ex)
+//    }
   }
 
   /**

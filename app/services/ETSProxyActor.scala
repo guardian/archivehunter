@@ -43,11 +43,11 @@ object ETSProxyActor {
     * private message dispatched when we need to find a pipeline
     * @param entry
     */
-  case class GetTranscodePipeline(entry:ArchiveEntry, scanTarget: ScanTarget, jobDesc:JobModel) extends ETSMsg
+  case class GetTranscodePipeline(entry:ArchiveEntry, targetProxyBucket:String, jobDesc:JobModel) extends ETSMsg
   /**
     * private message dispatched from a timer to check waiting pipelines
     */
-  case class CheckPipelinesStatus() extends ETSMsg
+  case object CheckPipelinesStatus extends ETSMsg
 
   case class WaitingOperation(entry:ArchiveEntry, jobDesc:JobModel, pipelineId:String)
 }
@@ -86,7 +86,7 @@ class ETSProxyActor @Inject() (implicit config:ArchiveHunterConfiguration, etsCl
     /**
       * timed message, check on the operations we have waiting and trigger any that are ready.
       */
-    case CheckPipelinesStatus()=>
+    case CheckPipelinesStatus=>
       if(pipelinesToCheck.nonEmpty){
         logger.info(s"Checking status on ${pipelinesToCheck.length} creating pipelines...")
         pipelinesToCheck = checkNextPipeline(pipelinesToCheck)
@@ -96,16 +96,16 @@ class ETSProxyActor @Inject() (implicit config:ArchiveHunterConfiguration, etsCl
     /** private message, find an appropriate pipeline for the parameters and trigger immediately if so;
       * otherwise start the pipeline creation process and check it regularly
       */
-    case GetTranscodePipeline(entry:ArchiveEntry, scanTarget:ScanTarget, jobDesc:JobModel)=>
+    case GetTranscodePipeline(entry:ArchiveEntry, targetProxyBucket:String, jobDesc:JobModel)=>
       logger.info(s"Looking for pipeline for $entry")
-      ProxyGenerators.findPipelineFor(entry.bucket, scanTarget.proxyBucket) match {
+      ProxyGenerators.findPipelineFor(entry.bucket, targetProxyBucket) match {
         case Failure(err)=>
           logger.error(s"Could not look up pipelines for $entry", err)
           sender() ! PreparationFailure(err)
         case Success(pipelines)=>
           if(pipelines.isEmpty){  //nothing present, so we must create a pipeline.
-            val newPipelineName = s"archivehunter_${entry.bucket}_${scanTarget.proxyBucket}"
-            ProxyGenerators.createEtsPipeline(newPipelineName, entry.bucket, scanTarget.proxyBucket) match {
+            val newPipelineName = s"archivehunter_${entry.bucket}_$targetProxyBucket"
+            ProxyGenerators.createEtsPipeline(newPipelineName, entry.bucket, targetProxyBucket) match {
               case Success(pipeline)=>
                 logger.info(s"Initiated creation of $newPipelineName, starting status check")
                 pipelinesToCheck = pipelinesToCheck ++ Seq(WaitingOperation(entry, jobDesc, pipeline.getId))
@@ -114,7 +114,7 @@ class ETSProxyActor @Inject() (implicit config:ArchiveHunterConfiguration, etsCl
                 sender() ! PreparationFailure(err)
             }
           } else {
-            logger.info(s"Found ${pipelines.length} potential pipelines for ${entry.bucket} -> ${scanTarget.proxyBucket}, using the first")
+            logger.info(s"Found ${pipelines.length} potential pipelines for ${entry.bucket} -> $targetProxyBucket, using the first")
             self ! GotTranscodePipeline(entry, jobDesc, pipelines.head.getId)
           }
       }
@@ -148,15 +148,15 @@ class ETSProxyActor @Inject() (implicit config:ArchiveHunterConfiguration, etsCl
                 Failure(new RuntimeException(dynamoError.toString))
               case _=>  //either None or Some(Right(thing)) indicate success
 
-                Success(jobDesc)
+                Success(Tuple2(jobDesc, targetProxyBucket))
             })
         }
       })
 
       val originalSender = sender()
       preparationFuture.map({
-        case Success(jobDesc)=>
-          self ! GetPipelineFor(entry, jobDesc)
+        case Success((jobDesc, targetProxyBucket))=>
+          self ! ETSProxyActor.GetTranscodePipeline(entry, targetProxyBucket, jobDesc)
         case Failure(err)=>
           logger.error("Could not prepare for transcode: ", err)
           sender ! PreparationFailure(err)
