@@ -53,7 +53,7 @@ object ETSProxyActor {
 }
 
 class ETSProxyActor @Inject() (implicit config:ArchiveHunterConfiguration, etsClientMgr: ETSClientManager, scanTargetDAO: ScanTargetDAO, jobModelDAO: JobModelDAO,
-     proxyLocationDAO: ProxyLocationDAO, ddbClientMgr:DynamoClientManager, actorSystem: ActorSystem) extends Actor{
+                            ddbClientMgr:DynamoClientManager, actorSystem: ActorSystem) extends Actor{
   import ETSProxyActor._
 
   implicit val ec:ExecutionContext = actorSystem.dispatcher
@@ -63,6 +63,8 @@ class ETSProxyActor @Inject() (implicit config:ArchiveHunterConfiguration, etsCl
   private implicit val logger = LogManager.getLogger(getClass)
 
   var pipelinesToCheck:Seq[WaitingOperation] = Seq()
+
+  implicit val proxyLocationDAO = new ProxyLocationDAO(config.get[String]("proxies.tableName"))
 
   protected def checkNextPipeline(moreToCheck:Seq[WaitingOperation], notReady:Seq[WaitingOperation]=Seq()):Seq[WaitingOperation] = {
     if(moreToCheck.isEmpty) return notReady
@@ -87,6 +89,7 @@ class ETSProxyActor @Inject() (implicit config:ArchiveHunterConfiguration, etsCl
       * timed message, check on the operations we have waiting and trigger any that are ready.
       */
     case CheckPipelinesStatus=>
+      logger.debug(s"CheckPipelinesStatus: ${pipelinesToCheck.length}")
       if(pipelinesToCheck.nonEmpty){
         logger.info(s"Checking status on ${pipelinesToCheck.length} creating pipelines...")
         pipelinesToCheck = checkNextPipeline(pipelinesToCheck)
