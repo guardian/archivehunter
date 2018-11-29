@@ -35,27 +35,27 @@
     <logger name="play" level="INFO" />
     <logger name="application" level="ERROR" />
 
-    <logger name="services.AppStartup" level="DEBUG"/>
+    <logger name="services.AppStartup" level="INFO"/>
     <logger name="services.BucketScanner" level="INFO"/>
-    <logger name="akka.cluster" level="DEBUG"/>
+    <logger name="akka.cluster" level="INFO"/>
     <logger name="helpers.S3ToArchiveEntryFlow" level="WARN"/>
     <logger name="helpers.SearchHitToArchiveEntryFlow" level="WARN"/>
     <logger name="helpers.ArchiveEntryVerifyFlow" level="WARN"/>
     <logger name="com.sksamuel.elastic4s.streams" level="WARN"/>
     <logger name="controllers.SearchController" level="INFO"/>
     <logger name="controllers.ScanTargetController" level="INFO"/>
-    <logger name="controllers.JobController" level="DEBUG"/>
+    <logger name="controllers.JobController" level="INFO"/>
 
-    <logger name="helpers.DDBSink" level="DEBUG"/>
-    <logger name="helpers.S3ToProxyLocationFlow" level="DEBUG"/>
-    <logger name="services.LegacyProxiesScanner" level="DEBUG"/>
+    <logger name="helpers.DDBSink" level="INFO"/>
+    <logger name="helpers.S3ToProxyLocationFlow" level="INFO"/>
+    <logger name="services.LegacyProxiesScanner" level="INFO"/>
 
-    <logger name="S3LocationSpec" level="DEBUG"/>
-    <logger name="helpers.ParanoidS3Source" level="DEBUG"/>
+    <logger name="S3LocationSpec" level="INFO"/>
+    <logger name="helpers.ParanoidS3Source" level="INFO"/>
     <logger name="helpers.S3XMLProcessor" level="INFO"/>
-    <logger name="helpers.HasThumbnailFilter" level="DEBUG"/>
-    <logger name="helpers.CreateProxySink" level="DEBUG"/>
-    <logger name="services.BulkThumbnailer" level="DEBUG"/>
+    <logger name="helpers.HasThumbnailFilter" level="INFO"/>
+    <logger name="helpers.CreateProxySink" level="INFO"/>
+    <logger name="services.BulkThumbnailer" level="INFO"/>
     <logger name="services.DynamoCapacityActor" level="INFO"/>
 
     <root level="WARN">/

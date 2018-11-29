@@ -12,7 +12,7 @@ Configuration:
     logger:
     -
       name: com.theguardian.multimedia.archivehunter.common.services.ProxyGenerators
-      level: debug
+      level: INFO
       additivity: false
       AppenderRef:
         ref: STDOUT
