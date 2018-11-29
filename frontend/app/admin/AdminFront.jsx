@@ -8,6 +8,7 @@ class AdminFront extends React.Component {
             <BreadcrumbComponent path={this.props.location.pathname}/>
             <ul>
                 <li><Link to="/admin/scanTargets">Scan Targets</Link></li>
+                <li><Link to="/admin/jobs">Jobs</Link></li>
             </ul>
         </div>
     }

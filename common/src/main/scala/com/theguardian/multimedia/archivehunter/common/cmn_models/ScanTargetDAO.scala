@@ -1,16 +1,15 @@
-package models
+package com.theguardian.multimedia.archivehunter.common.cmn_models
 
 import java.time.ZonedDateTime
 
 import akka.actor.ActorSystem
 import akka.stream.{ActorMaterializer, Materializer}
+import com.theguardian.multimedia.archivehunter.common.clientManagers.DynamoClientManager
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsync
 import com.gu.scanamo.error.DynamoReadError
 import com.gu.scanamo.{Scanamo, ScanamoAlpakka, Table}
-import com.theguardian.multimedia.archivehunter.common.ZonedDateTimeEncoder
-import helpers.{DynamoClientManager, ZonedTimeFormat}
-import javax.inject.Inject
-import play.api.{Configuration, Logger}
+import com.theguardian.multimedia.archivehunter.common.{ArchiveHunterConfiguration, ExtValueConverters, ZonedDateTimeEncoder}
+import javax.inject.{Inject, Singleton}
 
 import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
@@ -19,9 +18,14 @@ import scala.math._
 import io.circe.generic.auto._
 import io.circe.syntax._
 import com.gu.scanamo.syntax._
+import com.theguardian.multimedia.archivehunter.common.cmn_helpers.ZonedTimeFormat
+import org.apache.logging.log4j.LogManager
 
-class ScanTargetDAO @Inject() (config:Configuration, ddbClientMgr: DynamoClientManager)(implicit actorSystem:ActorSystem) extends ZonedDateTimeEncoder with ZonedTimeFormat {
-  private val logger = Logger(getClass)
+@Singleton
+class ScanTargetDAO @Inject()(config:ArchiveHunterConfiguration, ddbClientMgr: DynamoClientManager)(implicit actorSystem:ActorSystem)
+  extends ZonedDateTimeEncoder with ZonedTimeFormat with ExtValueConverters {
+  private val logger = LogManager.getLogger(getClass)
+
   val table = Table[ScanTarget](config.get[String]("externalData.scanTargets"))
   val maxRetries = config.getOptional[Int]("externalData.maxRetries").getOrElse(10)
   val initialRetryDelay = config.getOptional[Int]("externalData.initialRetryDelay").getOrElse(2)

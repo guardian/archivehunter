@@ -1,25 +1,21 @@
-package helpers
+package com.theguardian.multimedia.archivehunter.common.clientManagers
 
 import akka.actor.ActorSystem
-import akka.stream.{ActorMaterializer, Materializer}
+import akka.stream.Materializer
 import akka.stream.alpakka.s3.impl.ListBucketVersion2
 import akka.stream.alpakka.s3.scaladsl.S3Client
 import akka.stream.alpakka.s3.{MemoryBufferType, S3Settings}
-import com.amazonaws.auth.{AWSCredentialsProviderChain, ContainerCredentialsProvider, InstanceProfileCredentialsProvider}
 import com.amazonaws.auth.profile.ProfileCredentialsProvider
+import com.amazonaws.auth.{AWSCredentialsProviderChain, ContainerCredentialsProvider, InstanceProfileCredentialsProvider}
 import com.amazonaws.regions.AwsRegionProvider
 import com.amazonaws.services.s3.{AmazonS3, AmazonS3ClientBuilder}
+import com.theguardian.multimedia.archivehunter.common.ArchiveHunterConfiguration
 import javax.inject.{Inject, Singleton}
-import play.api.Configuration
 
 @Singleton
-class S3ClientManager @Inject() (config:Configuration) {
+class S3ClientManager @Inject() (config:ArchiveHunterConfiguration) extends ClientManagerBase[AmazonS3]{
 
-  def credentialsProvider(profileName:Option[String]=None) = new AWSCredentialsProviderChain(
-    new ProfileCredentialsProvider(profileName.getOrElse("default")),
-    new ContainerCredentialsProvider(),
-    new InstanceProfileCredentialsProvider()
-  )
+  override def getClient(profileName:Option[String]=None): AmazonS3 = getS3Client(profileName)
 
   def getS3Client(profileName:Option[String]=None):AmazonS3 =
     AmazonS3ClientBuilder.standard().withCredentials(credentialsProvider(profileName)).build()

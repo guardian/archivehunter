@@ -3,11 +3,14 @@ import PropTypes from 'prop-types';
 import EntryPreview from './EntryPreview.jsx';
 import EntryThumbnail from './EntryThumbnail.jsx';
 import FileSizeView from './FileSizeView.jsx';
+import EntryJobs from "./EntryJobs.jsx";
 
 class EntryDetails extends React.Component {
     static propTypes = {
         entry: PropTypes.object.isRequired,
-        autoPlay: PropTypes.boolean
+        autoPlay: PropTypes.boolean,
+        showJobs: PropTypes.boolean,
+        loadJobs: PropTypes.boolean
     };
 
     extractFileInfo(fullpath){
@@ -40,6 +43,10 @@ class EntryDetails extends React.Component {
                               mimeType={this.props.entry.mimeType}
                               autoPlay={this.props.autoPlay}
                 />
+
+            {
+                this.props.showJobs ? <EntryJobs entryId={this.props.entry.id} loadImmediate={this.props.loadJobs}/> : ""
+            }
 
                 <table className="metadata-table">
                     <tbody>

@@ -2,11 +2,11 @@ package controllers
 
 import akka.actor.ActorSystem
 import akka.stream.{ActorMaterializer, Materializer}
+import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager}
 import com.amazonaws.HttpMethod
 import com.amazonaws.services.s3.model.GeneratePresignedUrlRequest
 import com.gu.scanamo.{ScanamoAlpakka, Table}
 import com.theguardian.multimedia.archivehunter.common._
-import helpers.{DynamoClientManager, ESClientManager, ProxyLocator, S3ClientManager}
 import javax.inject.{Inject, Singleton}
 import play.api.{Configuration, Logger}
 import play.api.libs.circe.Circe
@@ -17,15 +17,19 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import io.circe.generic.auto._
 import io.circe.syntax._
 import com.gu.scanamo.syntax._
-import com.sun.org.apache.xerces.internal.xs.datatypes.ObjectList
-import models.ScanTargetDAO
+import com.theguardian.multimedia.archivehunter.common.errors.{ExternalSystemError, NothingFoundError}
+import com.theguardian.multimedia.archivehunter.common.cmn_models.{JobModelDAO, ScanTargetDAO}
+import helpers.ProxyLocator
+import models._
+import services.ProxyGenerators
 
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
 @Singleton
-class ProxiesController @Inject()(config:Configuration, cc:ControllerComponents, ddbClientMgr: DynamoClientManager, esClientMgr:ESClientManager, s3ClientMgr:S3ClientManager)
-                                 (implicit actorSystem:ActorSystem, scanTargetDAO:ScanTargetDAO)
+class ProxiesController @Inject()(config:Configuration, cc:ControllerComponents, ddbClientMgr: DynamoClientManager,
+                                  esClientMgr:ESClientManager, s3ClientMgr:S3ClientManager, proxyGenerators: ProxyGenerators)
+                                 (implicit actorSystem:ActorSystem, scanTargetDAO:ScanTargetDAO, jobModelDAO:JobModelDAO)
   extends AbstractController(cc) with Circe with ProxyLocationEncoder {
   implicit private val mat:Materializer = ActorMaterializer.create(actorSystem)
   private val logger=Logger(getClass)
@@ -39,20 +43,30 @@ class ProxiesController @Inject()(config:Configuration, cc:ControllerComponents,
     try {
       val ddbClient = ddbClientMgr.getNewAlpakkaDynamoClient(awsProfile)
 
-      val actualType = proxyType match {
-        case None=>"VIDEO"
-        case Some(t)=>t.toUpperCase
-      }
+      proxyType match {
+        case None=>
+          ScanamoAlpakka.exec(ddbClient)(table.query('fileId->fileId)).map(result=>{
+            val failures = result.collect({case Left(err)=>err})
+            if(failures.nonEmpty){
+              logger.error(s"Could not look up proxy for $fileId: $failures")
+              InternalServerError(GenericErrorResponse("error",failures.map(_.toString).mkString(", ")).asJson)
+            } else {
+              val output = result.collect({case Right(entry)=>entry})
 
-      ScanamoAlpakka.exec(ddbClient)(
-        table.get('fileId->fileId and ('proxyType->actualType))
-      ).map({
-        case None=>NotFound(GenericErrorResponse("not_found","No proxy was registered").asJson)
-        case Some(Left(err))=>
-          logger.error(s"Could not look up proxy for $fileId: ${err.toString}")
-          InternalServerError(GenericErrorResponse("db_error", err.toString).asJson)
-        case Some(Right(entry))=>Ok(ObjectGetResponse("ok","proxy_location",entry).asJson)
-      })
+              Ok(ObjectListResponse("ok","proxy_location",output, output.length).asJson)
+            }
+          })
+        case Some(t)=>
+          ScanamoAlpakka.exec(ddbClient)(table.get('fileId->fileId and ('proxyType->t.toUpperCase))).map({
+            case None=>
+              NotFound(GenericErrorResponse("not_found","No proxy was registered").asJson)
+            case Some(Left(err))=>
+              logger.error(s"Could not look up proxy for $fileId: ${err.toString}")
+              InternalServerError(GenericErrorResponse("db_error", err.toString).asJson)
+            case Some(Right(items))=>
+              Ok(responses.ObjectGetResponse("ok","proxy_location",items).asJson)
+          })
+      }
 
     } catch {
       case ex:Throwable=>
@@ -92,6 +106,10 @@ class ProxiesController @Inject()(config:Configuration, cc:ControllerComponents,
           val result = s3client.generatePresignedUrl(rq)
           Ok(PlayableProxyResponse("ok",result.toString,mimeType).asJson)
       })
+    } catch {
+      case ex:Throwable=>
+        logger.error(s"Could not get playable $proxyType for $fileId", ex)
+        Future(InternalServerError(GenericErrorResponse("error",ex.toString).asJson))
     }
   }
   /**
@@ -112,6 +130,11 @@ class ProxiesController @Inject()(config:Configuration, cc:ControllerComponents,
     })
 
     resultFuture
+        .map(potentialProxiesResult=>{
+          val failures = potentialProxiesResult.collect({case Left(err)=>err})
+          if(failures.nonEmpty) throw new RuntimeException("Failed to get potential proxies")
+          potentialProxiesResult.collect({case Right(potentialProxy)=>potentialProxy})
+        })
       .map(potentialProxies=>{
         if(potentialProxies.length==1){
           //if we have an unambigous map, save it right away.
@@ -149,9 +172,9 @@ class ProxiesController @Inject()(config:Configuration, cc:ControllerComponents,
       case Some(fileId) =>
         val proxyLocationFuture = proxyLocationDAO.getProxyByProxyId(proxyId).flatMap({
           case None => //no proxy with this ID in the database yet; do an S3 scan to try to find the requested id
-            indexer.getById(fileId).flatMap(entry => {
-              ProxyLocator.findProxyLocation(entry)
-            }).map(_.find(_.proxyId == proxyId))
+            val potentialProxyOrErrorList = indexer.getById(fileId).flatMap(ProxyLocator.findProxyLocation(_))
+            potentialProxyOrErrorList.map(_.collect({case Right(loc)=>loc})).map(_.find(_.proxyId==proxyId))
+
           case Some(proxyLocation) => //found it in the database
             Future(Some(proxyLocation.copy(fileId = fileId)))
         })
@@ -171,5 +194,16 @@ class ProxiesController @Inject()(config:Configuration, cc:ControllerComponents,
             InternalServerError(GenericErrorResponse("error", ex.toString).asJson)
         })
     }
+  }
+
+  def generateThumbnail(fileId:String) = Action.async {
+    proxyGenerators.createThumbnailProxy(fileId).map({
+      case Failure(NothingFoundError(objectType, msg))=>
+        NotFound(GenericErrorResponse("not_found", msg.toString).asJson)
+      case Failure(ExternalSystemError(systemName, msg))=>
+        InternalServerError(GenericErrorResponse("error",s"Could not launch task: $msg").asJson)
+      case Success(taskId)=>
+        Ok(responses.ObjectGetResponse("ok","task",taskId).asJson)
+    })
   }
 }

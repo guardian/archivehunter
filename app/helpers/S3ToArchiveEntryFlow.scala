@@ -6,6 +6,7 @@ import akka.stream.{Attributes, FlowShape, Inlet, Outlet}
 import akka.stream.alpakka.s3.scaladsl._
 import akka.stream.scaladsl._
 import akka.stream.stage.{AbstractInHandler, AbstractOutHandler, GraphStage, GraphStageLogic}
+import com.theguardian.multimedia.archivehunter.common.clientManagers.S3ClientManager
 import com.amazonaws.services.s3.{AmazonS3, AmazonS3Client}
 import com.theguardian.multimedia.archivehunter.common.ArchiveEntry
 import javax.inject.Inject
@@ -13,7 +14,6 @@ import play.api.{Configuration, Logger}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-
 import scala.concurrent.{Await, Future}
 
 class S3ToArchiveEntryFlow @Inject() (s3ClientMgr: S3ClientManager, config:Configuration) extends GraphStage[FlowShape[ListBucketResultContents, ArchiveEntry]] {

@@ -8,6 +8,7 @@ import akka.actor.{Actor, ActorSystem, Timers}
 import akka.http.scaladsl.Http
 import akka.stream.scaladsl.{GraphDSL, Keep, RunnableGraph, Sink, Source}
 import akka.stream.{ActorMaterializer, ClosedShape, KillSwitches, Materializer}
+import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager}
 import com.amazonaws.regions.{Region, Regions}
 import com.google.inject.Injector
 import com.gu.scanamo.{ScanamoAlpakka, Table}
@@ -15,10 +16,11 @@ import com.sksamuel.elastic4s.http.HttpClient
 import com.sksamuel.elastic4s.http.bulk.BulkResponseItem
 import helpers._
 import javax.inject.Inject
-import models.{ScanTarget, ScanTargetDAO}
+import com.theguardian.multimedia.archivehunter.common.cmn_models.{ScanTarget, ScanTargetDAO}
 import play.api.{Configuration, Logger}
 import com.sksamuel.elastic4s.streams.ReactiveElastic._
 import com.sksamuel.elastic4s.streams.{RequestBuilder, ResponseListener, SubscriberConfig}
+import com.theguardian.multimedia.archivehunter.common.cmn_helpers.ZonedTimeFormat
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ArchiveEntryRequestBuilder}
 
 import scala.concurrent.{Await, ExecutionContext, Future, Promise}

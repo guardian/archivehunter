@@ -1,4 +1,4 @@
-package helpers
+package com.theguardian.multimedia.archivehunter.common.cmn_helpers
 
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
