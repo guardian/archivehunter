@@ -563,7 +563,7 @@ Resources:
           akka.remote {
             log-remote-lifecycle-events = on
             netty.tcp {
-              hostname = "${!HOSTNAME}"
+              hostname = "${!LOCAL_IP}"
               port = 2552
             }
           }
@@ -571,7 +571,7 @@ Resources:
           akka.management {
             http {
               hostname = "127.0.0.1"
-              hostname = ${!HOSTNAME}
+              hostname = "${!LOCAL_IP}"
               bind-hostname = "0.0.0.0"
               port = 8558
               bind-port = 8558
