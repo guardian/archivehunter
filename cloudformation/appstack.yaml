@@ -578,6 +578,7 @@ Resources:
             }
 
             cluster {
+              auto-down-unreachable-after = 30s
               bootstrap {
                 contact-point-discovery {
                   service-name = "${Stack}-${App}-${Stage}"
