@@ -15,6 +15,7 @@ lazy val commonSettings = Seq(
     "org.apache.logging.log4j" % "log4j-api" % "2.8.2",
     "org.scala-lang.modules" %% "scala-java8-compat" % "0.8.0",
     "com.amazonaws" % "aws-java-sdk-s3" % awsSdkVersion,
+    "com.amazonaws" % "aws-java-sdk-elastictranscoder"% awsSdkVersion,
     "com.dripower" %% "play-circe" % "2610.0",
     "com.sksamuel.elastic4s" %% "elastic4s-http" % elastic4sVersion,
     "com.sksamuel.elastic4s" %% "elastic4s-circe" % elastic4sVersion,
@@ -46,6 +47,7 @@ lazy val `archivehunter` = (project in file("."))
       "com.sksamuel.elastic4s" %% "elastic4s-testkit" % elastic4sVersion % "test",
       "com.sksamuel.elastic4s" %% "elastic4s-embedded" % elastic4sVersion % "test",
       "com.typesafe.akka" %% "akka-cluster-tools" % akkaVersion,
+      "com.lightbend.akka.management" %% "akka-management-cluster-bootstrap" % "0.20.0",
       "com.lightbend.akka.discovery" %% "akka-discovery-aws-api" % "0.18.0",
       "com.typesafe.akka" %% "akka-cluster" % akkaVersion,
       "com.typesafe.akka" %% "akka-cluster-metrics" % akkaVersion,
@@ -56,6 +58,7 @@ lazy val `archivehunter` = (project in file("."))
       "com.typesafe.akka" %% "akka-testkit" % akkaVersion,
       jdbc, ehcache, ws)
   )
+
 
 val lambdaDeps = Seq(
   "com.amazonaws" % "aws-lambda-java-log4j2" % "1.0.0"
