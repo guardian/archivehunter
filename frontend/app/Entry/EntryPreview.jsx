@@ -45,8 +45,6 @@ class EntryPreview extends React.Component {
     }
 
     bestAvailablePreview(proxyTypes){
-        console.log("bestAvailablePreview", proxyTypes);
-
         if(proxyTypes.includes("VIDEO")) return "VIDEO";
         if(proxyTypes.includes("AUDIO")) return "AUDIO";
         if(proxyTypes.includes("POSTER")) return "POSTER";
@@ -68,7 +66,6 @@ class EntryPreview extends React.Component {
     }
 
     componentWillMount(){
-        console.log(this);
         this.updateData();
     }
 
