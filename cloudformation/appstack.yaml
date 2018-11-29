@@ -432,6 +432,26 @@ Resources:
       Roles:
       - !Ref InstanceRole
 
+  #Akka clustering - let all instances within `InstanceSecurityGroup` talk to each other
+  InstanceSGIngressRemoting:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      SourceSecurityGroupId: !GetAtt InstanceSecurityGroup.GroupId
+      FromPort: 2552
+      ToPort: 2552
+      IpProtocol: tcp
+      GroupId: !GetAtt InstanceSecurityGroup.GroupId
+
+  #Akka clustering - let all instances within `InstanceSecurityGroup` talk to each other
+  InstanceSGIngressAkkaMgt:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      SourceSecurityGroupId: !GetAtt InstanceSecurityGroup.GroupId
+      FromPort: 8558
+      ToPort: 8558
+      IpProtocol: tcp
+      GroupId: !GetAtt InstanceSecurityGroup.GroupId
+
   InstanceSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -445,10 +465,6 @@ Resources:
       - CidrIp: !Ref OfficeIpRange
         FromPort: 22
         ToPort: 22
-        IpProtocol: tcp
-      - CidrIp: !Ref OfficeIpRange #FIXME: need to use a SecurityGroupIngres to avoid circular dependency
-        FromPort: 2552
-        ToPort: 2552
         IpProtocol: tcp
 
   LaunchConfig:
@@ -547,16 +563,26 @@ Resources:
           akka.remote {
             log-remote-lifecycle-events = on
             netty.tcp {
-              hostname = "${!HOSTNAME}"
+              hostname = "${!LOCAL_IP}"
               port = 2552
             }
           }
 
-          akka.management.cluster {
-            bootstrap {
-              contact-point-discovery {
-                service-name = "${Stack}-${App}-${Stage}"
-                discovery-method = akka.discovery.aws-api-ec2-tag-based
+          akka.management {
+            http {
+              hostname = "127.0.0.1"
+              hostname = "${!LOCAL_IP}"
+              bind-hostname = "0.0.0.0"
+              port = 8558
+              bind-port = 8558
+            }
+
+            cluster {
+              bootstrap {
+                contact-point-discovery {
+                  service-name = "${Stack}-${App}-${Stage}"
+                  discovery-method = akka.discovery.aws-api-ec2-tag-based
+                }
               }
             }
           }
@@ -569,6 +595,9 @@ Resources:
               tag-key = "service"
             }
           }
+
+          # Enable metrics extension in akka-cluster-metrics.
+          akka.extensions=["akka.cluster.metrics.ClusterMetricsExtension"]
           EOF
 
           cat > /etc/default/archivehunter << EOF
