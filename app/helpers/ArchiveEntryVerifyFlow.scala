@@ -3,6 +3,7 @@ package helpers
 import akka.stream.{Attributes, FlowShape, Inlet, Outlet}
 import akka.stream.alpakka.s3.scaladsl.ListBucketResultContents
 import akka.stream.stage.{AbstractInHandler, AbstractOutHandler, GraphStage, GraphStageLogic}
+import com.theguardian.multimedia.archivehunter.common.clientManagers.S3ClientManager
 import com.amazonaws.services.s3.AmazonS3
 import com.theguardian.multimedia.archivehunter.common.ArchiveEntry
 import javax.inject.Inject

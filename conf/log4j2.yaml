@@ -1,0 +1,22 @@
+Configuration:
+  status: warn
+  name: YAMLConfigTest
+  thresholdFilter:
+    level: debug
+  appenders:
+    Console:
+      name: STDOUT
+      PatternLayout:
+        Pattern: "%m%n"
+  Loggers:
+    logger:
+    -
+      name: com.theguardian.multimedia.archivehunter.common.services.ProxyGenerators
+      level: INFO
+      additivity: false
+      AppenderRef:
+        ref: STDOUT
+    Root:
+      level: error
+      AppenderRef:
+        ref: STDOUT

@@ -4,6 +4,7 @@ import com.amazonaws.services.s3.event.S3EventNotification
 import com.amazonaws.services.s3.event.S3EventNotification.S3ObjectEntity
 import com.amazonaws.services.s3.model.S3Object
 import com.amazonaws.services.s3.{AmazonS3, AmazonS3ClientBuilder}
+import com.google.inject.Guice
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer, MimeType}
 import org.apache.logging.log4j.LogManager
 import com.sksamuel.elastic4s.ElasticsearchClientUri
@@ -19,6 +20,8 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 class InputLambdaMain extends RequestHandler[S3Event, Unit] {
   private final val logger = LogManager.getLogger(getClass)
+
+  private val injector = Guice.createInjector(new Module)
 
   /**
     * these are extracted out as individual accessors to make over-riding them easier in unit tests

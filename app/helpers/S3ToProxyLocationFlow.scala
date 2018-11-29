@@ -3,6 +3,7 @@ package helpers
 import akka.stream.alpakka.s3.scaladsl._
 import akka.stream.stage.{AbstractInHandler, AbstractOutHandler, GraphStage, GraphStageLogic}
 import akka.stream.{Attributes, FlowShape, Inlet, Outlet}
+import com.theguardian.multimedia.archivehunter.common.clientManagers.S3ClientManager
 import com.amazonaws.services.s3.AmazonS3
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ProxyLocation}
 import javax.inject.Inject
@@ -43,7 +44,13 @@ class S3ToProxyLocationFlow (s3ClientMgr: S3ClientManager, config:Configuration,
               logger.debug("waiting for output port to be available")
               Thread.sleep(500L)
             }
-            push(out, mappedElem)
+            mappedElem match {
+              case Right(el)=>push(out, el)
+              case Left(err)=>
+                logger.error(s"could not map element: $err")
+                pull(in)
+            }
+
           } catch {
             case ex:Throwable=>
               logger.error(s"Could not create ProxyLocation: ", ex)

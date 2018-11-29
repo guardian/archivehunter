@@ -3,12 +3,13 @@ package services
 import akka.actor.{Actor, ActorSystem, Cancellable}
 import akka.stream.scaladsl.{Keep, Source}
 import akka.stream.{ActorMaterializer, KillSwitches}
+import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager}
 import com.amazonaws.services.dynamodbv2.model._
 import com.google.inject.Injector
 import com.theguardian.multimedia.archivehunter.common.ProxyLocation
 import helpers._
 import javax.inject.Inject
-import models.{ScanTarget, ScanTargetDAO}
+import com.theguardian.multimedia.archivehunter.common.cmn_models.{ScanTarget, ScanTargetDAO}
 import play.api.{Configuration, Logger}
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
@@ -173,8 +174,8 @@ class LegacyProxiesScanner @Inject()(config:Configuration, ddbClientMgr:DynamoCl
 
         //keySource.via(converter).log("legacy-proxies-scanner").via(eosDetect).to(ddbSink).run()
         searchHitSource
-          .via(archiveEntryConverter)
-          .via(proxyLocator)
+          .via(archiveEntryConverter.async)
+          .via(proxyLocator.async)
           .via(eosDetect)
           .log("proxies-scanner")
           .to(ddbSink)

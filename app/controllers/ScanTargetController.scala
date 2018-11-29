@@ -8,25 +8,28 @@ import akka.stream.{ActorMaterializer, Materializer}
 import com.gu.scanamo._
 import com.gu.scanamo.syntax._
 import com.theguardian.multimedia.archivehunter.common.ZonedDateTimeEncoder
-import helpers.{DynamoClientManager, ZonedTimeFormat}
-import javax.inject.{Inject, Named}
+import javax.inject.{Inject, Named, Singleton}
 import play.api.{Configuration, Logger}
 import play.api.mvc._
 import io.circe.generic.auto._
 import io.circe.syntax._
-import models.ScanTarget
 import play.api.libs.circe.Circe
 import responses.{GenericErrorResponse, ObjectCreatedResponse, ObjectGetResponse, ObjectListResponse}
 import akka.stream.alpakka.dynamodb.scaladsl._
 import akka.stream.alpakka.dynamodb.impl._
+import com.theguardian.multimedia.archivehunter.common.clientManagers.DynamoClientManager
 import com.amazonaws.auth.{AWSStaticCredentialsProvider, InstanceProfileCredentialsProvider}
-import services.{BucketScanner, LegacyProxiesScanner}
+import com.theguardian.multimedia.archivehunter.common.cmn_helpers.ZonedTimeFormat
+import com.theguardian.multimedia.archivehunter.common.cmn_models.ScanTarget
+import services.{BucketScanner, BulkThumbnailer, LegacyProxiesScanner}
 
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 
+@Singleton
 class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner:ActorRef,
                                       @Named("legacyProxiesScannerActor") proxyScanner:ActorRef,
+                                      @Named("bulkThumbnailerActor") bulkThumbnailer: ActorRef,
                                       config:Configuration,
                                       cc:ControllerComponents,ddbClientMgr:DynamoClientManager)(implicit system:ActorSystem)
   extends AbstractController(cc) with Circe with ZonedDateTimeEncoder with ZonedTimeFormat {
@@ -37,9 +40,12 @@ class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner
 
   private val profileName = config.getOptional[String]("externalData.awsProfile")
 
+  private val conventionalClient = ddbClientMgr.getNewDynamoClient(profileName)
+  private val alpakkaClient = ddbClientMgr.getNewAlpakkaDynamoClient(config.getOptional[String]("externalData.awsProfile"))
+
   def newTarget = Action(circe.json[ScanTarget]) { scanTarget=>
     logger.debug(scanTarget.body.toString)
-    Scanamo.exec(ddbClientMgr.getNewDynamoClient(profileName))(table.put(scanTarget.body)).map({
+    Scanamo.exec(conventionalClient)(table.put(scanTarget.body)).map({
       case Left(writeError)=>
         InternalServerError(GenericErrorResponse("error",writeError.toString).asJson)
       case Right(createdScanTarget)=>
@@ -62,8 +68,6 @@ class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner
   }
 
   def listScanTargets = Action.async {
-    val alpakkaClient = ddbClientMgr.getNewAlpakkaDynamoClient(config.getOptional[String]("externalData.awsProfile"))
-
     ScanamoAlpakka.exec(alpakkaClient)(table.scan()).map({ result=>
       val errors = result.collect({
         case Left(readError)=>readError
@@ -81,7 +85,7 @@ class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner
     })
   }
 
-  private def withLookup(targetName:String)(block: ScanTarget=>Result) = Scanamo.exec(ddbClientMgr.getNewDynamoClient(profileName))(table.get('bucketName -> targetName )).map({
+  private def withLookup(targetName:String)(block: ScanTarget=>Result) = Scanamo.exec(conventionalClient)(table.get('bucketName -> targetName )).map({
     case Left(error)=>
       InternalServerError(GenericErrorResponse("error", error.toString).asJson)
     case Right(tgt)=>
@@ -113,6 +117,13 @@ class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner
     withLookup(targetName) { tgt=>
       proxyScanner ! new LegacyProxiesScanner.ScanBucket(tgt)
       Ok(GenericErrorResponse("ok","scan started").asJson)
+    }
+  }
+
+  def genProxies(targetName:String) = Action {
+    withLookup(targetName) { tgt=>
+      bulkThumbnailer ! new BulkThumbnailer.DoThumbnails(tgt)
+      Ok(GenericErrorResponse("ok","proxy run started").asJson)
     }
   }
 }

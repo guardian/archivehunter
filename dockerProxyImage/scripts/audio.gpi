@@ -1,0 +1,17 @@
+#This is a GNU plot configuration
+
+set term png size 640,360 transparent truecolor  #want png output
+set output "/tmp/audio.png"
+set yr [-1:1]   #set Y range
+
+#only plot the data
+unset key
+unset tics
+unset border
+set lmargin 0
+set rmargin 0
+set tmargin 0
+set bmargin 0
+
+plot "/tmp/audio_only.dat" with lines lt rgb "grey"
+

@@ -2,9 +2,10 @@ package helpers
 
 import akka.stream.{Attributes, FlowShape, Inlet, Outlet}
 import akka.stream.stage.{AbstractInHandler, AbstractOutHandler, GraphStage, GraphStageLogic}
+import com.theguardian.multimedia.archivehunter.common.clientManagers.S3ClientManager
+import com.theguardian.multimedia.archivehunter.common.cmn_models.ScanTargetDAO
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ProxyLocation}
 import javax.inject.Inject
-import models.ScanTargetDAO
 import play.api.{Configuration, Logger}
 
 import scala.concurrent.Await
@@ -28,7 +29,10 @@ class ProxyLocatorFlow @Inject() (playConfig:Configuration, s3ClientManager: S3C
         val elem = grab(in)
         logger.debug(s"Got archive entry $elem")
 
-        val potentialProxyLocations = Await.result(ProxyLocator.findProxyLocation(elem), 10 seconds)
+        val potentialProxyLocationsResult = Await.result(ProxyLocator.findProxyLocation(elem), 10 seconds)
+
+        val potentialProxyLocations = potentialProxyLocationsResult.collect({case Right(thing)=>thing})
+
         logger.debug(s"Got $potentialProxyLocations for $elem")
         if(potentialProxyLocations.isEmpty){
           logger.info(s"Could not find any potential proxies for ${elem.bucket}/${elem.path}")

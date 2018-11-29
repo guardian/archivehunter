@@ -11,14 +11,15 @@ import FrontPage from './FrontPage.jsx';
 import TopMenu from './TopMenu.jsx';
 import AdminFront from './admin/AdminFront.jsx';
 import BasicSearchComponent from './search/BasicSearchComponent.jsx';
+import JobsList from './JobsList/JobsList.jsx';
 
 import { library } from '@fortawesome/fontawesome-svg-core'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faStroopwafel, faCheckCircle, faTimesCircle, faRoad, faSearch,faThList,faWrench, faLightbulb, faFolderPlus, faFolderMinus, faFolder } from '@fortawesome/free-solid-svg-icons'
-import { faChevronCircleDown,faChevronCircleRight,faTrashAlt, faFilm, faVolumeUp,faImage, faFile } from '@fortawesome/free-solid-svg-icons'
+import { faChevronCircleDown,faChevronCircleRight,faTrashAlt, faFilm, faVolumeUp,faImage, faFile, faClock, faRunning, faExclamationTriangle} from '@fortawesome/free-solid-svg-icons'
 
 library.add(faStroopwafel, faCheckCircle, faTimesCircle, faRoad,faSearch,faThList,faWrench, faLightbulb, faChevronCircleDown, faChevronCircleRight, faTrashAlt, faFolderPlus, faFolderMinus, faFolder);
-library.add(faFilm, faVolumeUp, faImage, faFilm, faFile);
+library.add(faFilm, faVolumeUp, faImage, faFile, faClock, faRunning, faExclamationTriangle);
 window.React = require('react');
 
 class App extends React.Component {
@@ -39,6 +40,8 @@ class App extends React.Component {
         return <div>
             <TopMenu visible={true} isAdmin={true}/>
             <Switch>
+                <Route path="/admin/jobs/:jobid" component={JobsList}/>
+                <Route path="/admin/jobs" component={JobsList}/>
                 <Route path="/admin/scanTargets/:id" component={ScanTargetEdit}/> /*this also handles "new" */
                 <Route path="/admin/scanTargets" component={ScanTargetsList}/>
                 <Route path="/admin" exact={true} component={AdminFront}/>
