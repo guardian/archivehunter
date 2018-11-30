@@ -48,6 +48,7 @@ lazy val `archivehunter` = (project in file("."))
       "com.sksamuel.elastic4s" %% "elastic4s-testkit" % elastic4sVersion % "test",
       "com.sksamuel.elastic4s" %% "elastic4s-embedded" % elastic4sVersion % "test",
       "com.typesafe.akka" %% "akka-cluster-tools" % akkaVersion,
+      "com.lightbend.akka" %% "akka-management-cluster-http" % "0.6",
       "com.lightbend.akka.management" %% "akka-management-cluster-bootstrap" % "0.20.0",
       "com.lightbend.akka.discovery" %% "akka-discovery-dns" % "0.20.0",
       "com.lightbend.akka.discovery" %% "akka-discovery-kubernetes-api" % "0.20.0",
