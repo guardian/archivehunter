@@ -5,7 +5,7 @@ import java.util.UUID
 
 import akka.actor.{Actor, ActorSystem}
 import akka.stream.{ActorMaterializer, Materializer}
-import com.amazonaws.services.elastictranscoder.model.{CreateJobOutput, CreateJobRequest, JobInput, Pipeline}
+import com.amazonaws.services.elastictranscoder.model._
 import com.amazonaws.services.sqs.model.{DeleteMessageRequest, ReceiveMessageRequest}
 import com.theguardian.multimedia.archivehunter.common.clientManagers._
 import com.theguardian.multimedia.archivehunter.common.cmn_models._
@@ -225,6 +225,7 @@ class ETSProxyActor @Inject() (implicit config:ArchiveHunterConfiguration,
     true
   }
 
+
   override def receive:Receive = {
     /**
       * timed message, check on the operations we have waiting and trigger any that are ready.
@@ -331,22 +332,27 @@ class ETSProxyActor @Inject() (implicit config:ArchiveHunterConfiguration,
         case _=>throw new RuntimeException(s"Request for incompatible proxy type $proxyType")
       }
 
-      val rq = new CreateJobRequest()
-        .withInput(new JobInput().withKey(entry.path))
-          .withOutput(new CreateJobOutput().withKey(entry.path).withPresetId(presetId))
-          .withPipelineId(pipelineId)
-          .withUserMetadata(Map("archivehunter-job-id"->jobDesc.jobId, "archivehunter-source-id"->entry.id).asJava)
+      ProxyGenerators.outputFilenameFor(presetId, entry.path) match {
+        case Failure(err) =>
+          logger.error(s"Could not look up preset ID $presetId", err)
+        case Success(outputPath) =>
+          val rq = new CreateJobRequest()
+            .withInput(new JobInput().withKey(entry.path))
+            .withOutput(new CreateJobOutput().withKey(outputPath).withPresetId(presetId))
+            .withPipelineId(pipelineId)
+            .withUserMetadata(Map("archivehunter-job-id" -> jobDesc.jobId, "archivehunter-source-id" -> entry.id).asJava)
 
-      try {
-        val result = etsClient.createJob(rq)
-        val destinationUrl = s"s3://${}"
-        val updatedJobDesc = jobDesc.copy(transcodeInfo = Some(TranscodeInfo(transcodeId=result.getJob.getId,destinationBucket = targetProxyBucket,proxyType=proxyType)))
-        jobModelDAO.putJob(updatedJobDesc)
-        //we stop tracking the job here; rely on data coming back via the message queue to inform us what is happening
-        logger.info(s"Started transcode for ${entry.path} with ID ${result.getJob.getId}")
-      } catch {
-        case ex:Throwable=>
-          logger.error("Could not create proxy job: ", ex)
+          try {
+            val result = etsClient.createJob(rq)
+            val destinationUrl = s"s3://${}"
+            val updatedJobDesc = jobDesc.copy(transcodeInfo = Some(TranscodeInfo(transcodeId = result.getJob.getId, destinationBucket = targetProxyBucket, proxyType = proxyType)))
+            jobModelDAO.putJob(updatedJobDesc)
+            //we stop tracking the job here; rely on data coming back via the message queue to inform us what is happening
+            logger.info(s"Started transcode for ${entry.path} with ID ${result.getJob.getId}")
+          } catch {
+            case ex: Throwable =>
+              logger.error("Could not create proxy job: ", ex)
+          }
       }
 
     case CreateMediaProxy(entry, proxyType)=>

@@ -123,6 +123,28 @@ object ProxyGenerators {
       result.getPipeline
     }
   }
+
+  private val extensionExtractor = "^(.*)\\.([^\\.]+)$".r
+
+  /**
+    * check the provided preset ID to get the container format, and use this to put the correct file extension onto the input path
+    * @param presetId preset ID that will be used
+    * @param inputPath bucket path to the input media
+    * @return the output path, if we could get the preset. Otherwise a Failure with the ETS exception.
+    */
+  def outputFilenameFor(presetId:String,inputPath:String)(implicit etsClient:AmazonElasticTranscoder, logger:Logger):Try[String] = Try {
+    val rq = new ReadPresetRequest().withId(presetId)
+    val presetResult = etsClient.readPreset(rq)
+    val properExtension = presetResult.getPreset.getContainer
+    logger.debug(s"Extension for ${presetResult.getPreset.getDescription} ($presetId) is $properExtension")
+
+    inputPath match {
+      case extensionExtractor(barePath:String,xtn:String)=>
+        barePath + "." + properExtension
+      case _=>
+        inputPath + "." + properExtension
+    }
+  }
 }
 
 class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration, esClientMgr: ESClientManager, s3ClientMgr: S3ClientManager,
