@@ -76,6 +76,10 @@ Parameters:
     Description: Docker path to the image used for proxying.
     Type: String
     Default: guardianmultimedia/archivehunter-proxying:90
+  VideoTranscodingPresetId:
+    Description: ETS Preset ID to use when transcoding video proxies
+    Type: String
+    Default: 1387374611767-d52fja
 
 Resources:
   AccessorSG: #this group is exported and used by bucketmonitor yaml. defined here so that it can be marked for access to ES
@@ -610,6 +614,15 @@ Resources:
             #this should match the container name in ProxyingTaskDefinition
             taskContainerName = "${Stack}-${App}Proxy-${Stage}"
             appServerUrl = "https://${LoadBalancer.DNSName}"
+
+            completionNotification = "${TranscodeUpdateTopic}"
+            errorNotification = "${TranscodeUpdateTopic}"
+            warningNotification = "${TranscodeUpdateTopic}"
+
+            transcodingRole = "${TranscodingRole.Arn}"
+
+            notificationsQueue = "${TranscodeUpdateMsg.Arn}"
+            videoPresetId = "${VideoTranscodingPresetId}"
           }
 
           ecs {
