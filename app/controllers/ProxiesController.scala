@@ -1,13 +1,13 @@
 package controllers
 
-import akka.actor.ActorSystem
+import akka.actor.{ActorRef, ActorSystem}
 import akka.stream.{ActorMaterializer, Materializer}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager}
 import com.amazonaws.HttpMethod
 import com.amazonaws.services.s3.model.GeneratePresignedUrlRequest
 import com.gu.scanamo.{ScanamoAlpakka, Table}
 import com.theguardian.multimedia.archivehunter.common._
-import javax.inject.{Inject, Singleton}
+import javax.inject.{Inject, Named, Singleton}
 import play.api.{Configuration, Logger}
 import play.api.libs.circe.Circe
 import play.api.mvc.{AbstractController, ControllerComponents}
@@ -21,14 +21,16 @@ import com.theguardian.multimedia.archivehunter.common.errors.{ExternalSystemErr
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{JobModelDAO, ScanTargetDAO}
 import helpers.ProxyLocator
 import models._
-import services.ProxyGenerators
+import services.ETSProxyActor
+import cmn_services.ProxyGenerators
 
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
 @Singleton
 class ProxiesController @Inject()(config:Configuration, cc:ControllerComponents, ddbClientMgr: DynamoClientManager,
-                                  esClientMgr:ESClientManager, s3ClientMgr:S3ClientManager, proxyGenerators: ProxyGenerators)
+                                  esClientMgr:ESClientManager, s3ClientMgr:S3ClientManager, proxyGenerators: ProxyGenerators,
+                                  @Named("etsProxyActor") etsProxyActor:ActorRef)
                                  (implicit actorSystem:ActorSystem, scanTargetDAO:ScanTargetDAO, jobModelDAO:JobModelDAO)
   extends AbstractController(cc) with Circe with ProxyLocationEncoder {
   implicit private val mat:Materializer = ActorMaterializer.create(actorSystem)
@@ -204,6 +206,20 @@ class ProxiesController @Inject()(config:Configuration, cc:ControllerComponents,
         InternalServerError(GenericErrorResponse("error",s"Could not launch task: $msg").asJson)
       case Success(taskId)=>
         Ok(responses.ObjectGetResponse("ok","task",taskId).asJson)
+    })
+  }
+
+  def generateProxy(fileId:String) = Action.async {
+    implicit val indexer = new Indexer(indexName)
+    implicit val client = esClientMgr.getClient()
+    indexer.getById(fileId).map(entry=>{
+      //FIXME: hardcoded proxy type
+      etsProxyActor ! ETSProxyActor.CreateMediaProxy(entry, ProxyType.VIDEO)
+      Ok(GenericErrorResponse("ok","proxying started").asJson)
+    }).recoverWith({
+      case ex:Throwable=>
+        logger.error("Could not trigger proxy: ", ex)
+        Future(InternalServerError(GenericErrorResponse("error", ex.toString).asJson))
     })
   }
 }

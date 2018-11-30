@@ -1,4 +1,4 @@
-package com.theguardian.multimedia.archivehunter.common.services
+package com.theguardian.multimedia.archivehunter.common.cmn_services
 
 import java.net.URI
 import java.time.ZonedDateTime
@@ -57,7 +57,7 @@ object ProxyGenerators {
     * @param outputBucket name of the required destination bucket
     * @return a Sequence containing zero or more pipelines. If no pipelines are found, the sequence is empty.
     */
-  def findPipelineFor(inputBucket:String, outputBucket:String)(implicit etsClient:AmazonElasticTranscoder) = {
+  def findPipelineFor(inputBucket:String, outputBucket:String)(implicit etsClient:AmazonElasticTranscoder, logger:Logger) = {
     def getNextPage(matches:Seq[Pipeline], pageToken: Option[String]):Seq[Pipeline] = {
       val rq = new ListPipelinesRequest()
       val updatedRq = pageToken match {
@@ -66,16 +66,23 @@ object ProxyGenerators {
       }
 
       val result = etsClient.listPipelines(updatedRq).getPipelines.asScala
+      logger.debug(s"findPipelineFor: checking in $result")
       if(result.isEmpty){
+        logger.debug(s"findPipelineFor: returning $matches")
         matches
       } else {
-        matches ++ result.filter(p=>p.getOutputBucket==outputBucket && p.getInputBucket==inputBucket)
+        val newMatches = result.filter(p=>p.getOutputBucket==outputBucket && p.getInputBucket==inputBucket)
+        logger.debug(s"findPipelineFor: got $newMatches to add")
+        matches ++ newMatches
       }
     }
 
     Try {
       val initialResult = getNextPage(Seq(), None)
-      initialResult.filterNot(p => p.getName.contains("archivehunter")) //filter out anything that is not ours
+      logger.debug(s"findPipelineFor: initial result is $initialResult")
+      val finalResult = initialResult.filter(p => p.getName.contains("archivehunter")) //filter out anything that is not ours
+      logger.debug(s"findPipelineFor: final result is $finalResult")
+      finalResult
     }
   }
 
@@ -102,7 +109,7 @@ object ProxyGenerators {
     val createRq = new CreatePipelineRequest()
       .withInputBucket(inputBucket)
       .withName(pipelineName)
-      .withNotifications(new Notifications().withCompleted(completionNotificationTopic).withError(errorNotificationTopic).withWarning(warningNotificationTopic))
+      .withNotifications(new Notifications().withCompleted(completionNotificationTopic).withError(errorNotificationTopic).withWarning(warningNotificationTopic).withProgressing(warningNotificationTopic))
       .withOutputBucket(outputBucket)
       .withRole(transcodingRole)
 
@@ -167,7 +174,7 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration, esClientMgr:
       case Some(Right(target))=>Some(target.proxyBucket)
     })
 
-    val jobDesc = JobModel(UUID.randomUUID().toString,"thumbnail",Some(ZonedDateTime.now()),None,JobStatus.ST_PENDING,None,entry.id,SourceType.SRC_MEDIA)
+    val jobDesc = JobModel(UUID.randomUUID().toString,"thumbnail",Some(ZonedDateTime.now()),None,JobStatus.ST_PENDING,None,entry.id,None,SourceType.SRC_MEDIA)
 
     val uriToProxyFuture = ProxyGenerators.getUriToProxy(entry)
 
@@ -205,32 +212,6 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration, esClientMgr:
     })
   }
 
-  def startEtsProxy(toProxy:String, presetId:String, destinationBucket:String)(implicit etsClient:AmazonElasticTranscoder) = {
-//    val toProxyUri = URI.create(toProxy)
-//
-//    findPipelineFor(toProxyUri.getHost,destinationBucket) match {
-//      case Success(matches)=>
-//        if(matches.nonEmpty) {
-//          logger.info(s"Found ${matches.length} pipelines for ${toProxyUri.getHost}->$destinationBucket, using the first")
-//          matches.head
-//        } else {
-//          logger.info(s"Found no matching pipelines for ${toProxyUri.getHost}->$destinationBucket, requesting creation")
-//          createEtsPipeline(s"archivehunter_", toProxyUri.getHost,destinationBucket)
-//        }
-//    }
-//    val jobRq = new CreateJobRequest()
-//      .withInput(new JobInput().withContainer("mp4").withKey(toProxyUri.getPath))
-//      .withOutput(new CreateJobOutput().withKey(makeOutputFilename(toProxyUri.getPath)).withPresetId(presetId))
-//      .withPipelineId(pipelineId)
-//
-//    try {
-//      val result = etsClient.createJob(jobRq)
-//      Success(result.getJob.getId)
-//    } catch {
-//      case ex:Throwable=>
-//        Failure(ex)
-//    }
-  }
 
   /**
     * try to start a media proxy
@@ -262,7 +243,7 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration, esClientMgr:
           logger.error("Nothing found to proxy")
           Future(Failure(NothingFoundError("media", "Nothing found to proxy")))
         case Some(uriToProxy)=>
-          val jobDesc = JobModel(UUID.randomUUID().toString,"proxy",Some(ZonedDateTime.now()),None,JobStatus.ST_PENDING,None,entry.id,SourceType.SRC_MEDIA)
+          val jobDesc = JobModel(UUID.randomUUID().toString,"proxy",Some(ZonedDateTime.now()),None,JobStatus.ST_PENDING,None,entry.id,None,SourceType.SRC_MEDIA)
 
           jobModelDAO.putJob(jobDesc).map({
             case Some(Left(dynamoError))=>

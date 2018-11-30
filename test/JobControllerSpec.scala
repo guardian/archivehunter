@@ -39,11 +39,11 @@ class JobControllerSpec extends Specification with Mockito with MockitoMatchers 
       implicit val mockEsClient = mock[HttpClient]
       val c = new JobController(mockConfig,mockCC,mockJobModelDAO,mockesClientManager, mocks3ClientManager, mockddbClientManager)
 
-      val toTest1 = JobModel("test","test",None,None,JobStatus.ST_PENDING,None,"fake-source-id",SourceType.SRC_PROXY)
+      val toTest1 = JobModel("test","test",None,None,JobStatus.ST_PENDING,None,"fake-source-id",None,SourceType.SRC_PROXY)
       val result1 = Await.result(c.thumbnailJobOriginalMedia(toTest1),10 seconds)
       result1 must beLeft
 
-      val toTest2 = JobModel("test","test",None,None,JobStatus.ST_PENDING,None,"fake-source-id",SourceType.SRC_THUMBNAIL)
+      val toTest2 = JobModel("test","test",None,None,JobStatus.ST_PENDING,None,"fake-source-id",None,SourceType.SRC_THUMBNAIL)
       val result2 = Await.result(c.thumbnailJobOriginalMedia(toTest2),10 seconds)
       result2 must beLeft
     }
@@ -67,7 +67,7 @@ class JobControllerSpec extends Specification with Mockito with MockitoMatchers 
         override protected val proxyLocationDAO = mockProxyLocationDAO
       }
 
-      val toTest = JobModel("test","test",None,None,JobStatus.ST_PENDING,None,"fake-source-id",SourceType.SRC_MEDIA)
+      val toTest = JobModel("test","test",None,None,JobStatus.ST_PENDING,None,"fake-source-id",None,SourceType.SRC_MEDIA)
       val mockResponse = ArchiveEntry("fake-id","fake-bucket","fake-path",None,1234L,ZonedDateTime.now(),"fake-etag",MimeType("video","something"),false,StorageClass.STANDARD)
 
       mockIndexer.getById("fake-source-id")(mockEsClient).returns(Future(mockResponse))
