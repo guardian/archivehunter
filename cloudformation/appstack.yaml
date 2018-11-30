@@ -161,8 +161,6 @@ Resources:
       KeySchema:
       - AttributeName: jobId
         KeyType: HASH
-      - AttributeName: startedAt
-        KeyType: RANGE
       ProvisionedThroughput:
         WriteCapacityUnits: 2
         ReadCapacityUnits: 10
@@ -446,6 +444,35 @@ Resources:
             - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ProxyLocationTable}/index/*
             - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${JobHistoryTable}
             - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${JobHistoryTable}/index/*
+      - PolicyName: TranscoderAccess
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+            Effect: Allow
+            Action:
+            - "elastictranscoder:*"
+            Resource:
+            - !Sub arn:aws:elastictranscoder:*:${AWS::AccountId}:pipeline/*
+            - !Sub arn:aws:elastictranscoder:*:${AWS::AccountId}:job/*
+            - !Sub arn:aws:elastictranscoder:*:${AWS::AccountId}:preset/${VideoTranscodingPresetId}
+      - PolicyName: TranscoderAccessList
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+            Effect: Allow
+            Action:
+            - elastictranscoder:ListPipelines
+            Resource:
+            - "*"
+      - PolicyName: MessageQueueRead
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+            Effect: Allow
+            Action:
+              - sqs:*
+            Resource:
+              - !GetAtt TranscodeUpdateMsg.Arn
       - PolicyName: ContainerAccess
         PolicyDocument:
           Version: 2012-10-17
@@ -621,7 +648,7 @@ Resources:
 
             transcodingRole = "${TranscodingRole.Arn}"
 
-            notificationsQueue = "${TranscodeUpdateMsg.Arn}"
+            notificationsQueue = "${TranscodeUpdateMsg}"
             videoPresetId = "${VideoTranscodingPresetId}"
           }
 

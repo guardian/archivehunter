@@ -213,9 +213,8 @@ class ProxiesController @Inject()(config:Configuration, cc:ControllerComponents,
     implicit val indexer = new Indexer(indexName)
     implicit val client = esClientMgr.getClient()
     try {
-      val pt = ProxyType.withName(typeStr)
+      val pt = ProxyType.withName(typeStr.toUpperCase)
       indexer.getById(fileId).map(entry=>{
-        //FIXME: hardcoded proxy type
         etsProxyActor ! ETSProxyActor.CreateMediaProxy(entry, pt)
         Ok(GenericErrorResponse("ok","proxying started").asJson)
       }).recoverWith({
