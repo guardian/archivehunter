@@ -34,6 +34,7 @@ lazy val commonSettings = Seq(
 scalaVersion := "2.12.2"
 
 val akkaVersion = "2.5.18"
+val akkaClusterVersion = "0.20.0"
 
 lazy val `archivehunter` = (project in file("."))
   .enablePlugins(PlayScala)
@@ -48,11 +49,11 @@ lazy val `archivehunter` = (project in file("."))
       "com.sksamuel.elastic4s" %% "elastic4s-testkit" % elastic4sVersion % "test",
       "com.sksamuel.elastic4s" %% "elastic4s-embedded" % elastic4sVersion % "test",
       "com.typesafe.akka" %% "akka-cluster-tools" % akkaVersion,
-      "com.lightbend.akka" %% "akka-management-cluster-http" % "0.6",
-      "com.lightbend.akka.management" %% "akka-management-cluster-bootstrap" % "0.20.0",
-      "com.lightbend.akka.discovery" %% "akka-discovery-dns" % "0.20.0",
-      "com.lightbend.akka.discovery" %% "akka-discovery-kubernetes-api" % "0.20.0",
-      "com.lightbend.akka.discovery" %% "akka-discovery-aws-api" % "0.18.0",
+      "com.lightbend.akka.management" %% "akka-management-cluster-http" % akkaClusterVersion,
+      "com.lightbend.akka.management" %% "akka-management-cluster-bootstrap" % akkaClusterVersion,
+      "com.lightbend.akka.discovery" %% "akka-discovery-dns" % akkaClusterVersion,
+      "com.lightbend.akka.discovery" %% "akka-discovery-kubernetes-api" % akkaClusterVersion,
+      "com.lightbend.akka.discovery" %% "akka-discovery-aws-api" % akkaClusterVersion,
       "com.typesafe.akka" %% "akka-cluster" % akkaVersion,
       "com.typesafe.akka" %% "akka-cluster-metrics" % akkaVersion,
       "com.typesafe.akka" %% "akka-actor" % akkaVersion,
