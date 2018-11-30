@@ -80,7 +80,10 @@ Parameters:
     Description: ETS Preset ID to use when transcoding video proxies
     Type: String
     Default: 1387374611767-d52fja
-
+  AudioTranscodingPresetId:
+    Description: ETS Preset ID to use when transcoding video proxies
+    Type: String
+    Default: 1351620000001-300040
 Resources:
   AccessorSG: #this group is exported and used by bucketmonitor yaml. defined here so that it can be marked for access to ES
     Type: AWS::EC2::SecurityGroup
@@ -650,6 +653,7 @@ Resources:
 
             notificationsQueue = "${TranscodeUpdateMsg}"
             videoPresetId = "${VideoTranscodingPresetId}"
+            audioPresetId = "${AudioTranscodingPresetId}"
           }
 
           ecs {
