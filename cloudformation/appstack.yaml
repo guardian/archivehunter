@@ -458,6 +458,7 @@ Resources:
             - !Sub arn:aws:elastictranscoder:*:${AWS::AccountId}:pipeline/*
             - !Sub arn:aws:elastictranscoder:*:${AWS::AccountId}:job/*
             - !Sub arn:aws:elastictranscoder:*:${AWS::AccountId}:preset/${VideoTranscodingPresetId}
+            - !Sub arn:aws:elastictranscoder:*:${AWS::AccountId}:preset/${AudioTranscodingPresetId}
       - PolicyName: TranscoderAccessList
         PolicyDocument:
           Version: 2012-10-17

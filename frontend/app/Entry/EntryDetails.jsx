@@ -48,6 +48,10 @@ class EntryDetails extends React.Component {
         this.setState({jobsAutorefresh: true});
     }
 
+    componentDidUpdate(oldProps,oldState){
+        //if the highlighted media changes, then disable auto-refresh
+        if(oldProps.entry !== this.props.entry && this.state.jobsAutorefresh) this.setState({jobsAutorefresh: false});
+    }
     render(){
         if(!this.props.entry){
             return <div className="entry-details">
