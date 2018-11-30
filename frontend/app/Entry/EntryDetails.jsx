@@ -13,6 +13,16 @@ class EntryDetails extends React.Component {
         loadJobs: PropTypes.boolean
     };
 
+    constructor(props){
+        super(props);
+        this.state = {
+            jobsAutorefresh: false
+        };
+
+        this.jobsAutorefreshUpdated = this.jobsAutorefreshUpdated.bind(this);
+        this.proxyGenerationWasTriggered = this.proxyGenerationWasTriggered.bind(this);
+    }
+
     extractFileInfo(fullpath){
         const parts = fullpath.split("/");
         const len = parts.length;
@@ -29,6 +39,15 @@ class EntryDetails extends React.Component {
         }
     }
 
+    jobsAutorefreshUpdated(newValue){
+        this.setState({jobsAutorefresh: newValue});
+    }
+
+    proxyGenerationWasTriggered(){
+        console.log("new proxy generation was started");
+        this.setState({jobsAutorefresh: true});
+    }
+
     render(){
         if(!this.props.entry){
             return <div className="entry-details">
@@ -42,10 +61,14 @@ class EntryDetails extends React.Component {
                               fileExtension={this.props.entry.file_extension}
                               mimeType={this.props.entry.mimeType}
                               autoPlay={this.props.autoPlay}
+                              triggeredProxyGeneration={this.proxyGenerationWasTriggered}
                 />
 
             {
-                this.props.showJobs ? <EntryJobs entryId={this.props.entry.id} loadImmediate={this.props.loadJobs}/> : ""
+                this.props.showJobs ? <EntryJobs entryId={this.props.entry.id}
+                                                 loadImmediate={this.props.loadJobs}
+                                                 autoRefresh={this.state.jobsAutorefresh}
+                                                 autoRefreshUpdated={this.jobsAutorefreshUpdated}/> : ""
             }
 
                 <table className="metadata-table">
