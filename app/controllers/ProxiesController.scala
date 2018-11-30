@@ -107,6 +107,8 @@ class ProxiesController @Inject()(config:Configuration, cc:ControllerComponents,
             .withExpiration(expiration)
           val result = s3client.generatePresignedUrl(rq)
           Ok(PlayableProxyResponse("ok",result.toString,mimeType).asJson)
+        case Some(Left(err))=>
+          InternalServerError(GenericErrorResponse("db_error", err.toString).asJson)
       })
     } catch {
       case ex:Throwable=>
@@ -215,8 +217,33 @@ class ProxiesController @Inject()(config:Configuration, cc:ControllerComponents,
     try {
       val pt = ProxyType.withName(typeStr.toUpperCase)
       indexer.getById(fileId).map(entry=>{
-        etsProxyActor ! ETSProxyActor.CreateMediaProxy(entry, pt)
-        Ok(GenericErrorResponse("ok","proxying started").asJson)
+        val canContinue = entry.mimeType.major.toLowerCase match {
+          case "video"=>  //video can proxy to anything
+            Right(true)
+          case "audio"=>
+            if(pt==ProxyType.VIDEO){
+              Left("Can't make a video proxy of an audio item")
+            } else {
+              Right(true)
+            }
+          case "image"=>
+            if(pt==ProxyType.AUDIO || pt==ProxyType.VIDEO){
+              Left("Can't make audio or video proxy of an image item")
+            } else {
+              Right(true)
+            }
+          case _=>
+            Left(s"Can't proxy media of type ${entry.mimeType.toString}")
+        }
+
+        canContinue match {
+          case Right(_)=>
+            etsProxyActor ! ETSProxyActor.CreateMediaProxy(entry, pt)
+            Ok(GenericErrorResponse("ok","proxying started").asJson)
+          case Left(err)=>
+            BadRequest(GenericErrorResponse("bad_request",err).asJson)
+        }
+
       }).recoverWith({
         case ex:Throwable=>
           logger.error("Could not trigger proxy: ", ex)
