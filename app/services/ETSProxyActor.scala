@@ -280,7 +280,6 @@ class ETSProxyActor @Inject() (implicit config:ArchiveHunterConfiguration,
           val updatedJob = jobDesc.copy(jobStatus = JobStatus.ST_SUCCESS, completedAt = Some(ZonedDateTime.now()))
           val jobModelUpdateFuture = jobModelDAO.putJob(updatedJob)
           val indexUpdateFuture = indexer.getById(jobDesc.sourceId).flatMap(entry=>indexer.indexSingleItem(entry.copy(proxied = true)))
-          //FIXME: hard-coding video type
           val proxyLocationUpdateFuture = ProxyLocation.newInS3(transcodeUrl,jobDesc.sourceId,transcodeInfo.proxyType) match {
             case Failure(err)=>
               logger.error(s"Could not update proxy ref for $transcodeUrl (${transcodeInfo.proxyType}): ", err)
@@ -326,10 +325,15 @@ class ETSProxyActor @Inject() (implicit config:ArchiveHunterConfiguration,
 
     case GotTranscodePipeline(entry:ArchiveEntry, targetProxyBucket:String, jobDesc:JobModel, pipelineId: String, proxyType)=>
       logger.info(s"Got transcode pipeline $pipelineId for $jobDesc")
+      val presetId = proxyType match {
+        case ProxyType.VIDEO=>config.get[String]("proxies.videoPresetId")
+        case ProxyType.AUDIO=>config.get[String]("proxies.audioPresetId")
+        case _=>throw new RuntimeException(s"Request for incompatible proxy type $proxyType")
+      }
+
       val rq = new CreateJobRequest()
         .withInput(new JobInput().withKey(entry.path))
-        //FIXME: hardcoded video option
-          .withOutput(new CreateJobOutput().withKey(entry.path).withPresetId(config.get[String]("proxies.videoPresetId")))
+          .withOutput(new CreateJobOutput().withKey(entry.path).withPresetId(presetId))
           .withPipelineId(pipelineId)
           .withUserMetadata(Map("archivehunter-job-id"->jobDesc.jobId, "archivehunter-source-id"->entry.id).asJava)
 
