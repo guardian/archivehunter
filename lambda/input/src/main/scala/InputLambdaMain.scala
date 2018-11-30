@@ -129,6 +129,8 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] {
       rec.getEventName match {
         case "ObjectCreated:Put"=>
           handleCreated(rec)
+        case "ObjectCreated:CompleteMultipartUpload"=>
+          handleCreated(rec)
         case "ObjectRemoved:Delete"=>
           handleRemoved(rec)
         case other:String=>
