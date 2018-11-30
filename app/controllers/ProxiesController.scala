@@ -209,17 +209,24 @@ class ProxiesController @Inject()(config:Configuration, cc:ControllerComponents,
     })
   }
 
-  def generateProxy(fileId:String) = Action.async {
+  def generateProxy(fileId:String, typeStr:String) = Action.async {
     implicit val indexer = new Indexer(indexName)
     implicit val client = esClientMgr.getClient()
-    indexer.getById(fileId).map(entry=>{
-      //FIXME: hardcoded proxy type
-      etsProxyActor ! ETSProxyActor.CreateMediaProxy(entry, ProxyType.VIDEO)
-      Ok(GenericErrorResponse("ok","proxying started").asJson)
-    }).recoverWith({
+    try {
+      val pt = ProxyType.withName(typeStr)
+      indexer.getById(fileId).map(entry=>{
+        //FIXME: hardcoded proxy type
+        etsProxyActor ! ETSProxyActor.CreateMediaProxy(entry, pt)
+        Ok(GenericErrorResponse("ok","proxying started").asJson)
+      }).recoverWith({
+        case ex:Throwable=>
+          logger.error("Could not trigger proxy: ", ex)
+          Future(InternalServerError(GenericErrorResponse("error", ex.toString).asJson))
+      })
+    } catch {
       case ex:Throwable=>
-        logger.error("Could not trigger proxy: ", ex)
-        Future(InternalServerError(GenericErrorResponse("error", ex.toString).asJson))
-    })
+        logger.error("Could not request proxy: ", ex)
+        Future(BadRequest(GenericErrorResponse("bad_request", ex.toString).asJson))
+    }
   }
 }
