@@ -14,6 +14,7 @@ class TimeIntervalComponent extends React.Component {
         super(props);
 
         this.state = {
+            daysSet: 0,
             hoursSet: 0,
             minutesSet: 0,
             secondsSet:0,
@@ -25,7 +26,7 @@ class TimeIntervalComponent extends React.Component {
 
     componentWillMount(){
         const d = moment.duration(this.props.value,"seconds");
-        this.setState({moment: d, hoursSet: d.hours(), minutesSet: d.minutes(), secondsSet: d.seconds()})
+        this.setState({moment: d, daysSet: d.days(), hoursSet: d.hours(), minutesSet: d.minutes(), secondsSet: d.seconds()})
     }
 
     componentDidUpdate(oldProps,oldState){
@@ -39,7 +40,7 @@ class TimeIntervalComponent extends React.Component {
 
     notifyParent(){
         console.log("notifyParent", this.state);
-        if(this.props.didUpdate) this.props.didUpdate(this.state.hoursSet*3600+this.state.minutesSet*60+this.state.secondsSet);
+        if(this.props.didUpdate) this.props.didUpdate(this.state.daysSet*(3600*24)+this.state.hoursSet*3600+this.state.minutesSet*60+this.state.secondsSet);
     }
 
     safeUpdateValue(key, newValue){
@@ -55,6 +56,10 @@ class TimeIntervalComponent extends React.Component {
             return <span className="duration">
                 <input className="time-interval"
                        type="number"
+                       value={this.state.daysSet}
+                       onChange={evt=>this.safeUpdateValue("daysSet", evt.target.value)}/> days
+                <input className="time-interval"
+                       type="number"
                        value={this.state.hoursSet}
                        onChange={evt=>this.safeUpdateValue("hoursSet", evt.target.value)}/> hours
                 <input className="time-interval"
@@ -68,12 +73,17 @@ class TimeIntervalComponent extends React.Component {
             </span>
         } else {
             let fmtStringParts = [];
+            if (this.state.daysSet > 0) fmtStringParts = fmtStringParts.concat(["d [days]"]);
             if (this.state.hoursSet > 0) fmtStringParts = fmtStringParts.concat(["h [hours]"]);
             if (this.state.minutesSet > 0) fmtStringParts = fmtStringParts.concat(["m [minutes]"]);
             if (this.state.secondsSet > 0) fmtStringParts = fmtStringParts.concat(["s [seconds]"]);
-            const formatString = fmtStringParts.join(", ");
+            if(fmtStringParts.length===0){
+                return <span className="duration">invalid duration</span>
+            } else {
+                const formatString = fmtStringParts.join(", ");
 
-            return <span className="duration">{this.state.moment.format(formatString)}</span>
+                return <span className="duration">{this.state.moment.format(formatString)}</span>
+            }
         }
     }
 }

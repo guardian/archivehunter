@@ -157,6 +157,8 @@ Resources:
       KeySchema:
       - AttributeName: jobId
         KeyType: HASH
+      - AttributeName: startedAt
+        KeyType: RANGE
       ProvisionedThroughput:
         WriteCapacityUnits: 2
         ReadCapacityUnits: 10
@@ -296,6 +298,8 @@ Resources:
             - s3:GetObject
             - s3:PutObject
             Resource:
+            - arn:aws:s3:::archivehunter-*
+            - arn:aws:s3:::archivehunter-*/*
             - arn:aws:s3:::gnm-multimedia-*
             - arn:aws:s3:::gnm-multimedia-*/*
             - arn:aws:s3:::mm-archive-*
@@ -324,6 +328,82 @@ Resources:
               - "ecr:GetAuthorizationToken"
               - ecr:GetAuthorizationToken
             Resource: "*"
+
+  #see https://docs.aws.amazon.com/elastictranscoder/latest/developerguide/access-control.html
+  TranscodingRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: elastictranscoder.amazonaws.com
+            Action: sts:AssumeRole
+      Path: "/"
+      Policies:
+      - PolicyName: BucketRead
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+            Sid: '1'
+            Effect: Allow
+            Action:
+            - s3:Get*
+            - s3:ListBucket
+            - s3:Put*
+            - s3:*MultipartUpload*
+            Resource: "*"
+      - PolicyName: SNSPublish
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+            Sid: '2'
+            Effect: Allow
+            Action: sns:Publish
+            Resource: "*"
+      - PolicyName: BlockBucketOps
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+            Sid: '3'
+            Effect: Deny
+            Action:
+            - sns:*Permission*
+            - sns:*Delete*
+            - sns:*Remove*
+            - s3:*Policy*
+            - s3:*Delete*
+            Resource: "*"
+
+  TranscodeUpdateTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      Subscription:
+        - Endpoint: !GetAtt TranscodeUpdateMsg.Arn
+          Protocol: sqs
+
+  TranscodeUpdateMsg:
+    Type: AWS::SQS::Queue
+
+  SNSSubscriptionPolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      PolicyDocument:
+        Version: '2012-10-17'
+        Id: MyQueuePolicy
+        Statement:
+        - Sid: Allow-SendMessage-From-SNS-Topic
+          Effect: Allow
+          Principal: "*"
+          Action:
+          - sqs:SendMessage
+          Resource: !GetAtt TranscodeUpdateMsg.Arn
+          Condition:
+            ArnEquals:
+              aws:SourceArn: !Ref TranscodeUpdateTopic
+      Queues:
+      - !GetAtt TranscodeUpdateMsg.QueueName
 
   InstanceRole:
     Type: AWS::IAM::Role
