@@ -345,3 +345,8 @@ p.information {
     cursor:pointer;
     text-decoration:underline;
 }
+
+.entry-view-selected {
+    border-color: white !important;
+    box-shadow: 3px 3px 5px black
+}
