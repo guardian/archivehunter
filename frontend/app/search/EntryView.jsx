@@ -7,7 +7,8 @@ import EntryThumbnail from "../Entry/EntryThumbnail.jsx";
 class EntryView extends React.Component {
     static propTypes = {
         entry: PropTypes.object.isRequired,
-        itemOpenRequest: PropTypes.func.isRequired
+        itemOpenRequest: PropTypes.func.isRequired,
+        isSelected: PropTypes.bool
     };
 
     constructor(props){
@@ -32,6 +33,13 @@ class EntryView extends React.Component {
         return "";
     }
 
+    classForSelected(){
+        if(this.props.isSelected){
+            return "entry-view-selected"
+        } else {
+            return "";
+        }
+    }
     /*
     ArchiveEntry(id:String, bucket: String, path: String, file_extension: Option[String],
     size: scala.Long, last_modified: ZonedDateTime, etag: String, mimeType: MimeType,
@@ -39,7 +47,7 @@ class EntryView extends React.Component {
 
      */
     render(){
-        let classList = ["entry-view", this.classForStorageClass(this.props.entry.storageClass)];
+        let classList = ["entry-view", this.classForStorageClass(this.props.entry.storageClass), this.classForSelected() ];
         if(this.props.entry.beenDeleted) classList = classList.concat("entry-gone-missing");
 
         return <div className={classList.join(" ")} onClick={this.entryClicked}>

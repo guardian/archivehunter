@@ -5,7 +5,6 @@ import SearchResultsComponent from './SearchResultsComponent.jsx';
 import SearchSuggestionsComponent from './SearchSuggestionsComponent.jsx';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import Dialog from "react-dialog";
 import EntryDetails from "../Entry/EntryDetails.jsx";
 
 class BasicSearchComponent extends React.Component {
@@ -99,7 +98,7 @@ class BasicSearchComponent extends React.Component {
         if(this.state.error){
             return <ErrorViewComponent error={this.state.error}/>
         } else if(this.state.totalHits!==-1){
-            return <SearchResultsComponent entries={this.state.searchResults} onItemOpen={this.onItemOpen} onItemClose={this.onItemClose}/>
+            return <SearchResultsComponent entries={this.state.searchResults} onItemOpen={this.onItemOpen} onItemClose={this.onItemClose} selectedEntry={this.state.showingPreview}/>
         } else if(this.state.searching) {
             return <img style={{marginLeft:"auto",marginRight:"auto",width:"200px",display:"block"}} src="/assets/images/Spinner-1s-200px.gif"/>
         } else {
@@ -118,7 +117,7 @@ class BasicSearchComponent extends React.Component {
                 <SearchSuggestionsComponent terms={this.state.searchTerms} autoHide={true}/>
             </div>
             <div className="centered" style={{marginBottom: "2em",height: "2em", display: this.state.totalHits===-1 ? "none":"block"}}>
-                <p className="centered">Found a total of {this.state.totalHits} results{ this.state.searching ? " so far" : ""}.</p>
+                <p className="centered">Loaded {this.state.searchResults.length} of {this.state.totalHits} results{ this.state.searching ? " so far" : ""}.</p>
             </div>
             <EntryDetails entry={this.state.showingPreview} autoPlay={this.state.autoPlay} showJobs={true} loadJobs={false}/>
             {this.renderMainBody()}
