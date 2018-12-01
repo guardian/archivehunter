@@ -9,6 +9,8 @@ import Dialog from "react-dialog";
 import EntryDetails from "../Entry/EntryDetails.jsx";
 
 class BasicSearchComponent extends React.Component {
+    searchTimeout = 1000;   //timeout in milliseconds between last keypress and the search starting
+
     constructor(props){
         super(props);
 
@@ -21,7 +23,8 @@ class BasicSearchComponent extends React.Component {
             totalHits: -1,
             limit: 1000,
             showingPreview: null,
-            autoPlay: true
+            autoPlay: true,
+            searchTimer: null
         };
 
         this.cancelTokenSource = axios.CancelToken.source();
@@ -29,6 +32,7 @@ class BasicSearchComponent extends React.Component {
 
         this.onItemOpen = this.onItemOpen.bind(this);
         this.onItemClose = this.onItemClose.bind(this);
+        this.triggerSearchTimer = this.triggerSearchTimer.bind(this);
     }
 
     componentWillMount(){
@@ -45,7 +49,10 @@ class BasicSearchComponent extends React.Component {
         }
 
         this.setState({searching: true, currentSearch:tok},()=>
-            axios.get("/api/search/basic?q=" + encodedParamString + "&start=" + startAt + "&length=" + this.defaultPageSize).then(result=>{
+            axios.get("/api/search/basic?q=" + encodedParamString + "&start=" + startAt + "&length=" + this.defaultPageSize,
+                {
+                cancelToken: tok
+            }).then(result=>{
                 if(result.data.entries.length===0 || this.state.searchResults.length>=this.state.limit) {  //we've run out of results
                     this.setState({
                         currentSearch: null,
@@ -68,11 +75,16 @@ class BasicSearchComponent extends React.Component {
         );  //this.setState
     }
 
+    triggerSearchTimer(){
+        if(this.state.searchTimer) window.clearTimeout(this.state.searchTimer);
+        this.setState({searchTimer: window.setTimeout(()=>this.runSearch(0), this.searchTimeout)});
+    }
+
     updateSearchTerms(newString){
         if(this.state.currentSearch){
             this.cancelTokenSource.cancel("New search terms")
         }
-        this.setState({searchTerms: newString, searchResults: []},()=>this.runSearch(0));
+        this.setState({searchTerms: newString, searchResults: []},this.triggerSearchTimer);
     }
 
     onItemOpen(newTarget){
