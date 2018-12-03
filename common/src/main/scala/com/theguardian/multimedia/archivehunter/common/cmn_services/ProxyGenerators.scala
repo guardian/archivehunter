@@ -234,49 +234,4 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration, esClientMgr:
     })
   }
 
-
-  /**
-    * try to start a media proxy
-    * @param entry
-    * @return
-    */
-  def createMediaProxy(entry: ArchiveEntry):Future[Try[String]] = {
-    implicit val s3Client = s3ClientMgr.getS3Client(awsProfile)
-    implicit val dynamoClient = ddbClientMgr.getClient(awsProfile)
-    implicit val proxyLocationDAO = new ProxyLocationDAO(tableName)
-
-    val callbackUrl=config.get[String]("proxies.appServerUrl")
-    logger.info(s"callbackUrl is $callbackUrl")
-    val jobUuid = UUID.randomUUID()
-
-    val targetProxyBucketFuture = scanTargetDAO.targetForBucket(entry.bucket).map({
-      case None=>throw new RuntimeException(s"Entry's source bucket ${entry.bucket} is not registered")
-      case Some(Left(err))=>throw new RuntimeException(err.toString)
-      case Some(Right(target))=>Some(target.proxyBucket)
-    })
-
-    Future.sequence(Seq(targetProxyBucketFuture, getUriToProxy(entry))).flatMap(results=> {
-      val targetProxyBucket = results.head.get
-      val maybeUriToProxy = results(1)
-      logger.info(s"Target proxy bucket is $targetProxyBucket")
-      logger.info(s"Source media is $maybeUriToProxy")
-      maybeUriToProxy match {
-        case None=>
-          logger.error("Nothing found to proxy")
-          Future(Failure(NothingFoundError("media", "Nothing found to proxy")))
-        case Some(uriToProxy)=>
-          val jobDesc = JobModel(UUID.randomUUID().toString,"proxy",Some(ZonedDateTime.now()),None,JobStatus.ST_PENDING,None,entry.id,None,SourceType.SRC_MEDIA)
-
-          jobModelDAO.putJob(jobDesc).map({
-            case Some(Left(dynamoError))=>
-              logger.error(s"Could not save new job description: $dynamoError")
-              Failure(new RuntimeException(dynamoError.toString))
-            case _=>  //either None or Some(Right(thing)) indicate success
-
-              Success("hello")
-          })
-      }
-    })
-  }
-
 }

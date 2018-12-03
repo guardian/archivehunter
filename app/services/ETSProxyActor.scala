@@ -3,7 +3,8 @@ package services
 import java.time.ZonedDateTime
 import java.util.UUID
 
-import akka.actor.{Actor, ActorSystem}
+import akka.actor.{Actor, ActorRef, ActorSystem}
+import akka.stream.alpakka.s3.auth.AWSSessionCredentials
 import akka.stream.{ActorMaterializer, Materializer}
 import com.amazonaws.services.elastictranscoder.model._
 import com.amazonaws.services.sqs.model.{DeleteMessageRequest, ReceiveMessageRequest}
@@ -23,7 +24,7 @@ import scala.util.{Failure, Success}
 
 object ETSProxyActor {
   trait ETSMsg
-
+  trait ETSMsgReply extends ETSMsg
   /**
     * public message to start proxy creation process
     * @param entry archive entry to proxy
@@ -34,7 +35,12 @@ object ETSProxyActor {
     * public message reply if something went wrong
     * @param err
     */
-  case class PreparationFailure(err:Throwable) extends  ETSMsg
+  case class PreparationFailure(err:Throwable) extends  ETSMsgReply
+
+  /**
+    * public message reply if it worked
+    */
+  case class PreparationSuccess(transcodeId:String, jobId:String) extends ETSMsgReply
 
   /* --- Private messages --- */
   /**
@@ -42,13 +48,13 @@ object ETSProxyActor {
     * @param entry
     * @param pipeline
     */
-  case class GotTranscodePipeline(entry:ArchiveEntry, targetProxyBucket:String, jobDesc:JobModel, pipelineId:String, proxyType: ProxyType.Value) extends ETSMsg
+  case class GotTranscodePipeline(entry:ArchiveEntry, targetProxyBucket:String, jobDesc:JobModel, pipelineId:String, proxyType: ProxyType.Value, originalSender: ActorRef) extends ETSMsg
 
   /**
     * private message dispatched when we need to find a pipeline
     * @param entry
     */
-  case class GetTranscodePipeline(entry:ArchiveEntry, targetProxyBucket:String, jobDesc:JobModel, proxyType: ProxyType.Value) extends ETSMsg
+  case class GetTranscodePipeline(entry:ArchiveEntry, targetProxyBucket:String, jobDesc:JobModel, proxyType: ProxyType.Value, originalSender:ActorRef) extends ETSMsg
 
   /**
     * private messages dispatched when we get status updates from ETS
@@ -76,7 +82,7 @@ object ETSProxyActor {
     * @param jobDesc
     * @param pipelineId
     */
-  case class WaitingOperation(entry:ArchiveEntry, jobDesc:JobModel, pipelineId:String, targetProxyBucket:String,proxyType:ProxyType.Value)
+  case class WaitingOperation(entry:ArchiveEntry, jobDesc:JobModel, pipelineId:String, targetProxyBucket:String,proxyType:ProxyType.Value, originalSender:ActorRef)
 }
 
 /**
@@ -136,9 +142,9 @@ class ETSProxyActor @Inject() (implicit config:ArchiveHunterConfiguration,
     ProxyGenerators.getPipelineStatus(pipelineId) match {
       case Success(status)=>
         logger.info(s"Status for $pipelineId is $status")
-        if(status.toLowerCase()=="active") { //FIXME: check this value
+        if(status.toLowerCase()=="active") {
           logger.info(s"Status is ACTIVE, informing actor")
-          self ! GotTranscodePipeline(checking.entry, checking.targetProxyBucket, checking.jobDesc, pipelineId, checking.proxyType)
+          self ! GotTranscodePipeline(checking.entry, checking.targetProxyBucket, checking.jobDesc, pipelineId, checking.proxyType, checking.originalSender)
           checkNextPipeline(moreToCheck.tail,notReady)
         } else {
           logger.info("Status is not ACTIVE, continuing")
@@ -147,7 +153,11 @@ class ETSProxyActor @Inject() (implicit config:ArchiveHunterConfiguration,
     }
   }
 
-
+  /**
+    * Generate a random alphanumeric string
+    * @param length number of characters in the string
+    * @return the random string
+    */
   protected def randomAlphaNumericString(length: Int): String = {
     val chars = ('a' to 'z') ++ ('A' to 'Z') ++ ('0' to '9')
     randomStringFromCharList(length, chars)
@@ -162,64 +172,68 @@ class ETSProxyActor @Inject() (implicit config:ArchiveHunterConfiguration,
     sb.toString
   }
 
+  /**
+    * called repeatedly to pull messages from the SQS queue that receives transcoder messages.
+    *
+    * @param rq ReceiveMessageRequest describing what to pull
+    * @param notificationsQueue SQS queue URL that we are pulling from
+    * @return a boolean indicating whether anything was received or not.  The method should be called repeatedly until
+    *         this returns false, at which point the queue will be emptied.
+    */
   def handleNextSqsMessage(rq:ReceiveMessageRequest, notificationsQueue:String):Boolean = {
     val result = sqsClient.receiveMessage(rq)
     val msgList = result.getMessages.asScala
     if(msgList.isEmpty) return false
 
-    msgList.foreach(msg=>{
+    msgList.foreach(msg=> {
       logger.debug(s"Received message ${msg.getMessageId}:")
       logger.debug(s"\tAttributes: ${msg.getAttributes.asScala}")
       logger.debug(s"\tReceipt Handle: ${msg.getReceiptHandle}")
       logger.debug(s"\tBody: ${msg.getBody}")
-      AwsSqsMsg.fromJsonString(msg.getBody) match {
-        case Left(err)=>
-          logger.error(s"Could not parse message: ${err.toString}")
-        case Right(content)=>
-          content.getETSMessage match {
-            case Left(err)=>
-              logger.error(s"Could not parse inner ETS message: ${err.toString}")
-            case Right(etsMessage)=>
-              logger.info(s"Got parsed update message: $etsMessage")
-              etsMessage.userMetadata match {
-                case None=>
-                  logger.error("Can't process message with no user metadata! Need the internal Job ID")
-                case Some(md)=>
-                  md.get("archivehunter-job-id") match {
-                    case Some(jobId)=>
-                      jobModelDAO.jobForId(jobId).map({
-                        case None=>
-                          logger.error(s"Received message for non-existent job ID $jobId")
-                        case Some(Left(err))=>
-                          logger.error(s"Could not retrieve information for job ID $jobId: ${err.toString}")
-                        case Some(Right(jobDesc))=>
-                          etsMessage.state match {
-                            case TranscoderState.ERROR=>
-                              self ! TranscodeFailed(jobDesc,etsMessage.errorCode,etsMessage.messageDetails.getOrElse("not provided"))
-                            case TranscoderState.PROGRESSING=>
-                              self ! TranscodeProgress(jobDesc)
-                            case TranscoderState.COMPLETED=>
-                              val transcodePath = etsMessage.outputs.flatMap(_.headOption.map(_.key))
-                              logger.debug(s"transcodePath is $transcodePath")
-                              val transcodeUrl = jobDesc.transcodeInfo.flatMap(tcInfo=>
-                                transcodePath.map(tcPath=>s"s3://${tcInfo.destinationBucket}/$tcPath"))
 
-                              transcodeUrl match{
-                                case None=>
-                                  logger.error("Job completed but with no transcode URL? this must be a bug")
-                                case Some(actualTranscodeUrl)=>
-                                  self ! TranscodeSuccess(jobDesc, actualTranscodeUrl)
-                              }
-                            case TranscoderState.WARNING=>
-                              self ! TranscodeWarning(jobDesc, etsMessage.errorCode, etsMessage.messageDetails.getOrElse("not provided"))
-                          }
-                      })
-                    case None=>
-                      logger.error("Job message had user metadata but no archivehunter-job-id, can't process it.")
+      val etsMsg = AwsSqsMsg.fromJsonString(msg.getBody).flatMap(_.getETSMessage)
+      val maybeMd = etsMsg.map(_.userMetadata)
+
+      maybeMd match {
+        case Left(err) =>
+          logger.error(s"Could not parse message: ${err.toString}")
+        case Right(Some(md)) =>
+          md.get("archivehunter-job-id") match {
+            case Some(jobId) =>
+              jobModelDAO.jobForId(jobId).map({
+                case None =>
+                  logger.error(s"Received message for non-existent job ID $jobId")
+                case Some(Left(err)) =>
+                  logger.error(s"Could not retrieve information for job ID $jobId: ${err.toString}")
+                case Some(Right(jobDesc)) =>
+                  val etsMessage = etsMsg.right.get
+                  etsMessage.state match {
+                    case TranscoderState.ERROR =>
+                      self ! TranscodeFailed(jobDesc, etsMessage.errorCode, etsMessage.messageDetails.getOrElse("not provided"))
+                    case TranscoderState.PROGRESSING =>
+                      self ! TranscodeProgress(jobDesc)
+                    case TranscoderState.COMPLETED =>
+                      val transcodePath = etsMessage.outputs.flatMap(_.headOption.map(_.key))
+                      logger.debug(s"transcodePath is $transcodePath")
+                      val transcodeUrl = jobDesc.transcodeInfo.flatMap(tcInfo =>
+                        transcodePath.map(tcPath => s"s3://${tcInfo.destinationBucket}/$tcPath"))
+                      transcodeUrl match {
+                        case None =>
+                          logger.error("Job completed but with no transcode URL? this must be a bug")
+                        case Some(actualTranscodeUrl) =>
+                          self ! TranscodeSuccess(jobDesc, actualTranscodeUrl)
+                      }
+                    case TranscoderState.WARNING =>
+                      self ! TranscodeWarning(jobDesc, etsMessage.errorCode, etsMessage.messageDetails.getOrElse("not provided"))
                   }
-              }
+              })
+              sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(notificationsQueue).withReceiptHandle(msg.getReceiptHandle))
+            case None =>
+              logger.error("Job message had user metadata but no archivehunter-job-id, can't process it.")
               sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(notificationsQueue).withReceiptHandle(msg.getReceiptHandle))
           }
+        case Right(None) =>
+          logger.error("Can't process message with no user metadata! Need the internal Job ID")
       }
     })
     true
@@ -301,58 +315,67 @@ class ETSProxyActor @Inject() (implicit config:ArchiveHunterConfiguration,
     /** private message, find an appropriate pipeline for the parameters and trigger immediately if so;
       * otherwise start the pipeline creation process and check it regularly
       */
-    case GetTranscodePipeline(entry:ArchiveEntry, targetProxyBucket:String, jobDesc:JobModel, proxyType)=>
+    case GetTranscodePipeline(entry:ArchiveEntry, targetProxyBucket:String, jobDesc:JobModel, proxyType, originalSender)=>
       logger.info(s"Looking for pipeline for $entry")
       ProxyGenerators.findPipelineFor(entry.bucket, targetProxyBucket) match {
         case Failure(err)=>
           logger.error(s"Could not look up pipelines for $entry", err)
-          sender() ! PreparationFailure(err)
+          originalSender ! PreparationFailure(err)
         case Success(pipelines)=>
           if(pipelines.isEmpty){  //nothing present, so we must create a pipeline.
             val newPipelineName = s"archivehunter_${randomAlphaNumericString(10)}"
             ProxyGenerators.createEtsPipeline(newPipelineName, entry.bucket, targetProxyBucket) match {
               case Success(pipeline)=>
                 logger.info(s"Initiated creation of $newPipelineName, starting status check")
-                pipelinesToCheck = pipelinesToCheck ++ Seq(WaitingOperation(entry, jobDesc, pipeline.getId, targetProxyBucket, proxyType))
+                pipelinesToCheck = pipelinesToCheck ++ Seq(WaitingOperation(entry, jobDesc, pipeline.getId, targetProxyBucket, proxyType, originalSender))
               case Failure(err)=>
                 logger.error(s"Could not create new pipeline for $newPipelineName", err)
-                sender() ! PreparationFailure(err)
+                originalSender ! PreparationFailure(err)
             }
           } else {
             logger.info(s"Found ${pipelines.length} potential pipelines for ${entry.bucket} -> $targetProxyBucket, using the first")
-            self ! GotTranscodePipeline(entry, targetProxyBucket, jobDesc, pipelines.head.getId, proxyType)
+            self ! GotTranscodePipeline(entry, targetProxyBucket, jobDesc, pipelines.head.getId, proxyType, originalSender)
           }
       }
 
-    case GotTranscodePipeline(entry:ArchiveEntry, targetProxyBucket:String, jobDesc:JobModel, pipelineId: String, proxyType)=>
+    case GotTranscodePipeline(entry:ArchiveEntry, targetProxyBucket:String, jobDesc:JobModel, pipelineId: String, proxyType, originalSender)=>
       logger.info(s"Got transcode pipeline $pipelineId for $jobDesc")
-      val presetId = proxyType match {
-        case ProxyType.VIDEO=>config.get[String]("proxies.videoPresetId")
-        case ProxyType.AUDIO=>config.get[String]("proxies.audioPresetId")
-        case _=>throw new RuntimeException(s"Request for incompatible proxy type $proxyType")
-      }
+      try {
+        val presetId = proxyType match {
+          case ProxyType.VIDEO => config.get[String]("proxies.videoPresetId")
+          case ProxyType.AUDIO => config.get[String]("proxies.audioPresetId")
+          case _ => throw new RuntimeException(s"Request for incompatible proxy type $proxyType")
+        }
 
-      ProxyGenerators.outputFilenameFor(presetId, entry.path) match {
-        case Failure(err) =>
-          logger.error(s"Could not look up preset ID $presetId", err)
-        case Success(outputPath) =>
-          val rq = new CreateJobRequest()
-            .withInput(new JobInput().withKey(entry.path))
-            .withOutput(new CreateJobOutput().withKey(outputPath).withPresetId(presetId))
-            .withPipelineId(pipelineId)
-            .withUserMetadata(Map("archivehunter-job-id" -> jobDesc.jobId, "archivehunter-source-id" -> entry.id).asJava)
+        ProxyGenerators.outputFilenameFor(presetId, entry.path) match {
+          case Failure(err) =>
+            logger.error(s"Could not look up preset ID $presetId", err)
+          case Success(outputPath) =>
+            val rq = new CreateJobRequest()
+              .withInput(new JobInput().withKey(entry.path))
+              .withOutput(new CreateJobOutput().withKey(outputPath).withPresetId(presetId))
+              .withPipelineId(pipelineId)
+              .withUserMetadata(Map("archivehunter-job-id" -> jobDesc.jobId, "archivehunter-source-id" -> entry.id).asJava)
 
-          try {
-            val result = etsClient.createJob(rq)
-            val destinationUrl = s"s3://${}"
-            val updatedJobDesc = jobDesc.copy(transcodeInfo = Some(TranscodeInfo(transcodeId = result.getJob.getId, destinationBucket = targetProxyBucket, proxyType = proxyType)))
-            jobModelDAO.putJob(updatedJobDesc)
-            //we stop tracking the job here; rely on data coming back via the message queue to inform us what is happening
-            logger.info(s"Started transcode for ${entry.path} with ID ${result.getJob.getId}")
-          } catch {
-            case ex: Throwable =>
-              logger.error("Could not create proxy job: ", ex)
-          }
+            try {
+              val result = etsClient.createJob(rq)
+              val destinationUrl = s"s3://${}"
+              val updatedJobDesc = jobDesc.copy(transcodeInfo = Some(TranscodeInfo(transcodeId = result.getJob.getId, destinationBucket = targetProxyBucket, proxyType = proxyType)))
+              jobModelDAO.putJob(updatedJobDesc).map(putJobResult=>{
+                originalSender ! PreparationSuccess(result.getJob.getId, jobDesc.jobId)
+              })
+              //we stop tracking the job here; rely on data coming back via the message queue to inform us what is happening
+              logger.info(s"Started transcode for ${entry.path} with ID ${result.getJob.getId}")
+
+            } catch {
+              case ex: Throwable =>
+                logger.error("Could not create proxy job: ", ex)
+                originalSender ! PreparationFailure(ex)
+            }
+        }
+      } catch {
+        case ex:Throwable=>
+          originalSender ! PreparationFailure(ex)
       }
 
     case CreateMediaProxy(entry, proxyType)=>
@@ -360,42 +383,38 @@ class ETSProxyActor @Inject() (implicit config:ArchiveHunterConfiguration,
       logger.info(s"callbackUrl is $callbackUrl")
       val jobUuid = UUID.randomUUID()
 
-      val targetProxyBucketFuture = scanTargetDAO.targetForBucket(entry.bucket).map({
-        case None=>throw new RuntimeException(s"Entry's source bucket ${entry.bucket} is not registered")
-        case Some(Left(err))=>throw new RuntimeException(err.toString)
-        case Some(Right(target))=>Some(target.proxyBucket)
-      })
-
-      val preparationFuture = Future.sequence(Seq(targetProxyBucketFuture, ProxyGenerators.getUriToProxy(entry))).flatMap(results=> {
-        val targetProxyBucket = results.head.get
-        val maybeUriToProxy = results(1)
-        logger.info(s"Target proxy bucket is $targetProxyBucket")
-        logger.info(s"Source media is $maybeUriToProxy")
-        maybeUriToProxy match {
-          case None=>
-            logger.error("Nothing found to proxy")
-            Future(Failure(NothingFoundError("media", "Nothing found to proxy")))
-          case Some(uriToProxy)=>
-            val jobDesc = JobModel(UUID.randomUUID().toString,"proxy",Some(ZonedDateTime.now()),None,JobStatus.ST_PENDING,None,entry.id,None,SourceType.SRC_MEDIA)
-
-            jobModelDAO.putJob(jobDesc).map({
-              case Some(Left(dynamoError))=>
-                logger.error(s"Could not save new job description: $dynamoError")
-                Failure(new RuntimeException(dynamoError.toString))
-              case _=>  //either None or Some(Right(thing)) indicate success
-
-                Success(Tuple2(jobDesc, targetProxyBucket))
-            })
-        }
-      })
-
       val originalSender = sender()
-      preparationFuture.map({
-        case Success((jobDesc, targetProxyBucket))=>
-          self ! ETSProxyActor.GetTranscodePipeline(entry, targetProxyBucket, jobDesc, proxyType)
-        case Failure(err)=>
-          logger.error("Could not prepare for transcode: ", err)
-          sender ! PreparationFailure(err)
+      scanTargetDAO.targetForBucket(entry.bucket).map({
+        case Some(Right(target)) =>
+          val targetProxyBucket = target.proxyBucket
+          val preparationFuture = ProxyGenerators.getUriToProxy(entry).flatMap(maybeUriToProxy => {
+            logger.info(s"Target proxy bucket is $targetProxyBucket")
+            logger.info(s"Source media is $maybeUriToProxy")
+            maybeUriToProxy match {
+              case None =>
+                logger.error("Nothing found to proxy")
+                Future(Failure(NothingFoundError("media", "Nothing found to proxy")))
+              case Some(uriToProxy) =>
+                val jobDesc = JobModel(UUID.randomUUID().toString, "proxy", Some(ZonedDateTime.now()), None, JobStatus.ST_PENDING, None, entry.id, None, SourceType.SRC_MEDIA)
+                jobModelDAO.putJob(jobDesc).map({
+                  case Some(Left(dynamoError)) =>
+                    logger.error(s"Could not save new job description: $dynamoError")
+                    Failure(new RuntimeException(dynamoError.toString))
+                  case _ => //either None or Some(Right(thing)) indicate success
+                    Success(jobDesc)
+                })
+            }
+          })
+
+          preparationFuture.map({
+            case Success(jobDesc) =>
+              self ! ETSProxyActor.GetTranscodePipeline(entry, targetProxyBucket, jobDesc, proxyType, originalSender)
+            case Failure(err) =>
+              logger.error("Could not prepare for transcode: ", err)
+              originalSender ! PreparationFailure(err)
+          })
+        case None => throw new RuntimeException(s"Entry's source bucket ${entry.bucket} is not registered")
+        case Some(Left(err)) => throw new RuntimeException(err.toString)
       })
   }
 }
