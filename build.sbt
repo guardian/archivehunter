@@ -105,10 +105,10 @@ lazy val autoDowningLambda = (project in file("lambda/autodowning")).settings(co
       "com.amazonaws" % "aws-java-sdk-lambda" % awsSdkVersion,
       "com.amazonaws" % "aws-lambda-java-events" % "2.1.0",
       "com.amazonaws" % "aws-java-sdk-events" % awsSdkVersion,
+      "com.amazonaws" % "aws-java-sdk-ec2" % awsSdkVersion,
       "com.amazonaws" % "aws-lambda-java-core" % "1.0.0",
       "org.scala-lang.modules" %% "scala-java8-compat" % "0.8.0",
-      "ch.qos.logback"          %  "logback-classic" % "1.2.3",
-      "org.dispatchhttp"        %% "dispatch-core"   % "1.0.0"
+      "ch.qos.logback"          %  "logback-classic" % "1.2.3"
     ),
     assemblyJarName in assembly := "autoDowningLambda.jar",
     assemblyMergeStrategy in assembly := {x=>
