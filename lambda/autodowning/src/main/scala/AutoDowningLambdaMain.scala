@@ -9,6 +9,11 @@ import models.{LifecycleMessage, LifecycleMessageDecoder}
 import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
 
+import akka.actor.ActorSystem
+import akka.http.scaladsl.Http
+import akka.http.scaladsl.model._
+import akka.stream.ActorMaterializer
+
 class AutoDowningLambdaMain extends RequestHandler[String,Unit] with LifecycleMessageDecoder{
   private final val logger = LogManager.getLogger(getClass)
 
@@ -30,8 +35,9 @@ class AutoDowningLambdaMain extends RequestHandler[String,Unit] with LifecycleMe
   }
 
   def handleRequest(input:String, context:Context) = {
-    println("Got input: ")
-    println(input)
+    logger.info("Got input: ")
+    logger.info(input)
+
 
     io.circe.parser.parse(input).flatMap(_.as[LifecycleMessage]) match {
       case Left(err)=>
