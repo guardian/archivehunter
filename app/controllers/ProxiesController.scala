@@ -1,7 +1,9 @@
 package controllers
 
 import akka.actor.{ActorRef, ActorSystem}
+import akka.pattern.AskTimeoutException
 import akka.stream.{ActorMaterializer, Materializer}
+import akka.util.Timeout
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager}
 import com.amazonaws.HttpMethod
 import com.amazonaws.services.s3.model.GeneratePresignedUrlRequest
@@ -23,7 +25,9 @@ import helpers.ProxyLocator
 import models._
 import services.ETSProxyActor
 import cmn_services.ProxyGenerators
+import services.ETSProxyActor.{ETSMsg, ETSMsgReply, PreparationFailure, PreparationSuccess}
 
+import scala.concurrent.duration._
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
@@ -33,6 +37,7 @@ class ProxiesController @Inject()(config:Configuration, cc:ControllerComponents,
                                   @Named("etsProxyActor") etsProxyActor:ActorRef)
                                  (implicit actorSystem:ActorSystem, scanTargetDAO:ScanTargetDAO, jobModelDAO:JobModelDAO)
   extends AbstractController(cc) with Circe with ProxyLocationEncoder {
+  import akka.pattern.ask
   implicit private val mat:Materializer = ActorMaterializer.create(actorSystem)
   private val logger=Logger(getClass)
 
@@ -214,9 +219,11 @@ class ProxiesController @Inject()(config:Configuration, cc:ControllerComponents,
   def generateProxy(fileId:String, typeStr:String) = Action.async {
     implicit val indexer = new Indexer(indexName)
     implicit val client = esClientMgr.getClient()
+    implicit val timeout:Timeout = 55 seconds
+
     try {
       val pt = ProxyType.withName(typeStr.toUpperCase)
-      indexer.getById(fileId).map(entry=>{
+      indexer.getById(fileId).flatMap(entry=>{
         val canContinue = entry.mimeType.major.toLowerCase match {
           case "video"=>  //video can proxy to anything
             Right(true)
@@ -238,13 +245,30 @@ class ProxiesController @Inject()(config:Configuration, cc:ControllerComponents,
 
         canContinue match {
           case Right(_)=>
-            etsProxyActor ! ETSProxyActor.CreateMediaProxy(entry, pt)
-            Ok(GenericErrorResponse("ok","proxying started").asJson)
+            if(pt==ProxyType.THUMBNAIL){
+              proxyGenerators.createThumbnailProxy(entry).map({
+                case Success(jobId)=>
+                  Ok(TranscodeStartedResponse("transcode_started", jobId, None).asJson)
+                case Failure(err)=>
+                  InternalServerError(GenericErrorResponse("not_started", err.toString).asJson)
+              })
+            } else {
+              val result = (etsProxyActor ? ETSProxyActor.CreateMediaProxy(entry, pt)).mapTo[ETSMsgReply]
+              result.map({
+                case PreparationSuccess(transcodeId, jobId)=>
+                  Ok(TranscodeStartedResponse("transcode_started", jobId, Some(transcodeId)).asJson)
+                case PreparationFailure(err)=>
+                  InternalServerError(GenericErrorResponse("not_started", err.toString).asJson)
+              })
+            }
           case Left(err)=>
-            BadRequest(GenericErrorResponse("bad_request",err).asJson)
+            Future(BadRequest(GenericErrorResponse("bad_request",err).asJson))
         }
 
       }).recoverWith({
+        case timeout:AskTimeoutException=>
+          logger.warn("Ask timed out: ", timeout)
+          Future(Ok(GenericErrorResponse("warning", "proxy request timed out server-side, may not have started").asJson))
         case ex:Throwable=>
           logger.error("Could not trigger proxy: ", ex)
           Future(InternalServerError(GenericErrorResponse("error", ex.toString).asJson))

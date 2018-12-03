@@ -16,7 +16,7 @@ object SourceType extends Enumeration {
 
 case class JobModel (jobId:String, jobType:String, startedAt: Option[ZonedDateTime], completedAt: Option[ZonedDateTime], jobStatus: JobStatus.Value, log:Option[String], sourceId:String, transcodeInfo: Option[TranscodeInfo], sourceType: SourceType.Value)
 
-trait JobModelEncoder extends {
+trait JobModelEncoder {
   implicit val jobStatusEncoder = Encoder.enumEncoder(JobStatus)
   implicit val jobStatusDecoder = Decoder.enumDecoder(JobStatus)
 
