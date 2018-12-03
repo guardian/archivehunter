@@ -93,7 +93,9 @@ lazy val inputLambda = (project in file("lambda/input"))
     "com.amazonaws" % "aws-java-sdk-lambda" % awsSdkVersion,
     "com.amazonaws" % "aws-lambda-java-events" % "2.1.0",
     "com.amazonaws" % "aws-lambda-java-core" % "1.0.0",
-    "org.scala-lang.modules" %% "scala-java8-compat" % "0.8.0"
+    "org.scala-lang.modules" %% "scala-java8-compat" % "0.8.0",
+    "com.amazonaws" % "aws-lambda-java-log4j2" % "1.0.0",
+
   ),
   assemblyJarName in assembly := "inputLambda.jar",
 )
@@ -113,6 +115,8 @@ lazy val autoDowningLambda = (project in file("lambda/autodowning")).settings(co
     assemblyJarName in assembly := "autoDowningLambda.jar",
     assemblyMergeStrategy in assembly := {x=>
         if(x.contains("io.netty.versions.properties")){ //no idea why this is not working in pattern matching
+          MergeStrategy.first
+        } else if(x=="META-INF/org/apache/logging/log4j/core/config/plugins/Log4j2Plugins.dat"){
           MergeStrategy.first
         } else {
           val oldStrategy = (assemblyMergeStrategy in assembly).value
