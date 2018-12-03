@@ -25,6 +25,7 @@ GET     /api/proxy/:id/playable         @controllers.ProxiesController.getPlayab
 GET     /api/proxy/:id                  @controllers.ProxiesController.proxyForId(id, proxyType:Option[String])
 
 POST    /api/proxy/generate/:id/thumbnail   @controllers.ProxiesController.generateThumbnail(id)
+POST    /api/proxy/generate/:id/:typeStr     @controllers.ProxiesController.generateProxy(id, typeStr)
 
 POST    /api/job/:jobid/report          @controllers.JobController.updateStatus(jobid)
 GET     /api/job/all                    @controllers.JobController.getAllJobs(limit:Int ?=100, scanFrom:Option[String])

@@ -14,7 +14,7 @@ object SourceType extends Enumeration {
   val SRC_MEDIA, SRC_PROXY, SRC_THUMBNAIL = Value
 }
 
-case class JobModel (jobId:String, jobType:String, startedAt: Option[ZonedDateTime], completedAt: Option[ZonedDateTime], jobStatus: JobStatus.Value, log:Option[String], sourceId:String, sourceType: SourceType.Value)
+case class JobModel (jobId:String, jobType:String, startedAt: Option[ZonedDateTime], completedAt: Option[ZonedDateTime], jobStatus: JobStatus.Value, log:Option[String], sourceId:String, transcodeInfo: Option[TranscodeInfo], sourceType: SourceType.Value)
 
 trait JobModelEncoder {
   implicit val jobStatusEncoder = Encoder.enumEncoder(JobStatus)
@@ -25,6 +25,13 @@ trait JobModelEncoder {
   )(
     pt=>pt.toString
   )
+
+  implicit val proxyTypeEncoder = Encoder.enumEncoder(ProxyType)
+  implicit val proxyTypeDecoder = Decoder.enumDecoder(ProxyType)
+
+  implicit val proxyTypeFormat = DynamoFormat.coercedXmap[ProxyType.Value, String, IllegalArgumentException](
+    input=>ProxyType.withName(input)
+  )(pt=>pt.toString)
 
   implicit val sourceTypeEncoder = Encoder.enumEncoder(SourceType)
   implicit val sourceTypeDecoder = Decoder.enumDecoder(SourceType)

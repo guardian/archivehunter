@@ -12,7 +12,8 @@ class EntryPreview extends React.Component {
         mimeType: PropTypes.string.isRequired,
         fileExtension: PropTypes.string.isRequired,
         autoPlay: PropTypes.boolean,
-        hasProxy: PropTypes.bool.isRequired
+        hasProxy: PropTypes.bool.isRequired,
+        triggeredProxyGeneration: PropTypes.func
     };
 
     constructor(props){
@@ -75,7 +76,9 @@ class EntryPreview extends React.Component {
 
     initiateCreateProxy(){
         axios.post("/api/proxy/generate/" + this.props.entryId + "/" + this.state.selectedType.toLowerCase()).then(result=>{
-            this.setState({processMessage: "Proxy generation started"})
+            this.setState({processMessage: "Proxy generation started"}, ()=>{
+                if(this.props.triggeredProxyGeneration) this.props.triggeredProxyGeneration();
+            })
         }).catch(err=>{
             console.log(err);
             this.setState({processMessage: "Proxy generation failed, see console log"})

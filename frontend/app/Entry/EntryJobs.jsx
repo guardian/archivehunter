@@ -5,11 +5,14 @@ import Expander from '../common/Expander.jsx';
 import ErrorViewComponent from '../common/ErrorViewComponent.jsx';
 import JobStatusIcon from '../JobsList/JobStatusIcon.jsx';
 import {Link} from "react-router-dom";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
 class EntryJobs extends React.Component {
     static propTypes = {
         entryId: PropTypes.string.isRequired,
-        loadImmediate: PropTypes.bool.isRequired
+        loadImmediate: PropTypes.bool.isRequired,
+        autoRefresh: PropTypes.bool.isRequired,
+        autoRefreshUpdated: PropTypes.func.isRequired
     };
 
     constructor(props){
@@ -19,10 +22,12 @@ class EntryJobs extends React.Component {
            loading: false,
            lastError: null,
            jobsList: [],
-           expanded: false
+           expanded: false,
+           refreshTimer: null
        };
 
        this.expanderChanged = this.expanderChanged.bind(this);
+       this.autoRefresh = this.autoRefresh.bind(this);
     }
 
     loadData(){
@@ -40,6 +45,17 @@ class EntryJobs extends React.Component {
 
     componentDidUpdate(oldProps, oldState) {
         if (this.props.entryId !== oldProps.entryId) this.setState({jobsList: []}, () => this.loadData());
+        if(oldProps.autoRefresh !== this.props.autoRefresh){
+            if(this.state.refreshTimer) window.clearInterval(this.state.refreshTimer);
+            if(this.props.autoRefresh){
+                this.setState({refreshTimer: window.setInterval(this.autoRefresh, 3000)})
+            }
+        }
+    }
+
+    autoRefresh(){
+        console.log("autoRefresh");
+        this.loadData();
     }
 
     expanderChanged(newState){
@@ -60,8 +76,16 @@ class EntryJobs extends React.Component {
 
     render(){
         return <div className="entry-jobs-list">
-            <span><Expander expanded={this.state.expanded} onChange={this.expanderChanged}/><span style={{marginLeft: "0.4em"}}>Jobs for this item</span><img src="/assets/images/Spinner-1s-44px.svg" style={{display: this.state.loading ? "inline-block":"none", verticalAlign: "bottom", height: "1.9em"}}/></span>
+            <span>
+                <Expander expanded={this.state.expanded} onChange={this.expanderChanged}/>
+                <span style={{marginLeft: "0.4em"}}>Jobs for this item</span>
+                <img src="/assets/images/Spinner-1s-44px.svg" style={{display: this.state.loading ? "inline-block":"none", verticalAlign: "bottom", height: "1.9em"}}/>
+            </span>
             <div style={{display: this.state.expanded ? "block" : "none"}}>
+                <span className="command-link">
+                    <a onClick={(evt)=>this.props.autoRefreshUpdated(!this.props.autoRefresh)}>Auto-refresh</a>
+                    <FontAwesomeIcon icon="check" style={{display: this.props.autoRefresh ? "inline" : "none", marginLeft: "0.5em"}}/>
+                </span>
                 {
                     this.state.lastError ? <ErrorViewComponent error={this.state.lastError}/> : this.renderJobsList()
                 }

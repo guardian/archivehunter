@@ -1,4 +1,4 @@
-package com.theguardian.multimedia.archivehunter.common.services
+package com.theguardian.multimedia.archivehunter.common.cmn_services
 
 import com.theguardian.multimedia.archivehunter.common.ArchiveHunterConfiguration
 import com.theguardian.multimedia.archivehunter.common.clientManagers.ECSClientManager
