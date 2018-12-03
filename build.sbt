@@ -106,9 +106,19 @@ lazy val autoDowningLambda = (project in file("lambda/autodowning")).settings(co
       "com.amazonaws" % "aws-lambda-java-events" % "2.1.0",
       "com.amazonaws" % "aws-java-sdk-events" % awsSdkVersion,
       "com.amazonaws" % "aws-lambda-java-core" % "1.0.0",
-      "org.scala-lang.modules" %% "scala-java8-compat" % "0.8.0"
+      "org.scala-lang.modules" %% "scala-java8-compat" % "0.8.0",
+      "ch.qos.logback"          %  "logback-classic" % "1.2.3",
+      "org.dispatchhttp"        %% "dispatch-core"   % "1.0.0"
     ),
-    assemblyJarName in assembly := "autoDowningLambda.jar"
+    assemblyJarName in assembly := "autoDowningLambda.jar",
+    assemblyMergeStrategy in assembly := {x=>
+        if(x.contains("io.netty.versions.properties")){ //no idea why this is not working in pattern matching
+          MergeStrategy.first
+        } else {
+          val oldStrategy = (assemblyMergeStrategy in assembly).value
+          oldStrategy(x)
+        }
+    }
   )
 
 val jsTargetDir = "target/riffraff/packages"
