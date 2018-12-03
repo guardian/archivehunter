@@ -34,6 +34,19 @@ object ProxyLocation extends DocId {
     new URI(proto, host, "/"+path, "")
   }
 
+  def newInS3(proxyLocationString:String, mainMediaId:String, proxyType:ProxyType.Value)(implicit s3Client:AmazonS3) = Try {
+    val proxyLocationURI = getUrlElems(proxyLocationString)
+    logger.debug(s"newInS3: bucket is ${proxyLocationURI.getHost} path is ${proxyLocationURI.getPath}")
+    val fixedPath = if(proxyLocationURI.getPath.startsWith("/")){
+      proxyLocationURI.getPath.stripPrefix("/")
+    } else {
+      proxyLocationURI.getPath
+    }
+
+    val storageClassValue = s3Client.getObjectMetadata(proxyLocationURI.getHost,fixedPath).getStorageClass
+    new ProxyLocation(mainMediaId, makeDocId(proxyLocationURI.getHost, fixedPath),proxyType, proxyLocationURI.getHost,fixedPath, StorageClass.safeWithName(storageClassValue))
+  }
+
   def fromS3(proxyUri: String, mainMediaUri: String, proxyType:Option[ProxyType.Value])(implicit client:AmazonS3):Future[Either[String, ProxyLocation]] = {
     val proxyUriDecoded = getUrlElems(proxyUri)
     val mainMediaUriDecoded = getUrlElems(mainMediaUri)

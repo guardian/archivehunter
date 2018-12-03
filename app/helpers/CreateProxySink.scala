@@ -3,7 +3,7 @@ package helpers
 import akka.stream.{Attributes, Inlet, SinkShape}
 import akka.stream.stage.{AbstractInHandler, GraphStage, GraphStageLogic}
 import com.theguardian.multimedia.archivehunter.common.ArchiveEntry
-import com.theguardian.multimedia.archivehunter.common.services.ProxyGenerators
+import com.theguardian.multimedia.archivehunter.common.cmn_services.ProxyGenerators
 import javax.inject.Inject
 import play.api.Logger
 

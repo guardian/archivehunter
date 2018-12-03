@@ -14,6 +14,8 @@ class Module extends AbstractModule with AkkaGuiceSupport {
     bindActor[LegacyProxiesScanner]("legacyProxiesScannerActor")
     bindActor[BulkThumbnailer]("bulkThumbnailerActor")
     bindActor[DynamoCapacityActor]("dynamoCapacityActor")
+    bindActor[ETSProxyActor]("etsProxyActor")
+
     bind(classOf[AppStartup]).asEagerSingleton() //do app startup
   }
 }

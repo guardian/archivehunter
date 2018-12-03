@@ -70,15 +70,13 @@ object DynamoCapacityActor {
   case class TestCheckListResponse(entries:Seq[DCAMsg])
 }
 
-class DynamoCapacityActor @Inject() (ddbClientMgr:DynamoClientManager, config:ArchiveHunterConfiguration) extends Actor with Timers {
+class DynamoCapacityActor @Inject() (ddbClientMgr:DynamoClientManager, config:ArchiveHunterConfiguration) extends Actor {
   import DynamoCapacityActor._
   private val logger = Logger(getClass)
 
   private var checkList:Seq[DCAMsg] = Seq()
   private val awsProfile = config.getOptional[String]("externalData.awsProfile")
   private val ddbClient = ddbClientMgr.getClient(awsProfile)
-
-  timers.startPeriodicTimer(TimedStateCheck, TimedStateCheck, 10.seconds)
 
   /**
     * converts an [[UpdateCapacityIndex]] request into a DynamoDB [[GlobalSecondaryIndexUpdate]] request.
