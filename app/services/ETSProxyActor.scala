@@ -272,7 +272,8 @@ class ETSProxyActor @Inject() (implicit config:ArchiveHunterConfiguration,
 
     case TranscodeProgress(jobDesc)=>
       logger.info(s"Transcode for job ${jobDesc.jobId} (${jobDesc.transcodeInfo.map(_.transcodeId)}) is progressing")
-      if(jobDesc.jobStatus!=JobStatus.ST_RUNNING){
+      //if the transcode completed or errored very quickly, this message might arrive after the completion one; don't over-write it if so.
+      if(jobDesc.jobStatus!=JobStatus.ST_RUNNING && jobDesc.jobStatus!=JobStatus.ST_SUCCESS && jobDesc.jobStatus!=JobStatus.ST_ERROR){
         val updatedJob = jobDesc.copy(jobStatus = JobStatus.ST_RUNNING)
         jobModelDAO.putJob(updatedJob)
       }
@@ -310,7 +311,6 @@ class ETSProxyActor @Inject() (implicit config:ArchiveHunterConfiguration,
               logger.error("Unable to update proxy records after completed transcode", err)
           })
       }
-
 
     /** private message, find an appropriate pipeline for the parameters and trigger immediately if so;
       * otherwise start the pipeline creation process and check it regularly
