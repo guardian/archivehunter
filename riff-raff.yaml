@@ -19,3 +19,8 @@ deployments:
       functionNames: [archivehunter-input-]
       fileName: inputLambda.jar
 
+  archivehunter-autodowning-lambda:
+    template: lambda
+    parameters:
+      functionNames: [archivehunter-autodown-]
+      fileName: autoDowningLambda.jar

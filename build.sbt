@@ -93,13 +93,23 @@ lazy val inputLambda = (project in file("lambda/input"))
     "com.amazonaws" % "aws-java-sdk-lambda" % awsSdkVersion,
     "com.amazonaws" % "aws-lambda-java-events" % "2.1.0",
     "com.amazonaws" % "aws-lambda-java-core" % "1.0.0",
-//    "software.amazon.awssdk" % "lambda" % awsversion,
-//    "software.amazon.awssdk" % "core" % awsversion,
-//    "com.amazonaws" % "aws-lambda-java-events" % "2.1.0",
     "org.scala-lang.modules" %% "scala-java8-compat" % "0.8.0"
   ),
   assemblyJarName in assembly := "inputLambda.jar",
 )
+
+lazy val autoDowningLambda = (project in file("lambda/autodowning")).settings(commonSettings, name:="autoDowningLambda")
+  .dependsOn(common)
+  .settings(commonSettings,
+    libraryDependencies ++=Seq(
+      "com.amazonaws" % "aws-java-sdk-lambda" % awsSdkVersion,
+      "com.amazonaws" % "aws-lambda-java-events" % "2.1.0",
+      "com.amazonaws" % "aws-java-sdk-events" % awsSdkVersion,
+      "com.amazonaws" % "aws-lambda-java-core" % "1.0.0",
+      "org.scala-lang.modules" %% "scala-java8-compat" % "0.8.0"
+    ),
+    assemblyJarName in assembly := "autoDowningLambda.jar"
+  )
 
 val jsTargetDir = "target/riffraff/packages"
 
@@ -109,6 +119,7 @@ riffRaffManifestProjectName := "multimedia:ArchiveHunter"
 riffRaffArtifactResources := Seq(
   (packageBin in Debian in archivehunter).value -> s"archivehunter-webapp/${(name in archivehunter).value}.deb",
   (assembly in Universal in inputLambda).value -> s"archivehunter-input-lambda/${(assembly in Universal in inputLambda).value.getName}",
+  (assembly in Universal in autoDowningLambda).value -> s"archivehunter-autodowning-lambda/${(assembly in Universal in autoDowningLambda).value.getName}",
 //  (packageBin in Universal in expirer).value -> s"${(name in expirer).value}/${(packageBin in Universal in expirer).value.getName}",
 //  (packageBin in Universal in scheduler).value -> s"${(name in scheduler).value}/${(packageBin in Universal in scheduler).value.getName}",
 //  (baseDirectory in Global in app).value / s"$plutoMessageIngestion/$jsTargetDir/$plutoMessageIngestion/$plutoMessageIngestion.zip" -> s"$plutoMessageIngestion/$plutoMessageIngestion.zip",
@@ -116,7 +127,6 @@ riffRaffArtifactResources := Seq(
 //  (resourceManaged in Compile in uploader).value / "media-atom-pipeline.yaml" -> "media-atom-pipeline-cloudformation/media-atom-pipeline.yaml"
 )
 
-lazy val removalLambda = (project in file("lambda/output")).settings(commonSettings, name:="ArchiveRemovedLambda")
 
 resolvers += "scalaz-bintray" at "https://dl.bintray.com/scalaz/releases"
 
