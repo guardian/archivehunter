@@ -1,7 +1,7 @@
 Configuration:
   name: Default
   Appenders:
-    ConsoleAppender:
+    Console:
       name: LambdaAppender
       target: SYSTEM_OUT
       PatternLayout:
@@ -16,3 +16,7 @@ Configuration:
       level: debug
       AppenderRef:
         - ref: LambdaAppender
+    - name: AkkaComms
+      level: debug
+      AppenderRef:
+      - ref: LambdaAppender

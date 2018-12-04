@@ -250,6 +250,10 @@ Resources:
         FromPort: 8558
         ToPort: 8558
         IpProtocol: tcp
+      - CidrIp: !Ref OfficeIpRange
+        FromPort: 8558
+        ToPort: 8558
+        IpProtocol: tcp
       VpcId: !Ref VPCID
 
   LoadBalancer:
@@ -497,6 +501,15 @@ Resources:
             - logs:CreateLogStream
             - logs:PutLogEvents
             Resource: "*"
+      - PolicyName: AccessInstancesTable
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:*
+              Resource:
+              - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${AutodowningInstancesTable}
 
   #main lambda function
   AutodowningLambda:
@@ -693,6 +706,10 @@ Resources:
       - SourceSecurityGroupId: !GetAtt LoadBalancerSG.GroupId
         FromPort: 9000
         ToPort: 9000
+        IpProtocol: tcp
+      - SourceSecurityGroupId: !GetAtt LoadBalancerSG.GroupId
+        FromPort: 8558
+        ToPort: 8558
         IpProtocol: tcp
       - CidrIp: !Ref OfficeIpRange
         FromPort: 22
