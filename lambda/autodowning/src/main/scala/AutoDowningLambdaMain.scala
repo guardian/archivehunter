@@ -1,4 +1,4 @@
-import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsyncClientBuilder
+import com.amazonaws.services.dynamodbv2.{AmazonDynamoDBAsyncClientBuilder, AmazonDynamoDBClientBuilder}
 import com.amazonaws.services.lambda.runtime.{Context, RequestHandler}
 import org.apache.logging.log4j.LogManager
 import com.amazonaws.services.ec2.AmazonEC2ClientBuilder
@@ -8,7 +8,7 @@ import com.gu.scanamo.{Scanamo, Table}
 import com.gu.scanamo.syntax._
 import com.theguardian.multimedia.archivehunter.common.ArchiveHunterConfiguration
 import com.theguardian.multimedia.archivehunter.common.clientManagers.DynamoClientManager
-import models.{InstanceIp, LifecycleDetails, LifecycleMessage, LifecycleMessageDecoder}
+import models._
 
 import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
@@ -25,8 +25,7 @@ class AutoDowningLambdaMain extends RequestHandler[java.util.LinkedHashMap[Strin
   val instanceTableName = config.get("instances.tableName")
   val instanceTable = Table[InstanceIp](instanceTableName)
   val ec2Client = AmazonEC2ClientBuilder.defaultClient()
-  val ddbClientMgr = injector.getInstance(classOf[DynamoClientManager])
-  val ddbClient = ddbClientMgr.getClient()
+  val ddbClient = AmazonDynamoDBClientBuilder.defaultClient()
 
   val akkaComms = new AkkaComms(sys.env("LOADBALANCER"), 8558)
 
@@ -52,21 +51,24 @@ class AutoDowningLambdaMain extends RequestHandler[java.util.LinkedHashMap[Strin
 
   def deleteRecord(rec:InstanceIp) = Scanamo.exec(ddbClient)(instanceTable.delete('instanceId->rec.instanceId))
 
-  def registerInstanceTerminated(details: LifecycleDetails, attempt:Int=0):Future[Unit] =
+  def findAkkaNode(ipAddress:String, allNodes:Seq[AkkaMember]) =
+    allNodes.find(_.node.getHost==ipAddress)
+
+  def registerInstanceTerminated(details: LifecycleDetails, attempt:Int=0):Unit =
     findRecord(details.EC2InstanceId.get) match {
       case Some(Right(record))=>
         logger.info(s"Downing node for $record")
-        akkaComms.getNodes().map(akkaNodes=>{
+        Await.result(akkaComms.getNodes().flatMap(akkaNodes=>{
+          logger.info(s"Got $akkaNodes")
           akkaNodes.foreach(info=>logger.info(s"Got akka node: $info"))
-        })
-//        downAkkaNode(record.ipAddress).onCompleted({
-//          case Success(result)=>
-//            deleteRecord(record)
-//            logger.info("Downing completed")
-//          case Failure(err)=>
-//            logger.error(s"Could not complete downing message: ${err.toString}")
-//            throw err
-//        })
+          findAkkaNode(record.ipAddress, akkaNodes) match {
+            case None=>
+              logger.error(s"Could not find node ${details.EC2InstanceId.get} in the Akka cluster")
+              Future(false)
+            case Some(akkaNode)=>
+              akkaComms.downAkkaNode(akkaNode)
+          }
+        }), 60 seconds)
       case None=>
         throw new RuntimeException(s"No record returned for ${details.EC2InstanceId}")
       case Some(Left(err))=>
@@ -112,8 +114,8 @@ class AutoDowningLambdaMain extends RequestHandler[java.util.LinkedHashMap[Strin
       case Some(details)=>
         details.state match {
           case Some(state)=>
-            if(state=="terminating" || state=="terminated"){
-              Await.ready(registerInstanceTerminated(details), 60 seconds)
+            if(state=="shutting-down" || state=="terminated"){
+              registerInstanceTerminated(details)
             } else {
               registerInstanceStarted(details)
             }

@@ -1,3 +1,5 @@
 package models
 
-case class AkkaMember(node:String, nodeUid:String, status:String, roles:Seq[String])
+import java.net.URI
+
+case class AkkaMember(node:URI, nodeUid:String, status:String, roles:Seq[String])
