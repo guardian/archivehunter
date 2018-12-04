@@ -418,26 +418,6 @@ Resources:
       - !GetAtt TranscodeUpdateMsg.QueueName
 
   #Autodowning lambda - receive events from autoscaling to tell us when nodes go away.
-#  InvokeAutodowningRole:
-#    Type: AWS::IAM::Role
-#    Properties:
-#      AssumeRolePolicyDocument:
-#        Version: 2012-10-17
-#        Statement:
-#        - Effect: Allow
-#          Principal:
-#            Service: events.amazonaws.com
-#          Action: sts:AssumeRole
-#      Path: "/"
-#      Policies:
-#      - PolicyName: InvokeLambda
-#        PolicyDocument:
-#          Version: 2012-10-17
-#          Statement:
-#            Effect: Allow
-#            Action:
-#            - lambda:InvokeFunction
-#            Resource: !GetAtt AutodowningLambda.Arn
   ScalingRule:
     Type: AWS::Events::Rule
     Properties:
@@ -453,6 +433,26 @@ Resources:
           Id: !Sub ${Stack}-${App}Autodowning-${Stage}
 
   #this SG is allowed to access 8558 via the (internal) loadbalancer
+  AutodowningInstancesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+      - AttributeName: instanceId
+        AttributeType: S
+      KeySchema:
+      - AttributeName: instanceId
+        KeyType: HASH
+      ProvisionedThroughput:
+        WriteCapacityUnits: 1
+        ReadCapacityUnits: 1
+      Tags:
+      - Key: App
+        Value: !Sub ${App}-autodowning
+      - Key: Stack
+        Value: !Ref Stack
+      - Key: Stage
+        Value: !Ref Stage
+
   AutodowningLambdaSG:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -488,6 +488,8 @@ Resources:
             - ec2:CreateNetworkInterface
             - ec2:DescribeNetworkInterfaces
             - ec2:DeleteNetworkInterface
+            - ec2:DescribeInstances
+            - ec2:DescribeInstanceStatus
             Resource: "*"
           - Effect: Allow
             Action:
@@ -506,6 +508,7 @@ Resources:
       Environment:
         Variables:
           LOADBALANCER: !GetAtt LoadBalancer.DNSName
+          INSTANCES_TABLE: !Ref AutodowningInstancesTable
       Handler: AutoDowningLambdaMain
       FunctionName: !Sub archivehunter-autodown-${Stage}
       MemorySize: 768
