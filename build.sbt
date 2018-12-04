@@ -103,26 +103,28 @@ lazy val inputLambda = (project in file("lambda/input"))
 lazy val autoDowningLambda = (project in file("lambda/autodowning")).settings(commonSettings, name:="autoDowningLambda")
   .dependsOn(common)
   .settings(commonSettings,
-    libraryDependencies ++=Seq(
+    libraryDependencies :=Seq(
       "com.amazonaws" % "aws-java-sdk-lambda" % awsSdkVersion,
       "com.amazonaws" % "aws-lambda-java-events" % "2.1.0",
       "com.amazonaws" % "aws-java-sdk-events" % awsSdkVersion,
       "com.amazonaws" % "aws-java-sdk-ec2" % awsSdkVersion,
       "com.amazonaws" % "aws-lambda-java-core" % "1.0.0",
       "org.scala-lang.modules" %% "scala-java8-compat" % "0.8.0",
-      "ch.qos.logback"          %  "logback-classic" % "1.2.3"
+      "ch.qos.logback"          %  "logback-classic" % "1.2.3",
+      "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.9.7",
+      specs2 % Test
     ),
     assemblyJarName in assembly := "autoDowningLambda.jar",
-    assemblyMergeStrategy in assembly := {x=>
-        if(x.contains("io.netty.versions.properties")){ //no idea why this is not working in pattern matching
-          MergeStrategy.first
-        } else if(x=="META-INF/org/apache/logging/log4j/core/config/plugins/Log4j2Plugins.dat"){
-          MergeStrategy.first
-        } else {
-          val oldStrategy = (assemblyMergeStrategy in assembly).value
-          oldStrategy(x)
-        }
-    }
+//    assemblyMergeStrategy in assembly := {x=>
+//        if(x.contains("io.netty.versions.properties")){ //no idea why this is not working in pattern matching
+//          MergeStrategy.first
+//        } else if(x=="META-INF/org/apache/logging/log4j/core/config/plugins/Log4j2Plugins.dat"){
+//          MergeStrategy.first
+//        } else {
+//          val oldStrategy = (assemblyMergeStrategy in assembly).value
+//          oldStrategy(x)
+//        }
+//    }
   )
 
 val jsTargetDir = "target/riffraff/packages"

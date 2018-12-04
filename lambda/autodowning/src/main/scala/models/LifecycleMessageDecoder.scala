@@ -2,10 +2,9 @@ package models
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 
-import com.amazonaws.regions.{Region, Regions}
+import com.amazonaws.regions.Regions
 import io.circe.Decoder.Result
 import io.circe._
-import io.circe.generic.semiauto._
 import io.circe.generic.auto._
 import io.circe.syntax._
 
@@ -19,9 +18,9 @@ trait LifecycleMessageDecoder {
       ("account", Json.fromString(a.account)),
       ("time", Json.fromString(a.time.format(DateTimeFormatter.ISO_DATE_TIME))),
       ("region", Json.fromString(a.region.toString)),
-      ("resources", Json.arr(a.resources.map(entry=>Json.fromString(entry)):_*)),
-      ("detail", a.detail.map(d=>Encoder[LifecycleDetails].apply(d)).getOrElse(Json.Null))
-    )
+      ("resources", Json.arr(a.resources.map(Json.fromString):_*)),
+      ("detail", a.detail.map(_.asJson).getOrElse(Json.Null)
+    ))
   }
 
   implicit val decodeLifecycleMessage: Decoder[LifecycleMessage] = new Decoder[LifecycleMessage] {
