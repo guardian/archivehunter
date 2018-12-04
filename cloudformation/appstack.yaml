@@ -250,10 +250,6 @@ Resources:
         FromPort: 8558
         ToPort: 8558
         IpProtocol: tcp
-      - CidrIp: !Ref OfficeIpRange
-        FromPort: 8558
-        ToPort: 8558
-        IpProtocol: tcp
       VpcId: !Ref VPCID
 
   LoadBalancer:
