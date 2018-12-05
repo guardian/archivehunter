@@ -209,33 +209,36 @@ class AutoDowningLambdaMain extends RequestHandler[java.util.LinkedHashMap[Strin
     * returns a boolean if the tags for this instance match the ones that we are configured to manage
     * @param instance Ec2 instance model describing the instance in question
     */
-  def shouldHandle(instance:Instance):Boolean = {
-    val tags = getEc2Tags(instance)
-    logger.debug(s"got tags $tags")
-    val usefulTags = tagsComparison.keys
-      .foldLeft[Seq[TagDescription]](Seq())((acc, entry)=>acc ++ tags.filter(_.getKey==entry))
-        .map(t=>(t.getKey, t.getValue))
-        .toMap
-
-    logger.debug(s"usefulTags are $usefulTags")
-
-    val unmatchedTags = tagsComparison.filter(comp=>{
-      logger.debug(s"comparator: ${comp._1} to ${comp._2}")
-      usefulTags.get(comp._1) match {
-        case Some(matchedTagValue)=>
-          logger.debug (s"values: $matchedTagValue vs ${getTagConfigValue(comp._2)}")
-          getTagConfigValue (comp._2) match {
-            case None => false
-            case Some (configValue) => matchedTagValue != configValue
-          }
-        case None=>
-          logger.warn(s"Instance was missing required tag ${comp._1}")
-          return false
-      }
-    })
-    logger.debug(s"got $unmatchedTags unmatched tags")
-    unmatchedTags.isEmpty
-  }
+//  def shouldHandle(instance:Instance):Boolean = {
+//    val tags = getEc2Tags(instance)
+//    logger.debug(s"got tags $tags")
+//    val usefulTags = tagsComparison.keys
+//      .foldLeft[Seq[TagDescription]](Seq())((acc, entry)=>acc ++ tags.filter(_.getKey==entry))
+//        .map(t=>(t.getKey, t.getValue))
+//        .toMap
+//
+//    logger.debug(s"usefulTags are $usefulTags")
+//
+//    val unmatchedTags = tagsComparison.filter(comp=>{
+//      logger.debug(s"comparator: ${comp._1} to ${comp._2}")
+//      usefulTags.get(comp._1) match {
+//        case Some(matchedTagValue)=>
+//          logger.debug (s"values: $matchedTagValue vs ${getTagConfigValue(comp._2)}")
+//          getTagConfigValue (comp._2) match {
+//            case None => false
+//            case Some (configValue) => matchedTagValue != configValue
+//          }
+//        case None=>
+//          logger.warn(s"Instance was missing required tag ${comp._1}")
+//          return false
+//      }
+//    })
+//    logger.debug(s"got $unmatchedTags unmatched tags")
+//    unmatchedTags.isEmpty
+//  }
+    //ok, so that SHOULD work but i don't seem to get tags for Pending or Running instnaces (??)
+    //so, just accept everything and have done with it
+  def shouldHandle(instance: Instance):Boolean = true
 
   def handleRequest(input:java.util.LinkedHashMap[String,Object], context:Context) = {
     val msg = LifecycleMessage.fromLinkedHashMap(input)
