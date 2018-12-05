@@ -59,6 +59,8 @@ lazy val `archivehunter` = (project in file("."))
       "com.typesafe.akka" %% "akka-actor" % akkaVersion,
       "com.typesafe.akka" %% "akka-stream" % akkaVersion,
       "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
+      "com.typesafe.akka" %% "akka-persistence" % akkaVersion,
+      "com.typesafe.akka" %% "akka-cluster-sharding" % akkaVersion,
       // Only if you are using Akka Testkit
       "com.typesafe.akka" %% "akka-testkit" % akkaVersion,
       jdbc, ehcache, ws)
@@ -85,6 +87,8 @@ lazy val common = (project in file("common"))
     )
   )
 
+val meta = """META.INF(.)*""".r
+
 lazy val inputLambda = (project in file("lambda/input"))
   .dependsOn(common)
   .settings(commonSettings,
@@ -95,9 +99,18 @@ lazy val inputLambda = (project in file("lambda/input"))
     "com.amazonaws" % "aws-lambda-java-core" % "1.0.0",
     "org.scala-lang.modules" %% "scala-java8-compat" % "0.8.0",
     "com.amazonaws" % "aws-lambda-java-log4j2" % "1.0.0",
-
   ),
   assemblyJarName in assembly := "inputLambda.jar",
+  assemblyMergeStrategy in assembly := {
+    case PathList("javax", "servlet", xs @ _*)         => MergeStrategy.first
+    case PathList(ps @ _*) if ps.last endsWith ".html" => MergeStrategy.first
+    case "application.conf" => MergeStrategy.concat
+    case meta(_)=>MergeStrategy.discard
+    case x=>
+      val oldStrategy = (assemblyMergeStrategy in assembly).value
+      oldStrategy(x)
+
+  }
 )
 
 lazy val autoDowningLambda = (project in file("lambda/autodowning")).settings(commonSettings, name:="autoDowningLambda")
