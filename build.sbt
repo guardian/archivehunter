@@ -105,6 +105,8 @@ lazy val inputLambda = (project in file("lambda/input"))
     case PathList("javax", "servlet", xs @ _*)         => MergeStrategy.first
     case PathList(ps @ _*) if ps.last endsWith ".html" => MergeStrategy.first
     case "application.conf" => MergeStrategy.concat
+      //META-INF/org/apache/logging/log4j/core/config/plugins/Log4j2Plugins.dat
+    case PathList("META-INF","org","apache","logging","log4j","core","config","plugins","Log4j2Plugins.dat") => MergeStrategy.last
     case meta(_)=>MergeStrategy.discard
     case x=>
       val oldStrategy = (assemblyMergeStrategy in assembly).value
