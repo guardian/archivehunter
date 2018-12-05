@@ -518,6 +518,10 @@ Resources:
         Variables:
           LOADBALANCER: !GetAtt LoadBalancer.DNSName
           INSTANCES_TABLE: !Ref AutodowningInstancesTable
+          #only act on instances that match these tags
+          APP_TAG: !Sub ${App}-webapp
+          STACK_TAG: !Ref Stack
+          STAGE_TAG: !Ref Stage
       Handler: AutoDowningLambdaMain
       FunctionName: !Sub archivehunter-autodown-${Stage}
       MemorySize: 768

@@ -110,12 +110,6 @@ class AkkaDataSpec extends Specification with UriDecoder {
       result must beRight
       val data  = result.right.get
       data.members.length mustEqual 6
-      data.members.foreach(entry=>{
-        println(entry.node.getScheme)
-        println(entry.node.getHost)
-        println(entry.node.getUserInfo)
-        println(entry.node.getPort)
-      })
       data.unreachable.length mustEqual 5
       data.selfNode mustEqual "akka.tcp://application@10.225.13.242:2552"
     }
