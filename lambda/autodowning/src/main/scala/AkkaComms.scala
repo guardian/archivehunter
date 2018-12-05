@@ -3,6 +3,7 @@ import akka.http.scaladsl._
 import akka.http.scaladsl.model.{Multipart, _}
 import akka.stream.{ActorMaterializer, Materializer}
 import akka.util.ByteString
+import com.typesafe.config.{Config, ConfigFactory}
 import io.circe.generic.auto._
 import io.circe.syntax._
 import models.{AkkaMember, AkkaMembersResponse, UriDecoder}
@@ -16,7 +17,8 @@ import scala.concurrent.ExecutionContext.Implicits.global
 class AkkaComms (contactAddress:String, contactPort:Int) extends UriDecoder {
   private val logger = LogManager.getLogger(getClass)
 
-  implicit val actorSystem = ActorSystem.create("akka-comms")
+  private val actorSystemConfig:Config = ConfigFactory.empty()
+  implicit val actorSystem = ActorSystem("akka-comms",config=actorSystemConfig, classLoader=getClass.getClassLoader)
   implicit val mat:Materializer = ActorMaterializer.create(actorSystem)
 
   def consumeResponseEntity(entity:HttpEntity) = {

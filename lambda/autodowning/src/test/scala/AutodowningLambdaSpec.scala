@@ -32,6 +32,8 @@ class AutodowningLambdaSpec extends Specification with Mockito {
         override def getInjectorModule = new TestInjectorModule
 
         override def getLoadBalancerHost: String = "loadbalancer"
+
+        override val akkaComms = mock[AkkaComms]
       }
 
       val fakeInstance = new Instance().withTags(
@@ -57,6 +59,8 @@ class AutodowningLambdaSpec extends Specification with Mockito {
         override def getInjectorModule = new TestInjectorModule
 
         override def getLoadBalancerHost: String = "loadbalancer"
+
+        override val akkaComms = mock[AkkaComms]
       }
 
       val fakeInstance = new Instance().withTags(
@@ -82,6 +86,8 @@ class AutodowningLambdaSpec extends Specification with Mockito {
         override def getInjectorModule = new TestInjectorModule
 
         override def getLoadBalancerHost: String = "loadbalancer"
+
+        override val akkaComms = mock[AkkaComms]
       }
 
       val fakeInstance = new Instance().withTags(
@@ -107,6 +113,8 @@ class AutodowningLambdaSpec extends Specification with Mockito {
         override def getInjectorModule = new TestInjectorModule
 
         override def getLoadBalancerHost: String = "loadbalancer"
+
+        override val akkaComms = mock[AkkaComms]
       }
 
       test.processInstance(fakeDetails,"starting", maxRetries = 1) must throwA(expectedError)
@@ -136,6 +144,8 @@ class AutodowningLambdaSpec extends Specification with Mockito {
         override def registerInstanceTerminated(details: LifecycleDetails, attempt: Int): Unit = fakeRegisterTerminated(details, attempt)
 
         override def shouldHandle(instance: Instance): Boolean = true
+
+        override val akkaComms = mock[AkkaComms]
       }
       //
       test.processInstance(fakeDetails,"terminated", maxRetries = 1)
@@ -168,6 +178,8 @@ class AutodowningLambdaSpec extends Specification with Mockito {
         override def registerInstanceTerminated(details: LifecycleDetails, attempt: Int): Unit = fakeRegisterTerminated(details, attempt)
 
         override def shouldHandle(instance: Instance): Boolean = true
+
+        override val akkaComms = mock[AkkaComms]
       }
       //
       test.processInstance(fakeDetails,"started", maxRetries = 1)
@@ -200,6 +212,8 @@ class AutodowningLambdaSpec extends Specification with Mockito {
         override def registerInstanceTerminated(details: LifecycleDetails, attempt: Int): Unit = fakeRegisterTerminated(details, attempt)
 
         override def shouldHandle(instance: Instance): Boolean = false
+
+        override val akkaComms = mock[AkkaComms]
       }
       //
       test.processInstance(fakeDetails,"started", maxRetries = 1)
@@ -219,6 +233,8 @@ class AutodowningLambdaSpec extends Specification with Mockito {
         override def getInjectorModule = new TestInjectorModule
 
         override def getLoadBalancerHost: String = "loadbalancer"
+
+        override val akkaComms = mock[AkkaComms]
       }
 
       test.processInstance(fakeDetails,"starting", maxRetries = 1) must throwA(expectedException)
@@ -242,6 +258,8 @@ class AutodowningLambdaSpec extends Specification with Mockito {
         override def getLoadBalancerHost: String = "loadbalancer"
 
         override def addRecord(rec: InstanceIp): Option[Either[DynamoReadError, InstanceIp]] = addRecordMock(rec)
+
+        override val akkaComms = mock[AkkaComms]
       }
 
       test.registerInstanceStarted(fakeDetails, fakeInstance)
@@ -271,6 +289,8 @@ class AutodowningLambdaSpec extends Specification with Mockito {
         override def getLoadBalancerHost: String = "loadbalancer"
 
         override def addRecord(rec: InstanceIp): Option[Either[DynamoReadError, InstanceIp]] = addRecordMock(rec)
+
+        override val akkaComms = mock[AkkaComms]
 
         /**
           * the registerInstanceStarted implementation recurses in order to retry. We detect this and redirect to the mock
