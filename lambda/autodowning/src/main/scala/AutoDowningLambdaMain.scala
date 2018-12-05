@@ -211,6 +211,7 @@ class AutoDowningLambdaMain extends RequestHandler[java.util.LinkedHashMap[Strin
     */
   def shouldHandle(instance:Instance):Boolean = {
     val tags = getEc2Tags(instance)
+    logger.debug(s"got tags $tags")
     val usefulTags = tagsComparison.keys
       .foldLeft[Seq[TagDescription]](Seq())((acc, entry)=>acc ++ tags.filter(_.getKey==entry))
         .map(t=>(t.getKey, t.getValue))
