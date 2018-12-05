@@ -12,8 +12,8 @@ import TopMenu from './TopMenu.jsx';
 import AdminFront from './admin/AdminFront.jsx';
 import BasicSearchComponent from './search/BasicSearchComponent.jsx';
 import JobsList from './JobsList/JobsList.jsx';
-
 import BrowseComponent from './browse/BrowseComponent.jsx';
+import LoginStatusComponent from './Login/LoginStatusComponent.jsx';
 
 import { library } from '@fortawesome/fontawesome-svg-core'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
@@ -27,6 +27,13 @@ window.React = require('react');
 class App extends React.Component {
     constructor(props){
         super(props);
+
+        this.state = {
+            userLogin: null,
+            lastError: null,
+            loading: false
+        };
+
         axios.get("/system/publicdsn").then(response=> {
             Raven
                 .config(response.data.publicDsn)
@@ -35,12 +42,27 @@ class App extends React.Component {
         }).catch(error => {
             console.error("Could not intialise sentry", error);
         });
+        this.userLoggedOut = this.userLoggedOut.bind(this);
+    }
 
+    componentWillMount(){
+        this.setState({loading: true}, ()=>axios.get("/api/loginStatus")
+            .then(response=> {
+                this.setState({userLogin: response.data})
+            }).catch(err=>{
+                console.error(err);
+                this.setState({lastError: err})
+            }));
+    }
+
+    userLoggedOut(){
+        this.setState({userLogin: null}, ()=>location.reload(true));
     }
 
     render(){
         return <div>
             <TopMenu visible={true} isAdmin={true}/>
+            <LoginStatusComponent userData={this.state.userLogin} userLoggedOutCb={this.userLoggedOut}/>
             <Switch>
                 <Route path="/admin/jobs/:jobid" component={JobsList}/>
                 <Route path="/admin/jobs" component={JobsList}/>

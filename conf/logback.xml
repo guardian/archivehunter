@@ -33,7 +33,7 @@
     </appender>-->
 
     <logger name="play" level="INFO" />
-    <logger name="application" level="ERROR" />
+    <logger name="application" level="DEBUG" />
 
     <logger name="services.AppStartup" level="INFO"/>
     <logger name="services.BucketScanner" level="INFO"/>
@@ -46,6 +46,10 @@
     <logger name="controllers.ScanTargetController" level="INFO"/>
     <logger name="controllers.JobController" level="INFO"/>
     <logger name="controllers.BrowseCollectionController" level="DEBUG"/>
+
+    <logger name="controllers.Auth" level="DEBUG"/>
+
+    <logger name="com.gu.pandomainauth.action.AuthActions" level="DEBUG"/>
 
     <logger name="helpers.DDBSink" level="INFO"/>
     <logger name="helpers.S3ToProxyLocationFlow" level="INFO"/>

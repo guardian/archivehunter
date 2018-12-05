@@ -18,6 +18,8 @@ import io.circe.generic.auto._
 import io.circe.syntax._
 import models._
 import com.theguardian.multimedia.archivehunter.common.cmn_models._
+import helpers.InjectableRefresher
+import play.api.libs.ws.WSClient
 import responses.{GenericErrorResponse, ObjectListResponse}
 
 import scala.util.{Failure, Success}
@@ -25,9 +27,14 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 @Singleton
-class JobController @Inject() (config:Configuration, cc:ControllerComponents, jobModelDAO: JobModelDAO,
-                               esClientManager: ESClientManager, s3ClientManager: S3ClientManager,ddbClientManager:DynamoClientManager)
-                              (implicit actorSystem:ActorSystem) extends AbstractController(cc) with Circe with JobModelEncoder with ZonedDateTimeEncoder {
+class JobController @Inject() (override val config:Configuration, override val controllerComponents:ControllerComponents, jobModelDAO: JobModelDAO,
+                               esClientManager: ESClientManager, s3ClientManager: S3ClientManager,
+                               ddbClientManager:DynamoClientManager,
+                               override val refresher:InjectableRefresher,
+                               override val wsClient:WSClient)
+                              (implicit actorSystem:ActorSystem)
+  extends AbstractController(controllerComponents) with Circe with JobModelEncoder with ZonedDateTimeEncoder with PanDomainAuthActions {
+
   private val logger = Logger(getClass)
 
   private implicit val mat:Materializer = ActorMaterializer.create(actorSystem)
@@ -38,7 +45,7 @@ class JobController @Inject() (config:Configuration, cc:ControllerComponents, jo
   protected val indexer = new Indexer(indexName)
   protected val proxyLocationDAO = new ProxyLocationDAO(tableName)
 
-  def renderListAction(block: ()=>Future[List[Either[DynamoReadError, JobModel]]]) = Action.async {
+  def renderListAction(block: ()=>Future[List[Either[DynamoReadError, JobModel]]]) = APIAuthAction.async {
       val resultFuture = block()
       resultFuture.recover({
         case ex:Throwable=>
@@ -89,7 +96,7 @@ class JobController @Inject() (config:Configuration, cc:ControllerComponents, jo
         })
     })
 
-  def updateStatus(jobId:String) = Action.async(circe.json(2048)) { request=>
+  def updateStatus(jobId:String) = APIAuthAction.async(circe.json(2048)) { request=>
     jobModelDAO.jobForId(jobId).flatMap({
       case None=>
         Future(NotFound(GenericErrorResponse("not_found",s"no job found for id $jobId").asJson))
