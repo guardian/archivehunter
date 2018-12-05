@@ -16,107 +16,108 @@ class AutodowningLambdaSpec extends Specification with Mockito {
     }
   }
 
-  "AutoDowningLambdaMain.shouldHandle" should {
-    "return true if all required tags are matched" in {
-      val fakeTags = Map(
-        "APP_TAG"->"myapp",
-        "STACK_TAG"->"mystack",
-        "STAGE_TAG"->"mystage"
-      )
-
-      val test = new AutoDowningLambdaMain {
-        override def getTagConfigValue(configKey: String): Option[String] = fakeTags.get(configKey)
-
-        override def getInjectorModule = new TestInjectorModule
-
-        override def getLoadBalancerHost: String = "loadbalancer"
-
-        override val akkaComms = mock[AkkaComms]
-
-        override def getEc2Tags(instance: Instance): Seq[TagDescription] = Seq(
-          new TagDescription().withKey("App").withValue("myapp"),
-          new TagDescription().withKey("Stack").withValue("mystack"),
-          new TagDescription().withKey("Stage").withValue("mystage"),
-          new TagDescription().withKey("irrelevant").withValue("irrelevant"),
-        )
-      }
-
-      val fakeInstance = new Instance().withTags(
-        new Tag().withKey("App").withValue("myapp"),
-        new Tag().withKey("Stack").withValue("mystack"),
-        new Tag().withKey("Stage").withValue("mystage"),
-        new Tag().withKey("irrelevant").withValue("irrelevant")
-      )
-
-      test.shouldHandle(fakeInstance) must beTrue
-    }
-
-    "return false if any required tags are not matched" in {
-      val fakeTags = Map(
-        "APP_TAG"->"myapp",
-        "STACK_TAG"->"mystack",
-        "STAGE_TAG"->"mystage"
-      )
-
-      val test = new AutoDowningLambdaMain {
-        override def getTagConfigValue(configKey: String): Option[String] = fakeTags.get(configKey)
-
-        override def getInjectorModule = new TestInjectorModule
-
-        override def getLoadBalancerHost: String = "loadbalancer"
-
-        override val akkaComms = mock[AkkaComms]
-
-        override def getEc2Tags(instance: Instance): Seq[TagDescription] = Seq(
-          new TagDescription().withKey("App").withValue("myapp"),
-          new TagDescription().withKey("Stack").withValue("anotherstack"),
-          new TagDescription().withKey("Stage").withValue("mystage"),
-          new TagDescription().withKey("irrelevant").withValue("irrelevant"),
-        )
-      }
-
-      val fakeInstance = new Instance().withTags(
-        new Tag().withKey("App").withValue("myapp"),
-        new Tag().withKey("Stack").withValue("anotherstack"),
-        new Tag().withKey("Stage").withValue("mystage"),
-        new Tag().withKey("irrelevant").withValue("irrelevant")
-      )
-
-      test.shouldHandle(fakeInstance) must beFalse
-    }
-
-    "not crash if any required tags are missing" in {
-      val fakeTags = Map(
-        "APP_TAG"->"myapp",
-        "STACK_TAG"->"mystack",
-        "STAGE_TAG"->"mystage"
-      )
-
-      val test = new AutoDowningLambdaMain {
-        override def getTagConfigValue(configKey: String): Option[String] = fakeTags.get(configKey)
-
-        override def getInjectorModule = new TestInjectorModule
-
-        override def getLoadBalancerHost: String = "loadbalancer"
-
-        override val akkaComms = mock[AkkaComms]
-
-        override def getEc2Tags(instance: Instance): Seq[TagDescription] = Seq(
-          new TagDescription().withKey("App").withValue("myapp"),
-          new TagDescription().withKey("Stage").withValue("mystage"),
-          new TagDescription().withKey("irrelevant").withValue("irrelevant"),
-        )
-      }
-
-      val fakeInstance = new Instance().withTags(
-        new Tag().withKey("App").withValue("myapp"),
-        new Tag().withKey("Stage").withValue("mystage"),
-        new Tag().withKey("irrelevant").withValue("irrelevant")
-      )
-
-      test.shouldHandle(fakeInstance) must beFalse
-    }
-  }
+  //tag matching has been temporarily removed
+//  "AutoDowningLambdaMain.shouldHandle" should {
+//    "return true if all required tags are matched" in {
+//      val fakeTags = Map(
+//        "APP_TAG"->"myapp",
+//        "STACK_TAG"->"mystack",
+//        "STAGE_TAG"->"mystage"
+//      )
+//
+//      val test = new AutoDowningLambdaMain {
+//        override def getTagConfigValue(configKey: String): Option[String] = fakeTags.get(configKey)
+//
+//        override def getInjectorModule = new TestInjectorModule
+//
+//        override def getLoadBalancerHost: String = "loadbalancer"
+//
+//        override val akkaComms = mock[AkkaComms]
+//
+//        override def getEc2Tags(instance: Instance): Seq[TagDescription] = Seq(
+//          new TagDescription().withKey("App").withValue("myapp"),
+//          new TagDescription().withKey("Stack").withValue("mystack"),
+//          new TagDescription().withKey("Stage").withValue("mystage"),
+//          new TagDescription().withKey("irrelevant").withValue("irrelevant"),
+//        )
+//      }
+//
+//      val fakeInstance = new Instance().withTags(
+//        new Tag().withKey("App").withValue("myapp"),
+//        new Tag().withKey("Stack").withValue("mystack"),
+//        new Tag().withKey("Stage").withValue("mystage"),
+//        new Tag().withKey("irrelevant").withValue("irrelevant")
+//      )
+//
+//      test.shouldHandle(fakeInstance) must beTrue
+//    }
+//
+//    "return false if any required tags are not matched" in {
+//      val fakeTags = Map(
+//        "APP_TAG"->"myapp",
+//        "STACK_TAG"->"mystack",
+//        "STAGE_TAG"->"mystage"
+//      )
+//
+//      val test = new AutoDowningLambdaMain {
+//        override def getTagConfigValue(configKey: String): Option[String] = fakeTags.get(configKey)
+//
+//        override def getInjectorModule = new TestInjectorModule
+//
+//        override def getLoadBalancerHost: String = "loadbalancer"
+//
+//        override val akkaComms = mock[AkkaComms]
+//
+//        override def getEc2Tags(instance: Instance): Seq[TagDescription] = Seq(
+//          new TagDescription().withKey("App").withValue("myapp"),
+//          new TagDescription().withKey("Stack").withValue("anotherstack"),
+//          new TagDescription().withKey("Stage").withValue("mystage"),
+//          new TagDescription().withKey("irrelevant").withValue("irrelevant"),
+//        )
+//      }
+//
+//      val fakeInstance = new Instance().withTags(
+//        new Tag().withKey("App").withValue("myapp"),
+//        new Tag().withKey("Stack").withValue("anotherstack"),
+//        new Tag().withKey("Stage").withValue("mystage"),
+//        new Tag().withKey("irrelevant").withValue("irrelevant")
+//      )
+//
+//      test.shouldHandle(fakeInstance) must beFalse
+//    }
+//
+//    "not crash if any required tags are missing" in {
+//      val fakeTags = Map(
+//        "APP_TAG"->"myapp",
+//        "STACK_TAG"->"mystack",
+//        "STAGE_TAG"->"mystage"
+//      )
+//
+//      val test = new AutoDowningLambdaMain {
+//        override def getTagConfigValue(configKey: String): Option[String] = fakeTags.get(configKey)
+//
+//        override def getInjectorModule = new TestInjectorModule
+//
+//        override def getLoadBalancerHost: String = "loadbalancer"
+//
+//        override val akkaComms = mock[AkkaComms]
+//
+//        override def getEc2Tags(instance: Instance): Seq[TagDescription] = Seq(
+//          new TagDescription().withKey("App").withValue("myapp"),
+//          new TagDescription().withKey("Stage").withValue("mystage"),
+//          new TagDescription().withKey("irrelevant").withValue("irrelevant"),
+//        )
+//      }
+//
+//      val fakeInstance = new Instance().withTags(
+//        new Tag().withKey("App").withValue("myapp"),
+//        new Tag().withKey("Stage").withValue("mystage"),
+//        new Tag().withKey("irrelevant").withValue("irrelevant")
+//      )
+//
+//      test.shouldHandle(fakeInstance) must beFalse
+//    }
+//  }
 
   "AutodowningLambdaMain.processInstance" should {
     "raise an exception if getEc2Info consistently fails" in {
