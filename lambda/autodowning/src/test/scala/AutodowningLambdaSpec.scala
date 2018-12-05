@@ -10,6 +10,8 @@ import org.mockito.Mockito.{times, verify}
 import scala.util.{Failure, Success, Try}
 
 class AutodowningLambdaSpec extends Specification with Mockito {
+  sequential
+
   class TestInjectorModule extends AbstractModule {
     override def configure(): Unit = {
       bind(classOf[ArchiveHunterConfiguration]).to(classOf[ArchiveHunterConfigurationMock])
