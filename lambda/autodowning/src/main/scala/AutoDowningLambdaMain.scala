@@ -86,7 +86,15 @@ class AutoDowningLambdaMain extends RequestHandler[java.util.LinkedHashMap[Strin
     * @param instance instance of the `Instance` class from EC2. Get this by calling `getEc2Info`
     * @return a Sequence of `Tag` instances.
     */
-  def getEc2Tags(instance:Instance):Seq[Tag] = instance.getTags.asScala
+  //def getEc2Tags(instance:Instance):Seq[Tag] = instance.getTags.asScala
+  def getEc2Tags(instance:Instance):Seq[TagDescription] = {
+    val rq = new DescribeTagsRequest().withFilters(
+      new Filter().withName("resource-id").withValues(instance.getInstanceId),
+      new Filter().withName("resource-type").withValues("instance")
+    )
+    val result = ec2Client.describeTags(rq)
+    result.getTags.asScala
+  }
 
   def addRecord(rec:InstanceIp) = Scanamo.exec(ddbClient)(instanceTable.put(rec))
 
@@ -168,12 +176,14 @@ class AutoDowningLambdaMain extends RequestHandler[java.util.LinkedHashMap[Strin
     case Success(Some(info))=>
       println(s"Got $info")
       if(shouldHandle(info)) {
-        if (state == "shutting-down" || state == "terminated") {
+        if (state == "terminated") {
           println("registering shutdown")
           registerInstanceTerminated(details)
-        } else {
+        } else if(state == "running"){
           println("registering startup")
           registerInstanceStarted(details, info)
+        } else {
+          println(s"don't need to register $state state")
         }
       } else {
         println("not handling")
@@ -202,7 +212,7 @@ class AutoDowningLambdaMain extends RequestHandler[java.util.LinkedHashMap[Strin
   def shouldHandle(instance:Instance):Boolean = {
     val tags = getEc2Tags(instance)
     val usefulTags = tagsComparison.keys
-      .foldLeft[Seq[Tag]](Seq())((acc, entry)=>acc ++ tags.filter(_.getKey==entry))
+      .foldLeft[Seq[TagDescription]](Seq())((acc, entry)=>acc ++ tags.filter(_.getKey==entry))
         .map(t=>(t.getKey, t.getValue))
         .toMap
 
@@ -227,25 +237,24 @@ class AutoDowningLambdaMain extends RequestHandler[java.util.LinkedHashMap[Strin
   }
 
   def handleRequest(input:java.util.LinkedHashMap[String,Object], context:Context) = {
-    println("Got input: ")
-    println(input)
-
     val msg = LifecycleMessage.fromLinkedHashMap(input)
-    println(msg)
-
-    println(s"Message from ${msg.source} in ${msg.region}")
-    println(s"Message details: ${msg.detailType}, ${msg.detail}")
 
     msg.detail match {
       case Some(details)=>
         details.state match {
           case Some(state)=>
+            logger.info(s"$state instance; message from ${msg.source} in ${msg.region}")
             processInstance(details, state)
           case None=>
+            println(s"Message from ${msg.source} in ${msg.region}")
+            println(s"Message details: ${msg.detailType}, ${msg.detail}")
             logger.error("Received no instance state, can't proceed")
             throw new RuntimeException("Received no instance state, can't proceed")
         }
-      case None=>throw new RuntimeException("Received no instance details, can't proceed")
+      case None=>
+        println(s"Message from ${msg.source} in ${msg.region}")
+        println(s"Message details: ${msg.detailType}, ${msg.detail}")
+        throw new RuntimeException("Received no instance details, can't proceed")
     }
   }
 }

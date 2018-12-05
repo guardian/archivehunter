@@ -1,4 +1,4 @@
-import com.amazonaws.services.ec2.model.{Instance, InstanceNetworkInterface, Tag}
+import com.amazonaws.services.ec2.model.{Instance, InstanceNetworkInterface, Tag, TagDescription}
 import com.google.inject.AbstractModule
 import com.gu.scanamo.error.DynamoReadError
 import com.theguardian.multimedia.archivehunter.common.ArchiveHunterConfiguration
@@ -10,8 +10,6 @@ import org.mockito.Mockito.{times, verify}
 import scala.util.{Failure, Success, Try}
 
 class AutodowningLambdaSpec extends Specification with Mockito {
-  sequential
-
   class TestInjectorModule extends AbstractModule {
     override def configure(): Unit = {
       bind(classOf[ArchiveHunterConfiguration]).to(classOf[ArchiveHunterConfigurationMock])
@@ -34,6 +32,13 @@ class AutodowningLambdaSpec extends Specification with Mockito {
         override def getLoadBalancerHost: String = "loadbalancer"
 
         override val akkaComms = mock[AkkaComms]
+
+        override def getEc2Tags(instance: Instance): Seq[TagDescription] = Seq(
+          new TagDescription().withKey("App").withValue("myapp"),
+          new TagDescription().withKey("Stack").withValue("mystack"),
+          new TagDescription().withKey("Stage").withValue("mystage"),
+          new TagDescription().withKey("irrelevant").withValue("irrelevant"),
+        )
       }
 
       val fakeInstance = new Instance().withTags(
@@ -61,6 +66,13 @@ class AutodowningLambdaSpec extends Specification with Mockito {
         override def getLoadBalancerHost: String = "loadbalancer"
 
         override val akkaComms = mock[AkkaComms]
+
+        override def getEc2Tags(instance: Instance): Seq[TagDescription] = Seq(
+          new TagDescription().withKey("App").withValue("myapp"),
+          new TagDescription().withKey("Stack").withValue("anotherstack"),
+          new TagDescription().withKey("Stage").withValue("mystage"),
+          new TagDescription().withKey("irrelevant").withValue("irrelevant"),
+        )
       }
 
       val fakeInstance = new Instance().withTags(
@@ -88,6 +100,12 @@ class AutodowningLambdaSpec extends Specification with Mockito {
         override def getLoadBalancerHost: String = "loadbalancer"
 
         override val akkaComms = mock[AkkaComms]
+
+        override def getEc2Tags(instance: Instance): Seq[TagDescription] = Seq(
+          new TagDescription().withKey("App").withValue("myapp"),
+          new TagDescription().withKey("Stage").withValue("mystage"),
+          new TagDescription().withKey("irrelevant").withValue("irrelevant"),
+        )
       }
 
       val fakeInstance = new Instance().withTags(
@@ -180,9 +198,16 @@ class AutodowningLambdaSpec extends Specification with Mockito {
         override def shouldHandle(instance: Instance): Boolean = true
 
         override val akkaComms = mock[AkkaComms]
+
+        override def getEc2Tags(instance: Instance): Seq[TagDescription] = Seq(
+          new TagDescription().withKey("App").withValue("myapp"),
+          new TagDescription().withKey("Stack").withValue("anotherstack"),
+          new TagDescription().withKey("Stage").withValue("mystage"),
+          new TagDescription().withKey("irrelevant").withValue("irrelevant"),
+        )
       }
       //
-      test.processInstance(fakeDetails,"started", maxRetries = 1)
+      test.processInstance(fakeDetails,"running", maxRetries = 1)
       verify(fakeRegisterStarted, times(1)).apply(fakeDetails, fakeInstance, 0)
       verify(fakeRegisterTerminated, times(0)).apply(any, any)
       1 mustEqual 1 //specs2 requires a simple test at the end
@@ -214,6 +239,13 @@ class AutodowningLambdaSpec extends Specification with Mockito {
         override def shouldHandle(instance: Instance): Boolean = false
 
         override val akkaComms = mock[AkkaComms]
+
+        override def getEc2Tags(instance: Instance): Seq[TagDescription] = Seq(
+          new TagDescription().withKey("App").withValue("myapp"),
+          new TagDescription().withKey("Stack").withValue("anotherstack"),
+          new TagDescription().withKey("Stage").withValue("mystage"),
+          new TagDescription().withKey("irrelevant").withValue("irrelevant"),
+        )
       }
       //
       test.processInstance(fakeDetails,"started", maxRetries = 1)
