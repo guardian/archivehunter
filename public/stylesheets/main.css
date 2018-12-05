@@ -357,3 +357,24 @@ div.selector-panel {
     float: left;
     margin-right: 1em;
 }
+
+.login-info-container {
+    float: right;
+    position: absolute;
+    top: 0;
+    right: 0;
+    padding: 0.4em;
+    overflow: hidden;
+    cursor:pointer;
+}
+
+.login-user-avatar {
+    height: 24px;
+    border-radius: 24px;
+    vertical-align: middle;
+}
+
+.login-info-text {
+    color: #AAAAAA;
+    margin: 0.5em;
+}

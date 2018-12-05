@@ -5,6 +5,10 @@
 GET     /is-online                  controllers.Application.healthcheck
 GET     /                           @controllers.Application.rootIndex()
 
+GET     /oauthCallback              @controllers.Auth.oauthCallback
+POST    /api/logout                 @controllers.Auth.logout
+GET     /api/loginStatus            @controllers.UserController.loginStatus
+
 POST    /api/scanTarget                 @controllers.ScanTargetController.newTarget
 DELETE  /api/scanTarget/:id             @controllers.ScanTargetController.removeTarget(id)
 GET     /api/scanTarget/:id             @controllers.ScanTargetController.get(id)
