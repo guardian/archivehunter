@@ -59,6 +59,8 @@ lazy val `archivehunter` = (project in file("."))
       "com.typesafe.akka" %% "akka-actor" % akkaVersion,
       "com.typesafe.akka" %% "akka-stream" % akkaVersion,
       "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
+      "com.typesafe.akka" %% "akka-persistence" % akkaVersion,
+      "com.typesafe.akka" %% "akka-cluster-sharding" % akkaVersion,
       // Only if you are using Akka Testkit
       "com.typesafe.akka" %% "akka-testkit" % akkaVersion,
       jdbc, ehcache, ws)
@@ -85,6 +87,8 @@ lazy val common = (project in file("common"))
     )
   )
 
+val meta = """META.INF(.)*""".r
+
 lazy val inputLambda = (project in file("lambda/input"))
   .dependsOn(common)
   .settings(commonSettings,
@@ -93,13 +97,50 @@ lazy val inputLambda = (project in file("lambda/input"))
     "com.amazonaws" % "aws-java-sdk-lambda" % awsSdkVersion,
     "com.amazonaws" % "aws-lambda-java-events" % "2.1.0",
     "com.amazonaws" % "aws-lambda-java-core" % "1.0.0",
-//    "software.amazon.awssdk" % "lambda" % awsversion,
-//    "software.amazon.awssdk" % "core" % awsversion,
-//    "com.amazonaws" % "aws-lambda-java-events" % "2.1.0",
-    "org.scala-lang.modules" %% "scala-java8-compat" % "0.8.0"
+    "org.scala-lang.modules" %% "scala-java8-compat" % "0.8.0",
+    "com.amazonaws" % "aws-lambda-java-log4j2" % "1.0.0",
   ),
   assemblyJarName in assembly := "inputLambda.jar",
+  assemblyMergeStrategy in assembly := {
+    case PathList("javax", "servlet", xs @ _*)         => MergeStrategy.first
+    case PathList(ps @ _*) if ps.last endsWith ".html" => MergeStrategy.first
+    case "application.conf" => MergeStrategy.concat
+      //META-INF/org/apache/logging/log4j/core/config/plugins/Log4j2Plugins.dat
+    case PathList("META-INF","org","apache","logging","log4j","core","config","plugins","Log4j2Plugins.dat") => MergeStrategy.last
+    case meta(_)=>MergeStrategy.discard
+    case x=>
+      val oldStrategy = (assemblyMergeStrategy in assembly).value
+      oldStrategy(x)
+
+  }
 )
+
+lazy val autoDowningLambda = (project in file("lambda/autodowning")).settings(commonSettings, name:="autoDowningLambda")
+  .dependsOn(common)
+  .settings(commonSettings,
+    libraryDependencies :=Seq(
+      "com.amazonaws" % "aws-java-sdk-lambda" % awsSdkVersion,
+      "com.amazonaws" % "aws-lambda-java-events" % "2.1.0",
+      "com.amazonaws" % "aws-java-sdk-events" % awsSdkVersion,
+      "com.amazonaws" % "aws-java-sdk-ec2" % awsSdkVersion,
+      "com.amazonaws" % "aws-lambda-java-core" % "1.0.0",
+      "org.scala-lang.modules" %% "scala-java8-compat" % "0.8.0",
+      "ch.qos.logback"          %  "logback-classic" % "1.2.3",
+      "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.9.7",
+      specs2 % Test
+    ),
+    assemblyJarName in assembly := "autoDowningLambda.jar",
+//    assemblyMergeStrategy in assembly := {x=>
+//        if(x.contains("io.netty.versions.properties")){ //no idea why this is not working in pattern matching
+//          MergeStrategy.first
+//        } else if(x=="META-INF/org/apache/logging/log4j/core/config/plugins/Log4j2Plugins.dat"){
+//          MergeStrategy.first
+//        } else {
+//          val oldStrategy = (assemblyMergeStrategy in assembly).value
+//          oldStrategy(x)
+//        }
+//    }
+  )
 
 val jsTargetDir = "target/riffraff/packages"
 
@@ -109,6 +150,7 @@ riffRaffManifestProjectName := "multimedia:ArchiveHunter"
 riffRaffArtifactResources := Seq(
   (packageBin in Debian in archivehunter).value -> s"archivehunter-webapp/${(name in archivehunter).value}.deb",
   (assembly in Universal in inputLambda).value -> s"archivehunter-input-lambda/${(assembly in Universal in inputLambda).value.getName}",
+  (assembly in Universal in autoDowningLambda).value -> s"archivehunter-autodowning-lambda/${(assembly in Universal in autoDowningLambda).value.getName}",
 //  (packageBin in Universal in expirer).value -> s"${(name in expirer).value}/${(packageBin in Universal in expirer).value.getName}",
 //  (packageBin in Universal in scheduler).value -> s"${(name in scheduler).value}/${(packageBin in Universal in scheduler).value.getName}",
 //  (baseDirectory in Global in app).value / s"$plutoMessageIngestion/$jsTargetDir/$plutoMessageIngestion/$plutoMessageIngestion.zip" -> s"$plutoMessageIngestion/$plutoMessageIngestion.zip",
@@ -116,7 +158,6 @@ riffRaffArtifactResources := Seq(
 //  (resourceManaged in Compile in uploader).value / "media-atom-pipeline.yaml" -> "media-atom-pipeline-cloudformation/media-atom-pipeline.yaml"
 )
 
-lazy val removalLambda = (project in file("lambda/output")).settings(commonSettings, name:="ArchiveRemovedLambda")
 
 resolvers += "scalaz-bintray" at "https://dl.bintray.com/scalaz/releases"
 
