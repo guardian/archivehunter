@@ -45,6 +45,10 @@ class InputLambdaMainSpec extends Specification with Mockito {
           m
         }
 
+        override protected def getClusterEndpoint = "testClusterEndpoint"
+
+        override protected def getIndexName = "testIndexName"
+
         override protected def getIndexer(indexName: String): Indexer = mockIndexer
 
         override protected def getS3Client: AmazonS3 = {

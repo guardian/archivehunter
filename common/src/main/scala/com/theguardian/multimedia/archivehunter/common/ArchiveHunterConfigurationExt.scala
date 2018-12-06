@@ -6,7 +6,8 @@ class ArchiveHunterConfigurationExt extends ArchiveHunterConfiguration {
   private val environmentKeyMapping = Map(
     "elasticsearch.index"->"INDEX_NAME",
     "externalData.awsProfile"->"AWS_PROFILE",
-    "proxies.tableName" -> "PROXIES_TABLE_NAME"
+    "proxies.tableName" -> "PROXIES_TABLE_NAME",
+    "instances.tableName" -> "INSTANCES_TABLE"
   )
 
   override def getOptional[T](key: String)(implicit converter: String=>T): Option[T] = {
