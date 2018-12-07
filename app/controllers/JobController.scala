@@ -32,7 +32,7 @@ class JobController @Inject() (config:Configuration, cc:ControllerComponents, jo
 
   private implicit val mat:Materializer = ActorMaterializer.create(actorSystem)
   private val awsProfile = config.getOptional[String]("externalData.awsProfile")
-  private val indexName = config.getOptional[String]("elasticsearch.index").getOrElse("archivehunter")
+  private val indexName = config.getOptional[String]("externalData.indexName").getOrElse("archivehunter")
   private  val tableName:String = config.get[String]("proxies.tableName")
 
   protected val indexer = new Indexer(indexName)

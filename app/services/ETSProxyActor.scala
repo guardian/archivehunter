@@ -259,9 +259,13 @@ class ETSProxyActor @Inject() (implicit config:ArchiveHunterConfiguration,
       val notificationsQueue=config.get[String]("proxies.notificationsQueue")
       val rq = new ReceiveMessageRequest().withQueueUrl(notificationsQueue)
       var moreMessages=true
-      do {
-        moreMessages = handleNextSqsMessage(rq, notificationsQueue)
-      } while(moreMessages)
+      if(notificationsQueue=="queueUrl"){
+        logger.warn("notifications queue not set up in applications.conf")
+      } else {
+        do {
+          moreMessages = handleNextSqsMessage(rq, notificationsQueue)
+        } while (moreMessages)
+      }
     /**
       * private message, sent when we get an error notification from the queue
       */
