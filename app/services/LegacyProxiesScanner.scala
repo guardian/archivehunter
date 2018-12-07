@@ -91,21 +91,16 @@ class LegacyProxiesScanner @Inject()(config:Configuration, ddbClientMgr:DynamoCl
             initialRq.withProvisionedThroughput(newTableThroughput)
           }
 
-            val indexRq = if(indexThroughput.getWriteCapacityUnits==boostTo){
-              tableRq
-            } else {
-              tableRq.withGlobalSecondaryIndexUpdates(new GlobalSecondaryIndexUpdate()
-                .withUpdate(new UpdateGlobalSecondaryIndexAction()
-                  .withIndexName(indexName)
-                  .withProvisionedThroughput(newIndexThroughput)))
-            }
-
+          val indexRq = if(indexThroughput.getWriteCapacityUnits==boostTo){
+            tableRq
+          } else {
+            tableRq.withGlobalSecondaryIndexUpdates(new GlobalSecondaryIndexUpdate()
+              .withUpdate(new UpdateGlobalSecondaryIndexAction()
+                .withIndexName(indexName)
+                .withProvisionedThroughput(newIndexThroughput)))
+          }
 
           ddbClient.updateTable(indexRq) //this raises if it fails, caught just below.
-//          ddbClient.updateTable(config.get[String]("proxies.tableName"),
-//            new ProvisionedThroughput()
-//              .withReadCapacityUnits(tp.getReadCapacityUnits)
-//              .withWriteCapacityUnits(boostTo.toLong))
           tableReadyTimer = Some(system.scheduler.schedule(10 seconds, 1 second, self, msgToSend))
           Right(false)
         } catch {

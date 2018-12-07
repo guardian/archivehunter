@@ -1,5 +1,7 @@
 package controllers
 
+import java.util.UUID
+
 import akka.actor.{ActorRef, ActorSystem}
 import akka.pattern.AskTimeoutException
 import akka.stream.{ActorMaterializer, Materializer}
@@ -20,10 +22,10 @@ import io.circe.generic.auto._
 import io.circe.syntax._
 import com.gu.scanamo.syntax._
 import com.theguardian.multimedia.archivehunter.common.errors.{ExternalSystemError, NothingFoundError}
-import com.theguardian.multimedia.archivehunter.common.cmn_models.{JobModelDAO, ScanTargetDAO}
+import com.theguardian.multimedia.archivehunter.common.cmn_models._
 import helpers.ProxyLocator
 import models._
-import services.ETSProxyActor
+import services.{ETSProxyActor, ProxiesRelinker}
 import cmn_services.ProxyGenerators
 import services.ETSProxyActor.{ETSMsg, ETSMsgReply, PreparationFailure, PreparationSuccess}
 
@@ -34,7 +36,8 @@ import scala.util.{Failure, Success}
 @Singleton
 class ProxiesController @Inject()(config:Configuration, cc:ControllerComponents, ddbClientMgr: DynamoClientManager,
                                   esClientMgr:ESClientManager, s3ClientMgr:S3ClientManager, proxyGenerators: ProxyGenerators,
-                                  @Named("etsProxyActor") etsProxyActor:ActorRef)
+                                  @Named("etsProxyActor") etsProxyActor:ActorRef,
+                                  @Named("proxiesRelinker") proxiesRelinker:ActorRef)
                                  (implicit actorSystem:ActorSystem, scanTargetDAO:ScanTargetDAO, jobModelDAO:JobModelDAO)
   extends AbstractController(cc) with Circe with ProxyLocationEncoder {
   import akka.pattern.ask
@@ -278,5 +281,23 @@ class ProxiesController @Inject()(config:Configuration, cc:ControllerComponents,
         logger.error("Could not request proxy: ", ex)
         Future(BadRequest(GenericErrorResponse("bad_request", ex.toString).asJson))
     }
+  }
+
+  def relinkAllProxies = Action.async {
+    val jobId = UUID.randomUUID().toString
+    val jobDesc = JobModel(jobId,"RelinkProxies",None,None,JobStatus.ST_PENDING,None,"global",None,SourceType.SRC_GLOBAL)
+
+    jobModelDAO.putJob(jobDesc).map({
+      case None=>
+        proxiesRelinker ! ProxiesRelinker.RelinkAllRequest(jobId)
+        Ok(responses.ObjectCreatedResponse("ok","job",jobId).asJson)
+      case Some(Left(dberr))=>
+        logger.error(s"Could not create job entry: $dberr")
+        InternalServerError(GenericErrorResponse("db_error",dberr.toString).asJson)
+      case Some(Right(entry))=>
+        proxiesRelinker ! ProxiesRelinker.RelinkAllRequest(jobId)
+        Ok(responses.ObjectCreatedResponse("ok","job",jobId).asJson)
+    })
+
   }
 }
