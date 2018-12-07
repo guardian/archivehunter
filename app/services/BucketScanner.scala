@@ -119,7 +119,7 @@ class BucketScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientMan
       }
 
       override def onFailure(resp: BulkResponseItem, original: ArchiveEntry): Unit = {
-        logger.debug(s"ES subscriber failed on $original")
+        logger.error(s"ES subscriber failed: ${resp.error} ${resp.result}")
       }
     },batchSize=100,concurrentRequests=5,completionFn = ()=>{
       //the promise may have already been completed by the errorFn below

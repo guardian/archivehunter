@@ -13,6 +13,8 @@ import AdminFront from './admin/AdminFront.jsx';
 import BasicSearchComponent from './search/BasicSearchComponent.jsx';
 import JobsList from './JobsList/JobsList.jsx';
 
+import BrowseComponent from './browse/BrowseComponent.jsx';
+
 import { library } from '@fortawesome/fontawesome-svg-core'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faStroopwafel, faCheckCircle, faCheck, faTimes, faTimesCircle, faRoad, faSearch,faThList,faWrench, faLightbulb, faFolderPlus, faFolderMinus, faFolder } from '@fortawesome/free-solid-svg-icons'
@@ -45,6 +47,7 @@ class App extends React.Component {
                 <Route path="/admin/scanTargets/:id" component={ScanTargetEdit}/> /*this also handles "new" */
                 <Route path="/admin/scanTargets" component={ScanTargetsList}/>
                 <Route path="/admin" exact={true} component={AdminFront}/>
+                <Route path="/browse" exact={true} component={BrowseComponent}/>
                 <Route path="/search" exact={true} component={BasicSearchComponent}/>
                 <Route path="/" exact={true} component={FrontPage}/>
                 <Route default component={NotFoundComponent}/>

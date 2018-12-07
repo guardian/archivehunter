@@ -12,6 +12,7 @@ import io.circe.syntax._
 import com.sksamuel.elastic4s.circe._
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ArchiveEntryHitReader, StorageClassEncoder, ZonedDateTimeEncoder}
 import play.api.libs.circe.Circe
+import requests.SearchRequest
 import responses.{BasicSuggestionsResponse, GenericErrorResponse, ObjectListResponse}
 
 import scala.concurrent.Future
@@ -20,19 +21,18 @@ import scala.concurrent.Future
 class SearchController @Inject()(config:Configuration,cc:ControllerComponents,esClientManager:ESClientManager)
   extends AbstractController(cc) with ArchiveEntryHitReader with ZonedDateTimeEncoder with StorageClassEncoder with Circe {
   private val logger=Logger(getClass)
-  val indexName = config.getOptional[String]("elasticsearch.index").getOrElse("archivehunter")
+  val indexName = config.getOptional[String]("externalData.indexName").getOrElse("archivehunter")
 
+  private val esClient = esClientManager.getClient()
   import com.sksamuel.elastic4s.http.ElasticDsl._
 
   def simpleStringSearch(q:Option[String],start:Option[Int],length:Option[Int]) = Action.async {
-    val cli = esClientManager.getClient()
-
     val actualStart=start.getOrElse(0)
     val actualLength=length.getOrElse(50)
 
     q match {
       case Some(searchTerms) =>
-        val responseFuture = cli.execute {
+        val responseFuture = esClient.execute {
           search(indexName) query searchTerms from actualStart size actualLength sortBy fieldSort("path.keyword")
         }
 
@@ -48,12 +48,9 @@ class SearchController @Inject()(config:Configuration,cc:ControllerComponents,es
   }
 
   def suggestions = Action.async(parse.text) { request=>
-    val cli = esClientManager.getClient()
-
     val sg = termSuggestion("sg").on("path").text(request.body)
 
-
-    cli.execute({
+    esClient.execute({
       search(indexName) suggestions {
         sg
       }
@@ -65,5 +62,26 @@ class SearchController @Inject()(config:Configuration,cc:ControllerComponents,es
         logger.info(results.body.getOrElse("[empty body]"))
         Ok(BasicSuggestionsResponse.fromEsResponse(results.result.termSuggestion("sg")).asJson)
     })
+  }
+
+  def browserSearch(startAt:Int,pageSize:Int) = Action.async(circe.json(2048)) { request=>
+    request.body.as[SearchRequest].fold(
+      error=>{
+        Future(BadRequest(GenericErrorResponse("bad_request", error.toString).asJson))
+      },
+      request=> {
+        esClient.execute {
+          search(indexName) query {
+            boolQuery().must(request.toSearchParams)
+          } from startAt size pageSize sortBy fieldSort("path.keyword")
+        }.map({
+          case Left(err) =>
+            logger.error(s"Could not perform advanced search: $err")
+            InternalServerError(GenericErrorResponse("search_error", err.toString).asJson)
+          case Right(results) =>
+            Ok(ObjectListResponse("ok", "entry", results.result.to[ArchiveEntry], results.result.totalHits.toInt).asJson)
+        })
+      }
+    )
   }
 }
