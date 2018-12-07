@@ -9,7 +9,8 @@ class EntryThumbnail extends React.Component {
         mimeType: PropTypes.object.isRequired,
         fileExtension: PropTypes.string.isRequired,
         entryId: PropTypes.string.isRequired,
-        dataTip: PropTypes.string
+        dataTip: PropTypes.string,
+        cancelToken: PropTypes.object
     };
 
     static knownAudioExtensions = [
@@ -52,7 +53,7 @@ class EntryThumbnail extends React.Component {
 
     componentWillMount(){
         this.setState({loading: true, lastError: null},()=>{
-            axios.get("/api/proxy/" + this.props.entryId + "/playable?proxyType=THUMBNAIL")
+            axios.get("/api/proxy/" + this.props.entryId + "/playable?proxyType=THUMBNAIL", {cancelToken: this.props.cancelToken})
                 .then(result=>{
                     this.setState({loading: false, lastError: null, thumbnailUri: result.data.uri})
                 }).catch(err=>{

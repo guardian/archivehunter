@@ -5,6 +5,7 @@ import defaultTheme from 'react-treebeard/src/themes/default';
 import ErrorViewComponent from "../common/ErrorViewComponent.jsx";
 import SearchResultsComponent from "../search/SearchResultsComponent.jsx";
 import EntryDetails from "../Entry/EntryDetails.jsx";
+import BrowsePathSummary from "./BrowsePathSummary.jsx";
 
 class BrowseComponent extends React.Component {
     constructor(props){
@@ -20,7 +21,9 @@ class BrowseComponent extends React.Component {
             showingPreview: null,
             autoPlay: true,
             searchResults: [],
-            searching: false
+            searching: false,
+            cancelUnderway: false,
+            entriesCancelTokenSource: null
         };
 
         this.treeStyle = Object.assign({}, defaultTheme);
@@ -37,8 +40,6 @@ class BrowseComponent extends React.Component {
                         }
                     }
         });
-
-        this.cancelTokenSource = axios.CancelToken.source();
 
         this.onToggle = this.onToggle.bind(this);
         this.onItemClose = this.onItemClose.bind(this);
@@ -111,16 +112,21 @@ class BrowseComponent extends React.Component {
     }
 
     triggerSearch(node, startingPos){
-        const tok=this.cancelTokenSource.token;
-
         const startAt = startingPos ? startingPos : 0;
         const pageSize = 100;
 
         const toSend = this.makeSearchJson(node);
 
-        this.setState({loading: true, lastError: null, currentSearchToken: tok}, ()=>
-            axios.post("/api/search/browser?start=" + startAt + "&size=" + pageSize, toSend, {headers: {"Content-Type": "application/json"}, cancelToken: tok}).then(response=>{
+        console.log("triggerSearch: startAt ", startAt, " pageSize ", pageSize, " toSend ", toSend);
+
+        this.setState({loading: true, lastError: null}, ()=>
+            axios.post("/api/search/browser?start=" + startAt + "&size=" + pageSize, toSend,
+                {
+                    headers: {"Content-Type": "application/json"},
+                    cancelToken: axios.CancelToken(tok=>this.setState({currentSearchToken: tok}))
+                }).then(response=>{
                 console.log("Got " + response.data.entries.length + " results to add to " + this.state.searchResults.length + " already existing");
+                if(this.state.cancelUnderway) return;
                 if(response.data.entries.length>0 && this.state.searchResults.length < 1000 && startingPos){
                     this.setState({searchResults: this.state.searchResults.concat(response.data.entries)}, ()=>this.triggerSearch(node, startAt+pageSize));
                 } else if(!startingPos) {
@@ -139,20 +145,35 @@ class BrowseComponent extends React.Component {
         )
     }
 
+    postToggle(node){
+        if(this.state.entriesCancelTokenSource) {
+            this.state.entriesCancelTokenSource.cancel("new search terms");
+            this.setState({entriesCancelTokenSource: axios.CancelToken.source()});
+        }
+
+        if (node.isLoaded) {
+            this.triggerSearch(node);
+        } else {
+            this.loadSubFolder(node).then(() => this.triggerSearch(node));
+        }
+    }
+
     onToggle(node, toggled){
         if(this.state.cursor){this.state.cursor.active = false;}
         node.active = true;
         if(node.children){ node.toggled = toggled; }
-        this.setState({ cursor: node }, ()=>{
-            if(node.isLoaded) {
-                if(this.state.currentSearchToken){
-                    this.cancelTokenSource.cancel("New search terms")
+
+        if(this.state.cursor!==node) {
+            this.setState({cursor: node, searchResults: []}, () => {
+                if (this.state.currentSearchToken) {
+                    this.state.currentSearchToken();    //this will perform a cancellation
+                    //if we don't do this, it seems that the cancel above can cancel THIS search instead...
+                    this.setState({currentSearchToken: null}, () => window.setTimeout(()=>this.postToggle(node), 3000));
+                } else {
+                    this.postToggle(node);
                 }
-                this.triggerSearch(node);
-            } else {
-                this.loadSubFolder(node).then(()=>this.triggerSearch(node));
-            }
-        });
+            });
+        }
     }
 
     componentDidUpdate(oldProps, oldState){
@@ -175,7 +196,10 @@ class BrowseComponent extends React.Component {
         if(this.state.error){
             return <ErrorViewComponent error={this.state.error}/>
         } else if(this.state.totalHits!==-1){
-            return <SearchResultsComponent entries={this.state.searchResults} onItemOpen={this.onItemOpen} onItemClose={this.onItemClose} selectedEntry={this.state.showingPreview}/>
+            return <div>
+                <BrowsePathSummary collectionName={this.state.collectionName} path={this.state.cursor ? this.state.cursor.fullPath : null}/>
+                <SearchResultsComponent entries={this.state.searchResults} onItemOpen={this.onItemOpen} onItemClose={this.onItemClose} selectedEntry={this.state.showingPreview} cancelToken={this.entriesCancelTokenSource ? this.entriesCancelTokenSource.token : null}/>
+            </div>
         } else if(this.state.searching) {
             return <img style={{marginLeft:"auto",marginRight:"auto",width:"200px",display:"block"}} src="/assets/images/Spinner-1s-200px.gif"/>
         } else {
@@ -183,9 +207,18 @@ class BrowseComponent extends React.Component {
         }
     }
 
+    doCancelAll(){
+        if(!this.state.cancelUnderway) {
+            this.setState({cancelUnderway: true}, () => {
+                this.cancelTokenSource.cancel("User request");
+                window.setTimeout(() => this.setState({cancelUnderway: false}), 3000)
+            })
+        }
+    }
+
     render() {
         return <div>
-            <div id="selector-panel" style={{width: "20%", height: "90vh", overflow: this.state.treeContents.length>0 ? "scroll" : "hidden", float: "left"}}>
+            <div className="selector-panel" style={{overflow: this.state.treeContents.length>0 ? "scroll" : "hidden"}}>
                 <select id="collection-selector"
                         value={this.state.collectionName}
                         onChange={evt=>this.setState({collectionName: evt.target.value})}>
@@ -193,6 +226,7 @@ class BrowseComponent extends React.Component {
                         this.state.collectionNames.map(entry=><option id={entry} value={entry}>{entry}</option>)
                     }
                 </select>
+                <a onClick={this.doCancelAll}>{this.state.cancelUnderway ? "cancelling..." : "cancel all"}</a>
                 <Treebeard data={this.state.treeContents} onToggle={this.onToggle} style={this.treeStyle}/>
             </div>
             <EntryDetails entry={this.state.showingPreview} autoPlay={this.state.autoPlay} showJobs={true} loadJobs={false}/>
