@@ -7,7 +7,8 @@ class SearchResultsComponent extends React.Component {
         entries: PropTypes.array.isRequired,
         onItemOpen: PropTypes.func.isRequired,
         onItemClose: PropTypes.func.isRequired,
-        selectedEntry: PropTypes.object
+        selectedEntry: PropTypes.object,
+        cancelToken: PropTypes.object
     };
 
     constructor(props){
@@ -25,7 +26,10 @@ class SearchResultsComponent extends React.Component {
             {
                 this.props.entries.map(entry=><EntryView style={{cursor: "pointer"}}
                                                          isSelected={ this.props.selectedEntry ? this.props.selectedEntry.id===entry.id : false}
-                                                         entry={entry} itemOpenRequest={this.props.onItemOpen}/>)
+                                                         entry={entry}
+                                                         cancelToken={this.props.cancelToken}
+                                                         itemOpenRequest={this.props.onItemOpen}
+                />)
             }
         </div>
     }

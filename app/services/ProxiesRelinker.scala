@@ -13,7 +13,7 @@ import play.api.{Configuration, Logger}
 import com.sksamuel.elastic4s.streams.ReactiveElastic._
 import com.sksamuel.elastic4s.streams.{RequestBuilder, ResponseListener, SubscriberConfig}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{JobModelDAO, JobStatus}
-import helpers.{ProxyLocatorFlow, ProxyVerifyFlow, SearchHitToArchiveEntryFlow}
+import helpers.{EOSDetect, ProxyLocatorFlow, ProxyVerifyFlow, SearchHitToArchiveEntryFlow}
 import models.IndexUpdateCounter
 import play.api.inject.Injector
 
@@ -81,10 +81,41 @@ class ProxiesRelinker @Inject() (config:Configuration,
 
   private def globalRelinkScan(jobId:String) = {
     val completionPromise = Promise[IndexUpdateCounter]()
+    val eosPromise = Promise[Unit]()
+
     logger.info("Starting global relink scan")
-    getIndexScanSource.via(new SearchHitToArchiveEntryFlow).via(proxyVerifyFlow).to(getIndexUpdateSink(completionPromise)).run()
+    val eosDetect = new EOSDetect[Unit, ArchiveEntry](eosPromise, ())
+    getIndexScanSource
+      .via(new SearchHitToArchiveEntryFlow)
+      .via(proxyVerifyFlow)
+      .via(eosDetect)
+      .to(getIndexUpdateSink(completionPromise))
+      .run()
 
     val originalSender = sender()
+
+    eosPromise.future.onComplete({
+      case Success(counter)=>
+        logger.info(s"Global relink scan completed - detected via EOS")
+        jobModelDAO.jobForId(jobId).map({
+          case None=>
+            logger.error(s"Proxy relink job record must have been deleted while we were running! Job completed but can't record.")
+          case Some(Right(jobModel))=>
+            val updatedJob = jobModel.copy(completedAt = Some(ZonedDateTime.now()),jobStatus = JobStatus.ST_SUCCESS)
+            jobModelDAO.putJob(updatedJob)
+        })
+        originalSender ! RelinkSuccess(IndexUpdateCounter(-1,-1))
+      case Failure(err)=>
+        logger.error("Global relink scan failed with error: ",err)
+        jobModelDAO.jobForId(jobId).map({
+          case None=>
+            logger.error(s"Proxy relink job record must have been deleted while we were running! Job completed but can't record.")
+          case Some(Right(jobModel))=>
+            val updatedJob = jobModel.copy(completedAt = Some(ZonedDateTime.now()),jobStatus = JobStatus.ST_ERROR, log = Some(err.toString))
+            jobModelDAO.putJob(updatedJob)
+        })
+        originalSender ! RelinkError(err)
+    })
 
     completionPromise.future.onComplete({
       case Success(counter)=>

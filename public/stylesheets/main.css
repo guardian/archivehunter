@@ -350,3 +350,10 @@ p.information {
     border-color: white !important;
     box-shadow: 3px 3px 5px black
 }
+
+div.selector-panel {
+    width: 20%;
+    height: 90vh;
+    float: left;
+    margin-right: 1em;
+}
