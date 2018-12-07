@@ -60,6 +60,9 @@
     <logger name="services.DynamoCapacityActor" level="INFO"/>
     <logger name="services.ClockSingleton" level="DEBUG"/>
     <logger name="services.ETSProxyActor" level="DEBUG"/>
+    <logger name="services.ProxiesRelinker" level="DEBUG"/>
+    <logger name="helpers.ProxyVerifyFlow" level="DEBUG"/>
+
     <logger name="com.theguardian.multimedia.archivehunter.cmn_services.ProxyGenerators" level="DEBUG"/>
     <logger name="com.theguardian.multimedia.archivehunter.common.ProxyLocation$" level="DEBUG"/>
 

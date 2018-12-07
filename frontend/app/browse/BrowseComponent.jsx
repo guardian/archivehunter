@@ -38,6 +38,8 @@ class BrowseComponent extends React.Component {
                     }
         });
 
+        this.cancelTokenSource = axios.CancelToken.source();
+
         this.onToggle = this.onToggle.bind(this);
         this.onItemClose = this.onItemClose.bind(this);
         this.onItemOpen = this.onItemOpen.bind(this);
@@ -45,7 +47,8 @@ class BrowseComponent extends React.Component {
 
     refreshCollectionNames(){
         this.setState({isLoading: true, lastError: null}, ()=>axios.get("/api/scanTarget").then(result=>{
-            this.setState({isLoading: false, collectionNames: result.data.entries.map(ent=>ent.bucketName)});
+            const nameList = result.data.entries.map(ent=>ent.bucketName);
+            this.setState({isLoading: false, collectionNames: nameList, collectionName: nameList.length>0 ? nameList[0] : null}, ()=>this.refreshTreeContents());
         }).catch(err=>{
             console.error("Could not refresh collection names: ", err);
             this.setState({isLoading: false, lastError: err});
@@ -68,7 +71,7 @@ class BrowseComponent extends React.Component {
 
     refreshTreeContents(){
         this.setState({isLoading: true, lastError: null, treeContents: []}, ()=>axios.get("/api/browse/" + this.state.collectionName + "?prefix=").then(result=>{
-            this.setState({isLoading: false, lastError: null, treeContents: result.data.entries.map(ent=>BrowseComponent.treeDataForEntry(ent))})
+            this.setState({isLoading: false, lastError: null, treeContents: result.data.entries.map(ent=>BrowseComponent.treeDataForEntry(ent))}, ()=>this.triggerSearch())
         }).catch(err=>{
             console.error("Could not list folders: ", err);
             this.setState({isLoading: false, lastError: err});
@@ -97,19 +100,26 @@ class BrowseComponent extends React.Component {
         })
     }
 
+    makeSearchJson(node) {
+        if(node) {
+            const pathToSearch = node.fullPath.endsWith("/") ? node.fullPath.slice(0, node.fullPath.length - 1) : node.fullPath;
+            console.log("pathToSearch is " + pathToSearch);
+            return JSON.stringify({q: null, path: pathToSearch, collection: this.state.collectionName});
+        } else {
+            return JSON.stringify({q: null, path: null, collection: this.state.collectionName});
+        }
+    }
+
     triggerSearch(node, startingPos){
-        console.log("triggerSearch: ", node.fullPath);
+        const tok=this.cancelTokenSource.token;
 
-        const pathToSearch = node.fullPath.endsWith("/") ? node.fullPath.slice(0, node.fullPath.length-1) : node.fullPath;
-
-        console.log("pathToSearch is " + pathToSearch);
-
-        const toSend = JSON.stringify({q: null, path: pathToSearch, collection: this.state.collectionName});
         const startAt = startingPos ? startingPos : 0;
         const pageSize = 100;
 
-        this.setState({loading: true, lastError: null}, ()=>
-            axios.post("/api/search/browser?start=" + startAt + "&size=" + pageSize, toSend, {headers: {"Content-Type": "application/json"}}).then(response=>{
+        const toSend = this.makeSearchJson(node);
+
+        this.setState({loading: true, lastError: null, currentSearchToken: tok}, ()=>
+            axios.post("/api/search/browser?start=" + startAt + "&size=" + pageSize, toSend, {headers: {"Content-Type": "application/json"}, cancelToken: tok}).then(response=>{
                 console.log("Got " + response.data.entries.length + " results to add to " + this.state.searchResults.length + " already existing");
                 if(response.data.entries.length>0 && this.state.searchResults.length < 1000 && startingPos){
                     this.setState({searchResults: this.state.searchResults.concat(response.data.entries)}, ()=>this.triggerSearch(node, startAt+pageSize));
@@ -119,8 +129,12 @@ class BrowseComponent extends React.Component {
                     this.setState({loading: false, lastError: null});
                 }
             }).catch(err=>{
-                console.error(err);
-                this.setState({loading: false, lastError: err});
+                if(axios.isCancel(err)) {
+                    console.log("cancelled ongoing search");
+                } else {
+                    console.error(err);
+                    this.setState({loading: false, lastError: err});
+                }
             })
         )
     }
@@ -131,6 +145,9 @@ class BrowseComponent extends React.Component {
         if(node.children){ node.toggled = toggled; }
         this.setState({ cursor: node }, ()=>{
             if(node.isLoaded) {
+                if(this.state.currentSearchToken){
+                    this.cancelTokenSource.cancel("New search terms")
+                }
                 this.triggerSearch(node);
             } else {
                 this.loadSubFolder(node).then(()=>this.triggerSearch(node));
