@@ -20,8 +20,8 @@ class BytesFormatter extends React.Component {
 
     render(){
         const result = this.reduceValue();
-
-        return <span>{result[0].toPrecision(3)} {result[1]}</span>
+        //const numeric = result[0] < 1024 ? result[0].toPrecision(3) : result[0];
+        return <span>{result[0]} {result[1]}</span>
     }
 }
 
