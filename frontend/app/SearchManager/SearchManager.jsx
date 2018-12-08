@@ -1,4 +1,5 @@
 import Searcher from './Searcher.jsx';
+import uuid from 'uuid/v4';
 
 class SearchManager {
     constructor(){
@@ -6,8 +7,31 @@ class SearchManager {
 
     }
 
+    generateId(){
+        return uuid();
+    }
+
+    /**
+     * internal method to build the search object. Included like this for testing.
+     * @param searchId
+     * @param method
+     * @param url
+     * @param params
+     * @param bodyContent
+     * @param pageSize
+     * @param nextPageCb
+     * @param completedCb
+     * @param cancelledCb
+     * @param errorCb
+     * @private
+     */
+    _buildSearch(searchId, method, url, params, bodyContent, pageSize, nextPageCb, completedCb, cancelledCb, errorCb){
+        return new Searcher(searchId, method, url, params, bodyContent, pageSize, nextPageCb, completedCb, cancelledCb, errorCb);
+    }
+
     /**
      * create a new search. Stop the existing one before kicking this one off, if so.
+     * returns a Promise that resolves with the new search ID, once it is running.
      * @param method
      * @param url
      * @param params
@@ -18,20 +42,25 @@ class SearchManager {
      * @param cancelledCb
      * @param errorCb
      */
-    makeNewSearch(method, url, params, bodyContent, pageSize, nextPageCb, completedCb, cancelledCb, errorCb){
-        const searchId = this.generateId();
-        if(this.currentSearch){
-            this.currentSearch.cancel("new search terms").then(result=>{
-                this.currentSearch = new Searcher(searchId, method, url, params, bodyContent, pageSize, nextPageCb, completedCb, cancelledCb, errorCb);
+    makeNewSearch(method, url, params, bodyContent, pageSize, nextPageCb, completedCb, cancelledCb, errorCb) {
+        return new Promise((resolve, reject) => {
+            const searchId = this.generateId();
+            if (this.currentSearch) {
+                console.log("Cancelling current search");
+                this.currentSearch.cancel("new search terms").then(result => {
+                    console.log("Cancellation prcessed, building new one...");
+                    this.currentSearch = this._buildSearch(searchId, method, url, params, bodyContent, pageSize, nextPageCb, completedCb, cancelledCb, errorCb);
+                    this.currentSearch.startSearch();
+                    resolve(this.currentSearch.searchId);
+                })
+            } else {
+                this.currentSearch = this._buildSearch(searchId, method, url, params, bodyContent, pageSize, nextPageCb, completedCb, cancelledCb, errorCb);
                 this.currentSearch.startSearch();
-            })
-        } else {
-            this.currentSearch = new Searcher(searchId, method, url, params, bodyContent, pageSize, nextPageCb, completedCb, cancelledCb, errorCb);
-            this.currentSearch.startSearch();
-        }
-
-        return searchId;
+                resolve(this.currentSearch.searchId);
+            }
+        });
     }
+
 
 
 }
