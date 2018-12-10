@@ -6,6 +6,7 @@ import ErrorViewComponent from "../common/ErrorViewComponent.jsx";
 import SearchResultsComponent from "../search/SearchResultsComponent.jsx";
 import EntryDetails from "../Entry/EntryDetails.jsx";
 import BrowsePathSummary from "./BrowsePathSummary.jsx";
+import SearchManager from '../SearchManager/SearchManager.jsx';
 
 class BrowseComponent extends React.Component {
     constructor(props){
@@ -44,6 +45,8 @@ class BrowseComponent extends React.Component {
         this.onToggle = this.onToggle.bind(this);
         this.onItemClose = this.onItemClose.bind(this);
         this.onItemOpen = this.onItemOpen.bind(this);
+
+        this.searchManager = new SearchManager();
     }
 
     refreshCollectionNames(){
@@ -111,46 +114,44 @@ class BrowseComponent extends React.Component {
         }
     }
 
+    receivedNextPage(response, searchId){
+        if(searchId===this.state.currentSearch) {
+            this.setState({searchResults: this.state.searchResults.concat(response.data.entries)});
+        } else {
+            console.error("Received data for stale search " + searchId + ". Current search is " + this.state.currentSearch)
+        }
+    }
+
+    searchCompleted(searchId){
+        console.log("Search completed: " + searchId);
+        this.setState({loading: false, lastError: null});
+    }
+
+    searchCancelled(searchId){
+        console.log("Search cancelled: " + searchId);
+        this.setState({searchResults:[]});
+    }
+
+    searchError(error, searchId){
+        console.error(error);
+        this.setState({loading: false, lastError: error});
+    }
+
     triggerSearch(node, startingPos){
-        const startAt = startingPos ? startingPos : 0;
         const pageSize = 100;
+        const toSend = {
+            data: this.makeSearchJson(node),
+            contentType: "application/json"
+        };
 
-        const toSend = this.makeSearchJson(node);
-
-        console.log("triggerSearch: startAt ", startAt, " pageSize ", pageSize, " toSend ", toSend);
-
-        this.setState({loading: true, lastError: null}, ()=>
-            axios.post("/api/search/browser?start=" + startAt + "&size=" + pageSize, toSend,
-                {
-                    headers: {"Content-Type": "application/json"},
-                    cancelToken: axios.CancelToken(tok=>this.setState({currentSearchToken: tok}))
-                }).then(response=>{
-                console.log("Got " + response.data.entries.length + " results to add to " + this.state.searchResults.length + " already existing");
-                if(this.state.cancelUnderway) return;
-                if(response.data.entries.length>0 && this.state.searchResults.length < 1000 && startingPos){
-                    this.setState({searchResults: this.state.searchResults.concat(response.data.entries)}, ()=>this.triggerSearch(node, startAt+pageSize));
-                } else if(!startingPos) {
-                    this.setState({searchResults: response.data.entries}, ()=>this.triggerSearch(node, startAt+pageSize));
-                } else {
-                    this.setState({loading: false, lastError: null});
-                }
-            }).catch(err=>{
-                if(axios.isCancel(err)) {
-                    console.log("cancelled ongoing search");
-                } else {
-                    console.error(err);
-                    this.setState({loading: false, lastError: err});
-                }
-            })
-        )
+        this.searchManager.makeNewSearch("POST","/api/search/browser",null,toSend,pageSize,this.receivedNextPage, this.searchCompleted, this.searchCancelled,this.searchError)
+            .then(searchId=>{
+                console.log("Got new search ID " + searchId);
+                this.setState({currentSearch: searchId})
+            });
     }
 
     postToggle(node){
-        if(this.state.entriesCancelTokenSource) {
-            this.state.entriesCancelTokenSource.cancel("new search terms");
-            this.setState({entriesCancelTokenSource: axios.CancelToken.source()});
-        }
-
         if (node.isLoaded) {
             this.triggerSearch(node);
         } else {
@@ -165,13 +166,7 @@ class BrowseComponent extends React.Component {
 
         if(this.state.cursor!==node) {
             this.setState({cursor: node, searchResults: []}, () => {
-                if (this.state.currentSearchToken) {
-                    this.state.currentSearchToken();    //this will perform a cancellation
-                    //if we don't do this, it seems that the cancel above can cancel THIS search instead...
-                    this.setState({currentSearchToken: null}, () => window.setTimeout(()=>this.postToggle(node), 3000));
-                } else {
-                    this.postToggle(node);
-                }
+                this.postToggle(node);
             });
         }
     }

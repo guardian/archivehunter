@@ -35,7 +35,7 @@ class SearchManager {
      * @param method
      * @param url
      * @param params
-     * @param bodyContent
+     * @param bodyContent - either object containing {data, contentType} keys or null
      * @param pageSize
      * @param nextPageCb
      * @param completedCb
