@@ -12,7 +12,8 @@ describe("Searcher.getNextPage", ()=>{
     });
 
     it("should make the relevant request and call nextPageCb for each downloaded page before calling completedCb when done", (done)=>{
-        const nextPageCb = sinon.spy();
+        const nextPageCb = sinon.stub();
+        nextPageCb.returns(true);
         const completedCb = sinon.spy();
         const errorCb = sinon.spy();
         const cancelledCb = sinon.spy();
@@ -86,7 +87,8 @@ describe("Searcher.getNextPage", ()=>{
     });
 
     it("should marshall k/v pairs into a request query string", (done)=>{
-        const nextPageCb = sinon.spy();
+        const nextPageCb = sinon.stub();
+        nextPageCb.returns(true);
         const completedCb = sinon.spy();
         const errorCb = sinon.spy();
         const cancelledCb = sinon.spy();
