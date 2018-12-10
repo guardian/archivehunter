@@ -33,6 +33,9 @@ class BrowseComponent extends React.Component {
          */
         this.treeStyle.node = Object.assign(this.treeStyle.tree.node, {
                     container: {
+                        base: {
+                            cursor: 'pointer',
+                        },
                         link: {
                             cursor: 'pointer', position: 'relative', padding: '0px 5px', display: 'block'
                         },
@@ -45,6 +48,12 @@ class BrowseComponent extends React.Component {
         this.onToggle = this.onToggle.bind(this);
         this.onItemClose = this.onItemClose.bind(this);
         this.onItemOpen = this.onItemOpen.bind(this);
+
+        /* callbacks for Searcher */
+        this.receivedNextPage = this.receivedNextPage.bind(this);
+        this.searchError = this.searchError.bind(this);
+        this.searchCancelled = this.searchCancelled.bind(this);
+        this.searchCompleted = this.searchCompleted.bind(this);
 
         this.searchManager = new SearchManager();
     }
@@ -120,13 +129,22 @@ class BrowseComponent extends React.Component {
         } else {
             console.error("Received data for stale search " + searchId + ". Current search is " + this.state.currentSearch)
         }
+        return this.state.searchResults<450;
     }
 
+    /**
+     * callback, called by Searcher when a search has completed (returns no more results)
+     * @param searchId
+     */
     searchCompleted(searchId){
         console.log("Search completed: " + searchId);
         this.setState({loading: false, lastError: null});
     }
 
+    /**
+     * callback, called by Searcher when a search has been cancelled (i.e. superceded)
+     * @param searchId
+     */
     searchCancelled(searchId){
         console.log("Search cancelled: " + searchId);
         this.setState({searchResults:[]});

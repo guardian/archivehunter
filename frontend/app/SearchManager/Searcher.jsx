@@ -32,6 +32,8 @@ class Searcher {
         this.startAt=0;
 
         this.cancelTokenSource = axios.CancelToken.source();
+
+        console.log("Searcher body content: ", bodyContent);
     }
 
     /**
@@ -41,8 +43,10 @@ class Searcher {
         return new Promise((resolve, reject)=>{
             if(!this.operationInProgress){
                 this.terminationCompletedCb = resolve;
+                this.isCancelling = true;
                 this.cancelTokenSource.cancel(msg); //this is picked up in axios.isCancel() within getNextPage() - the promise is then completed.
             } else {
+                this.isCancelling = true;
                 resolve();
             }
         })
@@ -52,6 +56,7 @@ class Searcher {
      * internal method. called to request the next page of results from the server
      */
     getNextPage(){
+        if(this.isCancelling) return;
         this.operationInProgress = true;
         const urlParams = this.params ? Object.assign({size: this.pageSize, startAt:this.startAt}, this.params) : {size: this.pageSize, startAt:this.startAt};
         const urlParamsString = Object.keys(urlParams)
@@ -59,7 +64,10 @@ class Searcher {
             .join("&");
 
         const staticHeaders = {};
-        const updateHeaders = this.bodyContent && this.bodyContent.contentType ? Object.assign(staticHeaders, this.bodyContent.contentType) : staticHeaders;
+        const updateHeaders = this.bodyContent && this.bodyContent.contentType ? Object.assign(staticHeaders, {"Content-Type": this.bodyContent.contentType}) : staticHeaders;
+
+        console.log("getNextPage: headers ", updateHeaders);
+        console.log("getNextPage: body content ", this.bodyContent ? this.bodyContent.data : null);
 
         axios.request({
             method: this.method,
@@ -71,9 +79,9 @@ class Searcher {
                 this.completedCb(this.searchId);
                 this.operationInProgress = false;
             } else {
-                this.nextPageCb(response, this.searchId);
+                const shouldContinue = this.nextPageCb(response, this.searchId);
                 this.startAt+=this.pageSize;
-                this.getNextPage();
+                if(shouldContinue) this.getNextPage();
             }
         }).catch(err=>{
             this.operationInProgress = false;
