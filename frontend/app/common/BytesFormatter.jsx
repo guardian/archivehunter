@@ -20,8 +20,9 @@ class BytesFormatter extends React.Component {
 
     render(){
         const result = this.reduceValue();
-        //const numeric = result[0] < 1024 ? result[0].toPrecision(3) : result[0];
-        return <span>{result[0]} {result[1]}</span>
+        //parseFloat is necessary to remove the scientific notation
+        const numeric = result[0] < 1024 ? parseFloat(result[0].toPrecision(3)) : result[0];
+        return <span>{numeric} {result[1]}</span>
     }
 }
 
