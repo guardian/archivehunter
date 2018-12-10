@@ -214,6 +214,8 @@ class ProxiesController @Inject()(config:Configuration, cc:ControllerComponents,
         NotFound(GenericErrorResponse("not_found", msg.toString).asJson)
       case Failure(ExternalSystemError(systemName, msg))=>
         InternalServerError(GenericErrorResponse("error",s"Could not launch task: $msg").asJson)
+      case Failure(genericError)=>
+        InternalServerError(GenericErrorResponse("error", genericError.toString).asJson)
       case Success(taskId)=>
         Ok(responses.ObjectGetResponse("ok","task",taskId).asJson)
     })

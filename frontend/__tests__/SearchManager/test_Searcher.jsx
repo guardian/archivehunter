@@ -135,7 +135,9 @@ describe("Searcher.getNextPage", ()=>{
         const errorCb = sinon.spy();
         const cancelledCb = sinon.spy();
 
-        const searcher = new Searcher("test1","GET","/path/to/my/endpoint",null,"request body string",10,nextPageCb,completedCb, cancelledCb, errorCb);
+        const searcher = new Searcher("test1","GET","/path/to/my/endpoint",null,
+            {data: "request body string", contentType: "text/plain"}
+            ,10,nextPageCb,completedCb, cancelledCb, errorCb);
 
         searcher.getNextPage();
 

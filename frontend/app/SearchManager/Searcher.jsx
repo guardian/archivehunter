@@ -58,10 +58,14 @@ class Searcher {
             .map((k,idx)=>encodeURIComponent(k) + "=" + encodeURIComponent(urlParams[k]))
             .join("&");
 
+        const staticHeaders = {};
+        const updateHeaders = this.bodyContent && this.bodyContent.contentType ? Object.assign(staticHeaders, this.bodyContent.contentType) : staticHeaders;
+
         axios.request({
             method: this.method,
             url: this.url + "?" + urlParamsString,
-            data: this.bodyContent
+            data: this.bodyContent ? this.bodyContent.data : null,
+            headers: updateHeaders
         }).then(response=>{
             if(response.data.entries.length===0){
                 this.completedCb(this.searchId);

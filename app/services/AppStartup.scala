@@ -10,7 +10,7 @@ import play.api.{Configuration, Logger}
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
-import scala.util.Success
+import scala.util.{Failure, Success}
 
 class AppStartup @Inject()(@Named("bucketScannerActor") bucketScanner:ActorRef, actorSystem:ActorSystem,
                             config:Configuration, injector:Injector, lifecycle: ApplicationLifecycle)(implicit system:ActorSystem){
@@ -49,6 +49,8 @@ class AppStartup @Inject()(@Named("bucketScannerActor") bucketScanner:ActorRef, 
         if(err.error.`type`!="resource_already_exists_exception")  logger.error(s"Index create request failed: $err")
       case Success(Right(response))=>
         logger.info(s"Index create successful: $response")
+      case Failure(err)=>
+        logger.error(s"Index create request failed: $err")
     })
   }
   doTestCreateIndex()
