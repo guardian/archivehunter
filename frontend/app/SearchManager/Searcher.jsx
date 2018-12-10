@@ -9,7 +9,7 @@ class Searcher {
      * @param params any URL parameters to be added to the url. This takes the form of an object with key/value pairs.
      * @param bodyContent text to send as the request body, or undefined/null if not required
      * @param pageSize number of entries to return in a page
-     * @param nextPageCb callback for when a new page is returned. Receives the axios response object.
+     * @param nextPageCb callback for when a new page is returned. Receives the axios response object.  This MUST return "true" in order to continue processing
      * @param completedCb callback for when the search has completed (zero results got returned). Receives no arguments
      * @param cancelledCb callback for when the search has been cancelled.
      * @param errorCb callback for when an error has occurred. Receives the axios error object
@@ -56,6 +56,8 @@ class Searcher {
      * internal method. called to request the next page of results from the server
      */
     getNextPage(){
+        console.log("getNextPage: isCancelling? ", this.isCancelling);
+
         if(this.isCancelling) return;
         this.operationInProgress = true;
         const urlParams = this.params ? Object.assign({size: this.pageSize, startAt:this.startAt}, this.params) : {size: this.pageSize, startAt:this.startAt};
