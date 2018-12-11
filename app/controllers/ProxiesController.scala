@@ -23,10 +23,11 @@ import io.circe.syntax._
 import com.gu.scanamo.syntax._
 import com.theguardian.multimedia.archivehunter.common.errors.{ExternalSystemError, NothingFoundError}
 import com.theguardian.multimedia.archivehunter.common.cmn_models._
-import helpers.ProxyLocator
-import models._
+import com.theguardian.multimedia.archivehunter.common.cmn_models.{JobModelDAO, ScanTargetDAO}
+import helpers.{InjectableRefresher, ProxyLocator}
 import services.{ETSProxyActor, ProxiesRelinker}
 import cmn_services.ProxyGenerators
+import play.api.libs.ws.WSClient
 import services.ETSProxyActor.{ETSMsg, ETSMsgReply, PreparationFailure, PreparationSuccess}
 
 import scala.concurrent.duration._
@@ -34,12 +35,18 @@ import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
 @Singleton
-class ProxiesController @Inject()(config:Configuration, cc:ControllerComponents, ddbClientMgr: DynamoClientManager,
-                                  esClientMgr:ESClientManager, s3ClientMgr:S3ClientManager, proxyGenerators: ProxyGenerators,
+class ProxiesController @Inject()(override val config:Configuration,
+                                  override val controllerComponents:ControllerComponents,
+                                  ddbClientMgr: DynamoClientManager,
+                                  esClientMgr:ESClientManager,
+                                  s3ClientMgr:S3ClientManager,
+                                  proxyGenerators: ProxyGenerators,
+                                  override val wsClient:WSClient,
+                                  override val refresher:InjectableRefresher,
                                   @Named("etsProxyActor") etsProxyActor:ActorRef,
                                   @Named("proxiesRelinker") proxiesRelinker:ActorRef)
                                  (implicit actorSystem:ActorSystem, scanTargetDAO:ScanTargetDAO, jobModelDAO:JobModelDAO)
-  extends AbstractController(cc) with Circe with ProxyLocationEncoder {
+  extends AbstractController(controllerComponents) with Circe with ProxyLocationEncoder with PanDomainAuthActions {
   import akka.pattern.ask
   implicit private val mat:Materializer = ActorMaterializer.create(actorSystem)
   private val logger=Logger(getClass)
@@ -49,7 +56,7 @@ class ProxiesController @Inject()(config:Configuration, cc:ControllerComponents,
   protected val tableName:String = config.get[String]("proxies.tableName")
   private val table = Table[ProxyLocation](tableName)
 
-  def proxyForId(fileId:String, proxyType:Option[String]) = Action.async {
+  def proxyForId(fileId:String, proxyType:Option[String]) = APIAuthAction.async {
     try {
       val ddbClient = ddbClientMgr.getNewAlpakkaDynamoClient(awsProfile)
 
@@ -85,7 +92,7 @@ class ProxiesController @Inject()(config:Configuration, cc:ControllerComponents,
     }
   }
 
-  def getPlayable(fileId:String, proxyType:Option[String]) = Action.async {
+  def getPlayable(fileId:String, proxyType:Option[String]) = APIAuthAction.async {
     try {
       val ddbClient = ddbClientMgr.getNewAlpakkaDynamoClient(awsProfile)
       val s3client = s3ClientMgr.getS3Client(awsProfile)
@@ -130,7 +137,7 @@ class ProxiesController @Inject()(config:Configuration, cc:ControllerComponents,
     * @param fileId ES index file ID
     * @return
     */
-  def searchFor(fileId:String) = Action.async {
+  def searchFor(fileId:String) = APIAuthAction.async {
     implicit val indexer = new Indexer(indexName)
     implicit val client = esClientMgr.getClient()
     implicit val s3Client = s3ClientMgr.getS3Client(awsProfile)
@@ -171,7 +178,7 @@ class ProxiesController @Inject()(config:Configuration, cc:ControllerComponents,
     *                    None simply results in a 400 Bad Request error.
     * @param proxyId Proxy ID of the proxy to link to fileId. Get this from `searchFor`.
     */
-  def associate(maybeFileId:Option[String], proxyId:String) = Action.async {
+  def associate(maybeFileId:Option[String], proxyId:String) = APIAuthAction.async {
     implicit val indexer = new Indexer(indexName)
     implicit val client = esClientMgr.getClient()
     implicit val s3Client = s3ClientMgr.getS3Client(awsProfile)
@@ -208,7 +215,7 @@ class ProxiesController @Inject()(config:Configuration, cc:ControllerComponents,
     }
   }
 
-  def generateThumbnail(fileId:String) = Action.async {
+  def generateThumbnail(fileId:String) = APIAuthAction.async {
     proxyGenerators.createThumbnailProxy(fileId).map({
       case Failure(NothingFoundError(objectType, msg))=>
         NotFound(GenericErrorResponse("not_found", msg.toString).asJson)
@@ -221,7 +228,7 @@ class ProxiesController @Inject()(config:Configuration, cc:ControllerComponents,
     })
   }
 
-  def generateProxy(fileId:String, typeStr:String) = Action.async {
+  def generateProxy(fileId:String, typeStr:String) = APIAuthAction.async {
     implicit val indexer = new Indexer(indexName)
     implicit val client = esClientMgr.getClient()
     implicit val timeout:Timeout = 55 seconds
