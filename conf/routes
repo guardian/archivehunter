@@ -18,11 +18,12 @@ POST    /api/scanTarget/:id/genProxies  @controllers.ScanTargetController.genPro
 
 GET     /api/search/basic      @controllers.SearchController.simpleStringSearch(q:Option[String],start:Option[Int],length:Option[Int])
 PUT     /api/search/suggestions         @controllers.SearchController.suggestions
-
+POST    /api/search/browser             @controllers.SearchController.browserSearch(start:Int ?= 0, size:Int ?=100)
 GET     /api/proxy/searchForFile        @controllers.ProxiesController.searchFor(id:String)
 GET     /api/proxy/:id/associate        @controllers.ProxiesController.associate(fileId:Option[String],id)
 GET     /api/proxy/:id/playable         @controllers.ProxiesController.getPlayable(id, proxyType:Option[String])
 GET     /api/proxy/:id                  @controllers.ProxiesController.proxyForId(id, proxyType:Option[String])
+POST    /api/proxy/relink/global        @controllers.ProxiesController.relinkAllProxies
 
 POST    /api/proxy/generate/:id/thumbnail   @controllers.ProxiesController.generateThumbnail(id)
 POST    /api/proxy/generate/:id/:typeStr     @controllers.ProxiesController.generateProxy(id, typeStr)
@@ -30,6 +31,9 @@ POST    /api/proxy/generate/:id/:typeStr     @controllers.ProxiesController.gene
 POST    /api/job/:jobid/report          @controllers.JobController.updateStatus(jobid)
 GET     /api/job/all                    @controllers.JobController.getAllJobs(limit:Int ?=100, scanFrom:Option[String])
 GET     /api/job/forFile/:fileId        @controllers.JobController.jobsFor(fileId)
+
+GET     /api/browse/:collection         @controllers.BrowseCollectionController.getFolders(collection, prefix:Option[String])
+GET     /api/browse/:collection/summary @controllers.BrowseCollectionController.pathSummary(collection,prefix:Option[String])
 
 # Map static resources from the /public folder to the /assets URL path
 GET     /assets/*file               controllers.Assets.at(path="/public", file)

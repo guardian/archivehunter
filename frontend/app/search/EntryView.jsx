@@ -8,7 +8,8 @@ class EntryView extends React.Component {
     static propTypes = {
         entry: PropTypes.object.isRequired,
         itemOpenRequest: PropTypes.func.isRequired,
-        isSelected: PropTypes.bool
+        isSelected: PropTypes.bool,
+        cancelToken: PropTypes.object
     };
 
     constructor(props){
@@ -52,7 +53,7 @@ class EntryView extends React.Component {
 
         return <div className={classList.join(" ")} onClick={this.entryClicked}>
             <p className="entry-title"><FontAwesomeIcon icon="folder" className="entry-icon"/>{this.filename()}</p>
-            <EntryThumbnail mimeType={this.props.entry.mimeType} entryId={this.props.entry.id} fileExtension={this.props.entry.file_extension}/>
+            <EntryThumbnail mimeType={this.props.entry.mimeType} entryId={this.props.entry.id} cancelToken={this.props.cancelToken} fileExtension={this.props.entry.file_extension}/>
             <p className="entry-date"><TimestampFormatter relative={false}
                                                           value={this.props.entry.last_modified}
                                                           formatString="Do MMM YYYY, h:mm a"/></p>
