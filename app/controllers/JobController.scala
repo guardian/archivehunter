@@ -68,7 +68,12 @@ class JobController @Inject() (override val config:Configuration, override val c
 
   def jobsFor(fileId:String) = renderListAction(()=>jobModelDAO.jobsForSource(fileId))
 
-  def updateStatus(jobId:String) = APIAuthAction.async(circe.json(2048)) { request=>
+  /**
+    * receive a JSON report from an outboard process and handle it
+    * @param jobId
+    * @return
+    */
+  def updateStatus(jobId:String) = Action.async(circe.json(2048)) { request=>
     jobModelDAO.jobForId(jobId).flatMap({
       case None=>
         Future(NotFound(GenericErrorResponse("not_found",s"no job found for id $jobId").asJson))
