@@ -42,7 +42,7 @@ class JobController @Inject() (override val config:Configuration, override val c
   private val indexName = config.getOptional[String]("externalData.indexName").getOrElse("archivehunter")
   private  val tableName:String = config.get[String]("proxies.tableName")
 
-  protected val indexer = new Indexer(indexName)
+  protected implicit val indexer = new Indexer(indexName)
   protected val proxyLocationDAO = new ProxyLocationDAO(tableName)
 
   def renderListAction(block: ()=>Future[List[Either[DynamoReadError, JobModel]]]) = APIAuthAction.async {
@@ -67,34 +67,6 @@ class JobController @Inject() (override val config:Configuration, override val c
   def getAllJobs(limit:Int, scanFrom:Option[String]) = renderListAction(()=>jobModelDAO.allJobs(limit))
 
   def jobsFor(fileId:String) = renderListAction(()=>jobModelDAO.jobsForSource(fileId))
-
-  def thumbnailJobOriginalMedia(jobDesc:JobModel)(implicit esClient:HttpClient) = jobDesc.sourceType match {
-    case SourceType.SRC_MEDIA=>
-      indexer.getById(jobDesc.sourceId).map(result=>Right(result))
-    case SourceType.SRC_PROXY=>
-      Future(Left("need original media!"))
-    case SourceType.SRC_THUMBNAIL=>
-      Future(Left("need original media!"))
-  }
-
-  def updateProxyRef(report:JobReportSuccess, archiveEntry:ArchiveEntry)(implicit s3Client:AmazonS3, dynamoClient:DynamoClient) = ProxyLocation
-    .fromS3(proxyUri=report.output,mainMediaUri=s"s3://${archiveEntry.bucket}/${archiveEntry.path}", Some(ProxyType.THUMBNAIL))
-    .flatMap({
-      case Left(err)=>
-        logger.error(s"Could not get proxy location: $err")
-        Future(Left(err))
-      case Right(proxyLocation)=>
-        logger.info("Saving proxy location...")
-        proxyLocationDAO.saveProxy(proxyLocation).map({
-          case None=>
-            Right("Updated with no data back")
-          case Some(Left(err))=>
-            Left(err.toString)
-          case Some(Right(updatedLocation))=>
-            logger.info(s"Updated location: $updatedLocation")
-            Right(s"Updated $updatedLocation")
-        })
-    })
 
   def updateStatus(jobId:String) = APIAuthAction.async(circe.json(2048)) { request=>
     jobModelDAO.jobForId(jobId).flatMap({
@@ -127,9 +99,9 @@ class JobController @Inject() (override val config:Configuration, override val c
 
               logger.info(s"Outboard process indicated job success: $report")
 
-              val proxyUpdateFuture = thumbnailJobOriginalMedia(jobDesc).flatMap({
+              val proxyUpdateFuture = JobControllerHelper.thumbnailJobOriginalMedia(jobDesc).flatMap({
                 case Left(err)=>Future(Left(err))
-                case Right(archiveEntry)=>updateProxyRef(report, archiveEntry)
+                case Right(archiveEntry)=>JobControllerHelper.updateProxyRef(report, archiveEntry, proxyLocationDAO)
               })
 
               proxyUpdateFuture.flatMap({
