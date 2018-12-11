@@ -34,16 +34,7 @@ class AppStartup @Inject()(@Named("bucketScannerActor") bucketScanner:ActorRef, 
 
   def doTestCreateIndex():Unit = {
     val indexMgt = injector.instanceOf(classOf[IndexManagement])
-    indexMgt.verifyIndexStatus().map({
-      case Left(err) =>
-        logger.error(s"Could not verify index status: $err.")
-        if(!err.error.reason.contains("does not exist")){
-          lifecycle.stop()
-          return
-        }
-      case Right(result)=>
 
-    })
     indexMgt.doIndexCreate().onComplete({
       case Success(Left(err))=>
         if(err.error.`type`!="resource_already_exists_exception")  logger.error(s"Index create request failed: $err")
