@@ -292,7 +292,7 @@ class ProxiesController @Inject()(override val config:Configuration,
     }
   }
 
-  def relinkAllProxies = Action.async {
+  def relinkAllProxies = APIAuthAction.async {
     val jobId = UUID.randomUUID().toString
     val jobDesc = JobModel(jobId,"RelinkProxies",None,None,JobStatus.ST_PENDING,None,"global",None,SourceType.SRC_GLOBAL)
 

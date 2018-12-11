@@ -75,7 +75,7 @@ with PanDomainAuthActions {
     })
   }
 
-  def browserSearch(startAt:Int,pageSize:Int) = Action.async(circe.json(2048)) { request=>
+  def browserSearch(startAt:Int,pageSize:Int) = APIAuthAction.async(circe.json(2048)) { request=>
     request.body.as[SearchRequest].fold(
       error=>{
         Future(BadRequest(GenericErrorResponse("bad_request", error.toString).asJson))
