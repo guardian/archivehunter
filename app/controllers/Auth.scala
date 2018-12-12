@@ -4,8 +4,6 @@ import play.api.mvc._
 
 import scala.concurrent.Future
 import play.api.{Configuration, Logger}
-import akka.actor.ActorSystem
-import com.gu.pandomainauth.PanDomainAuthSettingsRefresher
 import com.gu.pandomainauth.model.AuthenticatedUser
 import com.gu.pandomainauth.service.{CookieUtils, GoogleAuthException}
 import helpers.InjectableRefresher
@@ -18,8 +16,6 @@ import io.circe.syntax._
 import models.{UserProfile, UserProfileDAO}
 import play.api.mvc.Results.Redirect
 
-import scala.concurrent.ExecutionContext.Implicits.global
-
 @Singleton
 class Auth @Inject() (
              override val controllerComponents: ControllerComponents,
@@ -29,6 +25,7 @@ class Auth @Inject() (
              userProfileDAO:UserProfileDAO,
            ) extends AbstractController(controllerComponents) with PanDomainAuthActions with Circe {
   private val logger=Logger(getClass)
+  implicit val ec = controllerComponents.executionContext
 
   /**
     * create a new userProfile object from the provided authentication data
@@ -55,7 +52,6 @@ class Auth @Inject() (
   def oauthCallback = Action.async { implicit request =>
     Logger.debug("processGoogleCallback")
     Logger.debug(request.session.toString)
-    implicit val myExecContext = controllerComponents.executionContext
     val token =
       request.session.get(ANTI_FORGERY_KEY).getOrElse(throw new GoogleAuthException("missing anti forgery token"))
     val originalUrl =

@@ -1,18 +1,16 @@
 package controllers
 
 import com.gu.pandomainauth.{PanDomain, PanDomainAuthSettingsRefresher, PublicSettings}
-import com.gu.pandomainauth.action.AuthActions
+import com.gu.pandomainauth.action.{AuthActions, UserRequest}
 import com.gu.pandomainauth.model._
-import com.gu.pandomainauth.service.{CookieUtils, GoogleAuthException}
 import helpers.InjectableRefresher
 import io.circe.ParsingFailure
 import models.{UserProfile, UserProfileDAO}
-import play.api.mvc.{ControllerComponents, Cookie, RequestHeader, Session}
+import play.api.mvc._
 import play.api.Configuration
 import play.api.Logger
-import play.api.mvc.Results.Redirect
 import io.circe.generic.auto._
-import io.circe.syntax._
+
 
 trait PanDomainAuthActions extends AuthActions {
   val refresher:InjectableRefresher
@@ -66,4 +64,5 @@ trait PanDomainAuthActions extends AuthActions {
     session.get("userProfile")
       .map(profileJson=>io.circe.parser.parse(profileJson).flatMap(_.as[UserProfile]))
   }
+
 }
