@@ -5,10 +5,14 @@ import com.gu.pandomainauth.action.AuthActions
 import com.gu.pandomainauth.model._
 import com.gu.pandomainauth.service.{CookieUtils, GoogleAuthException}
 import helpers.InjectableRefresher
-import play.api.mvc.{ControllerComponents, Cookie, RequestHeader}
+import io.circe.ParsingFailure
+import models.{UserProfile, UserProfileDAO}
+import play.api.mvc.{ControllerComponents, Cookie, RequestHeader, Session}
 import play.api.Configuration
 import play.api.Logger
 import play.api.mvc.Results.Redirect
+import io.circe.generic.auto._
+import io.circe.syntax._
 
 trait PanDomainAuthActions extends AuthActions {
   val refresher:InjectableRefresher
@@ -54,50 +58,12 @@ trait PanDomainAuthActions extends AuthActions {
     } getOrElse NotAuthenticated
   }
 
-  override def processGoogleCallback()(implicit request: RequestHeader) = {
-    Logger.debug("processGoogleCallback")
-    Logger.debug(request.session.toString)
-    implicit val myExecContext = controllerComponents.executionContext
-    val token =
-      request.session.get(ANTI_FORGERY_KEY).getOrElse(throw new GoogleAuthException("missing anti forgery token"))
-    val originalUrl =
-      request.session.get(LOGIN_ORIGIN_KEY).getOrElse(throw new GoogleAuthException("missing original url"))
-
-    val existingCookie = readCookie(request) // will be populated if this was a re-auth for expired login
-
-    GoogleAuth.validatedUserIdentity(token)(request, controllerComponents.executionContext, wsClient).map { claimedAuth =>
-      Logger.debug(claimedAuth.toString)
-      val authedUserData = existingCookie match {
-        case Some(c) =>
-          val existingAuth = CookieUtils.parseCookieData(c.value, panDomainSettings.settings.publicKey)
-          Logger.debug("user re-authed, merging auth data")
-
-          claimedAuth.copy(
-            authenticatingSystem = panDomainSettings.system,
-            authenticatedIn = existingAuth.authenticatedIn ++ Set(panDomainSettings.system),
-            multiFactor = checkMultifactor(claimedAuth)
-          )
-        case None =>
-          Logger.debug("fresh user login")
-          claimedAuth.copy(multiFactor = checkMultifactor(claimedAuth))
-      }
-
-      if (validateUser(authedUserData)) {
-        Logger.debug("User validated, adding cookies")
-        val updatedCookies = generateCookies(authedUserData)
-        Logger.debug(updatedCookies.toString())
-        Logger.debug(s"Redirecting back to $originalUrl")
-        Redirect(originalUrl)
-          .withCookies(updatedCookies: _*)
-          .withSession(session = request.session - ANTI_FORGERY_KEY - LOGIN_ORIGIN_KEY)
-      } else {
-        Logger.error(s"User did not auth")
-        showUnauthedMessage(invalidUserMessage(claimedAuth))
-      }
-    }
-  }
-
   override def cacheValidation = false
 
   override def authCallbackUrl: String = config.get[String]("auth.deployedUrl") + "/oauthCallback"
+
+  def userProfileFromSession(session:Session):Option[Either[io.circe.Error, UserProfile]] = {
+    session.get("userProfile")
+      .map(profileJson=>io.circe.parser.parse(profileJson).flatMap(_.as[UserProfile]))
+  }
 }
