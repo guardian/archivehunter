@@ -57,7 +57,6 @@ with PanDomainAuthActions {
     }
   }
 
-
   def suggestions = APIAuthAction.async(parse.text) { request=>
     val sg = termSuggestion("sg").on("path").text(request.body)
 

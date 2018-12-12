@@ -16,6 +16,8 @@ tr.dashboardheader, th.dashboardheader {
     font-weight: inherit;
     background-color: lavender;
     color: black;
+    padding-left: 1em;
+    padding-right: 1em;
 }
 
 tr {
@@ -377,4 +379,15 @@ div.selector-panel {
 .login-info-text {
     color: #AAAAAA;
     margin: 0.5em;
+}
+
+.collections-list {
+    list-style: none;
+    padding-left: 0.2em;
+    padding-right: 0.2em;
+}
+
+.collection-list-item-disabled {
+    color: #AAAAAA;
+    font-style: italic;
 }
