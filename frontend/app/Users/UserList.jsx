@@ -5,6 +5,7 @@ import BreadcrumbComponent from "../common/BreadcrumbComponent.jsx";
 import {Link} from "react-router-dom";
 import TimestampFormatter from "../common/TimestampFormatter.jsx";
 import axios from 'axios';
+import CollectionSelector from './CollectionSelector.jsx';
 
 class UserList extends React.Component {
     constructor(props){
@@ -50,13 +51,33 @@ class UserList extends React.Component {
         }))
     }
 
+    userCollectionsUpdated(entry, newValue){
+        console.log("userCollectionsUpdated", entry, newValue);
+        const updateRq = {
+            user: entry.userEmail,
+            fieldName: "VISIBLE_COLLECTIONS",
+            listValue: newValue,
+            operation: "OP_OVERWRITE"
+        };
+
+        this.setState({saving: true}, ()=>axios.put("/api/user/update", updateRq).then(response=>{
+            this.updateEntry(response.data.entry);
+        }).catch(err=>{
+            console.error(err);
+            this.setState({saving: false, lastError: err});
+        }))
+    }
+
     mainBody(){
         if(this.state.lastError) return <ErrorViewComponent error={this.state.lastError}/>;
 
-        return <table>
+        return <table style={{borderCollapse: "collapse"}}>
             <thead>
-            <tr>
-                <td>Email</td><td>Administrator</td><td>Visible collections</td><td>Allow all collections</td>
+            <tr className="dashboardheader">
+                <th className="dashboardheader">Email</th>
+                <th className="dashboardheader">Administrator</th>
+                <th className="dashboardheader">Visible collections</th>
+                <th className="dashboardheader">Allow all collections</th>
             </tr>
             </thead>
             <tbody>
@@ -64,7 +85,12 @@ class UserList extends React.Component {
                 this.state.usersList.map(entry=><tr>
                     <td>{entry.userEmail}</td>
                     <td><input type="checkbox" checked={entry.isAdmin} onChange={()=>this.boolFieldChanged(entry, "IS_ADMIN", entry.isAdmin)}/></td>
-                    <td><i>not implemented yet</i></td>
+                    <td style={{textAlign: "left"}}>
+                        <CollectionSelector collections={this.state.collectionsList}
+                                            userSelected={entry.visibleCollections}
+                                            selectionUpdated={newValue=>this.userCollectionsUpdated(entry, newValue)}
+                                            disabled={entry.allCollectionsVisible}
+                        /></td>
                     <td><input type="checkbox" checked={entry.allCollectionsVisible} onChange={()=>this.boolFieldChanged(entry, "ALL_COLLECTIONS", entry.allCollectionsVisible)}/></td>
                 </tr>)
             }
