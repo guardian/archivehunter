@@ -9,6 +9,7 @@ class AdminFront extends React.Component {
             <ul>
                 <li><Link to="/admin/scanTargets">Scan Targets</Link></li>
                 <li><Link to="/admin/jobs">Jobs</Link></li>
+                <li><Link to="/admin/users">Users</Link></li>
             </ul>
         </div>
     }
