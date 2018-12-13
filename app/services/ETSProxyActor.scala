@@ -359,7 +359,8 @@ class ETSProxyActor @Inject() (implicit config:ArchiveHunterConfiguration,
               .withInput(new JobInput().withKey(entry.path))
               .withOutput(new CreateJobOutput().withKey(outputPath).withPresetId(presetId))
               .withPipelineId(pipelineId)
-              .withUserMetadata(Map("archivehunter-job-id" -> jobDesc.jobId, "archivehunter-source-id" -> entry.id).asJava)
+              //base64 encoded version of this can be no more than 256 bytes!
+              .withUserMetadata(Map("archivehunter-job-id" -> jobDesc.jobId).asJava)
 
             try {
               val result = etsClient.createJob(rq)
