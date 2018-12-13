@@ -39,11 +39,11 @@ class ClockSingleton @Inject() (@Named("dynamoCapacityActor") dynamoCapacityActo
   override def receive: Receive = {
     case RapidClockTick=>
       logger.debug("ClockSingleton: RapidClockTick")
-      //dynamoCapacityActor ! DynamoCapacityActor.TimedStateCheck
-      //etsProxyActor ! ETSProxyActor.CheckForNotifications
+      dynamoCapacityActor ! DynamoCapacityActor.TimedStateCheck
+      etsProxyActor ! ETSProxyActor.CheckForNotifications
     case SlowClockTick=>
       logger.debug("ClockSingleton: SlowClockTick")
-      //etsProxyActor ! ETSProxyActor.CheckPipelinesStatus
+      etsProxyActor ! ETSProxyActor.CheckPipelinesStatus
     case ScanTick=>
       logger.debug("ClockSingleton: ScanTick")
       bucketScanner ! BucketScanner.RegularScanTrigger
