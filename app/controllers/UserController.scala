@@ -6,7 +6,7 @@ import play.api.{Configuration, Logger}
 import play.api.libs.circe.Circe
 import play.api.libs.ws.WSClient
 import play.api.mvc.{AbstractController, ControllerComponents}
-import responses.{GenericErrorResponse, ObjectCreatedResponse, ObjectGetResponse, ObjectListResponse}
+import responses._
 import io.circe.syntax._
 import io.circe.generic.auto._
 import models.{UserProfile, UserProfileDAO, UserProfileField}
@@ -26,7 +26,14 @@ class UserController @Inject()(override val controllerComponents:ControllerCompo
   private val logger = Logger(getClass)
   def loginStatus = APIAuthAction { request =>
     val user = request.user
-    Ok(user.toJson)
+    userProfileFromSession(request.session) match {
+      case None=>Ok(UserResponse.fromUser(user, false).asJson)
+      case Some(Left(err))=>
+        logger.error(err.toString)
+        InternalServerError("profile_error", err.toString)
+      case Some(Right(profile))=>
+        Ok(UserResponse.fromUser(user, profile.isAdmin).asJson)
+    }
   }
 
   def allUsers = APIAuthAction.async {request=>
