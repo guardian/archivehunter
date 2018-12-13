@@ -33,6 +33,9 @@ class ScanTargetDAO @Inject()(config:ArchiveHunterConfiguration, ddbClientMgr: D
 
   implicit private val materializer:Materializer = ActorMaterializer.create(actorSystem)
 
+  val alpakkaClient = ddbClientMgr.getNewAlpakkaDynamoClient(config.getOptional[String]("externalData.awsProfile"))
+  implicit val client = ddbClientMgr.getNewDynamoClient(config.getOptional[String]("externalData.awsProfile"))
+
   /**
     * synchronously attempts to make the update, doing exponential delay via sleep until successful.
     * this should be acceptable, since the most likely cause of the operation failing is the DB table running out of provisioned
@@ -65,7 +68,6 @@ class ScanTargetDAO @Inject()(config:ArchiveHunterConfiguration, ddbClientMgr: D
     * @return a Future which contains the updated [[ScanTarget]], or fails if the operation can't be completed.
     */
   def setInProgress(target:ScanTarget, newValue:Boolean) = Future {
-    implicit val client = ddbClientMgr.getNewDynamoClient(config.getOptional[String]("externalData.awsProfile"))
     val updatedRecord = target.copy(scanInProgress = newValue)
 
     /*
@@ -79,7 +81,6 @@ class ScanTargetDAO @Inject()(config:ArchiveHunterConfiguration, ddbClientMgr: D
   }
 
   def setScanCompleted(tgt:ScanTarget, completionTime:Option[ZonedDateTime] = None, error:Option[Throwable] = None) = Future {
-    implicit val client = ddbClientMgr.getNewDynamoClient(config.getOptional[String]("externalData.awsProfile"))
     val timestampToUse = completionTime match {
       case Some(time)=>time
       case None=>ZonedDateTime.now()
@@ -98,10 +99,10 @@ class ScanTargetDAO @Inject()(config:ArchiveHunterConfiguration, ddbClientMgr: D
     * @return a Future, which contains None if no record was found, Left(DynamoReadError) if an error occurred or Right(ScanTarget) if a record was found.
     */
   def targetForBucket(bucketName:String):Future[Option[Either[DynamoReadError,ScanTarget]]] = {
-    val client = ddbClientMgr.getNewAlpakkaDynamoClient(config.getOptional[String]("externalData.awsProfile"))
-
-    ScanamoAlpakka.exec(client)(
+    ScanamoAlpakka.exec(alpakkaClient)(
       table.get('bucketName->bucketName)
     )
   }
+
+  def allScanTargets():Future[List[Either[DynamoReadError,ScanTarget]]] = ScanamoAlpakka.exec(alpakkaClient)(table.scan())
 }

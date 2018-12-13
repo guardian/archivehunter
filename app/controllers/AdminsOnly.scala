@@ -42,4 +42,20 @@ trait AdminsOnly extends Circe {
         }
     }
   }
+
+  def adminsOnlySync[A](request: Request[A])(block: => Result)(implicit ec:ExecutionContext) = {
+    userProfileFromSession(request.session) match {
+      case None=>
+        Forbidden(GenericErrorResponse("error","Not logged in").asJson)
+      case Some(Left(err))=>
+        InternalServerError(GenericErrorResponse("error","Session is corrupted. Please log out and log in again").asJson)
+      case Some(Right(profile))=>
+        if(profile.isAdmin){
+          block
+        } else {
+          Forbidden(GenericErrorResponse("not_allowed","Only admins are allowed to perform this action").asJson)
+        }
+    }
+  }
+
 }

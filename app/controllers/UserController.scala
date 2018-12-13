@@ -30,7 +30,7 @@ class UserController @Inject()(override val controllerComponents:ControllerCompo
       case None=>Ok(UserResponse.fromUser(user, false).asJson)
       case Some(Left(err))=>
         logger.error(err.toString)
-        InternalServerError("profile_error", err.toString)
+        InternalServerError(GenericErrorResponse("profile_error", err.toString).asJson)
       case Some(Right(profile))=>
         Ok(UserResponse.fromUser(user, profile.isAdmin).asJson)
     }

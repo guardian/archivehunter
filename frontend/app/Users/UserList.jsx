@@ -71,7 +71,7 @@ class UserList extends React.Component {
     mainBody(){
         if(this.state.lastError) return <ErrorViewComponent error={this.state.lastError}/>;
 
-        return <table style={{borderCollapse: "collapse"}}>
+        return <table style={{borderCollapse: "collapse", width: "100%"}}>
             <thead>
             <tr className="dashboardheader">
                 <th className="dashboardheader">Email</th>

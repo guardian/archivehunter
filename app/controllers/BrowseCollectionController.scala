@@ -9,7 +9,7 @@ import javax.inject.Inject
 import play.api.libs.circe.Circe
 import play.api.{Configuration, Logger}
 import play.api.mvc.{AbstractController, ControllerComponents}
-import responses.{GenericErrorResponse, ObjectListResponse, PathInfoResponse}
+import responses.{ErrorListResponse, GenericErrorResponse, ObjectListResponse, PathInfoResponse}
 import io.circe.syntax._
 import io.circe.generic.auto._
 import play.api.libs.ws.WSClient
@@ -117,6 +117,32 @@ extends AbstractController(controllerComponents) with PanDomainAuthActions with 
             bucketsToCountMap(response.result.aggregations.terms("typesCount")),
           ).asJson)
       })
+    }
+  }
+
+  def getCollections() = APIAuthAction.async { request=>
+    userProfileFromSession(request.session) match {
+      case Some(Right(profile)) =>
+        scanTargetDAO.allScanTargets().map(resultList => {
+          val errors = resultList.collect({ case Left(err) => err })
+          if (errors.nonEmpty) {
+            InternalServerError(ErrorListResponse("db_error", "", errors.map(_.toString)).asJson)
+          } else {
+            val collectionsList = resultList.collect({case Right(target)=>target}).map(_.bucketName)
+            val allowedCollections = if(profile.allCollectionsVisible){
+              collectionsList
+            } else {
+              profile.visibleCollections
+            }
+            Ok(ObjectListResponse("ok", "collection", allowedCollections.sorted, allowedCollections.length).asJson)
+          }
+        })
+      case Some(Left(error))=>
+        logger.error(s"Corrupted login profile? ${error.toString}")
+        Future(InternalServerError(GenericErrorResponse("profile_error","Your login profile seems corrupted, try logging out and logging in again").asJson))
+      case None=>
+        logger.error(s"No user profile in session")
+        Future(Forbidden(GenericErrorResponse("profile_error","You do not appear to be logged in").asJson))
     }
   }
 }
