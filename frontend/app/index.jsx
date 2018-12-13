@@ -62,7 +62,7 @@ class App extends React.Component {
 
     render(){
         return <div>
-            <TopMenu visible={true} isAdmin={true}/>
+            <TopMenu visible={true} isAdmin={this.state.userLogin ? this.state.userLogin.isAdmin : false}/>
             <LoginStatusComponent userData={this.state.userLogin} userLoggedOutCb={this.userLoggedOut}/>
             <Switch>
                 <Route path="/admin/users" component={UserList}/>

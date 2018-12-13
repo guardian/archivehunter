@@ -38,7 +38,7 @@ class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner
                                       override val refresher:InjectableRefresher,
                                       ddbClientMgr:DynamoClientManager)
                                      (implicit system:ActorSystem)
-  extends AbstractController(controllerComponents) with PanDomainAuthActions with Circe with ZonedDateTimeEncoder with ZonedTimeFormat {
+  extends AbstractController(controllerComponents) with PanDomainAuthActions with Circe with ZonedDateTimeEncoder with ZonedTimeFormat with AdminsOnly {
   private val logger=Logger(getClass)
   implicit val mat:Materializer = ActorMaterializer.create(system)
 
@@ -59,36 +59,42 @@ class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner
     }).getOrElse(Ok(ObjectCreatedResponse[Option[String]]("created","scan_target",None).asJson))
   }
 
-  def removeTarget(targetName:String) = APIAuthAction {
-    val r = Scanamo.exec(ddbClientMgr.getNewDynamoClient(profileName))(table.delete('bucketName -> targetName))
-    Ok(ObjectCreatedResponse[String]("deleted","scan_target",targetName).asJson)
+  def removeTarget(targetName:String) = APIAuthAction { request=>
+    adminsOnlySync(request) {
+      val r = Scanamo.exec(ddbClientMgr.getNewDynamoClient(profileName))(table.delete('bucketName -> targetName))
+      Ok(ObjectCreatedResponse[String]("deleted", "scan_target", targetName).asJson)
+    }
   }
 
-  def get(targetName:String) = APIAuthAction {
-    Scanamo.exec(ddbClientMgr.getNewDynamoClient(profileName))(table.get('bucketName -> targetName)).map({
-      case Left(err)=>
-        InternalServerError(GenericErrorResponse("database_error", err.toString).asJson)
-      case Right(result)=>
-        Ok(ObjectGetResponse[ScanTarget]("ok", "scan_target", result).asJson)
-    }).getOrElse(NotFound(ObjectCreatedResponse[String]("not_found","scan_target",targetName).asJson))
+  def get(targetName:String) = APIAuthAction { request=>
+    adminsOnlySync(request) {
+      Scanamo.exec(ddbClientMgr.getNewDynamoClient(profileName))(table.get('bucketName -> targetName)).map({
+        case Left(err) =>
+          InternalServerError(GenericErrorResponse("database_error", err.toString).asJson)
+        case Right(result) =>
+          Ok(ObjectGetResponse[ScanTarget]("ok", "scan_target", result).asJson)
+      }).getOrElse(NotFound(ObjectCreatedResponse[String]("not_found", "scan_target", targetName).asJson))
+    }
   }
 
-  def listScanTargets = APIAuthAction.async {
-    ScanamoAlpakka.exec(alpakkaClient)(table.scan()).map({ result=>
-      val errors = result.collect({
-        case Left(readError)=>readError
-      })
-
-      if(errors.isEmpty){
-        val success = result.collect({
-          case Right(scanTarget)=>scanTarget
+  def listScanTargets = APIAuthAction.async { request=>
+    adminsOnlyAsync(request) {
+      ScanamoAlpakka.exec(alpakkaClient)(table.scan()).map({ result =>
+        val errors = result.collect({
+          case Left(readError) => readError
         })
-        Ok(ObjectListResponse[List[ScanTarget]]("ok","scan_target",success,success.length).asJson)
-      } else {
-        errors.foreach(err=>logger.error(err.toString))
-        InternalServerError(GenericErrorResponse("error", errors.map(_.toString).mkString(",")).asJson)
-      }
-    })
+
+        if (errors.isEmpty) {
+          val success = result.collect({
+            case Right(scanTarget) => scanTarget
+          })
+          Ok(ObjectListResponse[List[ScanTarget]]("ok", "scan_target", success, success.length).asJson)
+        } else {
+          errors.foreach(err => logger.error(err.toString))
+          InternalServerError(GenericErrorResponse("error", errors.map(_.toString).mkString(",")).asJson)
+        }
+      })
+    }
   }
 
   private def withLookup(targetName:String)(block: ScanTarget=>Result) = Scanamo.exec(conventionalClient)(table.get('bucketName -> targetName )).map({
@@ -98,38 +104,48 @@ class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner
       block(tgt)
   }).getOrElse(NotFound(ObjectCreatedResponse[String]("not_found","scan_target",targetName).asJson))
 
-  def manualTrigger(targetName:String) = APIAuthAction {
-    withLookup(targetName) { tgt=>
-      bucketScanner ! new BucketScanner.PerformDeletionScan(tgt,thenScanForNew=true)
-      Ok(GenericErrorResponse("ok", "scan started").asJson)
+  def manualTrigger(targetName:String) = APIAuthAction { request=>
+    adminsOnlySync(request) {
+      withLookup(targetName) { tgt =>
+        bucketScanner ! new BucketScanner.PerformDeletionScan(tgt, thenScanForNew = true)
+        Ok(GenericErrorResponse("ok", "scan started").asJson)
+      }
     }
   }
 
-  def manualTriggerAdditionScan(targetName:String) = APIAuthAction {
-    withLookup(targetName) { tgt=>
-      bucketScanner ! new BucketScanner.PerformTargetScan(tgt)
-      Ok(GenericErrorResponse("ok", "scan started").asJson)
+  def manualTriggerAdditionScan(targetName:String) = APIAuthAction { request=>
+    adminsOnlySync(request) {
+      withLookup(targetName) { tgt =>
+        bucketScanner ! new BucketScanner.PerformTargetScan(tgt)
+        Ok(GenericErrorResponse("ok", "scan started").asJson)
+      }
     }
   }
 
-  def manualTriggerDeletionScan(targetName:String) = APIAuthAction {
-    withLookup(targetName) { tgt=>
-      bucketScanner ! new BucketScanner.PerformDeletionScan(tgt)
-      Ok(GenericErrorResponse("ok","scan started").asJson)
+  def manualTriggerDeletionScan(targetName:String) = APIAuthAction { request=>
+    adminsOnlySync(request) {
+      withLookup(targetName) { tgt =>
+        bucketScanner ! new BucketScanner.PerformDeletionScan(tgt)
+        Ok(GenericErrorResponse("ok", "scan started").asJson)
+      }
     }
   }
 
-  def scanForLegacyProxies(targetName:String) = APIAuthAction {
-    withLookup(targetName) { tgt=>
-      proxyScanner ! new LegacyProxiesScanner.ScanBucket(tgt)
-      Ok(GenericErrorResponse("ok","scan started").asJson)
+  def scanForLegacyProxies(targetName:String) = APIAuthAction { request=>
+    adminsOnlySync(request) {
+      withLookup(targetName) { tgt =>
+        proxyScanner ! new LegacyProxiesScanner.ScanBucket(tgt)
+        Ok(GenericErrorResponse("ok", "scan started").asJson)
+      }
     }
   }
 
-  def genProxies(targetName:String) = APIAuthAction {
-    withLookup(targetName) { tgt=>
-      bulkThumbnailer ! new BulkThumbnailer.DoThumbnails(tgt)
-      Ok(GenericErrorResponse("ok","proxy run started").asJson)
+  def genProxies(targetName:String) = APIAuthAction { request=>
+    adminsOnlySync(request) {
+      withLookup(targetName) { tgt =>
+        bulkThumbnailer ! new BulkThumbnailer.DoThumbnails(tgt)
+        Ok(GenericErrorResponse("ok", "proxy run started").asJson)
+      }
     }
   }
 }
