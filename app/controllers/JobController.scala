@@ -18,6 +18,8 @@ import io.circe.generic.auto._
 import io.circe.syntax._
 import models._
 import com.theguardian.multimedia.archivehunter.common.cmn_models._
+import helpers.InjectableRefresher
+import play.api.libs.ws.WSClient
 import responses.{GenericErrorResponse, ObjectListResponse}
 
 import scala.util.{Failure, Success}
@@ -25,9 +27,14 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 @Singleton
-class JobController @Inject() (config:Configuration, cc:ControllerComponents, jobModelDAO: JobModelDAO,
-                               esClientManager: ESClientManager, s3ClientManager: S3ClientManager,ddbClientManager:DynamoClientManager)
-                              (implicit actorSystem:ActorSystem) extends AbstractController(cc) with Circe with JobModelEncoder with ZonedDateTimeEncoder {
+class JobController @Inject() (override val config:Configuration, override val controllerComponents:ControllerComponents, jobModelDAO: JobModelDAO,
+                               esClientManager: ESClientManager, s3ClientManager: S3ClientManager,
+                               ddbClientManager:DynamoClientManager,
+                               override val refresher:InjectableRefresher,
+                               override val wsClient:WSClient)
+                              (implicit actorSystem:ActorSystem)
+  extends AbstractController(controllerComponents) with Circe with JobModelEncoder with ZonedDateTimeEncoder with PanDomainAuthActions {
+
   private val logger = Logger(getClass)
 
   private implicit val mat:Materializer = ActorMaterializer.create(actorSystem)
@@ -35,10 +42,10 @@ class JobController @Inject() (config:Configuration, cc:ControllerComponents, jo
   private val indexName = config.getOptional[String]("externalData.indexName").getOrElse("archivehunter")
   private  val tableName:String = config.get[String]("proxies.tableName")
 
-  protected val indexer = new Indexer(indexName)
+  protected implicit val indexer = new Indexer(indexName)
   protected val proxyLocationDAO = new ProxyLocationDAO(tableName)
 
-  def renderListAction(block: ()=>Future[List[Either[DynamoReadError, JobModel]]]) = Action.async {
+  def renderListAction(block: ()=>Future[List[Either[DynamoReadError, JobModel]]]) = APIAuthAction.async {
       val resultFuture = block()
       resultFuture.recover({
         case ex:Throwable=>
@@ -61,34 +68,11 @@ class JobController @Inject() (config:Configuration, cc:ControllerComponents, jo
 
   def jobsFor(fileId:String) = renderListAction(()=>jobModelDAO.jobsForSource(fileId))
 
-  def thumbnailJobOriginalMedia(jobDesc:JobModel)(implicit esClient:HttpClient) = jobDesc.sourceType match {
-    case SourceType.SRC_MEDIA=>
-      indexer.getById(jobDesc.sourceId).map(result=>Right(result))
-    case SourceType.SRC_PROXY=>
-      Future(Left("need original media!"))
-    case SourceType.SRC_THUMBNAIL=>
-      Future(Left("need original media!"))
-  }
-
-  def updateProxyRef(report:JobReportSuccess, archiveEntry:ArchiveEntry)(implicit s3Client:AmazonS3, dynamoClient:DynamoClient) = ProxyLocation
-    .fromS3(proxyUri=report.output,mainMediaUri=s"s3://${archiveEntry.bucket}/${archiveEntry.path}", Some(ProxyType.THUMBNAIL))
-    .flatMap({
-      case Left(err)=>
-        logger.error(s"Could not get proxy location: $err")
-        Future(Left(err))
-      case Right(proxyLocation)=>
-        logger.info("Saving proxy location...")
-        proxyLocationDAO.saveProxy(proxyLocation).map({
-          case None=>
-            Right("Updated with no data back")
-          case Some(Left(err))=>
-            Left(err.toString)
-          case Some(Right(updatedLocation))=>
-            logger.info(s"Updated location: $updatedLocation")
-            Right(s"Updated $updatedLocation")
-        })
-    })
-
+  /**
+    * receive a JSON report from an outboard process and handle it
+    * @param jobId
+    * @return
+    */
   def updateStatus(jobId:String) = Action.async(circe.json(2048)) { request=>
     jobModelDAO.jobForId(jobId).flatMap({
       case None=>
@@ -120,9 +104,9 @@ class JobController @Inject() (config:Configuration, cc:ControllerComponents, jo
 
               logger.info(s"Outboard process indicated job success: $report")
 
-              val proxyUpdateFuture = thumbnailJobOriginalMedia(jobDesc).flatMap({
+              val proxyUpdateFuture = JobControllerHelper.thumbnailJobOriginalMedia(jobDesc).flatMap({
                 case Left(err)=>Future(Left(err))
-                case Right(archiveEntry)=>updateProxyRef(report, archiveEntry)
+                case Right(archiveEntry)=>JobControllerHelper.updateProxyRef(report, archiveEntry, proxyLocationDAO)
               })
 
               proxyUpdateFuture.flatMap({

@@ -59,8 +59,8 @@ class BrowseComponent extends React.Component {
     }
 
     refreshCollectionNames(){
-        this.setState({isLoading: true, lastError: null}, ()=>axios.get("/api/scanTarget").then(result=>{
-            const nameList = result.data.entries.map(ent=>ent.bucketName);
+        this.setState({isLoading: true, lastError: null}, ()=>axios.get("/api/browse/collections").then(result=>{
+            const nameList = result.data.entries;
             this.setState({isLoading: false, collectionNames: nameList, collectionName: nameList.length>0 ? nameList[0] : null}, ()=>this.refreshTreeContents());
         }).catch(err=>{
             console.error("Could not refresh collection names: ", err);

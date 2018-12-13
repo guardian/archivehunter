@@ -11,22 +11,32 @@ import io.circe.generic.auto._
 import io.circe.syntax._
 import com.sksamuel.elastic4s.circe._
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ArchiveEntryHitReader, StorageClassEncoder, ZonedDateTimeEncoder}
+import helpers.InjectableRefresher
 import play.api.libs.circe.Circe
 import requests.SearchRequest
+import play.api.libs.ws.WSClient
 import responses.{BasicSuggestionsResponse, GenericErrorResponse, ObjectListResponse}
 
 import scala.concurrent.Future
 
 @Singleton
-class SearchController @Inject()(config:Configuration,cc:ControllerComponents,esClientManager:ESClientManager)
-  extends AbstractController(cc) with ArchiveEntryHitReader with ZonedDateTimeEncoder with StorageClassEncoder with Circe {
+class SearchController @Inject()(override val config:Configuration,
+                                 override val controllerComponents:ControllerComponents,
+                                 esClientManager:ESClientManager,
+                                 override val wsClient:WSClient,
+                                 override val refresher:InjectableRefresher)
+  extends AbstractController(controllerComponents) with ArchiveEntryHitReader with ZonedDateTimeEncoder with StorageClassEncoder with Circe
+with PanDomainAuthActions {
+
   private val logger=Logger(getClass)
   val indexName = config.getOptional[String]("externalData.indexName").getOrElse("archivehunter")
 
   private val esClient = esClientManager.getClient()
   import com.sksamuel.elastic4s.http.ElasticDsl._
 
-  def simpleStringSearch(q:Option[String],start:Option[Int],length:Option[Int]) = Action.async {
+  def simpleStringSearch(q:Option[String],start:Option[Int],length:Option[Int]) = APIAuthAction.async {
+    val cli = esClientManager.getClient()
+
     val actualStart=start.getOrElse(0)
     val actualLength=length.getOrElse(50)
 
@@ -47,7 +57,7 @@ class SearchController @Inject()(config:Configuration,cc:ControllerComponents,es
     }
   }
 
-  def suggestions = Action.async(parse.text) { request=>
+  def suggestions = APIAuthAction.async(parse.text) { request=>
     val sg = termSuggestion("sg").on("path").text(request.body)
 
     esClient.execute({
@@ -64,7 +74,7 @@ class SearchController @Inject()(config:Configuration,cc:ControllerComponents,es
     })
   }
 
-  def browserSearch(startAt:Int,pageSize:Int) = Action.async(circe.json(2048)) { request=>
+  def browserSearch(startAt:Int,pageSize:Int) = APIAuthAction.async(circe.json(2048)) { request=>
     request.body.as[SearchRequest].fold(
       error=>{
         Future(BadRequest(GenericErrorResponse("bad_request", error.toString).asJson))

@@ -5,6 +5,10 @@
 GET     /is-online                  controllers.Application.healthcheck
 GET     /                           @controllers.Application.rootIndex()
 
+GET     /oauthCallback              @controllers.Auth.oauthCallback
+POST    /api/logout                 @controllers.Auth.logout
+GET     /api/loginStatus            @controllers.UserController.loginStatus
+
 POST    /api/scanTarget                 @controllers.ScanTargetController.newTarget
 DELETE  /api/scanTarget/:id             @controllers.ScanTargetController.removeTarget(id)
 GET     /api/scanTarget/:id             @controllers.ScanTargetController.get(id)
@@ -32,8 +36,13 @@ POST    /api/job/:jobid/report          @controllers.JobController.updateStatus(
 GET     /api/job/all                    @controllers.JobController.getAllJobs(limit:Int ?=100, scanFrom:Option[String])
 GET     /api/job/forFile/:fileId        @controllers.JobController.jobsFor(fileId)
 
+GET     /api/browse/collections         @controllers.BrowseCollectionController.getCollections
 GET     /api/browse/:collection         @controllers.BrowseCollectionController.getFolders(collection, prefix:Option[String])
 GET     /api/browse/:collection/summary @controllers.BrowseCollectionController.pathSummary(collection,prefix:Option[String])
+
+GET     /api/user                       @controllers.UserController.allUsers
+PUT     /api/user/update                @controllers.UserController.updateUserProfileField
+GET     /api/user/myProfile             @controllers.UserController.myProfile
 
 # Map static resources from the /public folder to the /assets URL path
 GET     /assets/*file               controllers.Assets.at(path="/public", file)

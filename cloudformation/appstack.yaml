@@ -19,6 +19,12 @@ Parameters:
   AmiId:
     Type: String
     Description: ID of the base image to build instances from.  Build this with Amigo.
+  DeploymentDomain:
+    Type: String
+    Description: DNS domain that this is going to be deployed into.  This is needed for pan-domain authentication to work (see readme).  Assumption is that the access URL is at https://${App}.${DeploymentDomain}
+  PandaBucket:
+    Type: String
+    Description: S3 bucket that contains the Pan-domain auth settings
   OfficeIpRange:
     Type: String
     Description: CIDR block of ip addresses to be allowed SSH access
@@ -146,6 +152,26 @@ Resources:
           Value: !Ref Stack
         - Key: Stage
           Value: !Ref Stage
+
+  UserProfileTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: userEmail
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userEmail
+          KeyType: HASH
+      ProvisionedThroughput:
+        WriteCapacityUnits: 1
+        ReadCapacityUnits: 4
+      Tags:
+      - Key: App
+        Value: !Sub ${App}-webapp
+      - Key: Stack
+        Value: !Ref Stack
+      - Key: Stage
+        Value: !Ref Stage
 
   JobHistoryTable:
     Type: AWS::DynamoDB::Table
@@ -578,6 +604,8 @@ Resources:
             - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ProxyLocationTable}/index/*
             - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${JobHistoryTable}
             - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${JobHistoryTable}/index/*
+            - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${UserProfileTable}
+            - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${UserProfileTable}/index/*
       - PolicyName: TranscoderAccess
         PolicyDocument:
           Version: 2012-10-17
@@ -599,6 +627,16 @@ Resources:
             - elastictranscoder:ListPipelines
             Resource:
             - "*"
+      - PolicyName: PandaAccess
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+            Effect: Allow
+            Action:
+              - s3:GetObject
+              - s3:ListObjects
+            Resource:
+              - !Sub arn:aws:s3:::${PandaBucket}/*
       - PolicyName: MessageQueueRead
         PolicyDocument:
           Version: 2012-10-17
@@ -803,6 +841,12 @@ Resources:
             ssl = true
           }
 
+          auth {
+             panDomainBucket = "${PandaBucket}"
+             deployedUrl = "https://${App}.${DeploymentDomain}"
+             domain = "${DeploymentDomain}"
+             userProfileTable = "${UserProfileTable}"
+          }
           akka.actor {
             provider = "cluster"
 
@@ -902,14 +946,14 @@ Resources:
   AutoScaleGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:
-      DesiredCapacity: "1"
+      DesiredCapacity: "2"
       HealthCheckGracePeriod: 300
       HealthCheckType: ELB
       LaunchConfigurationName: !Ref LaunchConfig
       LoadBalancerNames:
       - !Ref LoadBalancer
       MaxSize: "8"
-      MinSize: "1"
+      MinSize: "2"
       Tags:
       - Key: App
         Value: !Sub ${App}-webapp

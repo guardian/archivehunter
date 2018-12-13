@@ -33,7 +33,7 @@
     </appender>-->
 
     <logger name="play" level="INFO" />
-    <logger name="application" level="ERROR" />
+    <logger name="application" level="DEBUG" />
 
     <logger name="services.AppStartup" level="INFO"/>
     <logger name="services.BucketScanner" level="INFO"/>
@@ -45,7 +45,13 @@
     <logger name="controllers.SearchController" level="INFO"/>
     <logger name="controllers.ScanTargetController" level="INFO"/>
     <logger name="controllers.JobController" level="INFO"/>
-    <logger name="controllers.BrowseCollectionController" level="DEBUG"/>
+    <logger name="controllers.BrowseCollectionController" level="INFO"/>
+
+    <logger name="controllers.UserController" level="DEBUG"/>
+
+    <logger name="controllers.Auth" level="DEBUG"/>
+
+    <logger name="com.gu.pandomainauth.action.AuthActions" level="INFO"/>
 
     <logger name="helpers.DDBSink" level="INFO"/>
     <logger name="helpers.S3ToProxyLocationFlow" level="INFO"/>
@@ -58,10 +64,10 @@
     <logger name="helpers.CreateProxySink" level="INFO"/>
     <logger name="services.BulkThumbnailer" level="INFO"/>
     <logger name="services.DynamoCapacityActor" level="INFO"/>
-    <logger name="services.ClockSingleton" level="DEBUG"/>
-    <logger name="services.ETSProxyActor" level="DEBUG"/>
-    <logger name="services.ProxiesRelinker" level="DEBUG"/>
-    <logger name="helpers.ProxyVerifyFlow" level="DEBUG"/>
+    <logger name="services.ClockSingleton" level="INFO"/>
+    <logger name="services.ETSProxyActor" level="INFO"/>
+    <logger name="services.ProxiesRelinker" level="INFO"/>
+    <logger name="helpers.ProxyVerifyFlow" level="INFO"/>
 
     <logger name="com.theguardian.multimedia.archivehunter.cmn_services.ProxyGenerators" level="DEBUG"/>
     <logger name="com.theguardian.multimedia.archivehunter.common.ProxyLocation$" level="DEBUG"/>

@@ -14,7 +14,7 @@ class TopMenu extends React.Component {
             <Link className="top-menu-spacer" to="/search"><FontAwesomeIcon className="smallicon inline-icon highlight" icon="search"/>Search</Link>
             <Link className="top-menu-spacer" to="/browse"><FontAwesomeIcon className="smallicon inline-icon highlight" icon="th-list"/>Browse</Link>
             <Link className="top-menu-spacer" to="/lightbox"><FontAwesomeIcon className="smallicon inline-icon highlight" icon="lightbulb"/>My Lightbox</Link>
-            <Link className="top-menu-spacer" to="/admin" style={{display: this.props.visible ? "inline" : "none"}}><FontAwesomeIcon className="smallicon inline-icon highlight" icon="wrench"/>Admin</Link>
+            <Link className="top-menu-spacer" to="/admin" style={{display: this.props.isAdmin ? "inline" : "none"}}><FontAwesomeIcon className="smallicon inline-icon highlight" icon="wrench"/>Admin</Link>
         </div>
     }
 }

@@ -1,26 +1,32 @@
 package controllers
 
-import akka.actor.ActorSystem
-import akka.stream.{ActorMaterializer, Materializer}
 import com.amazonaws.services.s3.model.ListObjectsRequest
 import com.sksamuel.elastic4s.http.search.TermsAggResult
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{ESClientManager, S3ClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{ScanTarget, ScanTargetDAO}
+import helpers.InjectableRefresher
 import javax.inject.Inject
 import play.api.libs.circe.Circe
 import play.api.{Configuration, Logger}
 import play.api.mvc.{AbstractController, ControllerComponents}
-import responses.{GenericErrorResponse, ObjectListResponse, PathInfoResponse}
+import responses.{ErrorListResponse, GenericErrorResponse, ObjectListResponse, PathInfoResponse}
 import io.circe.syntax._
 import io.circe.generic.auto._
+import play.api.libs.ws.WSClient
 import play.api.mvc.Result
 
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
-class BrowseCollectionController @Inject() (config:Configuration,s3ClientMgr:S3ClientManager, scanTargetDAO:ScanTargetDAO,
-                                            cc:ControllerComponents, esClientMgr:ESClientManager) extends AbstractController(cc) with Circe{
+class BrowseCollectionController @Inject() (override val config:Configuration,
+                                            s3ClientMgr:S3ClientManager,
+                                            scanTargetDAO:ScanTargetDAO,
+                                            override val controllerComponents: ControllerComponents,
+                                            esClientMgr:ESClientManager,
+                                            override val wsClient:WSClient,
+                                            override val refresher:InjectableRefresher)
+extends AbstractController(controllerComponents) with PanDomainAuthActions with Circe{
   import com.sksamuel.elastic4s.http.ElasticDsl._
 
   private val logger=Logger(getClass)
@@ -59,7 +65,7 @@ class BrowseCollectionController @Inject() (config:Configuration,s3ClientMgr:S3C
     * @param prefix parent folder to list. If none, then lists the root
     * @return
     */
-  def getFolders(collectionName:String, prefix:Option[String]) = Action.async {
+  def getFolders(collectionName:String, prefix:Option[String]) = APIAuthAction.async {
     withScanTarget(collectionName) { target=>
       val rq = new ListObjectsRequest().withBucketName(collectionName).withDelimiter("/")
       val finalRq = prefix match {
@@ -83,7 +89,7 @@ class BrowseCollectionController @Inject() (config:Configuration,s3ClientMgr:S3C
     result.buckets.map(b=>Tuple2(b.key,b.docCount)).toMap
   }
 
-  def pathSummary(collectionName:String, prefix:Option[String]) = Action.async {
+  def pathSummary(collectionName:String, prefix:Option[String]) = APIAuthAction.async {
     withScanTargetAsync(collectionName) { target=>
       val queries = Seq(
         Some(matchQuery("bucket.keyword", collectionName)),
@@ -111,6 +117,32 @@ class BrowseCollectionController @Inject() (config:Configuration,s3ClientMgr:S3C
             bucketsToCountMap(response.result.aggregations.terms("typesCount")),
           ).asJson)
       })
+    }
+  }
+
+  def getCollections() = APIAuthAction.async { request=>
+    userProfileFromSession(request.session) match {
+      case Some(Right(profile)) =>
+        scanTargetDAO.allScanTargets().map(resultList => {
+          val errors = resultList.collect({ case Left(err) => err })
+          if (errors.nonEmpty) {
+            InternalServerError(ErrorListResponse("db_error", "", errors.map(_.toString)).asJson)
+          } else {
+            val collectionsList = resultList.collect({case Right(target)=>target}).map(_.bucketName)
+            val allowedCollections = if(profile.allCollectionsVisible){
+              collectionsList
+            } else {
+              profile.visibleCollections
+            }
+            Ok(ObjectListResponse("ok", "collection", allowedCollections.sorted, allowedCollections.length).asJson)
+          }
+        })
+      case Some(Left(error))=>
+        logger.error(s"Corrupted login profile? ${error.toString}")
+        Future(InternalServerError(GenericErrorResponse("profile_error","Your login profile seems corrupted, try logging out and logging in again").asJson))
+      case None=>
+        logger.error(s"No user profile in session")
+        Future(Forbidden(GenericErrorResponse("profile_error","You do not appear to be logged in").asJson))
     }
   }
 }
