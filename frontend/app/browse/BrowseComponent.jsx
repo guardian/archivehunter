@@ -129,7 +129,7 @@ class BrowseComponent extends React.Component {
         } else {
             console.error("Received data for stale search " + searchId + ". Current search is " + this.state.currentSearch)
         }
-        return this.state.searchResults<450;
+        return this.state.searchResults.length<450;
     }
 
     /**
