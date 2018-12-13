@@ -845,6 +845,7 @@ Resources:
              panDomainBucket = "${PandaBucket}"
              deployedUrl = "https://${App}.${DeploymentDomain}"
              domain = "${DeploymentDomain}"
+             userProfileTable = "${UserProfileTable}"
           }
           akka.actor {
             provider = "cluster"
