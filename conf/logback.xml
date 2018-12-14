@@ -33,7 +33,7 @@
     </appender>-->
 
     <logger name="play" level="INFO" />
-    <logger name="application" level="DEBUG" />
+    <logger name="application" level="ERROR" />
 
     <logger name="services.AppStartup" level="INFO"/>
     <logger name="services.BucketScanner" level="INFO"/>

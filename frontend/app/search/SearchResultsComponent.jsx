@@ -19,7 +19,9 @@ class SearchResultsComponent extends React.Component {
         };
     }
 
-
+    componentWillUpdate(newProps,newState){
+        console.log("SearchResultsComponent will update");
+    }
 
     render(){
         return <div className="search-results-container">

@@ -20,18 +20,19 @@ class BasicSearchComponent extends React.Component {
             error:null,
             searchResults: [],
             totalHits: -1,
-            limit: 1000,
+            limit: 500,
             showingPreview: null,
             autoPlay: true,
             searchTimer: null
         };
 
         this.cancelTokenSource = axios.CancelToken.source();
-        this.defaultPageSize = 100;
+        this.defaultPageSize = 20;
 
         this.onItemOpen = this.onItemOpen.bind(this);
         this.onItemClose = this.onItemClose.bind(this);
         this.triggerSearchTimer = this.triggerSearchTimer.bind(this);
+        this.addedToLightbox = this.addedToLightbox.bind(this);
     }
 
     componentWillMount(){
@@ -94,6 +95,35 @@ class BasicSearchComponent extends React.Component {
         this.setState({showingPreview: null});
     }
 
+    indexForFileid(entryId){
+        for(var i=0;i<this.state.searchResults.length;++i){
+            console.debug("checking "+this.state.searchResults[i].id+ "against" + entryId);
+            if(this.state.searchResults[i].id===entryId) return i;
+        }
+        console.error("Could not find existing entry for id " + entryId);
+        return -1;
+    }
+
+    addedToLightbox(entryId){
+        window.setTimeout(()=> {
+            this.setState({loading: true}, () => axios.get("/api/entry/" + entryId).then(response => {
+                const entryIndex = this.indexForFileid(entryId);
+                console.info("got existing entry at " + entryIndex);
+
+                if (entryIndex >= 0) {
+                    const updatedSearchResults =
+                        this.state.searchResults.slice(0, entryIndex).concat([response.data.entry].concat(this.state.searchResults.slice(entryIndex + 1)));
+                    this.setState({searchResults: updatedSearchResults}, () => {
+                        if (this.state.showingPreview.id === entryId) this.setState({showingPreview: response.data.entry});
+                        console.log("update completed")
+                    });
+                } else {
+                    this.setState({searchResults: this.state.searchResults.concat([response.data.entry])})
+                }
+            }))
+        }, 250);
+    }
+
     renderMainBody(){
         if(this.state.error){
             return <ErrorViewComponent error={this.state.error}/>
@@ -119,7 +149,12 @@ class BasicSearchComponent extends React.Component {
             <div className="centered" style={{marginBottom: "2em",height: "2em", display: this.state.totalHits===-1 ? "none":"block"}}>
                 <p className="centered">Loaded {this.state.searchResults.length} of {this.state.totalHits} results{ this.state.searching ? " so far" : ""}.</p>
             </div>
-            <EntryDetails entry={this.state.showingPreview} autoPlay={this.state.autoPlay} showJobs={true} loadJobs={false}/>
+            <EntryDetails entry={this.state.showingPreview}
+                          autoPlay={this.state.autoPlay}
+                          showJobs={true}
+                          loadJobs={false}
+                          lightboxedCb={this.addedToLightbox}
+            />
             {this.renderMainBody()}
         </div>
     }

@@ -21,6 +21,7 @@ POST    /api/scanTarget/:id/legacyProxiesScan @controllers.ScanTargetController.
 POST    /api/scanTarget/:id/genProxies  @controllers.ScanTargetController.genProxies(id)
 
 GET     /api/search/basic      @controllers.SearchController.simpleStringSearch(q:Option[String],start:Option[Int],length:Option[Int])
+GET     /api/entry/:id                  @controllers.SearchController.getEntry(id)
 PUT     /api/search/suggestions         @controllers.SearchController.suggestions
 POST    /api/search/browser             @controllers.SearchController.browserSearch(start:Int ?= 0, size:Int ?=100)
 GET     /api/search/myLightBox          @controllers.SearchController.lightboxSearch(start:Int ?= 0, size:Int ?=100)

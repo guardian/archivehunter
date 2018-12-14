@@ -48,6 +48,7 @@ class BrowseComponent extends React.Component {
         this.onToggle = this.onToggle.bind(this);
         this.onItemClose = this.onItemClose.bind(this);
         this.onItemOpen = this.onItemOpen.bind(this);
+        this.addedToLightbox = this.addedToLightbox.bind(this);
 
         /* callbacks for Searcher */
         this.receivedNextPage = this.receivedNextPage.bind(this);
@@ -130,6 +131,35 @@ class BrowseComponent extends React.Component {
             console.error("Received data for stale search " + searchId + ". Current search is " + this.state.currentSearch)
         }
         return this.state.searchResults.length<450;
+    }
+
+    indexForFileid(entryId){
+        for(var i=0;i<this.state.searchResults.length;++i){
+            console.debug("checking "+this.state.searchResults[i].id+ "against" + entryId);
+            if(this.state.searchResults[i].id===entryId) return i;
+        }
+        console.error("Could not find existing entry for id " + entryId);
+        return -1;
+    }
+
+    addedToLightbox(entryId){
+        window.setTimeout(()=> {
+            this.setState({loading: true}, () => axios.get("/api/entry/" + entryId).then(response => {
+                const entryIndex = this.indexForFileid(entryId);
+                console.info("got existing entry at " + entryIndex);
+
+                if (entryIndex >= 0) {
+                    const updatedSearchResults =
+                        this.state.searchResults.slice(0, entryIndex).concat([response.data.entry].concat(this.state.searchResults.slice(entryIndex + 1)));
+                    this.setState({searchResults: updatedSearchResults}, () => {
+                        if (this.state.showingPreview.id === entryId) this.setState({showingPreview: response.data.entry});
+                        console.log("update completed")
+                    });
+                } else {
+                    this.setState({searchResults: this.state.searchResults.concat([response.data.entry])})
+                }
+            }))
+        }, 250);
     }
 
     /**
@@ -242,7 +272,7 @@ class BrowseComponent extends React.Component {
                 <a style={{display: "none"}} onClick={this.doCancelAll}>{this.state.cancelUnderway ? "cancelling..." : "cancel all"}</a>
                 <Treebeard data={this.state.treeContents} onToggle={this.onToggle} style={this.treeStyle}/>
             </div>
-            <EntryDetails entry={this.state.showingPreview} autoPlay={this.state.autoPlay} showJobs={true} loadJobs={false}/>
+            <EntryDetails entry={this.state.showingPreview} autoPlay={this.state.autoPlay} showJobs={true} loadJobs={false} lightboxedCb={this.addedToLightbox}/>
             {this.renderMainBody()}
         </div>
     }

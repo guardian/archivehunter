@@ -136,7 +136,7 @@ div.entry-view {
     border: 1px solid black;
     overflow: hidden;
     width: 140px;
-    height: 140px;
+    height: 150px;
     border-radius: 10px;
     background-color: white;
     display:inline-block;
@@ -185,6 +185,7 @@ div.entry-view {
     font-size: 0.6em;
     font-style: italic;
     background-color: inherit;
+    margin-top:0;
 }
 
 .entry-thumbnail {
@@ -394,4 +395,31 @@ div.selector-panel {
 .collection-list-item-disabled {
     color: #AAAAAA;
     font-style: italic;
+}
+
+.entry-details-lightboxes {
+    margin-left: 1.5em;
+}
+
+span.entry-lightbox-banner {
+    width: 100%;
+    height: 16px;
+    overflow: hidden;
+    margin-left: 0.1em;
+    margin-right: 0.1em;
+}
+
+.entry-lightbox-banner-entry-small {
+     width: 16px;
+     height: 16px;
+     margin-right: 0.2em;
+     border-radius: 16px;
+ }
+
+.entry-lightbox-banner-entry-large {
+    width: 26px;
+    height: 26px;
+    margin-right: 0.4em;
+    margin-bottom: 0.6em;
+    border-radius: 32px;
 }

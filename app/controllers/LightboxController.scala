@@ -38,7 +38,7 @@ class LightboxController @Inject() (override val config:Configuration,
         Future(InternalServerError(GenericErrorResponse("session_error", "session is corrupted, log out and log in again").asJson))
       case Some(Right(profile)) =>
         val indexUpdateFuture = indexer.getById(fileId).flatMap(indexEntry => {
-          val updatedEntry = indexEntry.copy(lightboxEntries = indexEntry.lightboxEntries.filter(_.owner!=request.user))
+          val updatedEntry = indexEntry.copy(lightboxEntries = indexEntry.lightboxEntries.filter(_.owner!=request.user.email))
           indexer.indexSingleItem(updatedEntry, Some(updatedEntry.id))
         })
 
