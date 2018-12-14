@@ -4,23 +4,27 @@ import EntryPreview from './EntryPreview.jsx';
 import EntryThumbnail from './EntryThumbnail.jsx';
 import FileSizeView from './FileSizeView.jsx';
 import EntryJobs from "./EntryJobs.jsx";
+import axios from 'axios';
 
 class EntryDetails extends React.Component {
     static propTypes = {
         entry: PropTypes.object.isRequired,
         autoPlay: PropTypes.boolean,
         showJobs: PropTypes.boolean,
-        loadJobs: PropTypes.boolean
+        loadJobs: PropTypes.boolean,
+        lightboxedCb: PropTypes.func
     };
 
     constructor(props){
         super(props);
         this.state = {
-            jobsAutorefresh: false
+            jobsAutorefresh: false,
+            lightboxSaving: false
         };
 
         this.jobsAutorefreshUpdated = this.jobsAutorefreshUpdated.bind(this);
         this.proxyGenerationWasTriggered = this.proxyGenerationWasTriggered.bind(this);
+        this.putToLightbox = this.putToLightbox.bind(this);
     }
 
     extractFileInfo(fullpath){
@@ -52,6 +56,17 @@ class EntryDetails extends React.Component {
         //if the highlighted media changes, then disable auto-refresh
         if(oldProps.entry !== this.props.entry && this.state.jobsAutorefresh) this.setState({jobsAutorefresh: false});
     }
+
+    putToLightbox(){
+        this.setState({lightboxSaving: true}, ()=>axios.put("/api/lightbox/my/" + this.props.entry.id).then(response=>{
+            this.setState({lightboxSaving: false}, ()=>{
+                if(this.props.lightboxedCb) this.props.lightboxedCb(this.props.entry.id)
+            });
+        }).catch(err=>{
+            console.error(err);
+        }));
+    }
+
     render(){
         if(!this.props.entry){
             return <div className="entry-details">
@@ -75,6 +90,9 @@ class EntryDetails extends React.Component {
                                                  autoRefreshUpdated={this.jobsAutorefreshUpdated}/> : ""
             }
 
+                <span className="actions">
+                    <a onClick={this.putToLightbox} style={{cursor: "pointer"}}>Lightbox</a>
+                </span>
                 <table className="metadata-table">
                     <tbody>
                     <tr>

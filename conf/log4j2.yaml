@@ -12,17 +12,17 @@ Configuration:
     logger:
     -
       name: com.theguardian.multimedia.archivehunter.common.services.ProxyGenerators
-      level: DEBUG
+      level: INFO
       additivity: false
       AppenderRef:
         ref: STDOUT
     - name: services.ETSProxyActor
-      level: DEBUG
+      level: INFO
       additivity: false
       AppenderRef:
         ref: STDOUT
     - name: com.theguardian.multimedia.archivehunter.common.ProxyLocation$
-      level: DEBUG
+      level: INFO
       additivity: false
       AppenderRef:
         ref: STDOUT

@@ -43,7 +43,8 @@ class IndexerSpec extends Specification with AfterAll {
         "etag_here",
         MimeType("application","octet-stream"),
         proxied=false,
-        storageClass = StorageClass.STANDARD
+        storageClass = StorageClass.STANDARD,
+        Seq()
       )
 
       val i = new Indexer("testindex")

@@ -56,7 +56,7 @@ class JobControllerHelperSpec extends Specification with Mockito with MockitoMat
       implicit val mockEsClient = mock[HttpClient]
 
       val toTest = JobModel("test","test",None,None,JobStatus.ST_PENDING,None,"fake-source-id",None,SourceType.SRC_MEDIA)
-      val mockResponse = ArchiveEntry("fake-id","fake-bucket","fake-path",None,1234L,ZonedDateTime.now(),"fake-etag",MimeType("video","something"),false,StorageClass.STANDARD)
+      val mockResponse = ArchiveEntry("fake-id","fake-bucket","fake-path",None,1234L,ZonedDateTime.now(),"fake-etag",MimeType("video","something"),false,StorageClass.STANDARD, Seq())
 
       mockIndexer.getById("fake-source-id")(mockEsClient).returns(Future(mockResponse))
 
@@ -85,7 +85,7 @@ class JobControllerHelperSpec extends Specification with Mockito with MockitoMat
       mockProxyLocationDAO.saveProxy(any)(any).returns(Future(None))
 
       val report = JobReportSuccess("ok","s3://proxybucket/path/to/output.img","s3://sourcebucket/path/to/source.mp4")
-      val sourceEntry = ArchiveEntry("fake-id","fake-bucket","fake-path",None,1234L,ZonedDateTime.now(),"fake-etag",MimeType("video","something"),false,StorageClass.STANDARD)
+      val sourceEntry = ArchiveEntry("fake-id","fake-bucket","fake-path",None,1234L,ZonedDateTime.now(),"fake-etag",MimeType("video","something"),false,StorageClass.STANDARD, Seq())
 
       val result = Await.result(JobControllerHelper.updateProxyRef(report,sourceEntry, mockProxyLocationDAO), 10 seconds)
       result must beRight
@@ -110,7 +110,7 @@ class JobControllerHelperSpec extends Specification with Mockito with MockitoMat
       proxyLocationDAO.saveProxy(any)(any).returns(Future(None))
 
       val report = JobReportSuccess("ok","s3c://proxybucket/path/to/output.img","s3://sourcebucket/path/to/source.mp4")
-      val sourceEntry = ArchiveEntry("fake-id","fake-bucket","fake-path",None,1234L,ZonedDateTime.now(),"fake-etag",MimeType("video","something"),false,StorageClass.STANDARD)
+      val sourceEntry = ArchiveEntry("fake-id","fake-bucket","fake-path",None,1234L,ZonedDateTime.now(),"fake-etag",MimeType("video","something"),false,StorageClass.STANDARD, Seq())
 
       val result = Await.result(JobControllerHelper.updateProxyRef(report,sourceEntry, proxyLocationDAO), 10 seconds)
       result must beLeft

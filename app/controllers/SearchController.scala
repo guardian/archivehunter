@@ -94,4 +94,18 @@ with PanDomainAuthActions {
       }
     )
   }
+
+  def lightboxSearch(startAt:Int, pageSize:Int) = APIAuthAction.async {request=>
+    esClient.execute {
+      search(indexName) query {
+        termQuery("lightboxes.owner", request.user.email)
+      } from startAt size pageSize sortBy fieldSort("path.keyword")
+    }.map({
+      case Left(err)=>
+        logger.error(s"Could not perform lightbox query: $err")
+        InternalServerError(GenericErrorResponse("search_error", err.toString).asJson)
+      case Right(results)=>
+        Ok(ObjectListResponse("ok","entry", results.result.to[ArchiveEntry], results.result.totalHits.toInt).asJson)
+    })
+  }
 }

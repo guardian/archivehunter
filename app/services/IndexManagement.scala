@@ -29,7 +29,11 @@ class IndexManagement @Inject() (config:Configuration, esClientMgr:ESClientManag
             BasicFieldDefinition("path", "text", fields=Seq(
               BasicFieldDefinition("keyword", "keyword"),
               BasicFieldDefinition("tokens", "text").analyzer(StandardAnalyzer)
-            )).analyzer("pathAnalyzer")
+            )).analyzer("pathAnalyzer"),
+            BasicFieldDefinition("lightboxes","array", fields = Seq(
+              BasicFieldDefinition("owner","keyword"),
+              BasicFieldDefinition("avatarUrl","keyword")
+            ))
           )
         )
       ).analysis(CustomAnalyzerDefinition(

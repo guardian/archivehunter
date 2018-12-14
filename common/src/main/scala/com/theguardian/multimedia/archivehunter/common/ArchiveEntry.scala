@@ -16,10 +16,9 @@ import org.apache.logging.log4j.LogManager
 //needed to serialize/deserialize ZonedDateTime, even if Intellij says it's not
 import io.circe.java8.time._
 import java.util.Base64
-
 import io.circe.generic.semiauto._
 
-object ArchiveEntry extends ((String, String, String, Option[String], Long, ZonedDateTime, String, MimeType, Boolean, StorageClass, Boolean)=>ArchiveEntry) with DocId {
+object ArchiveEntry extends ((String, String, String, Option[String], Long, ZonedDateTime, String, MimeType, Boolean, StorageClass, Seq[LightboxIndex], Boolean)=>ArchiveEntry) with DocId {
   private val logger = LogManager.getLogger(getClass)
 
   def getFileExtension(str: String):Option[String] = {
@@ -59,7 +58,7 @@ object ArchiveEntry extends ((String, String, String, Option[String], Long, Zone
         logger.warn(s"s3://$bucket/$key has no storage class! Assuming STANDARD.")
         "STANDARD"
     }
-    ArchiveEntry(makeDocId(bucket, key), bucket, key, getFileExtension(key), meta.getContentLength, ZonedDateTime.ofInstant(meta.getLastModified.toInstant, ZoneId.systemDefault()), meta.getETag, mimeType, proxied = false, StorageClass.withName(storageClass), beenDeleted = false)
+    ArchiveEntry(makeDocId(bucket, key), bucket, key, getFileExtension(key), meta.getContentLength, ZonedDateTime.ofInstant(meta.getLastModified.toInstant, ZoneId.systemDefault()), meta.getETag, mimeType, proxied = false, StorageClass.withName(storageClass), Seq(), beenDeleted = false)
   }
 
   def fromIndex(bucket:String, key:String)(implicit indexer:Indexer, httpClient: HttpClient):Future[ArchiveEntry] =
@@ -67,7 +66,7 @@ object ArchiveEntry extends ((String, String, String, Option[String], Long, Zone
 
 }
 
-case class ArchiveEntry(id:String, bucket: String, path: String, file_extension: Option[String], size: scala.Long, last_modified: ZonedDateTime, etag: String, mimeType: MimeType, proxied: Boolean, storageClass:StorageClass, beenDeleted:Boolean=false) {
+case class ArchiveEntry(id:String, bucket: String, path: String, file_extension: Option[String], size: scala.Long, last_modified: ZonedDateTime, etag: String, mimeType: MimeType, proxied: Boolean, storageClass:StorageClass, lightboxEntries:Seq[LightboxIndex], beenDeleted:Boolean=false) {
   private val logger = LogManager.getLogger(getClass)
   def getProxy(proxyType: ProxyType.Value)(implicit proxyLocationDAO:ProxyLocationDAO, client:AmazonDynamoDBAsync) = proxyLocationDAO.getProxy(id,proxyType)
 
