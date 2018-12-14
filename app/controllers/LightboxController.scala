@@ -2,11 +2,11 @@ package controllers
 
 import java.time.ZonedDateTime
 
-import com.theguardian.multimedia.archivehunter.common.{Indexer, LightboxIndex, StorageClass}
+import com.theguardian.multimedia.archivehunter.common.{Indexer, LightboxIndex, StorageClass, ZonedDateTimeEncoder}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.ESClientManager
 import helpers.InjectableRefresher
 import javax.inject.{Inject, Singleton}
-import models.{LightboxEntry, LightboxEntryDAO, RestoreStatus}
+import models.{LightboxEntry, LightboxEntryDAO, RestoreStatus, RestoreStatusEncoder}
 import play.api.{Configuration, Logger}
 import play.api.libs.circe.Circe
 import play.api.mvc.{AbstractController, ControllerComponents}
@@ -24,7 +24,8 @@ class LightboxController @Inject() (override val config:Configuration,
                                     override val controllerComponents:ControllerComponents,
                                     override val wsClient:WSClient,
                                     override val refresher:InjectableRefresher,
-                                    esClientMgr:ESClientManager) extends AbstractController(controllerComponents) with PanDomainAuthActions with Circe {
+                                    esClientMgr:ESClientManager)
+  extends AbstractController(controllerComponents) with PanDomainAuthActions with Circe with ZonedDateTimeEncoder with RestoreStatusEncoder {
   private val logger=Logger(getClass)
   private val indexer = new Indexer(config.get[String]("externalData.indexName"))
   private implicit val esClient = esClientMgr.getClient()
@@ -103,6 +104,18 @@ class LightboxController @Inject() (override val config:Configuration,
           })
         })
     }
+  }
+
+  def lightboxDetails = APIAuthAction.async { request=>
+    lightboxEntryDAO.allForUser(request.user.email).map(results=>{
+      val errors = results.collect({case Left(err)=>err})
+      if(errors.nonEmpty){
+        errors.foreach(err=>logger.error(s"Could not retrieve lightbox details: ${err.toString}"))
+        InternalServerError(ObjectListResponse("db_error","error",errors.map(_.toString), errors.length).asJson)
+      } else {
+        Ok(ObjectListResponse("ok","lightboxEntry",results.collect({case Right(entry)=>entry}), results.length).asJson)
+      }
+    })
   }
 
 }
