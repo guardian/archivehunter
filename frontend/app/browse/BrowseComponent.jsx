@@ -7,8 +7,9 @@ import SearchResultsComponent from "../search/SearchResultsComponent.jsx";
 import EntryDetails from "../Entry/EntryDetails.jsx";
 import BrowsePathSummary from "./BrowsePathSummary.jsx";
 import SearchManager from '../SearchManager/SearchManager.jsx';
+import CommonSearchView from "../common/CommonSearchView.jsx";
 
-class BrowseComponent extends React.Component {
+class BrowseComponent extends CommonSearchView {
     constructor(props){
         super(props);
 
@@ -142,25 +143,6 @@ class BrowseComponent extends React.Component {
         return -1;
     }
 
-    addedToLightbox(entryId){
-        window.setTimeout(()=> {
-            this.setState({loading: true}, () => axios.get("/api/entry/" + entryId).then(response => {
-                const entryIndex = this.indexForFileid(entryId);
-                console.info("got existing entry at " + entryIndex);
-
-                if (entryIndex >= 0) {
-                    const updatedSearchResults =
-                        this.state.searchResults.slice(0, entryIndex).concat([response.data.entry].concat(this.state.searchResults.slice(entryIndex + 1)));
-                    this.setState({searchResults: updatedSearchResults}, () => {
-                        if (this.state.showingPreview.id === entryId) this.setState({showingPreview: response.data.entry});
-                        console.log("update completed")
-                    });
-                } else {
-                    this.setState({searchResults: this.state.searchResults.concat([response.data.entry])})
-                }
-            }))
-        }, 250);
-    }
 
     /**
      * callback, called by Searcher when a search has completed (returns no more results)
@@ -225,14 +207,6 @@ class BrowseComponent extends React.Component {
 
     componentWillMount(){
         this.refreshCollectionNames();
-    }
-
-    onItemOpen(newTarget){
-        this.setState({showingPreview: newTarget})
-    }
-
-    onItemClose(){
-        this.setState({showingPreview: null});
     }
 
     renderMainBody(){

@@ -1,13 +1,12 @@
 import React from 'react';
 import axios from 'axios';
-import ErrorViewComponent from '../common/ErrorViewComponent.jsx';
-import SearchResultsComponent from './SearchResultsComponent.jsx';
 import SearchSuggestionsComponent from './SearchSuggestionsComponent.jsx';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import EntryDetails from "../Entry/EntryDetails.jsx";
+import CommonSearchView from "../common/CommonSearchView.jsx";
 
-class BasicSearchComponent extends React.Component {
+class BasicSearchComponent extends CommonSearchView {
     searchTimeout = 1000;   //timeout in milliseconds between last keypress and the search starting
 
     constructor(props){
@@ -87,14 +86,6 @@ class BasicSearchComponent extends React.Component {
         this.setState({searchTerms: newString, searchResults: []},this.triggerSearchTimer);
     }
 
-    onItemOpen(newTarget){
-        this.setState({showingPreview: newTarget})
-    }
-
-    onItemClose(){
-        this.setState({showingPreview: null});
-    }
-
     indexForFileid(entryId){
         for(var i=0;i<this.state.searchResults.length;++i){
             console.debug("checking "+this.state.searchResults[i].id+ "against" + entryId);
@@ -102,38 +93,6 @@ class BasicSearchComponent extends React.Component {
         }
         console.error("Could not find existing entry for id " + entryId);
         return -1;
-    }
-
-    addedToLightbox(entryId){
-        window.setTimeout(()=> {
-            this.setState({loading: true}, () => axios.get("/api/entry/" + entryId).then(response => {
-                const entryIndex = this.indexForFileid(entryId);
-                console.info("got existing entry at " + entryIndex);
-
-                if (entryIndex >= 0) {
-                    const updatedSearchResults =
-                        this.state.searchResults.slice(0, entryIndex).concat([response.data.entry].concat(this.state.searchResults.slice(entryIndex + 1)));
-                    this.setState({searchResults: updatedSearchResults}, () => {
-                        if (this.state.showingPreview.id === entryId) this.setState({showingPreview: response.data.entry});
-                        console.log("update completed")
-                    });
-                } else {
-                    this.setState({searchResults: this.state.searchResults.concat([response.data.entry])})
-                }
-            }))
-        }, 250);
-    }
-
-    renderMainBody(){
-        if(this.state.error){
-            return <ErrorViewComponent error={this.state.error}/>
-        } else if(this.state.totalHits!==-1){
-            return <SearchResultsComponent entries={this.state.searchResults} onItemOpen={this.onItemOpen} onItemClose={this.onItemClose} selectedEntry={this.state.showingPreview}/>
-        } else if(this.state.searching) {
-            return <img style={{marginLeft:"auto",marginRight:"auto",width:"200px",display:"block"}} src="/assets/images/Spinner-1s-200px.gif"/>
-        } else {
-            return <span/>
-        }
     }
 
     render(){

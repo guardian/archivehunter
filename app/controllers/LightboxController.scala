@@ -113,7 +113,9 @@ class LightboxController @Inject() (override val config:Configuration,
         errors.foreach(err=>logger.error(s"Could not retrieve lightbox details: ${err.toString}"))
         InternalServerError(ObjectListResponse("db_error","error",errors.map(_.toString), errors.length).asJson)
       } else {
-        Ok(ObjectListResponse("ok","lightboxEntry",results.collect({case Right(entry)=>entry}), results.length).asJson)
+        //it's easier for the frontend to consume this if we convert to a mapping here
+        val finalResult = results.collect({case Right(entry)=>entry}).map(entry=>Tuple2(entry.fileId,entry)).toMap
+        Ok(ObjectListResponse("ok","lightboxEntry", finalResult, results.length).asJson)
       }
     })
   }

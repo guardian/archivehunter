@@ -14,6 +14,7 @@ import BasicSearchComponent from './search/BasicSearchComponent.jsx';
 import JobsList from './JobsList/JobsList.jsx';
 import BrowseComponent from './browse/BrowseComponent.jsx';
 import LoginStatusComponent from './Login/LoginStatusComponent.jsx';
+import MyLightbox from './Lightbox/MyLightbox.jsx';
 
 import { library } from '@fortawesome/fontawesome-svg-core'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
@@ -71,6 +72,7 @@ class App extends React.Component {
                 <Route path="/admin/scanTargets/:id" component={ScanTargetEdit}/> /*this also handles "new" */
                 <Route path="/admin/scanTargets" component={ScanTargetsList}/>
                 <Route path="/admin" exact={true} component={AdminFront}/>
+                <Route path="/lightbox" exact={true} component={MyLightbox}/>
                 <Route path="/browse" exact={true} component={BrowseComponent}/>
                 <Route path="/search" exact={true} component={BasicSearchComponent}/>
                 <Route path="/" exact={true} component={FrontPage}/>
