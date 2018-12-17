@@ -9,6 +9,7 @@ import TimestampFormatter from '../common/TimestampFormatter.jsx';
 import ErrorViewComponent from '../common/ErrorViewComponent.jsx';
 import BreadcrumbComponent from "../common/BreadcrumbComponent.jsx";
 import Dialog from 'react-dialog';
+import ReactTooltip from 'react-tooltip'
 
 class ScanTargetsList extends React.Component {
     constructor(props){
@@ -85,9 +86,11 @@ class ScanTargetsList extends React.Component {
                 key: "bucketName",
                 headerProps: {className: "dashboardheader"},
                 render: value=><span>
-                    <FontAwesomeIcon icon="folder-plus" className="clickable button-row" onClick={()=>this.triggerAddedScan(value)}/>
-                    <FontAwesomeIcon icon="folder-minus" className="clickable button-row" onClick={()=>this.triggerRemovedScan(value)}/>
-                    <FontAwesomeIcon icon="folder" className="clickablebutton-row " onClick={()=>this.triggerFullScan(value)}/>
+                    <span data-tip="Addition scan"><FontAwesomeIcon icon="folder-plus" className="clickable button-row" onClick={()=>this.triggerAddedScan(value)}/></span>
+                    <span data-tip="Removal scan"><FontAwesomeIcon icon="folder-minus" className="clickable button-row" onClick={()=>this.triggerRemovedScan(value)}/></span>
+                    <span data-tip="Full scan"><FontAwesomeIcon icon="folder" className="clickable button-row " onClick={()=>this.triggerFullScan(value)}/></span>
+                    <br/>
+                    <span data-tip="Proxy generation"><FontAwesomeIcon icon="balance-scale" className="clickable button-row" onClick={()=>this.triggerProxyGen(value)}/></span>
                 </span>
             }
         ];
@@ -114,6 +117,19 @@ class ScanTargetsList extends React.Component {
     triggerFullScan(targetId){
         return this.generalScanTrigger(targetId,"scan")
     }
+
+    triggerProxyGen(targetId){
+        this.setState({loading: true},()=>axios.post("/api/scanTarget/" + encodeURIComponent(targetId) + "/" + "genProxies")
+            .then(result=>{
+                console.log("Proxy generation has been triggered");
+                this.setState({loading:false, lastError:null, scanTargets:[]}, ()=>setTimeout(()=>this.componentWillMount(),1000));
+            })
+            .catch(err=>{
+                console.error(err);
+                this.setState({loading: false, lastError: err});
+            }))
+    }
+
     generalScanTrigger(targetId,type){
         this.setState({loading: true},()=>axios.post("/api/scanTarget/" + encodeURIComponent(targetId) + "/" + type)
             .then(result=>{
@@ -197,6 +213,7 @@ class ScanTargetsList extends React.Component {
                     <p style={{height:"200px"}} className="centered">Are you sure you want to delete the scan target for {this.state.deletionTarget}?</p>
                 </Dialog>
             }
+            <ReactTooltip/>
         </div>
     }
 }
