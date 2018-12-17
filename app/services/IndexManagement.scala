@@ -27,7 +27,8 @@ class IndexManagement @Inject() (config:Configuration, esClientMgr:ESClientManag
         MappingDefinition("entry",
           fields=Seq(
             BasicFieldDefinition("path", "text", fields=Seq(
-              BasicFieldDefinition("keyword", "keyword")
+              BasicFieldDefinition("keyword", "keyword"),
+              BasicFieldDefinition("tokens", "text").analyzer(StandardAnalyzer)
             )).analyzer("pathAnalyzer")
           )
         )

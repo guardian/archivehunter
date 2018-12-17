@@ -24,7 +24,7 @@ describe("Searcher.getNextPage", ()=>{
 
         moxios.wait(()=>{
             const request = moxios.requests.mostRecent();
-            expect(request.url).toEqual("/path/to/my/endpoint?size=10&startAt=0");
+            expect(request.url).toEqual("/path/to/my/endpoint?size=10&start=0");
             const response = {
                 status: 200,
                 response: {
@@ -37,7 +37,7 @@ describe("Searcher.getNextPage", ()=>{
                 expect(nextPageCb.called).toBeTruthy();
                 moxios.wait(()=>{
                     const secondRequest = moxios.requests.mostRecent();
-                    expect(secondRequest.url).toEqual("/path/to/my/endpoint?size=10&startAt=10");
+                    expect(secondRequest.url).toEqual("/path/to/my/endpoint?size=10&start=10");
                     const secondResponse = {
                         status: 200,
                         response: {
@@ -68,7 +68,7 @@ describe("Searcher.getNextPage", ()=>{
 
         moxios.wait(()=>{
             const request = moxios.requests.mostRecent();
-            expect(request.url).toEqual("/path/to/my/endpoint?size=10&startAt=0");
+            expect(request.url).toEqual("/path/to/my/endpoint?size=10&start=0");
             const response = {
                 status: 500,
                 response: {
@@ -99,7 +99,7 @@ describe("Searcher.getNextPage", ()=>{
 
         moxios.wait(()=>{
             const request = moxios.requests.mostRecent();
-            expect(request.url).toEqual("/path/to/my/endpoint?size=10&startAt=0&key1=value1&key2=value2");
+            expect(request.url).toEqual("/path/to/my/endpoint?size=10&start=0&key1=value1&key2=value2");
             const response = {
                 status: 200,
                 response: {
@@ -112,7 +112,7 @@ describe("Searcher.getNextPage", ()=>{
                 expect(nextPageCb.called).toBeTruthy();
                 moxios.wait(()=>{
                     const secondRequest = moxios.requests.mostRecent();
-                    expect(secondRequest.url).toEqual("/path/to/my/endpoint?size=10&startAt=10&key1=value1&key2=value2");
+                    expect(secondRequest.url).toEqual("/path/to/my/endpoint?size=10&start=10&key1=value1&key2=value2");
                     const secondResponse = {
                         status: 200,
                         response: {
@@ -145,7 +145,7 @@ describe("Searcher.getNextPage", ()=>{
 
         moxios.wait(()=>{
             const request = moxios.requests.mostRecent();
-            expect(request.url).toEqual("/path/to/my/endpoint?size=10&startAt=0");
+            expect(request.url).toEqual("/path/to/my/endpoint?size=10&start=0");
             expect(request.config.data).toEqual("request body string");
             const response = {
                 status: 500,
@@ -202,7 +202,7 @@ describe("Searcher.startSearch", ()=>{
 //
 //         moxios.wait(()=>{
 //             const request = moxios.requests.mostRecent();
-//             expect(request.url).toEqual("/path/to/my/endpoint?size=10&startAt=0");
+//             expect(request.url).toEqual("/path/to/my/endpoint?size=10&start=0");
 //             const response = {
 //                 status: 200,
 //                 response: {

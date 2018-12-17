@@ -129,7 +129,7 @@ class BrowseComponent extends React.Component {
         } else {
             console.error("Received data for stale search " + searchId + ". Current search is " + this.state.currentSearch)
         }
-        return this.state.searchResults<450;
+        return this.state.searchResults.length<450;
     }
 
     /**
@@ -234,12 +234,12 @@ class BrowseComponent extends React.Component {
             <div className="selector-panel" style={{overflow: this.state.treeContents.length>0 ? "scroll" : "hidden"}}>
                 <select id="collection-selector"
                         value={this.state.collectionName}
-                        onChange={evt=>this.setState({collectionName: evt.target.value})}>
+                        onChange={evt=>this.setState({collectionName: evt.target.value, searchResults: [], path: null})}>
                     {
                         this.state.collectionNames.map(entry=><option id={entry} value={entry}>{entry}</option>)
                     }
                 </select>
-                <a onClick={this.doCancelAll}>{this.state.cancelUnderway ? "cancelling..." : "cancel all"}</a>
+                <a style={{display: "none"}} onClick={this.doCancelAll}>{this.state.cancelUnderway ? "cancelling..." : "cancel all"}</a>
                 <Treebeard data={this.state.treeContents} onToggle={this.onToggle} style={this.treeStyle}/>
             </div>
             <EntryDetails entry={this.state.showingPreview} autoPlay={this.state.autoPlay} showJobs={true} loadJobs={false}/>

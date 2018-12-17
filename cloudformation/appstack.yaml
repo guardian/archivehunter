@@ -618,6 +618,23 @@ Resources:
             - !Sub arn:aws:elastictranscoder:*:${AWS::AccountId}:job/*
             - !Sub arn:aws:elastictranscoder:*:${AWS::AccountId}:preset/${VideoTranscodingPresetId}
             - !Sub arn:aws:elastictranscoder:*:${AWS::AccountId}:preset/${AudioTranscodingPresetId}
+      - PolicyName: TranscoderPipeline
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+            Effect: Allow
+            Action:
+            - elastictranscoder:CreatePipeline
+            Resource:
+            - "*"
+      - PolicyName: TranscodeRole
+        PolicyDocument:
+          Statement:
+            Effect: Allow
+            Action:
+            - iam:PassRole
+            Resource:
+            - !GetAtt TranscodingRole.Arn
       - PolicyName: TranscoderAccessList
         PolicyDocument:
           Version: 2012-10-17

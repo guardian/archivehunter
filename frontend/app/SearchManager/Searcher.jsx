@@ -41,7 +41,7 @@ class Searcher {
      */
     cancel(msg){
         return new Promise((resolve, reject)=>{
-            if(!this.operationInProgress){
+            if(this.operationInProgress){
                 this.terminationCompletedCb = resolve;
                 this.isCancelling = true;
                 this.cancelTokenSource.cancel(msg); //this is picked up in axios.isCancel() within getNextPage() - the promise is then completed.
@@ -58,9 +58,13 @@ class Searcher {
     getNextPage(){
         console.log("getNextPage: isCancelling? ", this.isCancelling);
 
-        if(this.isCancelling) return;
+        if(this.isCancelling){
+            this.operationInProgress = false;
+            if(this.cancelledCb) this.cancelledCb(this.searchId);
+            return;
+        }
         this.operationInProgress = true;
-        const urlParams = this.params ? Object.assign({size: this.pageSize, startAt:this.startAt}, this.params) : {size: this.pageSize, startAt:this.startAt};
+        const urlParams = this.params ? Object.assign({size: this.pageSize, start:this.startAt}, this.params) : {size: this.pageSize, start:this.startAt};
         const urlParamsString = Object.keys(urlParams)
             .map((k,idx)=>encodeURIComponent(k) + "=" + encodeURIComponent(urlParams[k]))
             .join("&");
@@ -83,7 +87,11 @@ class Searcher {
             } else {
                 const shouldContinue = this.nextPageCb(response, this.searchId);
                 this.startAt+=this.pageSize;
-                if(shouldContinue) this.getNextPage();
+                if(shouldContinue){
+                    this.getNextPage();
+                } else {
+                    this.operationInProgress = false;
+                }
             }
         }).catch(err=>{
             this.operationInProgress = false;

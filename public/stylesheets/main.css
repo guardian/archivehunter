@@ -163,6 +163,10 @@ div.entry-view {
     color: #333333;
 }
 
+.entry-standard {
+    background-color: lightgray !important;
+}
+
 .entry-deep-archive {
     background-color: #2676b5 !important;
     color: white !important;

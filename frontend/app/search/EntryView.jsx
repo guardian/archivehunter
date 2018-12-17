@@ -27,7 +27,7 @@ class EntryView extends React.Component {
     }
 
     classForStorageClass(storageClass){
-        if(storageClass==="STANDARD") return "";
+        if(storageClass==="STANDARD") return "entry-standard";
         if(storageClass==="STANDARD_IA") return "entry-shallow-archive";
         if(storageClass==="GLACIER") return "entry-deep-archive";
         console.warn("Unrecognised storage class for " + this.props.entry.path + ": " + storageClass);

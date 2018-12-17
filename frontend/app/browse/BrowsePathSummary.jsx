@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import axios from 'axios';
 import ErrorViewComponent from '../common/ErrorViewComponent.jsx';
 import BytesFormatter from "../common/BytesFormatter.jsx";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 
 class BrowsePathSummary extends React.Component {
     static propTypes = {
@@ -67,7 +68,8 @@ class BrowsePathSummary extends React.Component {
 
         /*TODO: add in jschart and put a horizontal bar of the filetypes breakdown*/
         if(this.state.hasLoaded) return <div>
-            <p className="centered">Summary of {this.props.collectionName} {this.props.path ? this.props.path : ""}</p>
+                <p className="centered"><FontAwesomeIcon style={{marginRight: "0.5em"}} icon="hdd"/>{this.props.collectionName}</p>
+                <p className="centered" style={{marginTop: "0.1em"}}><FontAwesomeIcon icon="folder" style={{marginRight: "0.5em", display: this.props.path ? "inline":"none"}}/>{this.props.path ? this.props.path : ""}</p>
             <p>
                 Total of {this.state.totalHits} items occupying <BytesFormatter value={this.state.totalSize}/>
             </p>
