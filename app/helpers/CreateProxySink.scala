@@ -1,11 +1,13 @@
 package helpers
 
+import akka.actor.ActorRef
 import akka.stream.{Attributes, Inlet, SinkShape}
 import akka.stream.stage.{AbstractInHandler, GraphStage, GraphStageLogic}
 import com.theguardian.multimedia.archivehunter.common.ArchiveEntry
 import com.theguardian.multimedia.archivehunter.common.cmn_services.ProxyGenerators
-import javax.inject.Inject
+import javax.inject.{Inject, Named}
 import play.api.Logger
+import services.ETSProxyActor
 
 import scala.concurrent.Await
 import scala.util.{Failure, Success}
@@ -16,7 +18,7 @@ import scala.util.{Failure, Success}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
-class CreateProxySink @Inject() (proxyGenerators: ProxyGenerators) extends GraphStage[SinkShape[ArchiveEntry]]{
+class CreateProxySink @Inject() (proxyGenerators: ProxyGenerators, @Named("etsProxyActor")etsProxyActor:ActorRef) extends GraphStage[SinkShape[ArchiveEntry]]{
   private final val in:Inlet[ArchiveEntry] = Inlet.create("CreateProxySink.in")
   private val logger = Logger(getClass)
 
@@ -26,6 +28,8 @@ class CreateProxySink @Inject() (proxyGenerators: ProxyGenerators) extends Graph
     setHandler(in, new AbstractInHandler {
       override def onPush(): Unit = {
         val elem = grab(in)
+
+        etsProxyActor ! ETSProxyActor.CreateDefaultMediaProxy(elem)
 
         Await.result(proxyGenerators.createThumbnailProxy(elem), 30 seconds) match {
           case Success(msg)=>

@@ -28,8 +28,15 @@ object ETSProxyActor {
   /**
     * public message to start proxy creation process
     * @param entry archive entry to proxy
+    * @param proxyType type of proxy to generate - from the [[ProxyType]] enumeration
     */
   case class CreateMediaProxy(entry:ArchiveEntry, proxyType: ProxyType.Value) extends ETSMsg
+
+  /**
+    * use the default type for the given MIME type to call CreateMediaProxy
+    * @param entry
+    */
+  case class CreateDefaultMediaProxy(entry:ArchiveEntry) extends ETSMsg
 
   /**
     * public message reply if something went wrong
@@ -381,6 +388,21 @@ class ETSProxyActor @Inject() (implicit config:ArchiveHunterConfiguration,
       } catch {
         case ex:Throwable=>
           originalSender ! PreparationFailure(ex)
+      }
+
+    case CreateDefaultMediaProxy(entry)=>
+      entry.mimeType.major match {
+        case "video"=>self ! CreateMediaProxy(entry, ProxyType.VIDEO)
+        case "audio"=>self ! CreateMediaProxy(entry, ProxyType.AUDIO)
+          //ETSProxyActor does not handle image files
+        case "image"=>sender ! PreparationFailure(new RuntimeException("ETSProxyActor does not handle image files"))
+        case "application"=>
+          if(entry.mimeType.minor=="octet-stream") {
+            self ! CreateMediaProxy(entry, ProxyType.VIDEO) //if it's application/octet-stream, then we don't know; try for video but expect failure.
+          } else {
+            sender ! PreparationFailure(new RuntimeException(s"ETSProxyActor does not know how to handle ${entry.mimeType.toString}"))
+          }
+        case _=>sender ! PreparationFailure(new RuntimeException(s"ETSProxyActor does not know how to handle ${entry.mimeType.toString}"))
       }
 
     case CreateMediaProxy(entry, proxyType)=>
