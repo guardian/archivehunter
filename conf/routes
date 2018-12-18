@@ -50,6 +50,7 @@ GET     /api/user/myProfile             @controllers.UserController.myProfile
 PUT     /api/lightbox/my/:fileId        @controllers.LightboxController.addToLightbox(fileId)
 DELETE  /api/lightbox/my/:fileId        @controllers.LightboxController.removeFromLightbox(fileId)
 GET     /api/lightbox/my/details        @controllers.LightboxController.lightboxDetails
+GET     /api/download/:fileId           @controllers.LightboxController.getDownloadLink(fileId)
 
 # Map static resources from the /public folder to the /assets URL path
 GET     /assets/*file               controllers.Assets.at(path="/public", file)

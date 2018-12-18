@@ -16,7 +16,12 @@ class EntryDetails extends React.Component {
         loadJobs: PropTypes.boolean,
         lightboxedCb: PropTypes.func,
         userLogin: null,
-        lastError: null
+        lastError: null,
+
+        preLightboxInsert: PropTypes.object,
+        postLightboxInsert: PropTypes.object,
+        postJobsInsert: PropTypes.object,
+        tableRowsInsert: PropTypes.object
     };
 
     constructor(props){
@@ -112,17 +117,19 @@ class EntryDetails extends React.Component {
                               autoPlay={this.props.autoPlay}
                               triggeredProxyGeneration={this.proxyGenerationWasTriggered}
                 />
-
+            <div className="entry-details-insert">{ this.props.preLightboxInsert ? this.props.preLightboxInsert : "" }</div>
             <div className="entry-details-lightboxes" style={{display: this.props.entry.lightboxEntries.length>0 ? "block":"none"}}>
                 <span style={{display:"block", marginBottom: "0.4em"}}><FontAwesomeIcon icon="lightbulb" style={{paddingRight: "0.4em"}}/>Lightboxes</span>
                 <EntryLightboxBanner lightboxEntries={this.props.entry.lightboxEntries} entryClassName="entry-lightbox-banner-entry-large"/>
             </div>
+            <div className="entry-details-insert">{ this.props.postLightboxInsert ? this.props.postLightboxInsert : "" }</div>
             {
                 this.props.showJobs ? <EntryJobs entryId={this.props.entry.id}
                                                  loadImmediate={this.props.loadJobs}
                                                  autoRefresh={this.state.jobsAutorefresh}
                                                  autoRefreshUpdated={this.jobsAutorefreshUpdated}/> : ""
             }
+            <div className="entry-details-insert">{ this.props.postJobsInsert ? this.props.postJobsInsert : "" }</div>
                 <table className="metadata-table">
                     <tbody>
                     <tr>
@@ -158,6 +165,7 @@ class EntryDetails extends React.Component {
                         <td className="metadata-heading">Storage class</td>
                         <td className="metadata-entry">{this.props.entry.storageClass}</td>
                     </tr>
+                    { this.props.tableRowsInsert ? this.props.tableRowsInsert : "" }
                     </tbody>
                 </table>
         </div>

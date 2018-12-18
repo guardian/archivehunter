@@ -4,6 +4,8 @@ import EntryDetails from "../Entry/EntryDetails.jsx";
 import ErrorViewComponent from "../common/ErrorViewComponent.jsx";
 import SearchResultsComponent from "../search/SearchResultsComponent.jsx";
 import CommonSearchView from "../common/CommonSearchView.jsx";
+import LightboxInfoInsert from "./LightboxInfoInsert.jsx";
+import AvailabilityInsert from "../JobsList/AvailabilityInsert.jsx";
 
 class MyLightbox extends CommonSearchView {
     constructor(props){
@@ -54,7 +56,40 @@ class MyLightbox extends CommonSearchView {
         this.refreshData();
     }
 
+    shouldHideAvailability(entry){
+        console.log("shouldHideAvailability: ",  entry);
+        if(!entry) return true;
+        console.log(entry.details.restoreStatus);
+
+        if(entry && entry.details && entry.details.restoreStatus){
+            return entry.details.restoreStatus!=="RS_UNNEEDED" && entry.details.restoreStatus!=="RS_SUCCESS"
+        } else {
+            return true
+        }
+    }
+
+    extractPath() {
+        console.log(this.state.showingPreview);
+
+        if (this.state.showingPreview) return this.state.showingPreview.path.substring(this.state.showingPreview.path.lastIndexOf('/') + 1);
+        return "unknown";
+    }
+
     render(){
+        const insert = <div><LightboxInfoInsert
+            entry={this.state.showingPreview && this.state.showingPreview.details ?
+                        this.state.showingPreview.details : null
+            }/>
+            <hr/>
+            <AvailabilityInsert status={this.state.showingPreview ? this.state.showingPreview.details.restoreStatus : ""}
+                                availableUntil={this.state.showingPreview ? this.state.showingPreview.details.availableUntil : ""}
+                                hidden={this.shouldHideAvailability(this.state.showingPreview)}
+                                fileId={this.state.showingPreview ? this.state.showingPreview.id : null}
+                                fileNameOnly={this.state.showingPreview ? this.extractPath() : null}
+            />
+            <hr style={{display: this.shouldHideAvailability(this.state.showingPreview) ? "inherit" : "none" }}/>
+        </div>;
+
         return <div>
             <div className="centered">
                 <h1>{this.state.userDetails ?
@@ -62,13 +97,15 @@ class MyLightbox extends CommonSearchView {
                     } Lightbox
                 </h1>
             </div>
-            {this.renderMainBody()}
             <EntryDetails entry={this.state.showingPreview}
                           autoPlay={this.state.autoPlay}
                           showJobs={true}
                           loadJobs={false}
                           lightboxedCb={this.addedToLightbox}
+                          preLightboxInsert={insert}
             />
+            <div>{this.renderMainBody()}</div>
+
         </div>
     }
 }

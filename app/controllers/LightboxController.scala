@@ -3,15 +3,17 @@ package controllers
 import java.time.ZonedDateTime
 
 import akka.actor.ActorRef
+import com.amazonaws.HttpMethod
+import com.amazonaws.services.s3.model.GeneratePresignedUrlRequest
 import com.theguardian.multimedia.archivehunter.common.{Indexer, LightboxIndex, StorageClass, ZonedDateTimeEncoder}
-import com.theguardian.multimedia.archivehunter.common.clientManagers.ESClientManager
+import com.theguardian.multimedia.archivehunter.common.clientManagers.{ESClientManager, S3ClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{LightboxEntry, LightboxEntryDAO, RestoreStatus, RestoreStatusEncoder}
 import helpers.InjectableRefresher
 import javax.inject.{Inject, Named, Singleton}
 import play.api.{Configuration, Logger}
 import play.api.libs.circe.Circe
 import play.api.mvc.{AbstractController, ControllerComponents}
-import responses.{GenericErrorResponse, ObjectListResponse}
+import responses.{GenericErrorResponse, ObjectGetResponse, ObjectListResponse}
 import io.circe.syntax._
 import io.circe.generic.auto._
 import play.api.libs.ws.WSClient
@@ -27,11 +29,14 @@ class LightboxController @Inject() (override val config:Configuration,
                                     override val wsClient:WSClient,
                                     override val refresher:InjectableRefresher,
                                     esClientMgr:ESClientManager,
+                                    s3ClientMgr:S3ClientManager,
                                     @Named("glacierRestoreActor") glacierRestoreActor:ActorRef)
   extends AbstractController(controllerComponents) with PanDomainAuthActions with Circe with ZonedDateTimeEncoder with RestoreStatusEncoder {
   private val logger=Logger(getClass)
   private val indexer = new Indexer(config.get[String]("externalData.indexName"))
+  private val awsProfile = config.getOptional[String]("externalData.awsProfile")
   private implicit val esClient = esClientMgr.getClient()
+  private val s3Client = s3ClientMgr.getClient(awsProfile)
   private implicit val ec:ExecutionContext  = controllerComponents.executionContext
 
   def removeFromLightbox(fileId:String) = APIAuthAction.async { request=>
@@ -126,4 +131,28 @@ class LightboxController @Inject() (override val config:Configuration,
     })
   }
 
+  def getDownloadLink(fileId:String) = APIAuthAction.async { request=>
+    userProfileFromSession(request.session) match {
+      case None=>Future(BadRequest(GenericErrorResponse("session_error","no session present").asJson))
+      case Some(Left(err))=>
+        logger.error(s"Session is corrupted: ${err.toString}")
+        Future(InternalServerError(GenericErrorResponse("session_error","session is corrupted, log out and log in again").asJson))
+      case Some(Right(userProfile))=>
+        indexer.getById(fileId).map(archiveEntry=>{
+          if(userProfile.allCollectionsVisible || userProfile.visibleCollections.contains(archiveEntry.bucket)){
+            try {
+              val rq = new GeneratePresignedUrlRequest(archiveEntry.bucket, archiveEntry.path, HttpMethod.GET)
+              val response = s3Client.generatePresignedUrl(rq)
+              Ok(ObjectGetResponse("ok","link",response.toString).asJson)
+            } catch {
+              case ex:Throwable=>
+                logger.error("Could not generate presigned s3 url: ", ex)
+                InternalServerError(GenericErrorResponse("error",ex.toString).asJson)
+            }
+          } else {
+            Forbidden(GenericErrorResponse("forbidden", "You don't have access to the right catalogue to do this").asJson)
+          }
+        })
+    }
+  }
 }
