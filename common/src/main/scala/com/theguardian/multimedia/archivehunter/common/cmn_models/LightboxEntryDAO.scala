@@ -1,23 +1,23 @@
-package models
+package com.theguardian.multimedia.archivehunter.common.cmn_models
 
 import akka.actor.ActorSystem
 import akka.stream.{ActorMaterializer, Materializer}
 import com.gu.scanamo.error.DynamoReadError
 import com.gu.scanamo.{ScanamoAlpakka, Table}
-import com.theguardian.multimedia.archivehunter.common.ZonedDateTimeEncoder
+import com.theguardian.multimedia.archivehunter.common.{ArchiveHunterConfiguration, ZonedDateTimeEncoder}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.DynamoClientManager
 import com.theguardian.multimedia.archivehunter.common.cmn_helpers.ZonedTimeFormat
 import javax.inject.{Inject, Singleton}
-import play.api.{Configuration, Logger}
+import org.slf4j.LoggerFactory
 
 import scala.concurrent.{ExecutionContext, Future}
 
 @Singleton
-class LightboxEntryDAO @Inject()(config:Configuration, ddbClientMgr:DynamoClientManager)(implicit system:ActorSystem)
+class LightboxEntryDAO @Inject()(config:ArchiveHunterConfiguration, ddbClientMgr:DynamoClientManager)(implicit system:ActorSystem)
   extends ZonedDateTimeEncoder with ZonedTimeFormat with RestoreStatusEncoder {
   import com.gu.scanamo.syntax._
 
-  private val logger = Logger(getClass)
+  private val logger = LoggerFactory.getLogger(getClass)
   private implicit val mat:Materializer = ActorMaterializer.create(system)
 
   private val awsProfile = config.getOptional[String]("externalData.awsProfile")

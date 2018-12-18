@@ -1,4 +1,4 @@
-package models
+package com.theguardian.multimedia.archivehunter.common.cmn_models
 
 import com.gu.scanamo.DynamoFormat
 import io.circe.{Decoder, Encoder}

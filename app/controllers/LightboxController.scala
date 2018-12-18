@@ -2,11 +2,12 @@ package controllers
 
 import java.time.ZonedDateTime
 
+import akka.actor.ActorRef
 import com.theguardian.multimedia.archivehunter.common.{Indexer, LightboxIndex, StorageClass, ZonedDateTimeEncoder}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.ESClientManager
+import com.theguardian.multimedia.archivehunter.common.cmn_models.{LightboxEntry, LightboxEntryDAO, RestoreStatus, RestoreStatusEncoder}
 import helpers.InjectableRefresher
-import javax.inject.{Inject, Singleton}
-import models.{LightboxEntry, LightboxEntryDAO, RestoreStatus, RestoreStatusEncoder}
+import javax.inject.{Inject, Named, Singleton}
 import play.api.{Configuration, Logger}
 import play.api.libs.circe.Circe
 import play.api.mvc.{AbstractController, ControllerComponents}
@@ -14,6 +15,7 @@ import responses.{GenericErrorResponse, ObjectListResponse}
 import io.circe.syntax._
 import io.circe.generic.auto._
 import play.api.libs.ws.WSClient
+import services.GlacierRestoreActor
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
@@ -24,7 +26,8 @@ class LightboxController @Inject() (override val config:Configuration,
                                     override val controllerComponents:ControllerComponents,
                                     override val wsClient:WSClient,
                                     override val refresher:InjectableRefresher,
-                                    esClientMgr:ESClientManager)
+                                    esClientMgr:ESClientManager,
+                                    @Named("glacierRestoreActor") glacierRestoreActor:ActorRef)
   extends AbstractController(controllerComponents) with PanDomainAuthActions with Circe with ZonedDateTimeEncoder with RestoreStatusEncoder {
   private val logger=Logger(getClass)
   private val indexer = new Indexer(config.get[String]("externalData.indexName"))
@@ -99,6 +102,9 @@ class LightboxController @Inject() (override val config:Configuration,
               errors.foreach(err=>logger.error("Could not create lightbox entry", err))
               InternalServerError(ObjectListResponse("error","errors",errors.map(_.toString), errors.length).asJson)
             } else {
+              if(indexEntry.storageClass==StorageClass.GLACIER){
+                glacierRestoreActor ! GlacierRestoreActor.InitiateRestore(indexEntry, lbEntry, None)  //use default expiration
+              }
               Ok(GenericErrorResponse("ok","saved").asJson)
             }
           })

@@ -1,4 +1,4 @@
-import java.time.Instant
+import java.time.{Instant, ZonedDateTime}
 import java.util.Date
 
 import com.amazonaws.services.lambda.runtime.events.S3Event
@@ -11,6 +11,7 @@ import org.specs2.mock.Mockito
 import org.specs2.mutable._
 import com.amazonaws.services.lambda.runtime.Context
 import com.amazonaws.services.s3.model.ObjectMetadata
+import com.theguardian.multimedia.archivehunter.common.cmn_models.{JobModel, JobModelDAO, JobStatus, SourceType}
 import org.junit.runner.RunWith
 import org.specs2.runner.JUnitRunner
 
@@ -18,6 +19,8 @@ import collection.JavaConverters._
 import scala.concurrent.Future
 import scala.util.Success
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Await
+import scala.concurrent.duration._
 
 @RunWith(classOf[JUnitRunner])
 class InputLambdaMainSpec extends Specification with Mockito {
@@ -72,5 +75,33 @@ class InputLambdaMainSpec extends Specification with Mockito {
       }
       1 mustEqual 1 //the actual test is that handleRequest does not raise an error
     }
+  }
+
+  "InputLambdaMain.handleRestore" should {
+    "update any open/pending jobs that refer to the file in question but leave ones that are not RESTORE" in {
+      val mockDao = mock[JobModelDAO]
+      val mockEntity = mock[S3EventNotification.S3Entity]
+      mockEntity.getBucket returns (mock[S3EventNotification.S3BucketEntity].getName returns "test-bucket")
+      mockEntity.getObject returns (mock[S3EventNotification.S3ObjectEntity].getKey returns "path/to/file")
+
+      val mockRecord = mock[S3EventNotification.S3EventNotificationRecord]
+      mockRecord.getS3 returns mockEntity
+
+      val job1 = JobModel("test-job-1","RESTORE",Some(ZonedDateTime.now()),None,JobStatus.ST_PENDING,None,"test-source-id",None,SourceType.SRC_MEDIA)
+      val job2 = JobModel("test-job-2","TRANSCODE",Some(ZonedDateTime.now()),None,JobStatus.ST_RUNNING,None,"test-source-id",None,SourceType.SRC_MEDIA)
+      val job3 = JobModel("test-job-3","RESTORE",Some(ZonedDateTime.now()),None,JobStatus.ST_PENDING,None,"test-source-id",None,SourceType.SRC_MEDIA)
+
+      mockDao.jobsForSource("test-source-id") returns Future(List(Right(job1),Right(job2),Right(job3)))
+      mockDao.putJob(any[JobModel]) returns Future(None)
+      val test = new InputLambdaMain {
+        override protected def getJobModelDAO: JobModelDAO = mockDao
+
+        override def makeDocId(bucket:String,path:String) = "test-source-id"
+      }
+
+      Await.ready(test.handleRestored(mockRecord), 5 seconds)
+      there were two(mockDao).putJob(any[JobModel])
+    }
+
   }
 }

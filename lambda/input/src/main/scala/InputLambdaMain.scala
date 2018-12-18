@@ -1,3 +1,5 @@
+import java.time.ZonedDateTime
+
 import com.amazonaws.services.lambda.runtime.{Context, RequestHandler}
 import com.amazonaws.services.lambda.runtime.events.S3Event
 import com.amazonaws.services.s3.event.S3EventNotification
@@ -5,10 +7,11 @@ import com.amazonaws.services.s3.event.S3EventNotification.S3ObjectEntity
 import com.amazonaws.services.s3.model.S3Object
 import com.amazonaws.services.s3.{AmazonS3, AmazonS3ClientBuilder}
 import com.google.inject.Guice
-import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer, MimeType}
+import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, DocId, Indexer, MimeType}
 import org.apache.logging.log4j.LogManager
 import com.sksamuel.elastic4s.ElasticsearchClientUri
 import com.sksamuel.elastic4s.http.{HttpClient, HttpRequestClient}
+import com.theguardian.multimedia.archivehunter.common.cmn_models.{JobModelDAO, JobStatus}
 import org.apache.http.HttpHost
 import org.elasticsearch.client.RestClient
 
@@ -18,7 +21,7 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class InputLambdaMain extends RequestHandler[S3Event, Unit] {
+class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId {
   private final val logger = LogManager.getLogger(getClass)
 
   private val injector = Guice.createInjector(new Module)
@@ -34,6 +37,8 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] {
   }
 
   protected def getIndexer(indexName: String) = new Indexer(indexName)
+
+  protected def getJobModelDAO = injector.getInstance(classOf[JobModelDAO])
 
   /**
     * returns a user-friendly string representing the event data, for debugging
@@ -96,6 +101,48 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] {
     })
   }
 
+  /**
+    * handle an "object restored" message.
+    * This is as simple as updating the database to tell the UI that the restore is complete.
+    * @param rec S3EventNotification.S3EventNotificationRecord instance
+    * @return a Future that completes when the operations have finished. No useful contents.
+    */
+  def handleRestored(rec:S3EventNotification.S3EventNotificationRecord) = {
+    val jobModelDAO = getJobModelDAO
+    val docId = makeDocId(rec.getS3.getBucket.getName, rec.getS3.getObject.getKey)
+
+    jobModelDAO.jobsForSource(docId).flatMap(resultList=>{
+      val failures = resultList.collect({case Left(err)=>err})
+      if(failures.nonEmpty){
+        logger.error(s"Could not look up jobs for source ID $docId: ")
+        failures.foreach(err=>logger.error(err))
+        Future (())
+      } else {
+        val success = resultList.collect({case Right(result)=>result})
+        val restoreJobs = success
+          .filter(_.jobType=="RESTORE").filter(_.completedAt.isEmpty)
+        logger.info(s"Found restore jobs: $restoreJobs")
+
+        val updateFutures = restoreJobs.map(job=>{
+          val updatedJob = job.copy(completedAt = Some(ZonedDateTime.now()), jobStatus = JobStatus.ST_SUCCESS)
+          jobModelDAO.putJob(updatedJob)
+        })
+
+        Future.sequence(updateFutures).map(updateResults=>{
+          val updateFailures = updateResults.collect({case Some(Left(err))=>err})
+          if(updateFailures.nonEmpty){
+            logger.error(s"Could not update jobs for source ID $docId: ")
+            updateFailures.foreach(err=>logger.error(err))
+            ()
+          } else {
+            logger.info(s"Updated jobs for source ID $docId")
+            ()
+          }
+        })
+      }
+    })
+  }
+
   protected def getIndexName = sys.env.get("INDEX_NAME") match {
     case Some(name)=>name
     case None=>
@@ -137,6 +184,8 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] {
           handleCreated(rec)
         case "ObjectRemoved:Delete"=>
           handleRemoved(rec)
+        case "ObjectRestore:Completed"=>
+          handleRestored(rec)
         case other:String=>
           println(s"ERROR: received unknown event $other")
           throw new RuntimeException(s"unknown event $other received")
