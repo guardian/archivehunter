@@ -4,7 +4,7 @@ import com.amazonaws.services.lambda.runtime.{Context, RequestHandler}
 import com.amazonaws.services.lambda.runtime.events.S3Event
 import com.amazonaws.services.s3.event.S3EventNotification
 import com.amazonaws.services.s3.event.S3EventNotification.S3ObjectEntity
-import com.amazonaws.services.s3.model.S3Object
+import com.amazonaws.services.s3.model.{ObjectMetadata, S3Object}
 import com.amazonaws.services.s3.{AmazonS3, AmazonS3ClientBuilder}
 import com.google.inject.Guice
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, DocId, Indexer, MimeType}
@@ -25,6 +25,7 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId {
   private final val logger = LogManager.getLogger(getClass)
 
   private val injector = Guice.createInjector(new Module)
+  val maxRetries = 20
 
   /**
     * these are extracted out as individual accessors to make over-riding them easier in unit tests
@@ -47,6 +48,22 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId {
   def dumpEventData(event: S3Event, indentChar:Option[String]=None) =
     event.getRecords.asScala.foldLeft("")((acc,record)=>acc + s"${indentChar.getOrElse("")}${record.getEventName} on ${record.getEventSource} in ${record.getAwsRegion} at ${record.getEventTime} with ${record.getS3.getObject.getKey}\n")
 
+  def getMetadataWithRetry(bucket:String, key:String, retryNumber:Int=0)(implicit s3Client:AmazonS3):ObjectMetadata = {
+    try{
+      s3Client.getObjectMetadata(bucket, key)
+    } catch {
+      case ex:com.amazonaws.services.s3.model.AmazonS3Exception=>
+        if(ex.getMessage.contains("Not Found")){
+          logger.warn(s"Could not find s3://$bucket/$key on attempt $retryNumber")
+          if(retryNumber+1>maxRetries) throw ex
+          Thread.sleep(500)
+          getMetadataWithRetry(bucket, key, retryNumber+1)
+        } else {
+          throw ex
+        }
+      case other:Throwable=>throw other
+    }
+  }
   /**
     * deal with an item created notification by adding it to the index
     * @param rec S3EventNotification record describing the event
@@ -56,7 +73,7 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId {
     * @return a Future, containing the ID of the new/updated record as a String.  If the operation fails, the Future will fail; pick this up with .onComplete or .recover
     */
   def handleCreated(rec:S3EventNotification.S3EventNotificationRecord)(implicit i:Indexer, s3Client:AmazonS3, elasticHttpClient:HttpClient):Future[String] = {
-    val md = s3Client.getObjectMetadata(rec.getS3.getBucket.getName, rec.getS3.getObject.getKey)
+    val md = getMetadataWithRetry(rec.getS3.getBucket.getName, rec.getS3.getObject.getKey)
 
     val mimeType = MimeType.fromString(md.getContentType) match {
       case Left(error) =>

@@ -734,6 +734,7 @@ Resources:
             Action:
               - s3:ListBucket
               - s3:GetObject
+              - s3:RestoreObject
             Resource:
               - arn:aws:s3:::*
               - arn:aws:s3:::*/*
