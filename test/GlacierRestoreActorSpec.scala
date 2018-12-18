@@ -1,6 +1,6 @@
 import akka.actor.Props
 import com.amazonaws.services.s3.AmazonS3
-import com.theguardian.multimedia.archivehunter.common.clientManagers.S3ClientManager
+import com.theguardian.multimedia.archivehunter.common.clientManagers.{ESClientManager, S3ClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{JobModel, JobModelDAO, LightboxEntry, LightboxEntryDAO}
 import org.specs2.mock.Mockito
 import org.specs2.mutable.Specification
@@ -21,6 +21,7 @@ class GlacierRestoreActorSpec extends Specification with Mockito {
     "create a job model instance, update a lightbox entry instance and tell S3 to initiate restore" in new AkkaTestkitSpecs2Support {
       implicit val ec:ExecutionContext = system.getDispatcher
       val mockedConfig = mock[Configuration]
+      val mockedEsClientMgr = mock[ESClientManager]
       mockedConfig.getOptional[Int]("archive.restoresExpireAfter") returns Some(3)
       val mockedS3ClientManager = mock[S3ClientManager]
       val mockedS3Client = mock[AmazonS3]
@@ -36,7 +37,7 @@ class GlacierRestoreActorSpec extends Specification with Mockito {
       mockedEntry.path returns "testpath"
       val mockedLbEntry = mock[LightboxEntry]
 
-      val toTest = system.actorOf(Props(new GlacierRestoreActor(mockedConfig, mockedS3ClientManager, mockedJobModelDAO, mockedLightboxEntryDAO, system)))
+      val toTest = system.actorOf(Props(new GlacierRestoreActor(mockedConfig, mockedEsClientMgr, mockedS3ClientManager, mockedJobModelDAO, mockedLightboxEntryDAO, system)))
 
       val result = Await.result(toTest ? GlacierRestoreActor.InitiateRestore(mockedEntry, mockedLbEntry, None), 30 seconds)
       result mustEqual GlacierRestoreActor.RestoreSuccess
