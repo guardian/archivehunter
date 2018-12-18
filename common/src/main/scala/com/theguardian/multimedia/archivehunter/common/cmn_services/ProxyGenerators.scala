@@ -1,12 +1,13 @@
 package com.theguardian.multimedia.archivehunter.common.cmn_services
 
 import java.net.URI
-import java.time.ZonedDateTime
-import java.util.UUID
+import java.time.{Instant, ZonedDateTime}
+import java.util.{Date, UUID}
 
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsync
 import com.amazonaws.services.elastictranscoder.AmazonElasticTranscoder
 import com.amazonaws.services.elastictranscoder.model._
+import com.amazonaws.services.s3.AmazonS3
 import com.gu.scanamo.Table
 import com.theguardian.multimedia.archivehunter.common._
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, ETSClientManager, S3ClientManager}
@@ -22,6 +23,30 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import io.circe.generic.auto._
 
 object ProxyGenerators {
+  private val logger = LogManager.getLogger(getClass)
+
+  def haveGlacierRestore(entry:ArchiveEntry)(implicit s3Client:AmazonS3) = Try {
+    val meta =s3Client.getObjectMetadata(entry.bucket, entry.path)
+    Option(meta.getOngoingRestore).map(_.booleanValue()) match {
+      case None=> //no restore has been requested
+        logger.debug("No restore requested")
+        false
+      case Some(true)=> //restore is ongoing but not ready
+        logger.debug("Restore is ongoing")
+        false
+      case Some(false)=>
+        Option(meta.getRestoreExpirationTime) match {
+          case Some(expiry)=>
+            if(expiry.toInstant.isAfter(Instant.now())){ //i.e., expiry.toInstant is greater than now()
+              logger.debug("Restore has completed and item is available")
+              true
+            } else {
+              logger.debug(s"Item expired at ${expiry.toString}")
+              false
+            }
+        }
+    }
+  }
   /**
     * try to find an applicable uri to use as the proxy source.  This will use the main media unless it's in the Glacier storage class;
     * otherwise it will try to find an existing proxy and use that.  Failing this, None will be returned
@@ -30,21 +55,32 @@ object ProxyGenerators {
     * @param ddbClient implicitly provided [[AmazonDynamoDBAsync]] object
     * @return
     */
-  def getUriToProxy(entry: ArchiveEntry)(implicit proxyLocationDAO: ProxyLocationDAO, ddbClient:AmazonDynamoDBAsync, logger:Logger) = entry.storageClass match {
+  def getUriToProxy(entry: ArchiveEntry)(implicit proxyLocationDAO: ProxyLocationDAO, s3Client:AmazonS3, ddbClient:AmazonDynamoDBAsync, logger:Logger) = entry.storageClass match {
     case StorageClass.GLACIER=>
-      logger.info(s"s3://${entry.bucket}/${entry.path} is in Glacier, can't proxy directly. Looking up any existing video proxy")
-      proxyLocationDAO.getProxy(entry.id,ProxyType.VIDEO).flatMap({
-        case None=>
-          proxyLocationDAO.getProxy(entry.id,ProxyType.AUDIO).map({
-            case None=>None
-            case Some(proxyLocation)=>
-              logger.info(s"Found audio proxy at s3://${proxyLocation.bucketName}/${proxyLocation.bucketPath}")
-              Some(s"s3://${proxyLocation.bucketName}/${proxyLocation.bucketPath}")
-          })
-        case Some(proxyLocation)=>
-          logger.info(s"Found video proxy at s3://${proxyLocation.bucketName}/${proxyLocation.bucketPath}")
-          Future(Some(s"s3://${proxyLocation.bucketName}/${proxyLocation.bucketPath}"))
-      })
+      val haveRestore = haveGlacierRestore(entry) match {
+        case Success(result)=>result
+        case Failure(err)=>
+          logger.error(err)
+          false
+      }
+      if(haveRestore){
+        logger.info(s"s3://${entry.bucket}/${entry.path} is in Glacier but has been restored. Trying to proxy directly.")
+        Future(Some(s"s3://${entry.bucket}/${entry.path}"))
+      } else {
+        logger.info(s"s3://${entry.bucket}/${entry.path} is in Glacier, can't proxy directly. Looking up any existing video proxy")
+        proxyLocationDAO.getProxy(entry.id, ProxyType.VIDEO).flatMap({
+          case None =>
+            proxyLocationDAO.getProxy(entry.id, ProxyType.AUDIO).map({
+              case None => None
+              case Some(proxyLocation) =>
+                logger.info(s"Found audio proxy at s3://${proxyLocation.bucketName}/${proxyLocation.bucketPath}")
+                Some(s"s3://${proxyLocation.bucketName}/${proxyLocation.bucketPath}")
+            })
+          case Some(proxyLocation) =>
+            logger.info(s"Found video proxy at s3://${proxyLocation.bucketName}/${proxyLocation.bucketPath}")
+            Future(Some(s"s3://${proxyLocation.bucketName}/${proxyLocation.bucketPath}"))
+        })
+      }
     case _=>
       logger.info(s"s3://${entry.bucket}/${entry.path} is in ${entry.storageClass}, will try to proxy directly")
       Future(Some(s"s3://${entry.bucket}/${entry.path}"))

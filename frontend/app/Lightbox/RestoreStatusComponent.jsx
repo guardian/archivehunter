@@ -2,6 +2,7 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import TimestampFormatter from "../common/TimestampFormatter.jsx";
+import axios from 'axios';
 
 class RestoreStatusComponent extends React.Component {
     static propTypes = {
@@ -51,7 +52,6 @@ class RestoreStatusComponent extends React.Component {
     render(){
         return <div style={{display: this.props.hidden ? "none" : "block"}} className="centered">
             <p>{this.statusIcon()} since {this.timeDisplay()}</p>
-            <p style={{display: this.isCompleted() ? "block" : "none" }}>Available for <TimestampFormatter relative={true} value={this.props.expires}/></p>
         </div>
     }
 }

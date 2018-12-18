@@ -70,7 +70,7 @@
     <logger name="services.ProxiesRelinker" level="INFO"/>
     <logger name="helpers.ProxyVerifyFlow" level="INFO"/>
 
-    <logger name="com.theguardian.multimedia.archivehunter.cmn_services.ProxyGenerators" level="INFO"/>
+    <logger name="com.theguardian.multimedia.archivehunter.cmn_services.ProxyGenerators" level="DEBUG"/>
     <logger name="com.theguardian.multimedia.archivehunter.common.ProxyLocation$" level="INFO"/>
 
     <root level="WARN">

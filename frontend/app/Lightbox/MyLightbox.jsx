@@ -17,8 +17,9 @@ class MyLightbox extends CommonSearchView {
             searchResults: [],
             userDetails: null,
             showingPreview: null
-        }
+        };
 
+        this.checkArchiveStatus = this.checkArchiveStatus.bind(this);
     }
 
     performLoad(){
@@ -75,11 +76,20 @@ class MyLightbox extends CommonSearchView {
         return "unknown";
     }
 
+    checkArchiveStatus(){
+        axios.get("/api/archive/status/" + this.state.showingPreview.id).then(response=>{
+            console.info(response.data);
+        }).catch(err=>{
+            console.error(err);
+        })
+    }
+
     render(){
         const insert = <div><LightboxInfoInsert
             entry={this.state.showingPreview && this.state.showingPreview.details ?
                         this.state.showingPreview.details : null
             }/>
+            <a style={{cursor: "pointer"}} onClick={this.checkArchiveStatus}>Re-check</a>
             <hr/>
             <AvailabilityInsert status={this.state.showingPreview ? this.state.showingPreview.details.restoreStatus : ""}
                                 availableUntil={this.state.showingPreview ? this.state.showingPreview.details.availableUntil : ""}

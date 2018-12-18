@@ -2,6 +2,7 @@ package controllers
 
 import java.time.ZonedDateTime
 
+import akka.pattern.ask
 import akka.actor.ActorRef
 import com.amazonaws.HttpMethod
 import com.amazonaws.services.s3.model.GeneratePresignedUrlRequest
@@ -13,12 +14,13 @@ import javax.inject.{Inject, Named, Singleton}
 import play.api.{Configuration, Logger}
 import play.api.libs.circe.Circe
 import play.api.mvc.{AbstractController, ControllerComponents}
-import responses.{GenericErrorResponse, ObjectGetResponse, ObjectListResponse}
+import responses.{GenericErrorResponse, ObjectGetResponse, ObjectListResponse, RestoreStatusResponse}
 import io.circe.syntax._
 import io.circe.generic.auto._
 import play.api.libs.ws.WSClient
 import services.GlacierRestoreActor
 
+import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
@@ -152,6 +154,35 @@ class LightboxController @Inject() (override val config:Configuration,
           } else {
             Forbidden(GenericErrorResponse("forbidden", "You don't have access to the right catalogue to do this").asJson)
           }
+        })
+    }
+  }
+
+  def checkRestoreStatus(fileId:String) = APIAuthAction.async { request=>
+    implicit val timeout:akka.util.Timeout = 60 seconds
+
+    userProfileFromSession(request.session) match {
+      case None=>Future(BadRequest(GenericErrorResponse("session_error","no session present").asJson))
+      case Some(Left(err))=>
+        logger.error(s"Session is corrupted: ${err.toString}")
+        Future(InternalServerError(GenericErrorResponse("session_error","session is corrupted, log out and log in again").asJson))
+      case Some(Right(userProfile))=>
+        lightboxEntryDAO.get(userProfile.userEmail, fileId).flatMap({
+          case None=>
+            Future(NotFound(GenericErrorResponse("not_found","This item is not in your lightbox").asJson))
+          case Some(Left(err))=>
+            Future(InternalServerError(GenericErrorResponse("db_error", err.toString).asJson))
+          case Some(Right(lbEntry))=>
+            val response = (glacierRestoreActor ? GlacierRestoreActor.CheckRestoreStatus(lbEntry)).mapTo[GlacierRestoreActor.GRMsg]
+            response.map({
+              case GlacierRestoreActor.RestoreCompleted(entry, expiry)=>
+                Ok(RestoreStatusResponse("ok", entry.id, RestoreStatus.RS_SUCCESS, Some(expiry)).asJson)
+              case GlacierRestoreActor.RestoreInProgress(entry)=>
+                Ok(RestoreStatusResponse("ok", entry.id, RestoreStatus.RS_UNDERWAY, None).asJson)
+              case GlacierRestoreActor.RestoreNotRequested(entry)=>
+                Ok(RestoreStatusResponse("not_requested", entry.id, RestoreStatus.RS_ERROR, None).asJson)
+            })
+
         })
     }
   }
