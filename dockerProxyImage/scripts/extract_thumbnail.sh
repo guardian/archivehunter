@@ -43,5 +43,8 @@ elif [[ "$MIMETYPE" =~ ^image.* ]]; then
     exit $?
 else
     echo ${MIMETYPE} files are not supported yet
+    echo Script failed. Informing server...
+    echo Server callback URL is $3
+    curl -k -X POST $3 -d'{"status":"error","log":"MIME type of file ('$MIMETYPE') not supported.","input":"'"$1"'"}' --header "Content-Type: application/json"
     exit 1
 fi
