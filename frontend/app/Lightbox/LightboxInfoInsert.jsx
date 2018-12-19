@@ -5,7 +5,8 @@ import RestoreStatusComponent from "./RestoreStatusComponent.jsx";
 
 class LightboxInfoInsert extends React.Component {
     static propTypes = {
-        entry: PropTypes.object.isRequired
+        entry: PropTypes.object.isRequired,
+        extraInfo: PropTypes.string
     };
 
     render(){
@@ -15,12 +16,16 @@ class LightboxInfoInsert extends React.Component {
             <span style={{display: "block"}}>
                 Added to lightbox <TimestampFormatter relative={true} value={this.props.entry.addedAt}/>
             </span>
+            <p className="centered">Archive availability</p>
             <RestoreStatusComponent
                 status={this.props.entry.restoreStatus}
                 startTime={this.props.entry.restoreStarted}
                 completed={this.props.entry.restoreCompleted}
                 expires={this.props.entry.availableUntil}
                 hidden={this.props.entry.restoreStatus==="RS_UNNEEDED"}/>
+            {
+                this.props.extraInfo ? <p className="centered">{this.props.extraInfo}</p> : ""
+            }
         </div>
     }
 }

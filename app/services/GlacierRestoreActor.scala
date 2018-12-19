@@ -31,6 +31,7 @@ object GlacierRestoreActor {
   case object RestoreSuccess extends GRMsg
   case class RestoreFailure(err:Throwable) extends GRMsg
 
+  case class NotInArchive(entry:ArchiveEntry) extends GRMsg
   case class RestoreNotRequested(entry:ArchiveEntry) extends GRMsg
   case class RestoreInProgress(entry:ArchiveEntry) extends GRMsg
   case class RestoreCompleted(entry:ArchiveEntry, expiresAt:ZonedDateTime) extends GRMsg
@@ -88,9 +89,13 @@ class GlacierRestoreActor @Inject() (config:Configuration, esClientMgr:ESClientM
       isRestoring match {
         case None =>
           logger.info(s"s3://${entry.bucket}/${entry.path} has not had any restore requested")
-          jobs.foreach(job=>updateJob(job, JobStatus.ST_ERROR,Some("No restore record in S3")))
-          updateLightbox(lbEntry,None,error=Some(new RuntimeException("No restore record in S3")))
-          originalSender ! RestoreNotRequested(entry)
+          if(result.getStorageClass!="GLACIER"){
+            originalSender ! NotInArchive(entry)
+          } else {
+            jobs.foreach(job=>updateJob(job, JobStatus.ST_ERROR,Some("No restore record in S3")))
+            updateLightbox(lbEntry,None,error=Some(new RuntimeException("No restore record in S3")))
+            originalSender ! RestoreNotRequested(entry)
+          }
         case Some(true) => //restore is in progress
           logger.info(s"s3://${entry.bucket}/${entry.path} is currently under restore")
           jobs.foreach(job=>updateJob(job, JobStatus.ST_RUNNING, None))

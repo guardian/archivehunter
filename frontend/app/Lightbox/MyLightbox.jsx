@@ -5,7 +5,7 @@ import ErrorViewComponent from "../common/ErrorViewComponent.jsx";
 import SearchResultsComponent from "../search/SearchResultsComponent.jsx";
 import CommonSearchView from "../common/CommonSearchView.jsx";
 import LightboxInfoInsert from "./LightboxInfoInsert.jsx";
-import AvailabilityInsert from "../JobsList/AvailabilityInsert.jsx";
+import AvailabilityInsert from "./AvailabilityInsert.jsx";
 
 class MyLightbox extends CommonSearchView {
     constructor(props){
@@ -16,7 +16,8 @@ class MyLightbox extends CommonSearchView {
             lastError: null,
             searchResults: [],
             userDetails: null,
-            showingPreview: null
+            showingPreview: null,
+            extraInfo: ""
         };
 
         this.checkArchiveStatus = this.checkArchiveStatus.bind(this);
@@ -33,10 +34,10 @@ class MyLightbox extends CommonSearchView {
         this.setState({loading: true}, ()=>this.performLoad().then(results=>{
             const detailsResult = results[0];   //this is a map of fileId->record
             const summaryResult = results[1];   //this is an array
-            const loginDetailsResult = results[2];
+            const loginDetailsResult = results[2];  //this is a map of key->value
 
-            console.log("detailsResult: ", detailsResult);
-            console.log("summaryResult: ", summaryResult);
+            // console.log("detailsResult: ", detailsResult);
+            // console.log("summaryResult: ", summaryResult);
 
             this.setState({loading: false,
                 lastError: null,
@@ -79,17 +80,41 @@ class MyLightbox extends CommonSearchView {
     checkArchiveStatus(){
         axios.get("/api/archive/status/" + this.state.showingPreview.id).then(response=>{
             console.info(response.data);
+            const itemIndex = this.indexForFileid(response.data.fileId);
+            if(itemIndex===-1){
+                console.error("Could not find file ID " + response.data.fileId + " in the component's data??")
+            } else {
+                const updatedDetails = Object.assign({}, this.state.searchResults[itemIndex].details, {
+                    restoreStatus: response.data.restoreStatus,
+                    availableUntil: response.data.expiry
+                });
+                const updatedEntry = Object.assign({}, this.state.searchResults[itemIndex], {details: updatedDetails});
+
+                this.updateSearchResults(updatedEntry, itemIndex, this.state.showingPreview.id).then(()=>{
+                    if(response.data.restoreStatus==="RS_UNNEEDED"){
+                        this.setState({extraInfo: "Not in archive"})
+                    } else if(this.state.extraInfo!==""){
+                        this.setState({extraInfo: ""})
+                    }
+                })
+            }
         }).catch(err=>{
             console.error(err);
         })
     }
 
     render(){
-        const insert = <div><LightboxInfoInsert
-            entry={this.state.showingPreview && this.state.showingPreview.details ?
-                        this.state.showingPreview.details : null
-            }/>
-            <a style={{cursor: "pointer"}} onClick={this.checkArchiveStatus}>Re-check</a>
+        /**
+         * this describes an "insert" into the standard entry details view, to provide lightbox-specific data
+         */
+        const insert = <div>
+            <LightboxInfoInsert
+                entry={this.state.showingPreview && this.state.showingPreview.details ?
+                            this.state.showingPreview.details : null
+                }
+                extraInfo={this.state.extraInfo}
+            />
+            <p className="centered small"><a style={{cursor: "pointer"}} onClick={this.checkArchiveStatus}>Re-check</a></p>
             <hr/>
             <AvailabilityInsert status={this.state.showingPreview ? this.state.showingPreview.details.restoreStatus : ""}
                                 availableUntil={this.state.showingPreview ? this.state.showingPreview.details.availableUntil : ""}

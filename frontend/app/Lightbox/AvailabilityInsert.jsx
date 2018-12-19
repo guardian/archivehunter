@@ -26,14 +26,7 @@ class AvailabilityInsert extends React.Component {
     doDownload(){
         this.setState({loading: true}, ()=>axios.get("/api/download/" + this.props.fileId)
             .then(response=>{
-                const downloadUrl = response.data.entry;
-                axios.get(downloadUrl).then(response=>{
-                    FileDownload(response.data, this.props.fileNameOnly);
-                    this.setState({loading: false, lastError: null});
-                }).catch(err=>{
-                    console.error(err);
-                    this.setState({loading: false, lastError: err});
-                })
+                this.setState({loading: false, lastError: null, downloadUrl: response.data.entry})
             }).catch(err=>{
                 console.error(err);
                 this.setState({loading: false, lastError: err})
@@ -48,10 +41,15 @@ class AvailabilityInsert extends React.Component {
             return <span>indefinitely</span>
         }
     }
+
     render(){
         return <div style={{display: this.props.hidden ? "none":"block"}} className="centered">
             <p className="centered no-spacing">Available {this.timeLabel()}</p>
             <p className="centered no-spacing"><a onClick={this.doDownload} style={{cursor: "pointer"}}>Download</a></p>
+            {
+                this.state.downloadUrl ?
+                    <iframe src={this.state.downloadUrl} style={{visibility: "none",display:"none"}}/> : <span/>
+            }
         </div>
     }
 }

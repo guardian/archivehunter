@@ -134,15 +134,6 @@ class BrowseComponent extends CommonSearchView {
         return this.state.searchResults.length<450;
     }
 
-    indexForFileid(entryId){
-        for(var i=0;i<this.state.searchResults.length;++i){
-            console.debug("checking "+this.state.searchResults[i].id+ "against" + entryId);
-            if(this.state.searchResults[i].id===entryId) return i;
-        }
-        console.error("Could not find existing entry for id " + entryId);
-        return -1;
-    }
-
 
     /**
      * callback, called by Searcher when a search has completed (returns no more results)

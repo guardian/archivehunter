@@ -86,15 +86,6 @@ class BasicSearchComponent extends CommonSearchView {
         this.setState({searchTerms: newString, searchResults: []},this.triggerSearchTimer);
     }
 
-    indexForFileid(entryId){
-        for(var i=0;i<this.state.searchResults.length;++i){
-            console.debug("checking "+this.state.searchResults[i].id+ "against" + entryId);
-            if(this.state.searchResults[i].id===entryId) return i;
-        }
-        console.error("Could not find existing entry for id " + entryId);
-        return -1;
-    }
-
     render(){
         return <div>
             <div className="centered" style={{height: "2em"}}>

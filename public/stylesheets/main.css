@@ -106,6 +106,7 @@ div.top-menu {
 
 p.centered {
     text-align: center;
+    width: 100%;
 }
 
 .login-icon{
@@ -429,4 +430,8 @@ p.no-spacing {
     padding-bottom: 0px;
     margin-top: 0;
     padding-top: 0;
+}
+
+p.small {
+    font-size: 0.7em;
 }

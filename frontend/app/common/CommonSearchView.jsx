@@ -22,19 +22,49 @@ class CommonSearchView extends React.Component {
         this.setState({showingPreview: null});
     }
 
+    indexForFileid(entryId){
+        for(var i=0;i<this.state.searchResults.length;++i){
+            console.debug("checking "+this.state.searchResults[i].id+ "against" + entryId);
+            if(this.state.searchResults[i].id===entryId) return i;
+        }
+        console.error("Could not find existing entry for id " + entryId);
+        return -1;
+    }
+
+    /**
+     * update the `searchResults` state array by replacing the item at `entryIndex` with the data of `newEntry`.
+     * It's assumed that `entryIndex` has been retrieved from indexForFileid().
+     * if the `showingPreview` state variable is pointing to `entryId` then it to is updated to point to `newEntry`.
+     * @param newEntry new data to put
+     * @param entryIndex
+     * @param entryId
+     * @returns {Promise}
+     */
+    updateSearchResults(newEntry, entryIndex, entryId){
+        return new Promise((resolve, reject)=> {
+            const updatedSearchResults =
+                this.state.searchResults.slice(0, entryIndex).concat([newEntry].concat(this.state.searchResults.slice(entryIndex + 1)));
+            this.setState({searchResults: updatedSearchResults}, () => {
+                if (this.state.showingPreview.id === entryId){
+                    console.log("update completed");
+                    this.setState({showingPreview: newEntry}, ()=>resolve());
+                } else {
+                    console.log("update completed");
+                    resolve();
+                }
+            });
+        });
+    }
+
     addedToLightbox(entryId){
+        //we have to use a small delay, otherwise the server returns stale data (that the item is NOT in the lightbox yet)
         window.setTimeout(()=> {
             this.setState({loading: true}, () => axios.get("/api/entry/" + entryId).then(response => {
                 const entryIndex = this.indexForFileid(entryId);
                 console.info("got existing entry at " + entryIndex);
 
                 if (entryIndex >= 0) {
-                    const updatedSearchResults =
-                        this.state.searchResults.slice(0, entryIndex).concat([response.data.entry].concat(this.state.searchResults.slice(entryIndex + 1)));
-                    this.setState({searchResults: updatedSearchResults}, () => {
-                        if (this.state.showingPreview.id === entryId) this.setState({showingPreview: response.data.entry});
-                        console.log("update completed")
-                    });
+                    this.updateSearchResults(response.data.entry, entryIndex, entryId)
                 } else {
                     this.setState({searchResults: this.state.searchResults.concat([response.data.entry])})
                 }
