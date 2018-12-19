@@ -109,7 +109,7 @@ class EntryDetails extends React.Component {
         }
         const fileinfo = this.extractFileInfo(this.props.entry.path);
 
-        return <div className="entry-details">
+        return <div className="entry-details" style={{overflow: "scroll"}}>
                 <EntryPreview entryId={this.props.entry.id}
                               hasProxy={this.props.entry.proxied}
                               fileExtension={this.props.entry.file_extension}
