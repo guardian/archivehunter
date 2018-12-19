@@ -1,6 +1,7 @@
 package com.theguardian.multimedia.archivehunter.common.cmn_models
 
 import java.time.ZonedDateTime
+import java.util.UUID
 
 import com.gu.scanamo.DynamoFormat
 import com.theguardian.multimedia.archivehunter.common.{ProxyType, StorageClassEncoder}
@@ -14,7 +15,34 @@ object SourceType extends Enumeration {
   val SRC_MEDIA, SRC_PROXY, SRC_THUMBNAIL, SRC_GLOBAL = Value
 }
 
-case class JobModel (jobId:String, jobType:String, startedAt: Option[ZonedDateTime], completedAt: Option[ZonedDateTime], jobStatus: JobStatus.Value, log:Option[String], sourceId:String, transcodeInfo: Option[TranscodeInfo], sourceType: SourceType.Value)
+case class JobModel (jobId:String, jobType:String, startedAt: Option[ZonedDateTime],
+                     completedAt: Option[ZonedDateTime], jobStatus: JobStatus.Value,
+                     log:Option[String], sourceId:String, transcodeInfo: Option[TranscodeInfo],
+                     sourceType: SourceType.Value)
+
+object JobModel extends ((String, String, Option[ZonedDateTime], Option[ZonedDateTime], JobStatus.Value, Option[String], String, Option[TranscodeInfo], SourceType.Value)=>JobModel) {
+  /**
+    * shortcut constructor that sets defaults for most options
+    * @param jobType
+    * @param sourceId
+    * @param sourceType
+    * @param startTimeOverride
+    * @return a new JobModel instance
+    */
+  def newJob(jobType:String, sourceId:String, sourceType:SourceType.Value, startTimeOverride:Option[ZonedDateTime]=None) = {
+    new JobModel(UUID.randomUUID().toString,
+      jobType,
+      Some(startTimeOverride.getOrElse(ZonedDateTime.now())),
+      None,
+      JobStatus.ST_PENDING,
+      None,
+      sourceId,
+      None,
+      sourceType
+    )
+  }
+}
+
 
 trait JobModelEncoder {
   implicit val jobStatusEncoder = Encoder.enumEncoder(JobStatus)

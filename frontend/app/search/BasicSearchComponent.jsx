@@ -1,13 +1,12 @@
 import React from 'react';
 import axios from 'axios';
-import ErrorViewComponent from '../common/ErrorViewComponent.jsx';
-import SearchResultsComponent from './SearchResultsComponent.jsx';
 import SearchSuggestionsComponent from './SearchSuggestionsComponent.jsx';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import EntryDetails from "../Entry/EntryDetails.jsx";
+import CommonSearchView from "../common/CommonSearchView.jsx";
 
-class BasicSearchComponent extends React.Component {
+class BasicSearchComponent extends CommonSearchView {
     searchTimeout = 1000;   //timeout in milliseconds between last keypress and the search starting
 
     constructor(props){
@@ -20,18 +19,19 @@ class BasicSearchComponent extends React.Component {
             error:null,
             searchResults: [],
             totalHits: -1,
-            limit: 1000,
+            limit: 500,
             showingPreview: null,
             autoPlay: true,
             searchTimer: null
         };
 
         this.cancelTokenSource = axios.CancelToken.source();
-        this.defaultPageSize = 100;
+        this.defaultPageSize = 20;
 
         this.onItemOpen = this.onItemOpen.bind(this);
         this.onItemClose = this.onItemClose.bind(this);
         this.triggerSearchTimer = this.triggerSearchTimer.bind(this);
+        this.addedToLightbox = this.addedToLightbox.bind(this);
     }
 
     componentWillMount(){
@@ -86,26 +86,6 @@ class BasicSearchComponent extends React.Component {
         this.setState({searchTerms: newString, searchResults: []},this.triggerSearchTimer);
     }
 
-    onItemOpen(newTarget){
-        this.setState({showingPreview: newTarget})
-    }
-
-    onItemClose(){
-        this.setState({showingPreview: null});
-    }
-
-    renderMainBody(){
-        if(this.state.error){
-            return <ErrorViewComponent error={this.state.error}/>
-        } else if(this.state.totalHits!==-1){
-            return <SearchResultsComponent entries={this.state.searchResults} onItemOpen={this.onItemOpen} onItemClose={this.onItemClose} selectedEntry={this.state.showingPreview}/>
-        } else if(this.state.searching) {
-            return <img style={{marginLeft:"auto",marginRight:"auto",width:"200px",display:"block"}} src="/assets/images/Spinner-1s-200px.gif"/>
-        } else {
-            return <span/>
-        }
-    }
-
     render(){
         return <div>
             <div className="centered" style={{height: "2em"}}>
@@ -119,7 +99,12 @@ class BasicSearchComponent extends React.Component {
             <div className="centered" style={{marginBottom: "2em",height: "2em", display: this.state.totalHits===-1 ? "none":"block"}}>
                 <p className="centered">Loaded {this.state.searchResults.length} of {this.state.totalHits} results{ this.state.searching ? " so far" : ""}.</p>
             </div>
-            <EntryDetails entry={this.state.showingPreview} autoPlay={this.state.autoPlay} showJobs={true} loadJobs={false}/>
+            <EntryDetails entry={this.state.showingPreview}
+                          autoPlay={this.state.autoPlay}
+                          showJobs={true}
+                          loadJobs={false}
+                          lightboxedCb={this.addedToLightbox}
+            />
             {this.renderMainBody()}
         </div>
     }

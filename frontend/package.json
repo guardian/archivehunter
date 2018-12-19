@@ -48,6 +48,7 @@
     "babel-preset-stage-0": "^6.24.1",
     "css-loader": "^0.28.10",
     "identity-obj-proxy": "^3.0.0",
+    "js-file-download": "^0.4.4",
     "lodash.omit": "^4.5.0",
     "moment": "^2.20.1",
     "moment-duration-format": "2.2.2",

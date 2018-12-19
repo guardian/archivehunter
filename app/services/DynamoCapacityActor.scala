@@ -184,7 +184,11 @@ class DynamoCapacityActor @Inject() (ddbClientMgr:DynamoClientManager, config:Ar
 
           val rq = new UpdateTableRequest().withTableName(tableRq.tableName)
 
-          if(tableThroughput.getReadCapacityUnits==actualReadTarget && tableThroughput.getWriteCapacityUnits==actualWriteTarget && indexUpdates.isEmpty){
+          if(tableThroughput.getReadCapacityUnits==0 && tableThroughput.getWriteCapacityUnits==0){
+            logger.info(s"Table ${tableRq.tableName} is in auto-provisioning mode, don't need to update.")
+            tableRq.signalActor ! tableRq.signalMsg
+            sender() ! UpdateRequestSuccess(tableRq.tableName, mustWait = false)
+          } else if(tableThroughput.getReadCapacityUnits==actualReadTarget && tableThroughput.getWriteCapacityUnits==actualWriteTarget && indexUpdates.isEmpty){
             logger.info(s"Table ${tableRq.tableName} and indices already have requested throughput")
             tableRq.signalActor ! tableRq.signalMsg
             sender() ! UpdateRequestSuccess(tableRq.tableName, mustWait = false)

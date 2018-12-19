@@ -19,10 +19,9 @@ trait PanDomainAuthActions extends AuthActions {
 
   override def panDomainSettings: PanDomainAuthSettingsRefresher = refresher.panDomainSettings
 
-  override def validateUser(authedUser: AuthenticatedUser): Boolean = {
-    println(s"validateUser: $authedUser")
-    (authedUser.user.email endsWith ("@guardian.co.uk"))
-  }
+  override def validateUser(authedUser: AuthenticatedUser): Boolean =
+    authedUser.user.email endsWith "@guardian.co.uk"
+
 
 
   override def readCookie(request: RequestHeader): Option[Cookie] = {

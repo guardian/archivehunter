@@ -21,6 +21,7 @@ case class LifecycleMessage (
 
 object LifecycleMessage extends((Int,String,String,String,String,ZonedDateTime,Regions,Seq[String],Option[LifecycleDetails])=>LifecycleMessage)
                         with HashmapExtractors {
+
   def fromLinkedHashMap(input:java.util.LinkedHashMap[String,Object]) = {
     val converted = input.asScala
 

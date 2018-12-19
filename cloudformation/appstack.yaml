@@ -173,6 +173,37 @@ Resources:
       - Key: Stage
         Value: !Ref Stage
 
+  LightboxTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: userEmail
+          AttributeType: S
+        - AttributeName: fileId
+          AttributeType: S
+        - AttributeName: restoreStatus
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userEmail
+          KeyType: HASH
+        - AttributeName: fileId
+          KeyType: RANGE
+      ProvisionedThroughput:
+        WriteCapacityUnits: 1
+        ReadCapacityUnits: 4
+      GlobalSecondaryIndexes:
+        - IndexName: statusIndex
+          KeySchema:
+            - AttributeName: restoreStatus
+              KeyType: HASH
+            - AttributeName: fileId
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+          ProvisionedThroughput:
+            WriteCapacityUnits: 1
+            ReadCapacityUnits: 4
+
   JobHistoryTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -606,6 +637,8 @@ Resources:
             - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${JobHistoryTable}/index/*
             - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${UserProfileTable}
             - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${UserProfileTable}/index/*
+            - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${LightboxTable}
+            - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${LightboxTable}/index/*
       - PolicyName: TranscoderAccess
         PolicyDocument:
           Version: 2012-10-17
@@ -701,6 +734,7 @@ Resources:
             Action:
               - s3:ListBucket
               - s3:GetObject
+              - s3:RestoreObject
             Resource:
               - arn:aws:s3:::*
               - arn:aws:s3:::*/*
@@ -845,6 +879,10 @@ Resources:
             notificationsQueue = "${TranscodeUpdateMsg}"
             videoPresetId = "${VideoTranscodingPresetId}"
             audioPresetId = "${AudioTranscodingPresetId}"
+          }
+
+          lightbox {
+            tableName = "${LightboxTable}"
           }
 
           ecs {

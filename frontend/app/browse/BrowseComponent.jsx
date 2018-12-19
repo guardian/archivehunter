@@ -7,8 +7,9 @@ import SearchResultsComponent from "../search/SearchResultsComponent.jsx";
 import EntryDetails from "../Entry/EntryDetails.jsx";
 import BrowsePathSummary from "./BrowsePathSummary.jsx";
 import SearchManager from '../SearchManager/SearchManager.jsx';
+import CommonSearchView from "../common/CommonSearchView.jsx";
 
-class BrowseComponent extends React.Component {
+class BrowseComponent extends CommonSearchView {
     constructor(props){
         super(props);
 
@@ -48,6 +49,7 @@ class BrowseComponent extends React.Component {
         this.onToggle = this.onToggle.bind(this);
         this.onItemClose = this.onItemClose.bind(this);
         this.onItemOpen = this.onItemOpen.bind(this);
+        this.addedToLightbox = this.addedToLightbox.bind(this);
 
         /* callbacks for Searcher */
         this.receivedNextPage = this.receivedNextPage.bind(this);
@@ -132,6 +134,7 @@ class BrowseComponent extends React.Component {
         return this.state.searchResults.length<450;
     }
 
+
     /**
      * callback, called by Searcher when a search has completed (returns no more results)
      * @param searchId
@@ -197,14 +200,6 @@ class BrowseComponent extends React.Component {
         this.refreshCollectionNames();
     }
 
-    onItemOpen(newTarget){
-        this.setState({showingPreview: newTarget})
-    }
-
-    onItemClose(){
-        this.setState({showingPreview: null});
-    }
-
     renderMainBody(){
         if(this.state.error){
             return <ErrorViewComponent error={this.state.error}/>
@@ -242,7 +237,7 @@ class BrowseComponent extends React.Component {
                 <a style={{display: "none"}} onClick={this.doCancelAll}>{this.state.cancelUnderway ? "cancelling..." : "cancel all"}</a>
                 <Treebeard data={this.state.treeContents} onToggle={this.onToggle} style={this.treeStyle}/>
             </div>
-            <EntryDetails entry={this.state.showingPreview} autoPlay={this.state.autoPlay} showJobs={true} loadJobs={false}/>
+            <EntryDetails entry={this.state.showingPreview} autoPlay={this.state.autoPlay} showJobs={true} loadJobs={false} lightboxedCb={this.addedToLightbox}/>
             {this.renderMainBody()}
         </div>
     }

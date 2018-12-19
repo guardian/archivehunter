@@ -33,7 +33,7 @@
     </appender>-->
 
     <logger name="play" level="INFO" />
-    <logger name="application" level="DEBUG" />
+    <logger name="application" level="ERROR" />
 
     <logger name="services.AppStartup" level="INFO"/>
     <logger name="services.BucketScanner" level="INFO"/>
@@ -47,9 +47,10 @@
     <logger name="controllers.JobController" level="INFO"/>
     <logger name="controllers.BrowseCollectionController" level="INFO"/>
 
-    <logger name="controllers.UserController" level="DEBUG"/>
+    <logger name="controllers.UserController" level="INFO"/>
+    <logger name="controllers.LightboxController" level="DEBUG"/>
 
-    <logger name="controllers.Auth" level="DEBUG"/>
+    <logger name="controllers.Auth" level="INFO"/>
 
     <logger name="com.gu.pandomainauth.action.AuthActions" level="INFO"/>
 
@@ -70,7 +71,7 @@
     <logger name="helpers.ProxyVerifyFlow" level="INFO"/>
 
     <logger name="com.theguardian.multimedia.archivehunter.cmn_services.ProxyGenerators" level="DEBUG"/>
-    <logger name="com.theguardian.multimedia.archivehunter.common.ProxyLocation$" level="DEBUG"/>
+    <logger name="com.theguardian.multimedia.archivehunter.common.ProxyLocation$" level="INFO"/>
 
     <root level="WARN">
         <appender-ref ref="STDOUT" />

@@ -14,15 +14,16 @@ import BasicSearchComponent from './search/BasicSearchComponent.jsx';
 import JobsList from './JobsList/JobsList.jsx';
 import BrowseComponent from './browse/BrowseComponent.jsx';
 import LoginStatusComponent from './Login/LoginStatusComponent.jsx';
+import MyLightbox from './Lightbox/MyLightbox.jsx';
 
 import { library } from '@fortawesome/fontawesome-svg-core'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faStroopwafel, faCheckCircle, faCheck, faTimes, faTimesCircle, faRoad, faSearch,faThList,faWrench, faLightbulb, faFolderPlus, faFolderMinus, faFolder } from '@fortawesome/free-solid-svg-icons'
-import { faChevronCircleDown,faChevronCircleRight,faTrashAlt, faFilm, faVolumeUp,faImage, faFile, faClock, faRunning, faExclamationTriangle, faHdd} from '@fortawesome/free-solid-svg-icons'
+import { faChevronCircleDown,faChevronCircleRight,faTrashAlt, faFilm, faVolumeUp,faImage, faFile, faClock, faRunning, faExclamationTriangle, faHdd, faBalanceScale} from '@fortawesome/free-solid-svg-icons'
 import UserList from "./Users/UserList.jsx";
 
 library.add(faStroopwafel, faCheckCircle, faCheck, faTimes, faTimesCircle, faRoad,faSearch,faThList,faWrench, faLightbulb, faChevronCircleDown, faChevronCircleRight, faTrashAlt, faFolderPlus, faFolderMinus, faFolder);
-library.add(faFilm, faVolumeUp, faImage, faFile, faClock, faRunning, faExclamationTriangle, faHdd);
+library.add(faFilm, faVolumeUp, faImage, faFile, faClock, faRunning, faExclamationTriangle, faHdd, faBalanceScale);
 window.React = require('react');
 
 class App extends React.Component {
@@ -71,6 +72,7 @@ class App extends React.Component {
                 <Route path="/admin/scanTargets/:id" component={ScanTargetEdit}/> /*this also handles "new" */
                 <Route path="/admin/scanTargets" component={ScanTargetsList}/>
                 <Route path="/admin" exact={true} component={AdminFront}/>
+                <Route path="/lightbox" exact={true} component={MyLightbox}/>
                 <Route path="/browse" exact={true} component={BrowseComponent}/>
                 <Route path="/search" exact={true} component={BasicSearchComponent}/>
                 <Route path="/" exact={true} component={FrontPage}/>

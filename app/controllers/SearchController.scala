@@ -15,7 +15,7 @@ import helpers.InjectableRefresher
 import play.api.libs.circe.Circe
 import requests.SearchRequest
 import play.api.libs.ws.WSClient
-import responses.{BasicSuggestionsResponse, GenericErrorResponse, ObjectListResponse}
+import responses.{BasicSuggestionsResponse, GenericErrorResponse, ObjectGetResponse, ObjectListResponse}
 
 import scala.concurrent.Future
 
@@ -33,6 +33,24 @@ with PanDomainAuthActions {
 
   private val esClient = esClientManager.getClient()
   import com.sksamuel.elastic4s.http.ElasticDsl._
+
+  def getEntry(fileId:String) = APIAuthAction.async {
+    esClient.execute {
+      search(indexName) query termQuery("id",fileId)
+    }.map({
+      case Left(failure)=>
+        logger.error(s"Could not look up file ID $fileId: ${failure.toString}")
+        InternalServerError(GenericErrorResponse("db_error", failure.toString).asJson)
+      case Right(response)=>
+        val resultList = response.result.to[ArchiveEntry]
+        resultList.headOption match {
+          case Some(entry) =>
+            Ok(ObjectGetResponse("ok", "entry", entry).asJson)
+          case None =>
+            NotFound(GenericErrorResponse("not_found", fileId).asJson)
+        }
+    })
+  }
 
   def simpleStringSearch(q:Option[String],start:Option[Int],length:Option[Int]) = APIAuthAction.async {
     val cli = esClientManager.getClient()
@@ -93,5 +111,21 @@ with PanDomainAuthActions {
         })
       }
     )
+  }
+
+  def lightboxSearch(startAt:Int, pageSize:Int) = APIAuthAction.async {request=>
+    esClient.execute {
+      search(indexName) query {
+        nestedQuery(path="lightboxEntries", query = {
+          matchQuery("lightboxEntries.owner", request.user.email)
+        })
+      } from startAt size pageSize sortBy fieldSort("path.keyword")
+    }.map({
+      case Left(err)=>
+        logger.error(s"Could not perform lightbox query: $err")
+        InternalServerError(GenericErrorResponse("search_error", err.toString).asJson)
+      case Right(results)=>
+        Ok(ObjectListResponse("ok","entry", results.result.to[ArchiveEntry], results.result.totalHits.toInt).asJson)
+    })
   }
 }

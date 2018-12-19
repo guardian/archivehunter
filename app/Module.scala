@@ -16,7 +16,7 @@ class Module extends AbstractModule with AkkaGuiceSupport {
     bindActor[DynamoCapacityActor]("dynamoCapacityActor")
     bindActor[ETSProxyActor]("etsProxyActor")
     bindActor[ProxiesRelinker]("proxiesRelinker")
-
+    bindActor[GlacierRestoreActor]("glacierRestoreActor")
     bind(classOf[AppStartup]).asEagerSingleton() //do app startup
   }
 }

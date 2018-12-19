@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import TimestampFormatter from "../common/TimestampFormatter.jsx";
 import EntryThumbnail from "../Entry/EntryThumbnail.jsx";
+import EntryLightboxBanner from '../Entry/EntryLightboxBanner.jsx';
 
 class EntryView extends React.Component {
     static propTypes = {
@@ -54,6 +55,7 @@ class EntryView extends React.Component {
         return <div className={classList.join(" ")} onClick={this.entryClicked}>
             <p className="entry-title"><FontAwesomeIcon icon="folder" className="entry-icon"/>{this.filename()}</p>
             <EntryThumbnail mimeType={this.props.entry.mimeType} entryId={this.props.entry.id} cancelToken={this.props.cancelToken} fileExtension={this.props.entry.file_extension}/>
+            <EntryLightboxBanner lightboxEntries={this.props.entry.lightboxEntries} entryClassName="entry-lightbox-banner-entry-small"/>
             <p className="entry-date"><TimestampFormatter relative={false}
                                                           value={this.props.entry.last_modified}
                                                           formatString="Do MMM YYYY, h:mm a"/></p>

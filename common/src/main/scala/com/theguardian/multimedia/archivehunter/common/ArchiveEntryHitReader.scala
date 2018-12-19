@@ -1,5 +1,6 @@
 package com.theguardian.multimedia.archivehunter.common
 
+import java.time.format.DateTimeFormatter
 import java.time.{Instant, ZoneId, ZonedDateTime}
 
 import com.sksamuel.elastic4s.{Hit, HitReader}
@@ -7,6 +8,12 @@ import com.sksamuel.elastic4s.{Hit, HitReader}
 trait ArchiveEntryHitReader {
   private def mappingToMimeType(value:Map[String,String]) =
     MimeType(value("major"),value("minor"))
+
+  private def mappingToLightboxes(value:Seq[Map[String,String]]) =
+    value.map(entry=>
+      LightboxIndex(entry("owner"),entry.get("avatarUrl"),ZonedDateTime.parse(entry("addedAt"), DateTimeFormatter.ISO_DATE_TIME))
+    )
+
   implicit object ArchiveEntryHR extends HitReader[ArchiveEntry] {
     override def read(hit: Hit): Either[Throwable, ArchiveEntry] = {
       val size = try {
@@ -29,6 +36,7 @@ trait ArchiveEntryHitReader {
           mappingToMimeType(hit.sourceField("mimeType").asInstanceOf[Map[String,String]]),
           hit.sourceField("proxied").asInstanceOf[Boolean],
           StorageClass.withName(hit.sourceField("storageClass").asInstanceOf[String]),
+          mappingToLightboxes(hit.sourceField("lightboxEntries").asInstanceOf[Seq[Map[String,String]]]),
           hit.sourceField("beenDeleted").asInstanceOf[Boolean]
         ))
       } catch {

@@ -7,7 +7,7 @@ import play.api.Configuration
 import com.sksamuel.elastic4s.http.ElasticDsl
 import com.sksamuel.elastic4s.http.index.mappings.IndexMappings
 import com.sksamuel.elastic4s.indexes.AnalysisDefinition
-import com.sksamuel.elastic4s.mappings.{Analysis, BasicFieldDefinition, KeywordFieldDefinition, MappingDefinition}
+import com.sksamuel.elastic4s.mappings.{BasicFieldDefinition, _}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -18,7 +18,6 @@ class IndexManagement @Inject() (config:Configuration, esClientMgr:ESClientManag
 
   private val esClient = esClientMgr.getClient()
 
-
   private val indexName = config.get[String]("externalData.indexName")
 
   def doIndexCreate() = {
@@ -26,6 +25,13 @@ class IndexManagement @Inject() (config:Configuration, esClientMgr:ESClientManag
       createIndex(indexName).mappings(
         MappingDefinition("entry",
           fields=Seq(
+            BasicFieldDefinition("id","keyword"),
+            BasicFieldDefinition("etag","keyword"),
+            NestedFieldDefinition("lightboxEntries", fields=Seq(
+              BasicFieldDefinition("owner","keyword"),
+              BasicFieldDefinition("avatarUrl","keyword"),
+              BasicFieldDefinition("addedAt","date")
+            )),
             BasicFieldDefinition("path", "text", fields=Seq(
               BasicFieldDefinition("keyword", "keyword"),
               BasicFieldDefinition("tokens", "text").analyzer(StandardAnalyzer)
