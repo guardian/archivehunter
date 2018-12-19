@@ -5,7 +5,7 @@ import java.time.ZonedDateTime
 import akka.pattern.ask
 import akka.actor.ActorRef
 import com.amazonaws.HttpMethod
-import com.amazonaws.services.s3.model.GeneratePresignedUrlRequest
+import com.amazonaws.services.s3.model.{GeneratePresignedUrlRequest, ResponseHeaderOverrides}
 import com.theguardian.multimedia.archivehunter.common.{Indexer, LightboxIndex, StorageClass, ZonedDateTimeEncoder}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{ESClientManager, S3ClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{LightboxEntry, LightboxEntryDAO, RestoreStatus, RestoreStatusEncoder}
@@ -144,6 +144,7 @@ class LightboxController @Inject() (override val config:Configuration,
           if(userProfile.allCollectionsVisible || userProfile.visibleCollections.contains(archiveEntry.bucket)){
             try {
               val rq = new GeneratePresignedUrlRequest(archiveEntry.bucket, archiveEntry.path, HttpMethod.GET)
+                .withResponseHeaders(new ResponseHeaderOverrides().withContentDisposition("attachment"))
               val response = s3Client.generatePresignedUrl(rq)
               Ok(ObjectGetResponse("ok","link",response.toString).asJson)
             } catch {
