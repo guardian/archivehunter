@@ -79,9 +79,12 @@ class EntryDetails extends React.Component {
 
     putToLightbox(){
         this.setState({lightboxSaving: true}, ()=>axios.put("/api/lightbox/my/" + this.props.entry.id).then(response=>{
-            this.setState({lightboxSaving: false}, ()=>{
-                if(this.props.lightboxedCb) this.props.lightboxedCb(this.props.entry.id)
-            });
+            if(this.props.lightboxedCb){
+                this.props.lightboxedCb(this.props.entry.id).then(()=>this.setState({lightboxSaving: false}))
+            } else {
+                console.log("No lightboxCb");
+                this.setState({lightboxSaving: false});
+            }
         }).catch(err=>{
             console.error(err);
         }));
@@ -90,7 +93,12 @@ class EntryDetails extends React.Component {
     removeFromLightbox(){
         this.setState({lightboxSaving: true}, ()=>axios.delete("/api/lightbox/my/" + this.props.entry.id).then(response=>{
             this.setState({lightboxSaving: false}, ()=>{
-                if(this.props.lightboxedCb) this.props.lightboxedCb(this.props.entry.id)
+                if(this.props.lightboxedCb){
+                    this.props.lightboxedCb(this.props.entry.id).then(()=>this.setState({lightboxSaving: false}))
+                }  else {
+                    console.log("No lightboxCb");
+                    this.setState({lightboxSaving: false});
+                }
             })
         }).catch(err=>{
             console.error(err);
@@ -136,9 +144,11 @@ class EntryDetails extends React.Component {
                         <td className="metadata-heading">Lightbox</td>
                         <td className="metadata-entry">
                             {
-                                this.isInLightbox() ? <span>Saved <a onClick={this.removeFromLightbox} style={{cursor: "pointer"}}>remove</a></span> :
+                                this.isInLightbox() ?
+                                    <span>Saved <a onClick={this.removeFromLightbox} style={{cursor: "pointer"}}>remove</a></span> :
                                     <a onClick={this.putToLightbox} style={{cursor: "pointer"}}>Save to lightbox</a>
                             }
+                            <img src="/assets/images/Spinner-1s-44px.svg" style={{display: this.state.lightboxSaving ? "inline" : "none"}}/>
                         </td>
                     </tr>
                     <tr>

@@ -56,20 +56,28 @@ class CommonSearchView extends React.Component {
         });
     }
 
+    /**
+     * updates the search view data for a specific item once it has been added to the lightbox.
+     * Returns a Promise that resolves once the operation is fully completed
+     * @param entryId entry to update
+     * @returns {Promise} Promise that resolves once all updates have been done
+     */
     addedToLightbox(entryId){
-        //we have to use a small delay, otherwise the server returns stale data (that the item is NOT in the lightbox yet)
-        window.setTimeout(()=> {
-            this.setState({loading: true}, () => axios.get("/api/entry/" + entryId).then(response => {
-                const entryIndex = this.indexForFileid(entryId);
-                console.info("got existing entry at " + entryIndex);
+        return new Promise((resolve, reject)=> {
+            //we have to use a small delay, otherwise the server returns stale data (that the item is NOT in the lightbox yet)
+            window.setTimeout(() => {
+                this.setState({loading: true}, () => axios.get("/api/entry/" + entryId).then(response => {
+                    const entryIndex = this.indexForFileid(entryId);
+                    console.info("got existing entry at " + entryIndex);
 
-                if (entryIndex >= 0) {
-                    this.updateSearchResults(response.data.entry, entryIndex, entryId)
-                } else {
-                    this.setState({searchResults: this.state.searchResults.concat([response.data.entry])})
-                }
-            }))
-        }, 250);
+                    if (entryIndex >= 0) {
+                        this.updateSearchResults(response.data.entry, entryIndex, entryId).then(()=>resolve());
+                    } else {
+                        this.setState({searchResults: this.state.searchResults.concat([response.data.entry])}, ()=>resolve());
+                    }
+                }))
+            }, 1000);
+        });
     }
 
     renderMainBody(){
