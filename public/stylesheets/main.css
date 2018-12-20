@@ -468,3 +468,8 @@ p.large {
 .filter-entry {
     margin-right: 2em;
 }
+
+.browse-path-summary {
+    overflow-y: hidden;
+    overflow-x: auto;
+}
