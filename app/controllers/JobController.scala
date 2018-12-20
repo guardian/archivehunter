@@ -20,6 +20,7 @@ import models._
 import com.theguardian.multimedia.archivehunter.common.cmn_models._
 import helpers.InjectableRefresher
 import play.api.libs.ws.WSClient
+import requests.JobSearchRequest
 import responses.{GenericErrorResponse, ObjectListResponse}
 
 import scala.util.{Failure, Success}
@@ -33,7 +34,7 @@ class JobController @Inject() (override val config:Configuration, override val c
                                override val refresher:InjectableRefresher,
                                override val wsClient:WSClient)
                               (implicit actorSystem:ActorSystem)
-  extends AbstractController(controllerComponents) with Circe with JobModelEncoder with ZonedDateTimeEncoder with PanDomainAuthActions {
+  extends AbstractController(controllerComponents) with Circe with JobModelEncoder with ZonedDateTimeEncoder with PanDomainAuthActions with QueryRemaps {
 
   private val logger = Logger(getClass)
 
@@ -68,6 +69,48 @@ class JobController @Inject() (override val config:Configuration, override val c
 
   def jobsFor(fileId:String) = renderListAction(()=>jobModelDAO.jobsForSource(fileId))
 
+  def jobsForStatus = APIAuthAction.async(circe.json(2048)) { request=>
+    val maybeStatusString = request.body.\\("status").headOption.flatMap(_.asString)
+    maybeStatusString match {
+      case None=>
+        Future(BadRequest(GenericErrorResponse("error","You must provide a 'status' key").asJson))
+      case Some(stringValue)=>
+        try {
+          droppingConvert(jobModelDAO.jobsForStatus(JobStatus.withName(stringValue))).map({
+            case Left(err)=>
+              InternalServerError(GenericErrorResponse("db_error", err.toString).asJson)
+            case Right(results)=>
+              Ok(ObjectListResponse("ok","job",results, results.length).asJson)
+          })
+        } catch {
+          case ex:java.util.NoSuchElementException=>
+            Future(BadRequest(GenericErrorResponse("error","status value not recognised").asJson))
+          case ex:Throwable=>
+            Future(InternalServerError(GenericErrorResponse("error",ex.toString).asJson.asJson))
+        }
+    }
+  }
+
+  def jobSearch(clientLimit:Int) = Action.async(circe.json(2048)) { request=>
+    implicit val daoImplicit = jobModelDAO
+    request.body.as[JobSearchRequest] match {
+      case Left(err)=>
+        Future(BadRequest(GenericErrorResponse("bad_request", err.toString).asJson))
+      case Right(rq)=>
+        rq.runSearch(clientLimit).map({
+          case Left(errors)=>
+            logger.error("Could not perform job search: ")
+            errors.foreach(err=>logger.error(err.toString))
+            InternalServerError(GenericErrorResponse("db_error", errors.head.toString).asJson)
+          case Right(results)=>
+            Ok(ObjectListResponse("ok","job",results, results.length).asJson)
+        }).recoverWith({
+          case err:Throwable=>
+            logger.error("Could not scan jobs: ", err)
+            Future(InternalServerError(GenericErrorResponse("db_error", err.toString).asJson))
+        })
+    }
+  }
   /**
     * receive a JSON report from an outboard process and handle it
     * @param jobId

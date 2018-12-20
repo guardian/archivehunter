@@ -4,10 +4,19 @@ html, body, p, th, td, li, dd, dt, pre .ui-dialog-buttonset{
     color: white;
 }
 
-.ui-dialog-content {
+.ui-dialog {
     background-color: #666666;
 }
 
+
+
+.ui-dialog-container {
+    position: fixed;
+    top: -50%;
+    left: 25%;
+    /* don't forget to add prefixes */
+    transform: translate(-50%, -50%);
+}
 a {
     color: #AAAAAA;
 }
@@ -436,6 +445,11 @@ p.small {
     font-size: 0.7em;
 }
 
+
 p.large {
     font-size: 1.4em;
+}
+
+.control-icon {
+    padding-right: 0.2em;
 }

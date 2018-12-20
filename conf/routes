@@ -38,6 +38,7 @@ POST    /api/proxy/generate/:id/:typeStr     @controllers.ProxiesController.gene
 POST    /api/job/:jobid/report          @controllers.JobController.updateStatus(jobid)
 GET     /api/job/all                    @controllers.JobController.getAllJobs(limit:Int ?=100, scanFrom:Option[String])
 GET     /api/job/forFile/:fileId        @controllers.JobController.jobsFor(fileId)
+PUT     /api/job/search                 @controllers.JobController.jobSearch(linit:Int ?=100)
 
 GET     /api/browse/collections         @controllers.BrowseCollectionController.getCollections
 GET     /api/browse/:collection         @controllers.BrowseCollectionController.getFolders(collection, prefix:Option[String])
