@@ -12,6 +12,7 @@ import FilterButton from "../common/FilterButton.jsx";
 import omit from "lodash.omit";
 import LoadingThrobber from "../common/LoadingThrobber.jsx";
 import Dialog from 'react-dialog';
+import JobsFilterComponent from "./JobsFilterComponent.jsx";
 
 class JobsList extends  React.Component {
     constructor(props){
@@ -28,6 +29,7 @@ class JobsList extends  React.Component {
         };
 
         this.filterUpdated = this.filterUpdated.bind(this);
+        this.filterbarUpdated = this.filterbarUpdated.bind(this);
         this.handleModalClose = this.handleModalClose.bind(this);
 
         this.columns = [
@@ -129,8 +131,18 @@ class JobsList extends  React.Component {
         }
     }
 
+    filterbarUpdated(newFilters){
+        console.log("Filter bar updated: ", newFilters);
+        this.setState({activeFilters: newFilters}, ()=>this.refreshData());
+    }
+
+    makeUpdateRequest(){
+        return Object.keys(this.state.activeFilters).length === 0 ?
+            axios.get("/api/job/all") : axios.put("/api/job/search",this.state.activeFilters)
+    }
+
     refreshData(){
-        this.setState({lastError: null, loading: true},()=>axios.put("/api/job/search",this.state.activeFilters).then(result=>{
+        this.setState({lastError: null, loading: true},()=>this.makeUpdateRequest().then(result=>{
             this.setState({lastError: null, jobsList: result.data.entries, loading: false})
         }).catch(err=>{
             console.error(err);
@@ -155,6 +167,7 @@ class JobsList extends  React.Component {
         if(this.state.lastError) return <ErrorViewComponent error={this.state.lastError}/>;
         return <div>
             <BreadcrumbComponent path={this.props.location.pathname}/>
+            <JobsFilterComponent activeFilters={this.state.activeFilters} filterChanged={this.filterbarUpdated}/>
             <LoadingThrobber show={this.state.loading} caption="Loading data..." small={false}/>
             {
                 this.state.showingLog && <Dialog modal={true}

@@ -453,3 +453,18 @@ p.large {
 .control-icon {
     padding-right: 0.2em;
 }
+
+.filter-bar {
+    margin-left: auto;
+    margin-right: auto;
+    width: 400px;
+    margin-bottom: 1em;
+}
+
+.filter-control-label {
+    margin-right: 0.6em;
+}
+
+.filter-entry {
+    margin-right: 2em;
+}
