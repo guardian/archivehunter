@@ -244,6 +244,13 @@ class ProxiesController @Inject()(override val config:Configuration,
             } else {
               Left(s"Can't proxy media of type ${entry.mimeType.toString}")
             }
+          case "binary"=>
+            if(entry.mimeType.minor.toLowerCase=="octet-stream"){
+              //application/octet-stream could be anything, so let it go through.
+              Right(true)
+            } else {
+              Left(s"Can't proxy media of type ${entry.mimeType.toString}")
+            }
           case "video"=>  //video can proxy to anything
             Right(true)
           case "audio"=>
