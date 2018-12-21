@@ -26,7 +26,8 @@ class JobsList extends  React.Component {
             lastError: null,
             activeFilters: {},
             showingLog: false,
-            logContent: ""
+            logContent: "",
+            specificJob: null
         };
 
         this.filterUpdated = this.filterUpdated.bind(this);
@@ -191,21 +192,35 @@ class JobsList extends  React.Component {
     }
 
     refreshData(){
-        this.setState({lastError: null, loading: true},()=>this.makeUpdateRequest().then(result=>{
-            this.setState({lastError: null, jobsList: result.data.entries, loading: false})
-        }).catch(err=>{
-            console.error(err);
-            this.setState({loading: false, lastError: err});
-        }))
+        if(this.state.specificJob){
+            this.setState({lastError: null, loading: true}, ()=>axios.get("/api/job/" + this.state.specificJob).then(result=>
+                this.setState({lastError: null, jobsList: [result.data.entry], loading: false})
+            ).catch(err=>{
+                console.error(err);
+                this.setState({lastError: err, loading: false});
+            }))
+        } else {
+            this.setState({lastError: null, loading: true}, () => this.makeUpdateRequest().then(result => {
+                this.setState({lastError: null, jobsList: result.data.entries, loading: false})
+            }).catch(err => {
+                console.error(err);
+                this.setState({loading: false, lastError: err});
+            }))
+        }
     }
 
+    componentDidUpdate(oldProps, oldState){
+        /*if the url changes, update the data */
+        if(oldProps.match!==this.props.match){
+            this.setState({specificJob: this.props.match.params.hasOwnProperty("jobid") ? this.props.match.params.jobid : null},()=>
+            this.refreshData());
+        }
+    }
     componentWillMount(){
-        this.setState({lastError:null, jobsList:[], loading: true}, ()=>axios.get("/api/job/all").then(result=>{
-            this.setState({lastError:null, jobsList: result.data.entries, loading: false})
-        }).catch(err=>{
-            console.error(err);
-            this.setState({lastError: err, loading: false});
-        }))
+        this.setState(
+            {jobsList:[], specificJob: this.props.match.params.hasOwnProperty("jobid") ? this.props.match.params.jobid : null},
+            ()=>this.refreshData()
+        );
     }
 
     handleModalClose(){
@@ -233,7 +248,7 @@ class JobsList extends  React.Component {
                                                      }]
                                                  }
                 >
-                    <p style={{height:"200px", overflowY: "auto"}} className="centered">{this.state.logContent.split("\n").map(para=><p>{para}</p>)}</p>
+                    <div style={{height:"200px", overflowY: "auto"}}>{this.state.logContent.split("\n").map(para=><p className="centered longlines">{para}</p>)}</div>
                 </Dialog>
             }
             <SortableTable

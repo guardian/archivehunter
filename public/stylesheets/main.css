@@ -473,3 +473,7 @@ p.large {
     overflow-y: hidden;
     overflow-x: auto;
 }
+
+p.longlines {
+    word-break: break-word;
+}
