@@ -477,3 +477,20 @@ p.large {
 p.longlines {
     word-break: break-word;
 }
+
+p.inline {
+    display: inline
+}
+
+.clickable-hovered {
+    color: black;
+    background-color: lightgrey;
+    border-radius: 20px;
+    padding-right: 3px;
+    padding-left: 3px;
+}
+
+.clickable-unhovered {
+    padding-right: 3px;
+    padding-left: 3px;
+}

@@ -232,7 +232,7 @@ class JobsList extends  React.Component {
         return <div>
             <BreadcrumbComponent path={this.props.location.pathname}/>
             <JobsFilterComponent activeFilters={this.state.activeFilters} filterChanged={this.filterbarUpdated}/>
-            <LoadingThrobber show={this.state.loading} caption="Loading data..." small={false}/>
+            <LoadingThrobber show={this.state.loading} caption="Loading data..." small={true}/>
             {
                 this.state.showingLog && <Dialog modal={true}
                                                  title="Job log"

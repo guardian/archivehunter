@@ -13,7 +13,7 @@ class LoadingThrobber extends React.Component {
         const path = this.props.small ? "/assets/images/Spinner-1s-44px.svg" : "/assets/images/Spinner-1s-200px.gif";
 
         return <span style={{display: this.props.show ? "block" : "none"}}>
-            <img src={path}/><p style={{verticalAlign: "middle"}}>{this.props.caption ? this.props.caption : ""}</p>
+            <img src={path} style={{verticalAlign: "middle"}}/><p style={{verticalAlign: "middle", display: "inline"}}>{this.props.caption ? this.props.caption : ""}</p>
         </span>
     }
 }

@@ -1,6 +1,9 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import omit from 'lodash.omit';
+import ItemEntryName from "../common/ItemEntryName.jsx";
+import ClickableIcon from "../common/ClickableIcon.jsx";
+
 
 class JobsFilterComponent extends React.Component {
     static propTypes = {
@@ -12,6 +15,7 @@ class JobsFilterComponent extends React.Component {
         super(props);
 
         this.selectorChanged = this.selectorChanged.bind(this);
+        this.sourceIdRemoved = this.sourceIdRemoved.bind(this);
     }
 
     jobTypeFilter(){
@@ -48,6 +52,11 @@ class JobsFilterComponent extends React.Component {
         }
     }
 
+    sourceIdRemoved(evt){
+        const updatedFilters = omit(this.props.activeFilters, "sourceId");
+        this.props.filterChanged(updatedFilters);
+    }
+
     render() {
         return <div className="filter-bar">
             <span className="filter-entry">
@@ -68,6 +77,11 @@ class JobsFilterComponent extends React.Component {
                     <option value="ST_SUCCESS">Success</option>
                     <option value="ST_ERROR">Error</option>
                 </select>
+            </span>
+            <span className="filter-entry" style={{display: this.props.activeFilters.hasOwnProperty("sourceId") ? "inherit" : "none"}}>
+                <ClickableIcon icon="times" onClick={this.sourceIdRemoved} style={{paddingRight: "0.4em"}}/>
+                <label htmlFor="entry-filter" className="filter-control-label">Specific item:</label>
+                <ItemEntryName id="entry-filter" entryId={this.props.activeFilters.hasOwnProperty("sourceId") ? this.props.activeFilters.sourceId : null}/>
             </span>
         </div>
     }
