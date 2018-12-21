@@ -76,7 +76,7 @@ class BrowseComponent extends CommonSearchView {
                 this.setState(toSet, () => this.refreshTreeContents().then(()=>resolve()));
             }).catch(err => {
                 console.error("Could not refresh collection names: ", err);
-                this.setState({isLoading: false, lastError: err}, ()=>reject());
+                this.setState({isLoading: false, lastError: err}, ()=>reject(err));
             }))
         });
     }
@@ -107,10 +107,18 @@ class BrowseComponent extends CommonSearchView {
         }
     }
 
-    loadNextNodeOfSpecific(parentNode, pathParts, index){
+    /**
+     * recursively loads nodes down a specific path.  Used when opening a specific item ID; the path to the item is automatically
+     * expanded and the state of the component set appropriately
+     * @param parentNode the tree node to work on.  this must have the `children` property; for an initial call fake this as {children: <nodeList>}
+     * @param pathParts array representation of the path being opened
+     * @param index which level of path we are opening. For an initial call set this to zero
+     * @returns {Promise} a Promise, which resolves with the pointer to the _terminal_ node (i.e., the last one opened) once the whole tree has been loaded.
+     */
+     loadNextNodeOfSpecific(parentNode, pathParts, index){
         return new Promise((resolve,reject)=> {
-            if (index > pathParts.length || !parentNode.children){
-                resolve();
+            if (index >= pathParts.length || !parentNode.children){
+                resolve(parentNode);
                 return;
             }
             console.log("parentNode", parentNode);
@@ -121,19 +129,18 @@ class BrowseComponent extends CommonSearchView {
                 console.error(pathParts);
                 console.error(pathParts[index]);
                 console.error(index);
-                reject();
+                reject("Could not find relevant child node");
             } else {
-                this.loadSubFolder(childNode).then(() => this.loadNextNodeOfSpecific(childNode, pathParts, index + 1).then(()=>resolve()));
+                this.loadSubFolder(childNode).then(() => this.loadNextNodeOfSpecific(childNode, pathParts, index + 1).then((terminalNode)=>resolve(terminalNode)).catch(err=>reject(err)));
             }
         });
     }
 
     loadSpecificTreePath(){
-        console.log("loadSpecificTreePath: ", this.state.openedPath);
         return new Promise((resolve, reject)=>{
             if(this.state.openedPath && this.state.openedPath.length>0){
-                this.loadNextNodeOfSpecific({children: this.state.treeContents}, this.state.openedPath, 0).then(()=>{
-                    this.triggerSearch().then(()=>resolve).catch(err=>reject(err));
+                this.loadNextNodeOfSpecific({children: this.state.treeContents}, this.state.openedPath, 0).then(terminalNode=>{
+                    this.triggerSearch(terminalNode).then(()=>resolve()).catch(err=>reject(err));
                 }).catch(err=>reject(err));
             } else {
                 this.triggerSearch().then(()=>resolve()).catch(err=>reject(err));
@@ -185,7 +192,6 @@ class BrowseComponent extends CommonSearchView {
     makeSearchJson(node) {
         if(node) {
             const pathToSearch = node.fullPath.endsWith("/") ? node.fullPath.slice(0, node.fullPath.length - 1) : node.fullPath;
-            console.log("pathToSearch is " + pathToSearch);
             return JSON.stringify({q: null, path: pathToSearch, collection: this.state.collectionName});
         } else {
             return JSON.stringify({q: null, path: null, collection: this.state.collectionName});
