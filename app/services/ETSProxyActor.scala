@@ -1,6 +1,7 @@
 package services
 
-import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
+import java.time.{Instant, ZoneId, ZonedDateTime}
 import java.util.UUID
 
 import akka.actor.{Actor, ActorRef, ActorSystem}
@@ -37,6 +38,12 @@ object ETSProxyActor {
     * @param entry
     */
   case class CreateDefaultMediaProxy(entry:ArchiveEntry) extends ETSMsg
+
+  /**
+    * public message to call ETS and re-check the status
+    * @param entry
+    */
+  case class ManualJobStatusRefresh(job:JobModel) extends ETSMsg
 
   /**
     * public message reply if something went wrong
@@ -443,5 +450,94 @@ class ETSProxyActor @Inject() (implicit config:ArchiveHunterConfiguration,
         case None => throw new RuntimeException(s"Entry's source bucket ${entry.bucket} is not registered")
         case Some(Left(err)) => throw new RuntimeException(err.toString)
       })
+
+    case ManualJobStatusRefresh(job)=>
+      job.transcodeInfo match {
+        case None=>
+          val originalSender = sender()
+          job.jobType match {
+            case "proxy"=>
+              val jobLogUpdate = "Proxy job has no transcode info! This should not happen."
+              val updatedLog = job.log match {
+                case None=>jobLogUpdate
+                case Some(existingLog)=>existingLog + "\n" + jobLogUpdate
+              }
+              val updatedJob = job.copy(jobStatus=JobStatus.ST_ERROR, log=Some(updatedLog))
+              jobModelDAO.putJob(updatedJob).onComplete({
+                case Success(_)=>
+                  originalSender ! PreparationFailure(new RuntimeException("Job has no transcodeinfo"))
+                case Failure(err)=>
+                  logger.error("Could not update job: ", err)
+                  originalSender ! PreparationFailure(new RuntimeException("Job has no transcodeinfo"))
+              })
+            case _=>
+              sender() ! PreparationFailure(new RuntimeException("Job has no transcodeinfo"))
+          }
+
+        case Some(transcodeInfo)=>
+          val reply = etsClient.readJob(new ReadJobRequest().withId(transcodeInfo.transcodeId))
+          val jobInfo = reply.getJob
+          val maybeNewStatus = jobStatusFromETSStatus(jobInfo.getStatus)
+
+          val maybeTiming = Option(jobInfo.getTiming)
+
+          val maybeCompletionTime = maybeTiming.flatMap(t=>Option(t.getFinishTimeMillis).map(millis=>ZonedDateTime.ofInstant(Instant.ofEpochMilli(millis), ZoneId.systemDefault())))
+
+          val logUpdateLine = maybeNewStatus match {
+            case None=>
+              s"Invalid job status ${jobInfo.getStatus} was found! Job status details:  ${jobInfo.getOutputs.asScala.map(_.getStatusDetail)}"
+            case Some(JobStatus.ST_RUNNING)=>
+              "Still running"
+            case Some(JobStatus.ST_SUCCESS)=>
+              completionLogLine(jobInfo)
+            case Some(JobStatus.ST_CANCELLED)=>
+              s"Job cancelled in ETS at time ${maybeCompletionTime.map(_.format(DateTimeFormatter.BASIC_ISO_DATE))}"
+            case Some(JobStatus.ST_ERROR)=>
+              s"Job(s) errored: ${jobInfo.getOutputs.asScala.map(_.getStatusDetail)}"
+          }
+
+          val updatedLog = job.log match {
+            case Some(logLines)=> logLines + "\n" + logUpdateLine
+            case None=> logUpdateLine
+          }
+
+          val updatedJob = job.copy(jobStatus = maybeNewStatus.getOrElse(JobStatus.ST_ERROR),
+            completedAt=maybeCompletionTime,
+            log=Some(updatedLog),
+          )
+          val originalSender = sender()
+
+          jobModelDAO.putJob(updatedJob).onComplete({
+            case Success(Some(Left(err)))=>originalSender ! PreparationFailure(new RuntimeException(s"Could not save to database: $err"))
+            case Success(_)=>originalSender ! PreparationSuccess(transcodeInfo.transcodeId, job.jobId)
+            case Failure(err)=>
+              originalSender ! PreparationFailure(err)
+          })
+      }
+  }
+
+  def completionLogLine(jobInfo:Job) = {
+    val submitTime = ZonedDateTime.ofInstant(Instant.ofEpochMilli(jobInfo.getTiming.getSubmitTimeMillis),ZoneId.systemDefault())
+    val startTime = ZonedDateTime.ofInstant(Instant.ofEpochMilli(jobInfo.getTiming.getStartTimeMillis),ZoneId.systemDefault())
+    val completionTime = ZonedDateTime.ofInstant(Instant.ofEpochMilli(jobInfo.getTiming.getFinishTimeMillis),ZoneId.systemDefault())
+
+    s"Job submitted at ${submitTime.format(DateTimeFormatter.ISO_DATE_TIME)}, started at ${startTime.format(DateTimeFormatter.ISO_DATE_TIME)} and completed at ${completionTime.format(DateTimeFormatter.ISO_DATE_TIME)}"
+  }
+
+  def jobStatusFromETSStatus(etsStatus: String) = {
+    /**Submitted, Progressing, Complete, Canceled, or Error. */
+    if(etsStatus=="Submitted"){
+      Some(JobStatus.ST_RUNNING)
+    } else if(etsStatus=="Progressing"){
+      Some(JobStatus.ST_RUNNING)
+    } else if(etsStatus=="Complete"){
+      Some(JobStatus.ST_SUCCESS)
+    } else if(etsStatus=="Cancelled"){
+      Some(JobStatus.ST_CANCELLED)
+    } else if(etsStatus=="Error"){
+      Some(JobStatus.ST_ERROR)
+    } else {
+      None
+    }
   }
 }

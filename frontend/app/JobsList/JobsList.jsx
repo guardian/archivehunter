@@ -13,6 +13,7 @@ import omit from "lodash.omit";
 import LoadingThrobber from "../common/LoadingThrobber.jsx";
 import Dialog from 'react-dialog';
 import JobsFilterComponent from "./JobsFilterComponent.jsx";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
 class JobsList extends  React.Component {
     constructor(props){
@@ -36,7 +37,8 @@ class JobsList extends  React.Component {
             {
                 header: "ID",
                 key: "jobId",
-                headerProps: {className: "dashboardheader"}
+                headerProps: {className: "dashboardheader"},
+                render: value=><span><p className="small">{value}</p><FontAwesomeIcon icon="sync-alt" onClick={()=>this.refreshJob(value)}/></span>
             },
             {
                 header: "Type",
@@ -69,6 +71,7 @@ class JobsList extends  React.Component {
                         <FilterButton fieldName="jobStatus" values={value} type="plus" onActivate={this.filterUpdated}/>
                         <FilterButton fieldName="jobStatus" values={value} type="minus" onActivate={this.filterUpdated}/>
                         <JobStatusIcon status={value}/>
+
                 </span>
             },
             {
@@ -104,6 +107,52 @@ class JobsList extends  React.Component {
             paddingLeft: '5px',
             paddingRight: '5px'
         };
+    }
+
+    /**
+     * updates the given job in the job list
+     * @param jobToUpdate
+     * @returns {Promise} promise that resolves once the update has completed
+     */
+    updateJobList(jobToUpdate){
+        return new Promise((resolve,reject)=>{
+            try {
+                const itemIndex = this.state.jobsList.findIndex(job => job.jobId === jobToUpdate.jobId);
+                this.setState({
+                    jobsList: this.state.jobsList.slice(0, itemIndex).concat([jobToUpdate]).concat(this.state.jobsList.slice(itemIndex + 1))
+                }, () => resolve());
+            } catch(ex){
+                reject(ex);
+            }
+        })
+    }
+
+    /**
+     * ask the server to update the job info about the given job. Currently only works for transcode jobs.
+     * @param jobId
+     */
+    refreshJob(jobId){
+        this.setState({loading: true}, ()=>axios.put("/api/job/transcode/" + jobId + "/refresh").then(response=>{
+            console.log("Job update request worked");
+            window.setTimeout(()=>{
+                axios.get("/api/job/" + jobId).then(response=>{
+                    this.updateJobList(response.data.entry).then(()=>{
+                        this.setState({loading: false});
+                    }).catch(err=>{
+                        this.setState({loading:false, lastError: err});
+                    })
+                })
+            }, 1000)
+        }).catch(err=>{
+            console.error(err);
+            axios.get("/api/job/" + jobId).then(response=>{
+                this.updateJobList(response.data.entry).then(()=>{
+                    this.setState({loading: false});
+                }).catch(err=>{
+                    this.setState({loading:false, lastError: err});
+                })
+            });
+        }))
     }
 
     /**
@@ -184,7 +233,7 @@ class JobsList extends  React.Component {
                                                      }]
                                                  }
                 >
-                    <p style={{height:"200px"}} className="centered">{this.state.logContent}</p>
+                    <p style={{height:"200px", overflowY: "auto"}} className="centered">{this.state.logContent.split("\n").map(para=><p>{para}</p>)}</p>
                 </Dialog>
             }
             <SortableTable

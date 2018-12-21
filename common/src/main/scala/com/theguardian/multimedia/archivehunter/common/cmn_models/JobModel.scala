@@ -8,7 +8,7 @@ import com.theguardian.multimedia.archivehunter.common.{ProxyType, StorageClassE
 import io.circe.{Decoder, Encoder}
 
 object JobStatus extends Enumeration {
-  val ST_PENDING, ST_RUNNING, ST_SUCCESS, ST_ERROR = Value
+  val ST_PENDING, ST_RUNNING, ST_SUCCESS, ST_ERROR, ST_CANCELLED = Value
 }
 
 object SourceType extends Enumeration {
