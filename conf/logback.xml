@@ -69,6 +69,7 @@
     <logger name="services.ETSProxyActor" level="INFO"/>
     <logger name="services.ProxiesRelinker" level="INFO"/>
     <logger name="helpers.ProxyVerifyFlow" level="INFO"/>
+    <logger name="services.JobPurgerActor" level="DEBUG"/>
 
     <logger name="requests.JobSearchRequest" level="DEBUG"/>
 

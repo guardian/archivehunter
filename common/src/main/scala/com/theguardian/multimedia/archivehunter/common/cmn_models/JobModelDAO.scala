@@ -85,29 +85,6 @@ class JobModelDAO @Inject()(config:ArchiveHunterConfiguration, ddbClientMgr: Dyn
       }
     }
 
-//  def jobsForStatus(status:JobStatus.Value, startingTime:Option[ZonedDateTime]=None, endingTime:Option[ZonedDateTime]=None,limit:Int=100) = {
-//    val currentTimeString = ZonedDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME)
-//    val maybeStartTimeString = startingTime.map(_.format(DateTimeFormatter.ISO_DATE_TIME))
-//
-//    val resultFuture = maybeStartTimeString match {
-//      case Some(startTimeString)=>
-//        ScanamoAlpakka.exec(ddbClient)(jobStatusIndex.limit(limit).query('jobStatus->status.toString and ('startedAt between Bounds(Bound(startTimeString), Bound(currentTimeString)))))
-//      case None=>
-//        ScanamoAlpakka.exec(ddbClient)(jobStatusIndex.limit(limit).query('jobStatus->status.toString))
-//    }
-//
-//    endingTime match {
-//      case Some(endTimeValue)=>
-//        resultFuture.map(_.filter({
-//          case Right(mdl)=>mdl.completedAt match {
-//            case Some(completionTime)=>endTimeValue.isAfter(completionTime)
-//            case None=>false
-//          }
-//          case Left(err)=>true
-//        }))
-//      case None=>resultFuture
-//    }
-//  }
 
   def jobsForType(jobType:String, startingTime:Option[ZonedDateTime]=None, endingTime:Option[ZonedDateTime]=None,limit:Int=100) =
     optionalTimeQuery(startingTime, endingTime) { (maybeStartTimeString, currentTimeString) =>
