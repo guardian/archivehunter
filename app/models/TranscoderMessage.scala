@@ -1,5 +1,7 @@
 package models
 import com.amazonaws.services.elastictranscoder.model.JobOutput
+import com.theguardian.multimedia.archivehunter.common.{StorageClassEncoder, ZonedDateTimeEncoder}
+import com.theguardian.multimedia.archivehunter.common.cmn_models.IngestMessage
 import io.circe._
 import io.circe.parser
 import io.circe.generic.auto._
@@ -42,9 +44,12 @@ case class AwsSqsMsg (
                        Message: String,
                        Timestamp: String,
                      )
- extends TranscoderMessageDecoder {
+ extends TranscoderMessageDecoder with ZonedDateTimeEncoder with StorageClassEncoder {
   def getETSMessage: Either[io.circe.Error, AwsElasticTranscodeMsg] =
     io.circe.parser.parse(Message).flatMap(_.as[AwsElasticTranscodeMsg])
+
+  def getIngestMessge: Either[io.circe.Error, IngestMessage] =
+    io.circe.parser.parse(Message).flatMap(_.as[IngestMessage])
 }
 
 object AwsSqsMsg extends TranscoderMessageDecoder {

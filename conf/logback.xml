@@ -37,7 +37,7 @@
 
     <logger name="services.AppStartup" level="INFO"/>
     <logger name="services.BucketScanner" level="INFO"/>
-    <logger name="akka.cluster" level="INFO"/>
+    <logger name="akka.cluster" level="ERROR"/>
     <logger name="helpers.S3ToArchiveEntryFlow" level="WARN"/>
     <logger name="helpers.SearchHitToArchiveEntryFlow" level="WARN"/>
     <logger name="helpers.ArchiveEntryVerifyFlow" level="WARN"/>
@@ -70,6 +70,7 @@
     <logger name="services.ProxiesRelinker" level="INFO"/>
     <logger name="helpers.ProxyVerifyFlow" level="INFO"/>
     <logger name="services.JobPurgerActor" level="DEBUG"/>
+    <logger name="services.IngestProxyQueue" level="DEBUG"/>
 
     <logger name="requests.JobSearchRequest" level="DEBUG"/>
 

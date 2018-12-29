@@ -131,6 +131,7 @@ class ProxiesController @Inject()(override val config:Configuration,
         Future(InternalServerError(GenericErrorResponse("error",ex.toString).asJson))
     }
   }
+
   /**
     * endpoint that performs a scan for potential proxies for the given file.
     * if there is only one result, it is automatically associated.
