@@ -1,7 +1,7 @@
 package services
 
 import akka.actor.{Actor, ActorRef, ActorSystem, Status}
-import com.amazonaws.services.sqs.model.ReceiveMessageRequest
+import com.amazonaws.services.sqs.model.{DeleteMessageRequest, ReceiveMessageRequest}
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ProxyLocationDAO, ProxyType}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, S3ClientManager, SQSClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.ScanTargetDAO
@@ -129,7 +129,6 @@ class IngestProxyQueue @Inject() (config:Configuration,
 
       Future.sequence(possibleProxyTypes.map(pt=>proxyLocationDAO.getProxy(entry.id,pt))).map(results=>{
         val validProxies = results.collect({case Some(proxyLocation)=>proxyLocation})
-        println(validProxies.toString)
         if(validProxies.isEmpty){
           logger.info(s"${entry.bucket}:${entry.path} has no known proxies, checking for loose...")
           ipqActor ! CheckNonRegisteredProxy(entry)
@@ -161,12 +160,14 @@ class IngestProxyQueue @Inject() (config:Configuration,
               logger.error(s"Could not decode message from queue: $err")
               sender ! Status.Failure
             case Right(finalMsg)=>
+              println(finalMsg)
               logger.info(s"Received notification of new item: ${finalMsg.archiveEntry}")
               ipqActor ! CheckRegisteredThumb(finalMsg.archiveEntry)
               ipqActor ! CheckRegisteredProxy(finalMsg.archiveEntry)
+              sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle(msg.getReceiptHandle))
           }
         })
-        self ! HandleNextSqsMessage(rq)
+        ipqActor ! HandleNextSqsMessage(rq)
       } else {
         sender ! Status.Success
       }
@@ -175,8 +176,11 @@ class IngestProxyQueue @Inject() (config:Configuration,
       logger.debug("CheckForNotifications")
       val notificationsQueue=config.get[String]("ingest.notificationsQueue")
       val rq = new ReceiveMessageRequest().withQueueUrl(notificationsQueue)
+        .withWaitTimeSeconds(10)
+        .withMaxNumberOfMessages(10)
       if(notificationsQueue=="queueUrl"){
         logger.warn("ingest notifications queue not set up in applications.conf")
+        sender ! Status.Failure
       } else {
         ipqActor ! HandleNextSqsMessage(rq)
       }
