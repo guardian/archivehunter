@@ -36,6 +36,7 @@ GET     /api/proxy/:id/playable         @controllers.ProxiesController.getPlayab
 GET     /api/proxy/:id                  @controllers.ProxiesController.proxyForId(id, proxyType:Option[String])
 POST    /api/proxy/relink/global        @controllers.ProxiesController.relinkAllProxies
 POST    /api/proxy/relink/:scanTargetName @controllers.ProxiesController.relinkProxiesForTarget(scanTargetName)
+POST    /api/proxy                      @controllers.ProxiesController.manualSet
 
 POST    /api/proxy/generate/:id/thumbnail   @controllers.ProxiesController.generateThumbnail(id)
 POST    /api/proxy/generate/:id/:typeStr     @controllers.ProxiesController.generateProxy(id, typeStr)

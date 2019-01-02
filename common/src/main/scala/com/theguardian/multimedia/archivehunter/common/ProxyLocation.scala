@@ -3,6 +3,7 @@ package com.theguardian.multimedia.archivehunter.common
 import java.net.URI
 
 import com.amazonaws.services.s3.AmazonS3
+import com.amazonaws.services.s3.model.ObjectMetadata
 import com.gu.scanamo.DynamoFormat
 import com.theguardian.multimedia.archivehunter.common.clientManagers.S3ClientManager
 import io.circe.{Decoder, Encoder}
@@ -35,7 +36,11 @@ object ProxyLocation extends DocId {
     new URI(proto, host, "/"+path, "")
   }
 
-  def newInS3(proxyLocationString:String, mainMediaId:String, region:String, proxyType:ProxyType.Value)(implicit s3Client:AmazonS3) = Try {
+  def fromS3(bucket:String, path:String, mainMediaId:String, meta:ObjectMetadata,proxyType:ProxyType.Value) = {
+    new ProxyLocation(mainMediaId, makeDocId(bucket,path), proxyType,bucket,path,StorageClass.withName(meta.getStorageClass))
+  }
+
+  def newInS3(proxyLocationString:String, mainMediaId:String, proxyType:ProxyType.Value)(implicit s3Client:AmazonS3) = Try {
     val proxyLocationURI = getUrlElems(proxyLocationString)
     logger.debug(s"newInS3: bucket is ${proxyLocationURI.getHost} path is ${proxyLocationURI.getPath}")
     val fixedPath = if(proxyLocationURI.getPath.startsWith("/")){
