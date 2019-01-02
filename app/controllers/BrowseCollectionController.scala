@@ -1,7 +1,7 @@
 package controllers
 
 import com.amazonaws.services.s3.AmazonS3
-import com.amazonaws.services.s3.model.ListObjectsRequest
+import com.amazonaws.services.s3.model.{ListObjectsRequest, S3ObjectSummary}
 import com.sksamuel.elastic4s.http.search.TermsAggResult
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{ESClientManager, S3ClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{ScanTarget, ScanTargetDAO}
@@ -20,6 +20,7 @@ import requests.SearchRequest
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
+import scala.util.Try
 
 class BrowseCollectionController @Inject() (override val config:Configuration,
                                             s3ClientMgr:S3ClientManager,
@@ -59,6 +60,23 @@ extends AbstractController(controllerComponents) with PanDomainAuthActions with 
 
   def withScanTarget(collectionName:String)(block: ScanTarget=>Result):Future[Result] =
     withScanTargetAsync(collectionName){ target=> Future(block(target)) }
+
+  def recurseGetFolders(baseRequest:ListObjectsRequest, s3Client:AmazonS3, continuationToken:Option[String]=None, currentSummaries:Seq[String]=Seq()):Seq[String] = {
+    val finalRequest = continuationToken match {
+      case None=>baseRequest
+      case Some(token)=>baseRequest.withMarker(token)
+    }
+
+    val result = s3Client.listObjects(finalRequest)
+    val updatedList = currentSummaries ++ result.getCommonPrefixes.asScala
+
+    Option(result.getNextMarker) match {
+      case Some(marker) =>
+        recurseGetFolders(baseRequest, s3Client, Some(marker), updatedList)
+      case None=>
+        updatedList
+    }
+  }
 
   /**
     * iterate through the S3 bucket recursively, until there are no more prefixes available.

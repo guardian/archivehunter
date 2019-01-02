@@ -378,33 +378,36 @@ class ProxiesController @Inject()(override val config:Configuration,
     * @return
     */
   def manualSet = APIAuthAction.async(circe.json(2048)) { request=>
-    request.body.as[ManualProxySet].fold(
-      failure=>Future(BadRequest(GenericErrorResponse("bad_request", failure.toString).asJson)),
-      proxySetRequest=>{
-        proxyLocationDAO.getProxy(proxySetRequest.entryId, proxySetRequest.proxyType).flatMap({
-          case Some(existingProxy)=>
-            Future(Conflict(responses.ObjectCreatedResponse("proxy_exists","proxy_id",existingProxy.proxyId).asJson))
-          case None=>
-            checkProxyExists(proxySetRequest.proxyBucket,proxySetRequest.proxyPath) match {
-              case Success(None)=>  //proxy does not exist
-                Future(NotFound(GenericErrorResponse("no_proxy","Requested proxy file does not exist").asJson))
-              case Failure(err)=>
-                logger.error(s"Could not access proxy at s3://${proxySetRequest.proxyBucket}/${proxySetRequest.proxyType}: ", err)
-                Future(InternalServerError(GenericErrorResponse("error",err.toString).asJson))
-              case Success(Some(proxyMeta))=>  //proxy exists
-                val newLoc=ProxyLocation.fromS3(proxySetRequest.proxyBucket,proxySetRequest.proxyPath,proxySetRequest.entryId,proxyMeta,proxySetRequest.proxyType)
-                proxyLocationDAO.saveProxy(newLoc).map({
-                  case Some(Left(err))=>
-                    InternalServerError(GenericErrorResponse("db_error", err.toString).asJson)
-                  case Some(Right(record))=>
-                    Ok(ObjectGetResponse("ok","proxy",record).asJson)
-                  case None=>
-                    Ok(ObjectCreatedResponse("ok","proxy",newLoc.proxyId).asJson)
-                })
-            }
-        })
-      }
-    )
+    adminsOnlyAsync(request) {
+      request.body.as[ManualProxySet].fold(
+        failure =>
+          Future(BadRequest(GenericErrorResponse("bad_request", failure.toString).asJson)),
+        proxySetRequest => {
+          proxyLocationDAO.getProxy(proxySetRequest.entryId, proxySetRequest.proxyType).flatMap({
+            case Some(existingProxy) =>
+              Future(Conflict(responses.ObjectCreatedResponse("proxy_exists", "proxy_id", existingProxy.proxyId).asJson))
+            case None =>
+              checkProxyExists(proxySetRequest.proxyBucket, proxySetRequest.proxyPath) match {
+                case Success(None) => //proxy does not exist
+                  Future(NotFound(GenericErrorResponse("no_proxy", "Requested proxy file does not exist").asJson))
+                case Failure(err) =>
+                  logger.error(s"Could not access proxy at s3://${proxySetRequest.proxyBucket}/${proxySetRequest.proxyType}: ", err)
+                  Future(InternalServerError(GenericErrorResponse("error", err.toString).asJson))
+                case Success(Some(proxyMeta)) => //proxy exists
+                  val newLoc = ProxyLocation.fromS3(proxySetRequest.proxyBucket, proxySetRequest.proxyPath, proxySetRequest.entryId, proxyMeta, proxySetRequest.proxyType)
+                  proxyLocationDAO.saveProxy(newLoc).map({
+                    case Some(Left(err)) =>
+                      InternalServerError(GenericErrorResponse("db_error", err.toString).asJson)
+                    case Some(Right(record)) =>
+                      Ok(ObjectGetResponse("ok", "proxy", record).asJson)
+                    case None =>
+                      Ok(ObjectCreatedResponse("ok", "proxy", newLoc.proxyId).asJson)
+                  })
+              }
+          })
+        }
+      )
+    }
   }
 
   def analyseMetadata(entryId:String) = APIAuthAction.async {
