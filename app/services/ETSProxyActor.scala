@@ -122,7 +122,7 @@ object ETSProxyActor {
   */
 class ETSProxyActor @Inject() (implicit config:ArchiveHunterConfiguration,
                                sqsClientMgr:SQSClientManager, etsClientMgr: ETSClientManager, s3ClientMgr:S3ClientManager, esClientMgr:ESClientManager,
-                               scanTargetDAO: ScanTargetDAO, jobModelDAO: JobModelDAO,
+                               scanTargetDAO: ScanTargetDAO, jobModelDAO: JobModelDAO, proxyLocationDAO:ProxyLocationDAO,
                             ddbClientMgr:DynamoClientManager, actorSystem: ActorSystem) extends Actor{
   import ETSProxyActor._
 
@@ -140,8 +140,6 @@ class ETSProxyActor @Inject() (implicit config:ArchiveHunterConfiguration,
   private val sqsClient = sqsClientMgr.getClient(awsProfile)
   private val indexer = new Indexer(config.get[String]("externalData.indexName"))
   var pipelinesToCheck:Seq[WaitingOperation] = Seq()
-
-  implicit val proxyLocationDAO = new ProxyLocationDAO(config.get[String]("proxies.tableName"))
 
   /**
     * recursively check the pipelinesToCheck list, removing from the list any that have become ready

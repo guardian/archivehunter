@@ -32,7 +32,7 @@ import services.ETSProxyActor.{ETSMsg, ETSMsgReply, PreparationFailure, Preparat
 
 import scala.concurrent.duration._
 import scala.concurrent.Future
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
 
 @Singleton
 class ProxiesController @Inject()(override val config:Configuration,
@@ -45,8 +45,8 @@ class ProxiesController @Inject()(override val config:Configuration,
                                   override val refresher:InjectableRefresher,
                                   @Named("etsProxyActor") etsProxyActor:ActorRef,
                                   @Named("proxiesRelinker") proxiesRelinker:ActorRef)
-                                 (implicit actorSystem:ActorSystem, scanTargetDAO:ScanTargetDAO, jobModelDAO:JobModelDAO)
-  extends AbstractController(controllerComponents) with Circe with ProxyLocationEncoder with PanDomainAuthActions {
+                                 (implicit actorSystem:ActorSystem, scanTargetDAO:ScanTargetDAO, jobModelDAO:JobModelDAO, proxyLocationDAO:ProxyLocationDAO)
+  extends AbstractController(controllerComponents) with Circe with ProxyLocationEncoder with PanDomainAuthActions with AdminsOnly {
   import akka.pattern.ask
   implicit private val mat:Materializer = ActorMaterializer.create(actorSystem)
   private val logger=Logger(getClass)
@@ -55,6 +55,8 @@ class ProxiesController @Inject()(override val config:Configuration,
   private val awsProfile = config.getOptional[String]("externalData.awsProfile")
   protected val tableName:String = config.get[String]("proxies.tableName")
   private val table = Table[ProxyLocation](tableName)
+  private implicit val dynamoClient = ddbClientMgr.getNewAlpakkaDynamoClient(awsProfile)
+  private val s3client = s3ClientMgr.getS3Client(awsProfile)
 
   def proxyForId(fileId:String, proxyType:Option[String]) = APIAuthAction.async {
     try {
@@ -95,7 +97,7 @@ class ProxiesController @Inject()(override val config:Configuration,
   def getPlayable(fileId:String, proxyType:Option[String]) = APIAuthAction.async {
     try {
       val ddbClient = ddbClientMgr.getNewAlpakkaDynamoClient(awsProfile)
-      val s3client = s3ClientMgr.getS3Client(awsProfile)
+
       val actualType = proxyType match {
         case None=>"VIDEO"
         case Some(t)=>t.toUpperCase
@@ -142,8 +144,6 @@ class ProxiesController @Inject()(override val config:Configuration,
     implicit val indexer = new Indexer(indexName)
     implicit val client = esClientMgr.getClient()
     implicit val s3Client = s3ClientMgr.getS3Client(awsProfile)
-    implicit val dynamoClient = ddbClientMgr.getNewAlpakkaDynamoClient(awsProfile)
-    implicit val proxyLocationDAO = new ProxyLocationDAO(tableName)
 
     val resultFuture = indexer.getById(fileId).flatMap(entry=>{
       ProxyLocator.findProxyLocation(entry)
@@ -183,8 +183,6 @@ class ProxiesController @Inject()(override val config:Configuration,
     implicit val indexer = new Indexer(indexName)
     implicit val client = esClientMgr.getClient()
     implicit val s3Client = s3ClientMgr.getS3Client(awsProfile)
-    implicit val dynamoClient = ddbClientMgr.getNewAlpakkaDynamoClient(awsProfile)
-    implicit val proxyLocationDAO = new ProxyLocationDAO(tableName)
 
     maybeFileId match {
       case None =>
@@ -323,5 +321,44 @@ class ProxiesController @Inject()(override val config:Configuration,
         Ok(responses.ObjectCreatedResponse("ok","job",jobId).asJson)
     })
 
+  }
+
+  def deleteProxyFile(proxyLocation:ProxyLocation) = Try {
+    s3client.deleteObject(proxyLocation.bucketName, proxyLocation.bucketPath)
+  }
+
+  /**
+    * manually delete the given proxy.
+    * @param fileId file ID of the main media
+    * @param inputProxyType type of proxy to delete.
+    * @return
+    */
+  def manualDelete(fileId:String, inputProxyType:String)  = APIAuthAction.async {request=>
+    adminsOnlyAsync(request) {
+
+      try {
+        val proxyType = ProxyType.withName(inputProxyType)
+        proxyLocationDAO.getProxy(fileId,proxyType).flatMap({
+          case None=>Future(NotFound(GenericErrorResponse("not_found","No proxy found").asJson))
+          case Some(loc)=>
+            deleteProxyFile(loc) match {
+              case Success(_)=>
+                proxyLocationDAO.deleteProxyRecord(fileId, proxyType).map(result=>
+                  Ok(ObjectCreatedResponse("deleted","proxy",s"${fileId}:${inputProxyType}").asJson)
+                ).recoverWith({
+                  case err:Throwable=>
+                    logger.error("Could not delete proxy record in database", err)
+                    Future(InternalServerError(GenericErrorResponse("db_error",err.toString).asJson))
+                })
+              case Failure(err)=>
+                logger.error("Could not delete proxy file: ", err)
+                Future(InternalServerError(GenericErrorResponse("error", err.toString).asJson))
+            }
+        })
+      } catch {
+        case ex:Throwable=>
+          Future(BadRequest(GenericErrorResponse("error",s"Did not recognise proxy type $inputProxyType").asJson))
+      }
+    }
   }
 }

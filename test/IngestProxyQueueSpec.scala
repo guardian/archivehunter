@@ -1,4 +1,5 @@
 import java.time.ZonedDateTime
+
 import akka.actor.Props
 import akka.testkit.TestProbe
 import com.theguardian.multimedia.archivehunter.common._
@@ -10,6 +11,7 @@ import org.specs2.mutable.Specification
 import play.api.Configuration
 import services.IngestProxyQueue
 import akka.pattern.ask
+import akka.stream.alpakka.dynamodb.scaladsl.DynamoClient
 import com.amazonaws.services.dynamodbv2.{AmazonDynamoDB, AmazonDynamoDBAsync}
 import com.amazonaws.services.sqs.AmazonSQS
 import com.amazonaws.services.sqs.model._
@@ -32,16 +34,16 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       val testConfig = Configuration.empty
       val mockSqsClientMgr = mock[SQSClientManager]
       val mockProxyGenerators = mock[ProxyGenerators]
-      val mockProxyLocationDAO = mock[ProxyLocationDAO]
+      implicit val mockProxyLocationDAO = mock[ProxyLocationDAO]
       val mockS3ClientMgr = mock[S3ClientManager]
       val mockDDBlientMgr = mock[DynamoClientManager]
-      val mockDDBClient = mock[AmazonDynamoDBAsync]
-      mockDDBlientMgr.getClient(any) returns mockDDBClient
+      val mockDDBClient = mock[DynamoClient]
+      mockDDBlientMgr.getNewAlpakkaDynamoClient(any)(any, any) returns mockDDBClient
       val mockEtsProxyActor = TestProbe()
       implicit val mockScanTargetDAO = mock[ScanTargetDAO]
       val mockedSelf = TestProbe()
 
-      val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockProxyLocationDAO, mockS3ClientMgr,
+      val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
         mockDDBlientMgr, mockEtsProxyActor.ref) {
         override protected val ipqActor = mockedSelf.ref
       }))
@@ -65,16 +67,16 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       val testConfig = Configuration.empty
       val mockSqsClientMgr = mock[SQSClientManager]
       val mockProxyGenerators = mock[ProxyGenerators]
-      val mockProxyLocationDAO = mock[ProxyLocationDAO]
+      implicit val mockProxyLocationDAO = mock[ProxyLocationDAO]
       val mockS3ClientMgr = mock[S3ClientManager]
       val mockDDBlientMgr = mock[DynamoClientManager]
-      val mockDDBClient = mock[AmazonDynamoDBAsync]
-      mockDDBlientMgr.getClient(any) returns mockDDBClient
+      val mockDDBClient = mock[DynamoClient]
+      mockDDBlientMgr.getNewAlpakkaDynamoClient(any)(any, any) returns mockDDBClient
       val mockEtsProxyActor = TestProbe()
       implicit val mockScanTargetDAO = mock[ScanTargetDAO]
       val mockedSelf = TestProbe()
 
-      val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockProxyLocationDAO, mockS3ClientMgr,
+      val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
         mockDDBlientMgr, mockEtsProxyActor.ref) {
         override protected val ipqActor = mockedSelf.ref
       }))
@@ -97,16 +99,16 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       val testConfig = Configuration.empty
       val mockSqsClientMgr = mock[SQSClientManager]
       val mockProxyGenerators = mock[ProxyGenerators]
-      val mockProxyLocationDAO = mock[ProxyLocationDAO]
+      implicit val mockProxyLocationDAO = mock[ProxyLocationDAO]
       val mockS3ClientMgr = mock[S3ClientManager]
       val mockDDBlientMgr = mock[DynamoClientManager]
-      val mockDDBClient = mock[AmazonDynamoDBAsync]
-      mockDDBlientMgr.getClient(any) returns mockDDBClient
+      val mockDDBClient = mock[DynamoClient]
+      mockDDBlientMgr.getNewAlpakkaDynamoClient(any)(any, any) returns mockDDBClient
       val mockEtsProxyActor = TestProbe()
       implicit val mockScanTargetDAO = mock[ScanTargetDAO]
       val mockedSelf = TestProbe()
 
-      val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockProxyLocationDAO, mockS3ClientMgr,
+      val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
         mockDDBlientMgr, mockEtsProxyActor.ref) {
         override protected val ipqActor = mockedSelf.ref
       }))
@@ -134,17 +136,17 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       val testConfig = Configuration.empty
       val mockSqsClientMgr = mock[SQSClientManager]
       val mockProxyGenerators = mock[ProxyGenerators]
-      mockProxyGenerators.createThumbnailProxy(any[ArchiveEntry]) returns Future(Success("fake-job-id"))
-      val mockProxyLocationDAO = mock[ProxyLocationDAO]
+      mockProxyGenerators.createThumbnailProxy(any[ArchiveEntry])(any) returns Future(Success("fake-job-id"))
+      implicit val mockProxyLocationDAO = mock[ProxyLocationDAO]
       val mockS3ClientMgr = mock[S3ClientManager]
       val mockDDBlientMgr = mock[DynamoClientManager]
-      val mockDDBClient = mock[AmazonDynamoDBAsync]
-      mockDDBlientMgr.getClient(any) returns mockDDBClient
+      val mockDDBClient = mock[DynamoClient]
+      mockDDBlientMgr.getNewAlpakkaDynamoClient(any)(any, any) returns mockDDBClient
       val mockEtsProxyActor = TestProbe()
       implicit val mockScanTargetDAO = mock[ScanTargetDAO]
       val mockedSelf = TestProbe()
 
-      val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockProxyLocationDAO, mockS3ClientMgr,
+      val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
         mockDDBlientMgr, mockEtsProxyActor.ref) {
         override protected val ipqActor = mockedSelf.ref
       }))
@@ -167,17 +169,17 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       val testConfig = Configuration.empty
       val mockSqsClientMgr = mock[SQSClientManager]
       val mockProxyGenerators = mock[ProxyGenerators]
-      mockProxyGenerators.createThumbnailProxy(any[ArchiveEntry]) returns Future(Failure(new RuntimeException("boo!")))
-      val mockProxyLocationDAO = mock[ProxyLocationDAO]
+      mockProxyGenerators.createThumbnailProxy(any[ArchiveEntry])(any) returns Future(Failure(new RuntimeException("boo!")))
+      implicit val mockProxyLocationDAO = mock[ProxyLocationDAO]
       val mockS3ClientMgr = mock[S3ClientManager]
       val mockDDBlientMgr = mock[DynamoClientManager]
-      val mockDDBClient = mock[AmazonDynamoDBAsync]
-      mockDDBlientMgr.getClient(any) returns mockDDBClient
+      val mockDDBClient = mock[DynamoClient]
+      mockDDBlientMgr.getNewAlpakkaDynamoClient(any)(any, any) returns mockDDBClient
       val mockEtsProxyActor = TestProbe()
       implicit val mockScanTargetDAO = mock[ScanTargetDAO]
       val mockedSelf = TestProbe()
 
-      val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockProxyLocationDAO, mockS3ClientMgr,
+      val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
         mockDDBlientMgr, mockEtsProxyActor.ref) {
         override protected val ipqActor = mockedSelf.ref
       }))
@@ -199,18 +201,18 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       implicit val timeout:akka.util.Timeout = 30 seconds
       val testConfig = Configuration.empty
       val mockSqsClientMgr = mock[SQSClientManager]
+      implicit val mockProxyLocationDAO = mock[ProxyLocationDAO]
       val mockProxyGenerators = mock[ProxyGenerators]
-      mockProxyGenerators.createThumbnailProxy(any[ArchiveEntry]) returns Future.failed(new RuntimeException("my hovercraft is full of eels"))
-      val mockProxyLocationDAO = mock[ProxyLocationDAO]
+      mockProxyGenerators.createThumbnailProxy(any[ArchiveEntry])(any) returns Future.failed(new RuntimeException("my hovercraft is full of eels"))
       val mockS3ClientMgr = mock[S3ClientManager]
       val mockDDBlientMgr = mock[DynamoClientManager]
-      val mockDDBClient = mock[AmazonDynamoDBAsync]
-      mockDDBlientMgr.getClient(any) returns mockDDBClient
+      val mockDDBClient = mock[DynamoClient]
+      mockDDBlientMgr.getNewAlpakkaDynamoClient(any)(any, any) returns mockDDBClient
       val mockEtsProxyActor = TestProbe()
       implicit val mockScanTargetDAO = mock[ScanTargetDAO]
       val mockedSelf = TestProbe()
 
-      val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockProxyLocationDAO, mockS3ClientMgr,
+      val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
         mockDDBlientMgr, mockEtsProxyActor.ref) {
         override protected val ipqActor = mockedSelf.ref
       }))
@@ -237,16 +239,16 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       val testConfig = Configuration.empty
       val mockSqsClientMgr = mock[SQSClientManager]
       val mockProxyGenerators = mock[ProxyGenerators]
-      val mockProxyLocationDAO = mock[ProxyLocationDAO]
+      implicit val mockProxyLocationDAO = mock[ProxyLocationDAO]
       val mockS3ClientMgr = mock[S3ClientManager]
       val mockDDBlientMgr = mock[DynamoClientManager]
-      val mockDDBClient = mock[AmazonDynamoDBAsync]
-      mockDDBlientMgr.getClient(any) returns mockDDBClient
+      val mockDDBClient = mock[DynamoClient]
+      mockDDBlientMgr.getNewAlpakkaDynamoClient(any)(any, any) returns mockDDBClient
       val mockEtsProxyActor = TestProbe()
       implicit val mockScanTargetDAO = mock[ScanTargetDAO]
       val mockedSelf = TestProbe()
 
-      val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockProxyLocationDAO, mockS3ClientMgr,
+      val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
         mockDDBlientMgr, mockEtsProxyActor.ref) {
         override protected val ipqActor = mockedSelf.ref
       }))
@@ -269,16 +271,16 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       val testConfig = Configuration.empty
       val mockSqsClientMgr = mock[SQSClientManager]
       val mockProxyGenerators = mock[ProxyGenerators]
-      val mockProxyLocationDAO = mock[ProxyLocationDAO]
+      implicit val mockProxyLocationDAO = mock[ProxyLocationDAO]
       val mockS3ClientMgr = mock[S3ClientManager]
       val mockDDBlientMgr = mock[DynamoClientManager]
-      val mockDDBClient = mock[AmazonDynamoDBAsync]
-      mockDDBlientMgr.getClient(any) returns mockDDBClient
+      val mockDDBClient = mock[DynamoClient]
+      mockDDBlientMgr.getNewAlpakkaDynamoClient(any)(any, any) returns mockDDBClient
       val mockEtsProxyActor = TestProbe()
       implicit val mockScanTargetDAO = mock[ScanTargetDAO]
       val mockedSelf = TestProbe()
 
-      val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockProxyLocationDAO, mockS3ClientMgr,
+      val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
         mockDDBlientMgr, mockEtsProxyActor.ref) {
         override protected val ipqActor = mockedSelf.ref
       }))
@@ -304,16 +306,16 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       val testConfig = Configuration.empty
       val mockSqsClientMgr = mock[SQSClientManager]
       val mockProxyGenerators = mock[ProxyGenerators]
-      val mockProxyLocationDAO = mock[ProxyLocationDAO]
+      implicit val mockProxyLocationDAO = mock[ProxyLocationDAO]
       val mockS3ClientMgr = mock[S3ClientManager]
       val mockDDBlientMgr = mock[DynamoClientManager]
-      val mockDDBClient = mock[AmazonDynamoDBAsync]
-      mockDDBlientMgr.getClient(any) returns mockDDBClient
+      val mockDDBClient = mock[DynamoClient]
+      mockDDBlientMgr.getNewAlpakkaDynamoClient(any)(any, any) returns mockDDBClient
       val mockEtsProxyActor = TestProbe()
       implicit val mockScanTargetDAO = mock[ScanTargetDAO]
       val mockedSelf = TestProbe()
 
-      val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockProxyLocationDAO, mockS3ClientMgr,
+      val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
         mockDDBlientMgr, mockEtsProxyActor.ref) {
         override protected val ipqActor = mockedSelf.ref
       }))
@@ -344,14 +346,14 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       mockSqsClientMgr.getClient(any) returns mockSqsClient
 
       val mockProxyGenerators = mock[ProxyGenerators]
-      val mockProxyLocationDAO = mock[ProxyLocationDAO]
+      implicit val mockProxyLocationDAO = mock[ProxyLocationDAO]
       val mockS3ClientMgr = mock[S3ClientManager]
       val mockDDBlientMgr = mock[DynamoClientManager]
       val mockEtsProxyActor = TestProbe()
       implicit val mockScanTargetDAO = mock[ScanTargetDAO]
       val mockedSelf = TestProbe()
 
-      val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockProxyLocationDAO, mockS3ClientMgr,
+      val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
         mockDDBlientMgr, mockEtsProxyActor.ref) {
         override protected val ipqActor = mockedSelf.ref
       }))
@@ -375,14 +377,14 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       mockSqsClientMgr.getClient(any) returns mockSqsClient
 
       val mockProxyGenerators = mock[ProxyGenerators]
-      val mockProxyLocationDAO = mock[ProxyLocationDAO]
+      implicit val mockProxyLocationDAO = mock[ProxyLocationDAO]
       val mockS3ClientMgr = mock[S3ClientManager]
       val mockDDBlientMgr = mock[DynamoClientManager]
       val mockEtsProxyActor = TestProbe()
       implicit val mockScanTargetDAO = mock[ScanTargetDAO]
       val mockedSelf = TestProbe()
 
-      val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockProxyLocationDAO, mockS3ClientMgr,
+      val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
         mockDDBlientMgr, mockEtsProxyActor.ref) {
         override protected val ipqActor = mockedSelf.ref
       }))
@@ -448,14 +450,14 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       mockSqsClientMgr.getClient(any) returns mockSqsClient
 
       val mockProxyGenerators = mock[ProxyGenerators]
-      val mockProxyLocationDAO = mock[ProxyLocationDAO]
+      implicit val mockProxyLocationDAO = mock[ProxyLocationDAO]
       val mockS3ClientMgr = mock[S3ClientManager]
       val mockDDBlientMgr = mock[DynamoClientManager]
       val mockEtsProxyActor = TestProbe()
       implicit val mockScanTargetDAO = mock[ScanTargetDAO]
       val mockedSelf = TestProbe()
 
-      val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockProxyLocationDAO, mockS3ClientMgr,
+      val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
         mockDDBlientMgr, mockEtsProxyActor.ref) {
         override protected val ipqActor = mockedSelf.ref
       }))
@@ -476,14 +478,14 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       mockSqsClientMgr.getClient(any) returns mockSqsClient
 
       val mockProxyGenerators = mock[ProxyGenerators]
-      val mockProxyLocationDAO = mock[ProxyLocationDAO]
+      implicit val mockProxyLocationDAO = mock[ProxyLocationDAO]
       val mockS3ClientMgr = mock[S3ClientManager]
       val mockDDBlientMgr = mock[DynamoClientManager]
       val mockEtsProxyActor = TestProbe()
       implicit val mockScanTargetDAO = mock[ScanTargetDAO]
       val mockedSelf = TestProbe()
 
-      val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockProxyLocationDAO, mockS3ClientMgr,
+      val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
         mockDDBlientMgr, mockEtsProxyActor.ref) {
         override protected val ipqActor = mockedSelf.ref
       }))

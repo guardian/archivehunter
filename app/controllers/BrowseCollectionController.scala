@@ -1,5 +1,6 @@
 package controllers
 
+import com.amazonaws.services.s3.AmazonS3
 import com.amazonaws.services.s3.model.ListObjectsRequest
 import com.sksamuel.elastic4s.http.search.TermsAggResult
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{ESClientManager, S3ClientManager}
@@ -58,6 +59,33 @@ extends AbstractController(controllerComponents) with PanDomainAuthActions with 
     withScanTargetAsync(collectionName){ target=> Future(block(target)) }
 
   /**
+    * iterate through the S3 bucket recursively, until there are no more prefixes available.
+    * @param baseRequest
+    * @param s3Client
+    * @param continuationToken
+    * @param currentSummaries
+    * @return
+    */
+  def recurseGetFolders(baseRequest:ListObjectsRequest, s3Client:AmazonS3,
+                        continuationToken:Option[String]=None, currentSummaries:Seq[String]=Seq()):Seq[String] =
+  {
+    val finalRequest = continuationToken match {
+      case None=>baseRequest
+      case Some(token)=>baseRequest.withMarker(token)
+    }
+
+    val result = s3Client.listObjects(finalRequest)
+    val updatedList = currentSummaries ++ result.getCommonPrefixes.asScala
+
+    Option(result.getNextMarker) match {
+      case Some(marker) =>
+        recurseGetFolders(baseRequest, s3Client, Some(marker), updatedList)
+      case None=>
+        updatedList
+    }
+  }
+
+  /**
     * get all of the "subfolders" ("common prefix" in s3 parlance) for the provided bucket, but only if it
     * is one that is registered as managed by us.
     * this is to drive the tree view in the browse window
@@ -85,6 +113,11 @@ extends AbstractController(controllerComponents) with PanDomainAuthActions with 
     }
   }
 
+  /**
+    * converts a TermsAggResult from Elasticsearch into a simple map of bucket->docCount
+    * @param result TermsAggResult from Elasticsearch
+    * @return a Map of String->Long
+    */
   def bucketsToCountMap(result:TermsAggResult) = {
     result.buckets.map(b=>Tuple2(b.key,b.docCount)).toMap
   }
@@ -132,7 +165,7 @@ extends AbstractController(controllerComponents) with PanDomainAuthActions with 
             val allowedCollections = if(profile.allCollectionsVisible){
               collectionsList
             } else {
-              profile.visibleCollections
+              collectionsList.intersect(profile.visibleCollections)
             }
             Ok(ObjectListResponse("ok", "collection", allowedCollections.sorted, allowedCollections.length).asJson)
           }

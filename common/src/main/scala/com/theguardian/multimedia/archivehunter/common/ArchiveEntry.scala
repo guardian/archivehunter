@@ -68,7 +68,7 @@ object ArchiveEntry extends ((String, String, String, Option[String], Long, Zone
 
 case class ArchiveEntry(id:String, bucket: String, path: String, file_extension: Option[String], size: scala.Long, last_modified: ZonedDateTime, etag: String, mimeType: MimeType, proxied: Boolean, storageClass:StorageClass, lightboxEntries:Seq[LightboxIndex], beenDeleted:Boolean=false) {
   private val logger = LogManager.getLogger(getClass)
-  def getProxy(proxyType: ProxyType.Value)(implicit proxyLocationDAO:ProxyLocationDAO, client:AmazonDynamoDBAsync) = proxyLocationDAO.getProxy(id,proxyType)
+  def getProxy(proxyType: ProxyType.Value)(implicit proxyLocationDAO:ProxyLocationDAO, client:DynamoClient) = proxyLocationDAO.getProxy(id,proxyType)
 
   /**
     * register a new proxy against this item.  This operation consists of saving the given proxy id to the proxies table,

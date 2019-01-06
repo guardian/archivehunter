@@ -37,7 +37,8 @@ class JobController @Inject() (override val config:Configuration, override val c
                                ddbClientManager:DynamoClientManager,
                                override val refresher:InjectableRefresher,
                                override val wsClient:WSClient,
-                              @Named("etsProxyActor") etsProxyActor:ActorRef)
+                              @Named("etsProxyActor") etsProxyActor:ActorRef,
+                               proxyLocationDAO:ProxyLocationDAO)
                               (implicit actorSystem:ActorSystem)
   extends AbstractController(controllerComponents) with Circe with JobModelEncoder with ZonedDateTimeEncoder with PanDomainAuthActions with QueryRemaps {
 
@@ -49,7 +50,6 @@ class JobController @Inject() (override val config:Configuration, override val c
   private  val tableName:String = config.get[String]("proxies.tableName")
 
   protected implicit val indexer = new Indexer(indexName)
-  protected val proxyLocationDAO = new ProxyLocationDAO(tableName)
 
   def renderListAction(block: ()=>Future[List[Either[DynamoReadError, JobModel]]]) = APIAuthAction.async {
       val resultFuture = block()

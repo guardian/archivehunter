@@ -1,6 +1,7 @@
 package services
 
 import akka.actor.{Actor, ActorRef, ActorSystem, Status}
+import akka.stream.{ActorMaterializer, Materializer}
 import com.amazonaws.services.sqs.model.{DeleteMessageRequest, ReceiveMessageRequest}
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ProxyLocationDAO, ProxyType}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, S3ClientManager, SQSClientManager}
@@ -37,16 +38,18 @@ class IngestProxyQueue @Inject() (config:Configuration,
                                   system:ActorSystem,
                                   sqsClientManager: SQSClientManager,
                                   proxyGenerators:ProxyGenerators,
-                                  proxyLocationDAO: ProxyLocationDAO,
                                   s3ClientMgr:S3ClientManager,
                                   dynamoClientMgr:DynamoClientManager,
                                   @Named("etsProxyActor") etsProxyActor:ActorRef
-                                 )(implicit scanTargetDAO: ScanTargetDAO)
+                                 )(implicit scanTargetDAO: ScanTargetDAO, proxyLocationDAO: ProxyLocationDAO)
   extends Actor {
   import IngestProxyQueue._
   private val logger = Logger(getClass)
 
   private val sqsClient = sqsClientManager.getClient(config.getOptional[String]("externalData.awsProfile"))
+
+  private implicit val implSystem = system
+  private implicit val mat:Materializer = ActorMaterializer.create(system)
 
   //override this in testing
   protected val ipqActor:ActorRef = self
@@ -54,7 +57,7 @@ class IngestProxyQueue @Inject() (config:Configuration,
   private implicit val ec:ExecutionContext = system.dispatcher
 
   private implicit val s3Client = s3ClientMgr.getClient(config.getOptional[String]("externalData.awsProfile"))
-  private implicit val ddbClient = dynamoClientMgr.getClient(config.getOptional[String]("externalData.awsProfile"))
+  private implicit val ddbClient = dynamoClientMgr.getNewAlpakkaDynamoClient(config.getOptional[String]("externalData.awsProfile"))
 
   override def receive: Receive = {
     case CheckRegisteredThumb(entry)=>
