@@ -61,7 +61,17 @@ extends AbstractController(controllerComponents) with PanDomainAuthActions with 
   def withScanTarget(collectionName:String)(block: ScanTarget=>Result):Future[Result] =
     withScanTargetAsync(collectionName){ target=> Future(block(target)) }
 
-  def recurseGetFolders(baseRequest:ListObjectsRequest, s3Client:AmazonS3, continuationToken:Option[String]=None, currentSummaries:Seq[String]=Seq()):Seq[String] = {
+  /**
+    * iterate through the S3 bucket recursively, until there are no more prefixes available.
+    * @param baseRequest
+    * @param s3Client
+    * @param continuationToken
+    * @param currentSummaries
+    * @return
+    */
+  def recurseGetFolders(baseRequest:ListObjectsRequest, s3Client:AmazonS3,
+                        continuationToken:Option[String]=None, currentSummaries:Seq[String]=Seq()):Seq[String] =
+  {
     val finalRequest = continuationToken match {
       case None=>baseRequest
       case Some(token)=>baseRequest.withMarker(token)

@@ -37,6 +37,7 @@ GET     /api/proxy/:id                  @controllers.ProxiesController.proxyForI
 POST    /api/proxy/relink/global        @controllers.ProxiesController.relinkAllProxies
 POST    /api/proxy/relink/:scanTargetName @controllers.ProxiesController.relinkProxiesForTarget(scanTargetName)
 POST    /api/proxy                      @controllers.ProxiesController.manualSet
+DELETE  /api/proxy/:fileId/:inputProxyType   @controllers.ProxiesController.manualDelete(fileId, inputProxyType)
 
 POST    /api/proxy/generate/:id/thumbnail   @controllers.ProxiesController.generateThumbnail(id)
 POST    /api/proxy/generate/:id/:typeStr     @controllers.ProxiesController.generateProxy(id, typeStr)

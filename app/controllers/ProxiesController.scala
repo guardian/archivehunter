@@ -410,21 +410,60 @@ class ProxiesController @Inject()(override val config:Configuration,
     }
   }
 
+
   def analyseMetadata(entryId:String) = APIAuthAction.async {
-    indexer.getById(entryId).flatMap(entry=>{
+    indexer.getById(entryId).flatMap(entry => {
       proxyGenerators
-        .requestMetadataAnalyse(entry,config.getOptional[String]("externalData.awsRegion").getOrElse("eu-west-1"))
+        .requestMetadataAnalyse(entry, config.getOptional[String]("externalData.awsRegion").getOrElse("eu-west-1"))
         .map({
-          case Left(err)=>
+          case Left(err) =>
             logger.error(s"Could not request analyse: $err")
             InternalServerError(GenericErrorResponse("error", err).asJson)
-          case Right(jobId)=>
-            Ok(ObjectCreatedResponse("ok","job",jobId).asJson)
+          case Right(jobId) =>
+            Ok(ObjectCreatedResponse("ok", "job", jobId).asJson)
         })
     }).recover({
-      case err:Throwable=>
+      case err: Throwable =>
         logger.error("Could not request analyse: ", err)
         InternalServerError(GenericErrorResponse("error", err.toString).asJson)
     })
+  }
+
+  def deleteProxyFile(proxyLocation:ProxyLocation) = Try {
+    s3conn.deleteObject(proxyLocation.bucketName, proxyLocation.bucketPath)
+  }
+
+  /**
+    * manually delete the given proxy.
+    * @param fileId file ID of the main media
+    * @param inputProxyType type of proxy to delete.
+    * @return
+    */
+  def manualDelete(fileId:String, inputProxyType:String)  = APIAuthAction.async {request=>
+    adminsOnlyAsync(request) {
+      try {
+        val proxyType = ProxyType.withName(inputProxyType)
+        proxyLocationDAO.getProxy(fileId,proxyType).flatMap({
+          case None=>Future(NotFound(GenericErrorResponse("not_found","No proxy found").asJson))
+          case Some(loc)=>
+            deleteProxyFile(loc) match {
+              case Success(_)=>
+                proxyLocationDAO.deleteProxyRecord(fileId, proxyType).map(result=>
+                  Ok(ObjectCreatedResponse("deleted","proxy",s"${fileId}:${inputProxyType}").asJson)
+                ).recoverWith({
+                  case err:Throwable=>
+                    logger.error("Could not delete proxy record in database", err)
+                    Future(InternalServerError(GenericErrorResponse("db_error",err.toString).asJson))
+                })
+              case Failure(err)=>
+                logger.error("Could not delete proxy file: ", err)
+                Future(InternalServerError(GenericErrorResponse("error", err.toString).asJson))
+            }
+        })
+      } catch {
+        case ex:Throwable=>
+          Future(BadRequest(GenericErrorResponse("error",s"Did not recognise proxy type $inputProxyType").asJson))
+      }
+    }
   }
 }

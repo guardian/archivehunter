@@ -136,7 +136,9 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       val testConfig = Configuration.from(Map("ingest.notificationsQueue"->"someQueue"))
       val mockSqsClientMgr = mock[SQSClientManager]
       val mockProxyGenerators = mock[ProxyGenerators]
+
       mockProxyGenerators.requestProxyJob(any,any[ArchiveEntry],any) returns Future(Success("fake-job-id"))
+
       implicit val mockProxyLocationDAO = mock[ProxyLocationDAO]
       val mockS3ClientMgr = mock[S3ClientManager]
       val mockDDBlientMgr = mock[DynamoClientManager]
@@ -169,6 +171,7 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       val testConfig = Configuration.from(Map("ingest.notificationsQueue"->"someQueue"))
       val mockSqsClientMgr = mock[SQSClientManager]
       val mockProxyGenerators = mock[ProxyGenerators]
+
       mockProxyGenerators.requestProxyJob(any,any[ArchiveEntry],any) returns Future(Failure(new RuntimeException("boo!")))
       implicit val mockProxyLocationDAO = mock[ProxyLocationDAO]
       val mockS3ClientMgr = mock[S3ClientManager]
@@ -203,6 +206,7 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       val mockSqsClientMgr = mock[SQSClientManager]
       implicit val mockProxyLocationDAO = mock[ProxyLocationDAO]
       val mockProxyGenerators = mock[ProxyGenerators]
+
       mockProxyGenerators.requestProxyJob(any,any[ArchiveEntry],any) returns Future.failed(new RuntimeException("my hovercraft is full of eels"))
       val mockS3ClientMgr = mock[S3ClientManager]
       val mockDDBlientMgr = mock[DynamoClientManager]
