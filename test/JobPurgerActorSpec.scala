@@ -168,7 +168,7 @@ class JobPurgerActorSpec extends Specification with Mockito {
         ),
       )
 
-      val testConfig = Configuration.from(Map("externalData.jobsTable"->"testJobTable"))
+      val testConfig = Configuration.from(Map("externalData.jobTable"->"testJobTable"))
       val mockedDDBClientManager = mock[DynamoClientManager]
       val mockedDDBClient = mock[DynamoClient]
       mockedDDBClientManager.getNewAlpakkaDynamoClient(any)(any, any) returns mockedDDBClient
