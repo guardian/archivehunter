@@ -10,6 +10,8 @@ import NotFoundComponent from './NotFoundComponent.jsx';
 import FrontPage from './FrontPage.jsx';
 import TopMenu from './TopMenu.jsx';
 import AdminFront from './admin/AdminFront.jsx';
+import AboutComponent from './admin/About.jsx';
+
 import BasicSearchComponent from './search/BasicSearchComponent.jsx';
 import JobsList from './JobsList/JobsList.jsx';
 import BrowseComponent from './browse/BrowseComponent.jsx';
@@ -66,6 +68,7 @@ class App extends React.Component {
             <TopMenu visible={true} isAdmin={this.state.userLogin ? this.state.userLogin.isAdmin : false}/>
             <LoginStatusComponent userData={this.state.userLogin} userLoggedOutCb={this.userLoggedOut}/>
             <Switch>
+                <Route path="/admin/about" component={AboutComponent}/>
                 <Route path="/admin/users" component={UserList}/>
                 <Route path="/admin/jobs/:jobid" component={JobsList}/>
                 <Route path="/admin/jobs" component={JobsList}/>

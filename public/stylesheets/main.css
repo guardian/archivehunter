@@ -435,3 +435,7 @@ p.no-spacing {
 p.small {
     font-size: 0.7em;
 }
+
+p.large {
+    font-size: 1.4em;
+}
