@@ -36,7 +36,7 @@ class AboutComponent extends React.Component {
                     <ErrorViewComponent error={this.state.lastError}/> :
                     <div>
                         <p className="centered large">You are running build number <b>{this.state.versionInfo.buildNumber}</b></p>
-                        <p className="centered">This was built from the {this.state.versionInfo.buildBranch} branch at <TimestampFormatter relative={false} value={this.state.versionInfo.buildDate}/></p>
+                        <p className="centered">This was built from the <b>{this.state.versionInfo.buildBranch}</b> branch at <TimestampFormatter relative={false} value={this.state.versionInfo.buildDate}/></p>
                     </div>
             }
         </div>
