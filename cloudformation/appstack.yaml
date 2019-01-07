@@ -1007,7 +1007,7 @@ Resources:
           systemctl start filebeat
 
         - DeploySubnetsString: !Join [",",!Ref DeploySubnets]
-        - LogstashEndpoint:
+          LogstashEndpoint:
             Fn::ImportValue:
               !Sub "${ElkStack}-LogstashEndpoint"
 
