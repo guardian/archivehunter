@@ -16,6 +16,9 @@ Parameters:
     - DEV
     - PROD
     Description: Deployment stage
+  ElkStack:
+    Description: Name of a deployed ELK6 stack (https://github.com/guardian/elk6) to send logs to
+    Type: String
   AmiId:
     Type: String
     Description: ID of the base image to build instances from.  Build this with Amigo.
@@ -976,27 +979,37 @@ Resources:
 
           systemctl restart archivehunter
           systemctl enable archivehunter
-        - DeploySubnetsString: !Join [",",!Ref DeploySubnets]
 
-#          cat > /etc/filebeat/filebeat.yml << EOF
-#          filebeat.prospectors:
-#          - type: log
-#            enabled: true
-#            paths:
-#            - /var/log/mmplasmadash/*.log
-#            fields:
-#              App: ${App}
-#              Stack: ${Stack}
-#              Stage: ${Stage}
-#
-#            multiline:
-#              pattern: '^\s+'
-#              negate: false
-#              match: after
-#
-#          output.logstash:
-#            hosts: ["${LogstashEndpoint}"]
-#          EOF
+          aws s3 cp s3://gnm-multimedia-archivedtech/ELK/filebeat-6.1.2-amd64.deb /tmp/install
+          dpkg --install /tmp/install/filebeat-6.1.2-amd64.deb
+
+          cat > /etc/filebeat/filebeat.yml << EOF
+          filebeat.prospectors:
+          - type: log
+            enabled: true
+            paths:
+            - /var/log/archivehunter/*.log
+            fields:
+              App: ${App}
+              Stack: ${Stack}
+              Stage: ${Stage}
+
+            multiline:
+              pattern: '^\s+'
+              negate: false
+              match: after
+
+          output.logstash:
+            hosts: ["${LogstashEndpoint}"]
+          EOF
+
+          systemctl enable filebeat
+          systemctl start filebeat
+
+        - DeploySubnetsString: !Join [",",!Ref DeploySubnets]
+          LogstashEndpoint:
+            Fn::ImportValue:
+              !Sub "${ElkStack}-LogstashEndpoint"
 
   AutoScaleGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
