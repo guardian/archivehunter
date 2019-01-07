@@ -213,6 +213,8 @@ Resources:
       AttributeDefinitions:
       - AttributeName: jobId
         AttributeType: S
+      - AttributeName: jobType
+        AttributeType: S
       - AttributeName: sourceId
         AttributeType: S
       - AttributeName: sourceType
@@ -245,6 +247,17 @@ Resources:
               KeyType: HASH
             - AttributeName: startedAt
               KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+          ProvisionedThroughput:
+            WriteCapacityUnits: 2
+            ReadCapacityUnits: 10
+        - IndexName: jobTypeIndex
+          KeySchema:
+          - AttributeName: jobType
+            KeyType: HASH
+          - AttributeName: startedAt
+            KeyType: RANGE
           Projection:
             ProjectionType: ALL
           ProvisionedThroughput:

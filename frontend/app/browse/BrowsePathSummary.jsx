@@ -67,7 +67,7 @@ class BrowsePathSummary extends React.Component {
         </div>;
 
         /*TODO: add in jschart and put a horizontal bar of the filetypes breakdown*/
-        if(this.state.hasLoaded) return <div>
+        if(this.state.hasLoaded) return <div className="browse-path-summary">
                 <p className="centered"><FontAwesomeIcon style={{marginRight: "0.5em"}} icon="hdd"/>{this.props.collectionName}</p>
                 <p className="centered" style={{marginTop: "0.1em"}}><FontAwesomeIcon icon="folder" style={{marginRight: "0.5em", display: this.props.path ? "inline":"none"}}/>{this.props.path ? this.props.path : ""}</p>
             <p>

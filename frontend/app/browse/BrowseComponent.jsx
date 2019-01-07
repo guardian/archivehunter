@@ -17,6 +17,7 @@ class BrowseComponent extends CommonSearchView {
             collectionName: "",
             isLoading: false,
             lastError: null,
+            openedPath: [],
             treeContents: [],
             cursor: null,
             collectionNames: [],
@@ -61,36 +62,109 @@ class BrowseComponent extends CommonSearchView {
     }
 
     refreshCollectionNames(){
-        this.setState({isLoading: true, lastError: null}, ()=>axios.get("/api/browse/collections").then(result=>{
-            const nameList = result.data.entries;
-            this.setState({isLoading: false, collectionNames: nameList, collectionName: nameList.length>0 ? nameList[0] : null}, ()=>this.refreshTreeContents());
-        }).catch(err=>{
-            console.error("Could not refresh collection names: ", err);
-            this.setState({isLoading: false, lastError: err});
-        }))
+        return new Promise((resolve,reject)=> {
+            this.setState({
+                isLoading: true,
+                lastError: null
+            }, () => axios.get("/api/browse/collections").then(result => {
+                const nameList = result.data.entries;
+                let toSet = {
+                    isLoading: false,
+                    collectionNames: nameList,
+                };
+                if(this.state.collectionName==="" || ! this.state.collectionName) toSet.collectionName= nameList.length > 0 ? nameList[0] : null;
+                this.setState(toSet, () => this.refreshTreeContents().then(()=>resolve()));
+            }).catch(err => {
+                console.error("Could not refresh collection names: ", err);
+                this.setState({isLoading: false, lastError: err}, ()=>reject(err));
+            }))
+        });
     }
 
-    static treeDataForEntry(entry, parent){
+    static arrayCompare(arr1,arr2){
+        for(var i=0;i<arr1.length;++i){
+            if(arr2[i]!==arr1[i]) return false;
+        }
+        return true;
+    }
+
+    static treeDataForEntry(entry, parent, openedPath){
         const pathParts = entry.split("/");
         const nodeName = pathParts.length>1 ? pathParts[pathParts.length-2] : pathParts[1];
+
+        const shouldToggle = openedPath.length>0 && this.arrayCompare(openedPath.slice(0,pathParts.length-1),pathParts.slice(0,pathParts.length-1));
+        console.log("openedPath: ",openedPath.slice(0,pathParts.length-1));
+        console.log("pathParts: ", pathParts.slice(0,pathParts.length-1));
+        console.log("shouldToggle: ", shouldToggle);
 
         return {
             name: nodeName,
             loading: false,
             children: [],
-            toggled: false,
+            toggled: shouldToggle,
             fullPath: entry,
             isLoaded: false
         }
     }
 
+    /**
+     * recursively loads nodes down a specific path.  Used when opening a specific item ID; the path to the item is automatically
+     * expanded and the state of the component set appropriately
+     * @param parentNode the tree node to work on.  this must have the `children` property; for an initial call fake this as {children: <nodeList>}
+     * @param pathParts array representation of the path being opened
+     * @param index which level of path we are opening. For an initial call set this to zero
+     * @returns {Promise} a Promise, which resolves with the pointer to the _terminal_ node (i.e., the last one opened) once the whole tree has been loaded.
+     */
+     loadNextNodeOfSpecific(parentNode, pathParts, index){
+        return new Promise((resolve,reject)=> {
+            if (index >= pathParts.length || !parentNode.children){
+                resolve(parentNode);
+                return;
+            }
+            console.log("parentNode", parentNode);
+            const childNode = parentNode.children.find(node => node.name === pathParts[index]);
+            if (!childNode) {
+                console.error("Could not find relevant child node");
+                console.error(parentNode);
+                console.error(pathParts);
+                console.error(pathParts[index]);
+                console.error(index);
+                reject("Could not find relevant child node");
+            } else {
+                this.loadSubFolder(childNode).then(() => this.loadNextNodeOfSpecific(childNode, pathParts, index + 1).then((terminalNode)=>resolve(terminalNode)).catch(err=>reject(err)));
+            }
+        });
+    }
+
+    loadSpecificTreePath(){
+        return new Promise((resolve, reject)=>{
+            if(this.state.openedPath && this.state.openedPath.length>0){
+                this.loadNextNodeOfSpecific({children: this.state.treeContents}, this.state.openedPath, 0).then(terminalNode=>{
+                    this.triggerSearch(terminalNode).then(()=>resolve()).catch(err=>reject(err));
+                }).catch(err=>reject(err));
+            } else {
+                this.triggerSearch().then(()=>resolve()).catch(err=>reject(err));
+            }
+        });
+    }
+
     refreshTreeContents(){
-        this.setState({isLoading: true, lastError: null, treeContents: []}, ()=>axios.get("/api/browse/" + this.state.collectionName + "?prefix=").then(result=>{
-            this.setState({isLoading: false, lastError: null, treeContents: result.data.entries.map(ent=>BrowseComponent.treeDataForEntry(ent))}, ()=>this.triggerSearch())
-        }).catch(err=>{
-            console.error("Could not list folders: ", err);
-            this.setState({isLoading: false, lastError: err});
-        }))
+        return new Promise((resolve, reject)=> {
+            this.setState({
+                isLoading: true,
+                lastError: null,
+                treeContents: []
+            }, () => axios.get("/api/browse/" + this.state.collectionName + "?prefix=").then(result => {
+                this.setState({
+                    isLoading: false,
+                    lastError: null,
+                    treeContents: result.data.entries.map(ent => BrowseComponent.treeDataForEntry(ent, undefined, this.state.openedPath))
+                }, () => this.loadSpecificTreePath().then(()=>resolve()));
+            }).catch(err => {
+                console.error("Could not list folders: ", err);
+                this.setState({isLoading: false, lastError: err}, ()=>reject());
+            }))
+        });
     }
 
     loadSubFolder(node){
@@ -104,12 +178,12 @@ class BrowseComponent extends CommonSearchView {
                         node.loading = false;
                         node.isLoaded = true;
                         node.children = response.data.entries.length ?
-                            response.data.entries.map(ent => BrowseComponent.treeDataForEntry(ent, node.fullPath)) :
+                            response.data.entries.map(ent => BrowseComponent.treeDataForEntry(ent, node.fullPath, this.state.openedPath)) :
                             null;
                         this.setState({loading: false}, ()=>resolve());
                     }).catch(err => {
                         node.loading = false;
-                        this.console.error(err);
+                        console.error(err);
                         this.setState({loading: false, lastError: err},()=>reject(err));
                 }));
         })
@@ -118,7 +192,6 @@ class BrowseComponent extends CommonSearchView {
     makeSearchJson(node) {
         if(node) {
             const pathToSearch = node.fullPath.endsWith("/") ? node.fullPath.slice(0, node.fullPath.length - 1) : node.fullPath;
-            console.log("pathToSearch is " + pathToSearch);
             return JSON.stringify({q: null, path: pathToSearch, collection: this.state.collectionName});
         } else {
             return JSON.stringify({q: null, path: null, collection: this.state.collectionName});
@@ -159,17 +232,19 @@ class BrowseComponent extends CommonSearchView {
     }
 
     triggerSearch(node, startingPos){
-        const pageSize = 100;
-        const toSend = {
-            data: this.makeSearchJson(node),
-            contentType: "application/json"
-        };
+        return new Promise((resolve,reject)=>{
+            const pageSize = 100;
+            const toSend = {
+                data: this.makeSearchJson(node),
+                contentType: "application/json"
+            };
 
-        this.searchManager.makeNewSearch("POST","/api/search/browser",null,toSend,pageSize,this.receivedNextPage, this.searchCompleted, this.searchCancelled,this.searchError)
-            .then(searchId=>{
-                console.log("Got new search ID " + searchId);
-                this.setState({currentSearch: searchId})
-            });
+            this.searchManager.makeNewSearch("POST","/api/search/browser",null,toSend,pageSize,this.receivedNextPage, this.searchCompleted, this.searchCancelled,this.searchError)
+                .then(searchId=>{
+                    console.log("Got new search ID " + searchId);
+                    this.setState({currentSearch: searchId}, resolve())
+                });
+        });
     }
 
     postToggle(node){
@@ -197,7 +272,28 @@ class BrowseComponent extends CommonSearchView {
     }
 
     componentWillMount(){
-        this.refreshCollectionNames();
+        const qp = this.breakdownQueryParams();
+
+        if(qp.hasOwnProperty("open")) {   //request to open a specific id
+            axios.get("/api/entry/" + qp.open).then(response=>{
+                this.setState({
+                    showingPreview: response.data.entry,
+                    collectionName: response.data.entry.bucket,
+                    openedPath: response.data.entry.path.split("/")
+                }, ()=>this.refreshCollectionNames());
+            }).catch(err=>{
+                console.error(err);
+                this.setState({error:err});
+            })
+            // this.refreshCollectionNames().then(()=>{
+            //     axios.get("/api/entry/" + qp.open).then(response=>{
+            //         console.log("Switching to id ", response.data.entry.id, ", bucket ", response.data.entry.bucket);
+            //         this.setState({showingPreview: response.data.entry, collectionName: response.data.entry.bucket});
+            //     });
+            // })
+        } else {
+            this.refreshCollectionNames();
+        }
     }
 
     renderMainBody(){
@@ -221,6 +317,20 @@ class BrowseComponent extends CommonSearchView {
                 this.cancelTokenSource.cancel("User request");
                 window.setTimeout(() => this.setState({cancelUnderway: false}), 3000)
             })
+        }
+    }
+
+    breakdownQueryParams(){
+        if(this.props.location.search){
+            const parts = this.props.location.search.substr(1).split("&");
+            return parts.reduce((acc,entry)=>{
+                const kv = entry.split("=");
+                let update = {};
+                update[kv[0]] = kv.slice(1).join("=");
+                return Object.assign({}, acc, update)
+            }, {});
+        } else {
+            return {}
         }
     }
 

@@ -17,6 +17,7 @@ class Module extends AbstractModule with AkkaGuiceSupport {
     bindActor[ETSProxyActor]("etsProxyActor")
     bindActor[ProxiesRelinker]("proxiesRelinker")
     bindActor[GlacierRestoreActor]("glacierRestoreActor")
+    bindActor[JobPurgerActor]("jobPurgerActor")
     bind(classOf[AppStartup]).asEagerSingleton() //do app startup
   }
 }

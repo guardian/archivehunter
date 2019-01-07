@@ -15,8 +15,8 @@ object ClockSingleton {
 
   case object RapidClockTick
   case object SlowClockTick
+  case object VerySlowClockTick
   case object ScanTick
-
 }
 
 /**
@@ -27,6 +27,7 @@ object ClockSingleton {
 class ClockSingleton @Inject() (@Named("dynamoCapacityActor") dynamoCapacityActor:ActorRef,
                                 @Named("etsProxyActor") etsProxyActor:ActorRef,
                                 @Named("bucketScannerActor") bucketScanner:ActorRef,
+                                @Named("jobPurgerActor") jobPurgerActor: ActorRef,
                                 config:ArchiveHunterConfiguration,
                                ) extends Actor with Timers with ExtValueConverters{
   import ClockSingleton._
@@ -34,6 +35,8 @@ class ClockSingleton @Inject() (@Named("dynamoCapacityActor") dynamoCapacityActo
 
   timers.startPeriodicTimer(RapidClockTick, RapidClockTick, 10.seconds)
   timers.startPeriodicTimer(SlowClockTick, SlowClockTick, 1.minutes)
+  timers.startPeriodicTimer(VerySlowClockTick, VerySlowClockTick, 1.hours)
+
   timers.startPeriodicTimer(ScanTick, ScanTick, Duration(config.get[Long]("scanner.masterSchedule"),SECONDS))
 
   override def receive: Receive = {
@@ -44,6 +47,9 @@ class ClockSingleton @Inject() (@Named("dynamoCapacityActor") dynamoCapacityActo
     case SlowClockTick=>
       logger.debug("ClockSingleton: SlowClockTick")
       etsProxyActor ! ETSProxyActor.CheckPipelinesStatus
+    case VerySlowClockTick=>
+      logger.debug("ClockSingleton: VerySlowClockTick")
+      jobPurgerActor ! JobPurgerActor.StartJobPurge
     case ScanTick=>
       logger.debug("ClockSingleton: ScanTick")
       bucketScanner ! BucketScanner.RegularScanTrigger

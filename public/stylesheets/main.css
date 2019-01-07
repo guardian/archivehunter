@@ -4,10 +4,19 @@ html, body, p, th, td, li, dd, dt, pre .ui-dialog-buttonset{
     color: white;
 }
 
-.ui-dialog-content {
+.ui-dialog {
     background-color: #666666;
 }
 
+
+
+.ui-dialog-container {
+    position: fixed;
+    top: -50%;
+    left: 25%;
+    /* don't forget to add prefixes */
+    transform: translate(-50%, -50%);
+}
 a {
     color: #AAAAAA;
 }
@@ -436,6 +445,52 @@ p.small {
     font-size: 0.7em;
 }
 
+
 p.large {
     font-size: 1.4em;
+}
+
+.control-icon {
+    padding-right: 0.2em;
+}
+
+.filter-bar {
+    margin-left: auto;
+    margin-right: auto;
+    width: 400px;
+    margin-bottom: 1em;
+}
+
+.filter-control-label {
+    margin-right: 0.6em;
+}
+
+.filter-entry {
+    margin-right: 2em;
+}
+
+.browse-path-summary {
+    overflow-y: hidden;
+    overflow-x: auto;
+}
+
+p.longlines {
+    word-break: break-word;
+}
+
+p.inline {
+    display: inline
+}
+
+.clickable-hovered {
+    color: black;
+    background-color: lightgrey;
+    border-radius: 20px;
+    padding-right: 3px;
+    padding-left: 3px;
+}
+
+.clickable-unhovered {
+    padding-right: 3px;
+    padding-left: 3px;
 }

@@ -2,7 +2,7 @@ package controllers
 
 import java.time.ZonedDateTime
 
-import akka.actor.ActorSystem
+import akka.actor.{ActorRef, ActorSystem}
 import akka.stream.alpakka.dynamodb.scaladsl.DynamoClient
 import akka.stream.{ActorMaterializer, Materializer}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager}
@@ -10,7 +10,7 @@ import com.amazonaws.services.s3.AmazonS3
 import com.gu.scanamo.error.DynamoReadError
 import com.sksamuel.elastic4s.http.HttpClient
 import com.theguardian.multimedia.archivehunter.common._
-import javax.inject.{Inject, Singleton}
+import javax.inject.{Inject, Named, Singleton}
 import play.api.{Configuration, Logger}
 import play.api.libs.circe.Circe
 import play.api.mvc.{AbstractController, ControllerComponents}
@@ -20,20 +20,26 @@ import models._
 import com.theguardian.multimedia.archivehunter.common.cmn_models._
 import helpers.InjectableRefresher
 import play.api.libs.ws.WSClient
-import responses.{GenericErrorResponse, ObjectListResponse}
+import requests.JobSearchRequest
+import responses.{GenericErrorResponse, ObjectGetResponse, ObjectListResponse}
 
 import scala.util.{Failure, Success}
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
 import scala.concurrent.Future
+import akka.pattern.ask
+import services.ETSProxyActor
+import services.ETSProxyActor.ETSMsgReply
 
 @Singleton
 class JobController @Inject() (override val config:Configuration, override val controllerComponents:ControllerComponents, jobModelDAO: JobModelDAO,
                                esClientManager: ESClientManager, s3ClientManager: S3ClientManager,
                                ddbClientManager:DynamoClientManager,
                                override val refresher:InjectableRefresher,
-                               override val wsClient:WSClient)
+                               override val wsClient:WSClient,
+                              @Named("etsProxyActor") etsProxyActor:ActorRef)
                               (implicit actorSystem:ActorSystem)
-  extends AbstractController(controllerComponents) with Circe with JobModelEncoder with ZonedDateTimeEncoder with PanDomainAuthActions {
+  extends AbstractController(controllerComponents) with Circe with JobModelEncoder with ZonedDateTimeEncoder with PanDomainAuthActions with QueryRemaps {
 
   private val logger = Logger(getClass)
 
@@ -68,6 +74,38 @@ class JobController @Inject() (override val config:Configuration, override val c
 
   def jobsFor(fileId:String) = renderListAction(()=>jobModelDAO.jobsForSource(fileId))
 
+  def getJob(jobId:String) = APIAuthAction.async { request=>
+    jobModelDAO.jobForId(jobId).map({
+      case None=>
+        NotFound(GenericErrorResponse("not_found", "Job ID is not found").asJson)
+      case Some(Left(err))=>
+        logger.error(s"Could not look up job info: ${err.toString}")
+        InternalServerError(GenericErrorResponse("db_error", s"Could not look up job: ${err.toString}").asJson)
+      case Some(Right(jobModel))=>
+        Ok(ObjectGetResponse("ok", "job", jobModel).asJson)
+    })
+  }
+
+  def jobSearch(clientLimit:Int) = Action.async(circe.json(2048)) { request=>
+    implicit val daoImplicit = jobModelDAO
+    request.body.as[JobSearchRequest] match {
+      case Left(err)=>
+        Future(BadRequest(GenericErrorResponse("bad_request", err.toString).asJson))
+      case Right(rq)=>
+        rq.runSearch(clientLimit).map({
+          case Left(errors)=>
+            logger.error("Could not perform job search: ")
+            errors.foreach(err=>logger.error(err.toString))
+            InternalServerError(GenericErrorResponse("db_error", errors.head.toString).asJson)
+          case Right(results)=>
+            Ok(ObjectListResponse("ok","job",results, results.length).asJson)
+        }).recoverWith({
+          case err:Throwable=>
+            logger.error("Could not scan jobs: ", err)
+            Future(InternalServerError(GenericErrorResponse("db_error", err.toString).asJson))
+        })
+    }
+  }
   /**
     * receive a JSON report from an outboard process and handle it
     * @param jobId
@@ -125,4 +163,24 @@ class JobController @Inject() (override val config:Configuration, override val c
     })
   }
 
+  def refreshTranscodeInfo(jobId:String) = APIAuthAction.async { request=>
+    implicit val timeout:akka.util.Timeout = 30 seconds
+
+    jobModelDAO.jobForId(jobId).flatMap({
+      case None=>
+        Future(NotFound(GenericErrorResponse("not_found","job ID not found").asJson))
+      case Some(Left(err))=>
+        logger.error(s"Could not read from jobs database: ${err.toString}")
+        Future(InternalServerError(GenericErrorResponse("db_error", err.toString).asJson))
+      case Some(Right(jobModel))=>
+        val resultFuture = (etsProxyActor ? ETSProxyActor.ManualJobStatusRefresh(jobModel)).mapTo[ETSMsgReply]
+        resultFuture.map({
+          case ETSProxyActor.PreparationFailure(err)=>
+            logger.error("Could not refresh transcode info", err)
+            InternalServerError(GenericErrorResponse("error", err.toString).asJson)
+          case ETSProxyActor.PreparationSuccess(transcodeId, rtnJobId)=>
+            Ok(ObjectGetResponse("ok","job_id",rtnJobId).asJson)
+        })
+    })
+  }
 }

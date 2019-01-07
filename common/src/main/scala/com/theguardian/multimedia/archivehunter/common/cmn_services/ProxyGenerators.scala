@@ -44,6 +44,9 @@ object ProxyGenerators {
               logger.debug(s"Item expired at ${expiry.toString}")
               false
             }
+          case None=>
+            logger.warn("ongoing restore is FALSE but no expiration time - this is not expected")
+            false
         }
     }
   }
