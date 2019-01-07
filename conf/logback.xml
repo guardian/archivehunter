@@ -17,7 +17,7 @@
     <appender name="FILE" class="ch.qos.logback.core.FileAppender">
         <file>/var/log/archivehunter/application.log</file>
         <encoder>
-            <pattern>%date [%level] from %logger in %thread - %message%n%xException</pattern>
+            <pattern>%date{"yyyy-MM-dd'T'HH:mm:ss,SSSXXX", UTC} [%level] from %logger in %thread - %message%n%xException</pattern>
         </encoder>
     </appender>
 

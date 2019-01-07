@@ -7,12 +7,12 @@ Configuration:
     Console:
       name: STDOUT
       PatternLayout:
-        Pattern: "%date [%level] from %logger in %thread - %message%n%xException"
+        Pattern: "%date{\"yyyy-MM-dd'T'HH:mm:ss,SSSXXX\", UTC} [%level] from %logger in %thread - %message%n%xException"
   Loggers:
     logger:
     -
       name: com.theguardian.multimedia.archivehunter.common.services.ProxyGenerators
-      level: DEBUG
+      level: INFO
       additivity: false
       AppenderRef:
         ref: STDOUT
