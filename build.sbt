@@ -3,6 +3,8 @@ import Keys._
 
 enablePlugins(RiffRaffArtifact, JDebPackaging, SystemdPlugin)
 
+resolvers += Resolver.mavenLocal
+
 //libraryDependencies += "org.vafer" % "jdeb" % "1.3" artifacts (Artifact("jdeb", "jar", "jar"))
 
 val elastic4sVersion = "6.0.4"
@@ -65,9 +67,9 @@ lazy val `archivehunter` = (project in file("."))
       // Only if you are using Akka Testkit
       "com.typesafe.akka" %% "akka-testkit" % akkaVersion,
       "com.gu" %% "pan-domain-auth-play_2-6" % "0.7.1",
-      jdbc, ehcache, ws)
+      "com.gu" %% "panda-hmac-play_2-6" % "1.3.1",
+        jdbc, ehcache, ws)
   )
-
 
 val lambdaDeps = Seq(
   "com.amazonaws" % "aws-lambda-java-log4j2" % "1.0.0"

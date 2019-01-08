@@ -28,10 +28,14 @@ trait AdminsOnly extends Circe {
     * @tparam A type of request body, implicit
     * @return a Play Response object.
     */
-  def adminsOnlyAsync[A](request: Request[A])(block: => Future[Result])(implicit ec:ExecutionContext) = {
+  def adminsOnlyAsync[A](request: UserRequest[A], allowHmac:Boolean=false)(block: => Future[Result])(implicit ec:ExecutionContext) = {
     userProfileFromSession(request.session) match {
       case None=>
-        Future(Forbidden(GenericErrorResponse("error","Not logged in").asJson))
+        if(allowHmac && request.user.firstName=="hmac-authed-service"){ //panda-hmac sets this value for the user when auth succeeds. If auth fails we don't get here.
+          block
+        } else {
+          Future(Forbidden(GenericErrorResponse("error", "Not logged in").asJson))
+        }
       case Some(Left(err))=>
         Future(InternalServerError(GenericErrorResponse("error","Session is corrupted. Please log out and log in again").asJson))
       case Some(Right(profile))=>

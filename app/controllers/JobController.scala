@@ -32,8 +32,11 @@ import akka.pattern.ask
 import com.theguardian.multimedia.archivehunter.common.ProxyTranscodeFramework.ProxyGenerators
 
 @Singleton
-class JobController @Inject() (override val config:Configuration, override val controllerComponents:ControllerComponents, jobModelDAO: JobModelDAO,
-                               esClientManager: ESClientManager, s3ClientManager: S3ClientManager,
+class JobController @Inject() (override val config:Configuration,
+                               override val controllerComponents:ControllerComponents,
+                               jobModelDAO: JobModelDAO,
+                               esClientManager: ESClientManager,
+                               s3ClientManager: S3ClientManager,
                                ddbClientManager:DynamoClientManager,
                                override val refresher:InjectableRefresher,
                                override val wsClient:WSClient,

@@ -30,6 +30,9 @@ import services.ProxiesRelinker
 import com.theguardian.multimedia.archivehunter.common.ProxyTranscodeFramework.{ProxyGenerators, RequestType}
 import play.api.libs.ws.WSClient
 import requests.ManualProxySet
+import com.gu.pandahmac.HMACAuthActions
+import com.gu.pandomainauth.action.UserRequest
+
 
 import scala.concurrent.duration._
 import scala.concurrent.Future
@@ -46,7 +49,7 @@ class ProxiesController @Inject()(override val config:Configuration,
                                   override val refresher:InjectableRefresher,
                                   @Named("proxiesRelinker") proxiesRelinker:ActorRef)
                                  (implicit actorSystem:ActorSystem, scanTargetDAO:ScanTargetDAO, jobModelDAO:JobModelDAO, proxyLocationDAO:ProxyLocationDAO)
-  extends AbstractController(controllerComponents) with Circe with ProxyLocationEncoder with PanDomainAuthActions with AdminsOnly {
+  extends AbstractController(controllerComponents) with Circe with ProxyLocationEncoder with PanDomainAuthActions with AdminsOnly with HMACAuthActions {
   import akka.pattern.ask
   implicit private val mat:Materializer = ActorMaterializer.create(actorSystem)
   private val logger=Logger(getClass)
@@ -65,6 +68,8 @@ class ProxiesController @Inject()(override val config:Configuration,
 
   private implicit val ddbClient = ddbClientMgr.getClient(awsProfile)
   private implicit val ddbAkkaClient = ddbClientMgr.getNewAlpakkaDynamoClient(awsProfile)
+
+  override def secret:String = config.get[String]("serverAuth.sharedSecret")
 
   def proxyForId(fileId:String, proxyType:Option[String]) = APIAuthAction.async {
     try {
@@ -377,8 +382,8 @@ class ProxiesController @Inject()(override val config:Configuration,
     * otherwise a 400 for invalid data or a 500 if there is a server-side error
     * @return
     */
-  def manualSet = APIAuthAction.async(circe.json(2048)) { request=>
-    adminsOnlyAsync(request) {
+  def manualSet = APIHMACAuthAction.async(circe.json(2048)) { request=>
+    adminsOnlyAsync(request, allowHmac = true) {
       request.body.as[ManualProxySet].fold(
         failure =>
           Future(BadRequest(GenericErrorResponse("bad_request", failure.toString).asJson)),
