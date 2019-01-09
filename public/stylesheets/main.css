@@ -494,3 +494,8 @@ p.inline {
     padding-right: 3px;
     padding-left: 3px;
 }
+
+div.fixed-row {
+    width: 100%;
+    height: 32px;
+}
