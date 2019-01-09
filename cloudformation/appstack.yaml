@@ -715,6 +715,7 @@ Resources:
               - sqs:*
             Resource:
               - !GetAtt TranscodeUpdateMsg.Arn
+              - !GetAtt IngestTranscodeMsg.Arn
       - PolicyName: ContainerAccess
         PolicyDocument:
           Version: 2012-10-17

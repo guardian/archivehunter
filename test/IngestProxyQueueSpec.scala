@@ -399,26 +399,14 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
           .withReceiptHandle("fake1")
           .withMessageAttributes(Map().asInstanceOf[Map[String,MessageAttributeValue]].asJava)
           .withBody(
-            AwsSqsMsg(
-              "faketype",
-              "id-msg-1",
-              "fakearn",
-              "",
               IngestMessage(fakeEntry1,"fake-id-1").asJson.toString,
-              "notime"
-            ).asJson.toString),
+          ),
         new Message().withMessageId("fake-message-2")
           .withReceiptHandle("fake2")
           .withMessageAttributes(Map().asInstanceOf[Map[String,MessageAttributeValue]].asJava)
           .withBody(
-            AwsSqsMsg(
-              "faketype",
-              "id-msg-1",
-              "fakearn",
-              "",
-              IngestMessage(fakeEntry2,"fake-id-2").asJson.toString,
-              "notime"
-            ).asJson.toString)
+              IngestMessage(fakeEntry2,"fake-id-2").asJson.toString
+          )
       ).asJavaCollection
 
       val msgResponse = new ReceiveMessageResult().withMessages(msgList)

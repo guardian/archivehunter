@@ -3,14 +3,16 @@ package services
 import akka.actor.{Actor, ActorRef, ActorSystem, Status}
 import akka.stream.{ActorMaterializer, Materializer}
 import com.amazonaws.services.sqs.model.{DeleteMessageRequest, ReceiveMessageRequest}
-import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ProxyLocationDAO, ProxyType}
+import com.theguardian.multimedia.archivehunter.common._
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, S3ClientManager, SQSClientManager}
-import com.theguardian.multimedia.archivehunter.common.cmn_models.ScanTargetDAO
+import com.theguardian.multimedia.archivehunter.common.cmn_models.{IngestMessage, ScanTargetDAO}
 import com.theguardian.multimedia.archivehunter.common.cmn_services.ProxyGenerators
 import helpers.ProxyLocator
 import javax.inject.{Inject, Named}
 import models.AwsSqsMsg
 import play.api.{Configuration, Logger}
+import io.circe.syntax._
+import io.circe.generic.auto._
 
 import scala.collection.JavaConverters._
 import scala.concurrent.{ExecutionContext, Future}
@@ -42,7 +44,7 @@ class IngestProxyQueue @Inject() (config:Configuration,
                                   dynamoClientMgr:DynamoClientManager,
                                   @Named("etsProxyActor") etsProxyActor:ActorRef
                                  )(implicit scanTargetDAO: ScanTargetDAO, proxyLocationDAO: ProxyLocationDAO)
-  extends Actor {
+  extends Actor with ZonedDateTimeEncoder with StorageClassEncoder{
   import IngestProxyQueue._
   private val logger = Logger(getClass)
 
@@ -158,7 +160,7 @@ class IngestProxyQueue @Inject() (config:Configuration,
           logger.debug(s"\tReceipt Handle: ${msg.getReceiptHandle}")
           logger.debug(s"\tBody: ${msg.getBody}")
 
-          AwsSqsMsg.fromJsonString(msg.getBody).flatMap(_.getIngestMessge) match {
+          io.circe.parser.parse(msg.getBody).flatMap(_.as[IngestMessage]) match {
             case Left(err)=>
               logger.error(s"Could not decode message from queue: $err")
               sender ! Status.Failure

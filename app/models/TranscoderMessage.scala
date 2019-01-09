@@ -35,7 +35,7 @@ case class AwsElasticTranscodeMsg ( state: TranscoderState.Value,
                                     userMetadata:Option[Map[String,String]],
                                     outputs:Option[Seq[ETSOutput]]) extends ExpectedMessages
 
-// Amazon Simple Queueing Service (SQS) message structure
+// Amazon Simple Queueing Service (SQS) message structure, used when sent via SNS
 case class AwsSqsMsg (
                        Type: String,
                        MessageId: String,
