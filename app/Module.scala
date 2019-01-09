@@ -18,6 +18,8 @@ class Module extends AbstractModule with AkkaGuiceSupport {
     bindActor[ProxiesRelinker]("proxiesRelinker")
     bindActor[GlacierRestoreActor]("glacierRestoreActor")
     bindActor[JobPurgerActor]("jobPurgerActor")
+    bindActor[IngestProxyQueue]("ingestProxyQueue")
+
     bind(classOf[AppStartup]).asEagerSingleton() //do app startup
   }
 }
