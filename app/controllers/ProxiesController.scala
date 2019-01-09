@@ -56,7 +56,7 @@ class ProxiesController @Inject()(override val config:Configuration,
   protected val tableName:String = config.get[String]("proxies.tableName")
   private val table = Table[ProxyLocation](tableName)
   private implicit val dynamoClient = ddbClientMgr.getNewAlpakkaDynamoClient(awsProfile)
-  private val s3client = s3ClientMgr.getS3Client(awsProfile)
+  private implicit val s3client = s3ClientMgr.getS3Client(awsProfile)
 
   def proxyForId(fileId:String, proxyType:Option[String]) = APIAuthAction.async {
     try {
