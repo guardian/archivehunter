@@ -18,7 +18,7 @@ Parameters:
     Description: Deployment stage
   BucketName:
     Type: String
-    Description: Name of the bucket to monitor (lambda will receive read-only access to this)
+    Description: Name of the buckets to monitor (lambda will receive read-only access to this)
   DeploymentBucket:
     Type: String
     Description: Name of the bucket where the deployment is stored
@@ -72,7 +72,7 @@ Resources:
       Action: lambda:InvokeFunction
       FunctionName: !Ref BucketMonitorLambda
       Principal: s3.amazonaws.com
-      SourceArn: !Sub arn:aws:s3:::${BucketName}
+      #SourceArn: !Sub arn:aws:s3:::${BucketName}
 
   MonitorLambdaRole:
     Type: AWS::IAM::Role
@@ -103,6 +103,11 @@ Resources:
                 - ec2:DescribeNetworkInterfaces
                 - ec2:DeleteNetworkInterface
               Resource: "*"
+            - Effect: Allow
+              Action:
+                - sqs:SendMessage
+              Resource:
+                - Fn::ImportValue: !Sub ${ArchiveHunterAppStack}-IngestTranscodeMsgArn
             - Effect: Allow
               Action:
                 - logs:CreateLogGroup

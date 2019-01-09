@@ -142,7 +142,6 @@ class InputLambdaMainSpec extends Specification with Mockito with ZonedDateTimeE
       val expectedMessageRequest = new SendMessageRequest()
         .withQueueUrl("fake-queue")
         .withMessageBody(IngestMessage(testEntry,"test-id").asJson.toString())
-        .withMessageDeduplicationId("test-id")
 
       test.sendIngestedMessage(testEntry)
       there was one(mockSqsClient).sendMessage(expectedMessageRequest)

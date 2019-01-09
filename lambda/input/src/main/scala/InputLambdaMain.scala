@@ -57,7 +57,6 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
     val rq = new SendMessageRequest()
       .withQueueUrl(getNotificationQueue)
       .withMessageBody(msg.asJson.toString())
-      .withMessageDeduplicationId(taskId)
 
     val r = client.sendMessage(rq)
     println(s"Send message with ID ${r.getMessageId}")

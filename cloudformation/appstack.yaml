@@ -1109,4 +1109,9 @@ Outputs:
     Description: URL of the message queue for notifications from the ingest lambda
     Value: !Ref IngestTranscodeMsg
     Export:
-      Name !Sub ${AWS::StackName}-IngestTranscodeMsg
+      Name: !Sub ${AWS::StackName}-IngestTranscodeMsg
+  IngestMessageQueueArn:
+    Description: URL of the message queue for notifications from the ingest lambda
+    Value: !GetAtt IngestTranscodeMsg.Arn
+    Export:
+      Name: !Sub ${AWS::StackName}-IngestTranscodeMsgArn
