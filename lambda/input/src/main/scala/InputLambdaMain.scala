@@ -1,19 +1,15 @@
 import java.time.ZonedDateTime
-import java.util.UUID
 
 import com.amazonaws.services.lambda.runtime.{Context, RequestHandler}
 import com.amazonaws.services.lambda.runtime.events.S3Event
 import com.amazonaws.services.s3.event.S3EventNotification
-import com.amazonaws.services.s3.event.S3EventNotification.S3ObjectEntity
 import com.amazonaws.services.s3.model.{ObjectMetadata, S3Object}
 import com.amazonaws.services.s3.{AmazonS3, AmazonS3ClientBuilder}
-import com.amazonaws.services.sqs
 import com.amazonaws.services.sqs.AmazonSQSClientBuilder
 import com.amazonaws.services.sqs.model.SendMessageRequest
 import com.google.inject.Guice
 import com.theguardian.multimedia.archivehunter.common._
 import org.apache.logging.log4j.LogManager
-import com.sksamuel.elastic4s.ElasticsearchClientUri
 import com.sksamuel.elastic4s.http.{HttpClient, HttpRequestClient}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{IngestMessage, JobModelDAO, JobStatus}
 import org.apache.http.HttpHost
