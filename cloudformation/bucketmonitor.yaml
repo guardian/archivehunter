@@ -46,6 +46,8 @@ Resources:
               - "https://"
               - Fn::ImportValue: !Sub ${ArchiveHunterAppStack}-ESEndpoint
               - ":443"
+          NOTIFICATION_QUEUE:
+            Fn::ImportValue: !Sub ${ArchiveHunterAppStack}-IngestTranscodeMsg
       Handler: InputLambdaMain
       FunctionName: !Sub archivehunter-input-${Stage}
       MemorySize: 768

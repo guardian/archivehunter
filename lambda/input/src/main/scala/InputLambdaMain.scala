@@ -1,4 +1,5 @@
 import java.time.ZonedDateTime
+import java.util.UUID
 
 import com.amazonaws.services.lambda.runtime.{Context, RequestHandler}
 import com.amazonaws.services.lambda.runtime.events.S3Event
@@ -6,14 +7,19 @@ import com.amazonaws.services.s3.event.S3EventNotification
 import com.amazonaws.services.s3.event.S3EventNotification.S3ObjectEntity
 import com.amazonaws.services.s3.model.{ObjectMetadata, S3Object}
 import com.amazonaws.services.s3.{AmazonS3, AmazonS3ClientBuilder}
+import com.amazonaws.services.sqs
+import com.amazonaws.services.sqs.AmazonSQSClientBuilder
+import com.amazonaws.services.sqs.model.SendMessageRequest
 import com.google.inject.Guice
-import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, DocId, Indexer, MimeType}
+import com.theguardian.multimedia.archivehunter.common._
 import org.apache.logging.log4j.LogManager
 import com.sksamuel.elastic4s.ElasticsearchClientUri
 import com.sksamuel.elastic4s.http.{HttpClient, HttpRequestClient}
-import com.theguardian.multimedia.archivehunter.common.cmn_models.{JobModelDAO, JobStatus}
+import com.theguardian.multimedia.archivehunter.common.cmn_models.{IngestMessage, JobModelDAO, JobStatus}
 import org.apache.http.HttpHost
 import org.elasticsearch.client.RestClient
+import io.circe.syntax._
+import io.circe.generic.auto._
 
 import collection.JavaConverters._
 import scala.concurrent.{Await, Future}
@@ -21,7 +27,7 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId {
+class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with ZonedDateTimeEncoder with StorageClassEncoder {
   private final val logger = LogManager.getLogger(getClass)
 
   private val injector = Guice.createInjector(new Module)
@@ -37,9 +43,25 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId {
     HttpClient.fromRestClient(esClient)
   }
 
+  protected def getSqsClient() = AmazonSQSClientBuilder.defaultClient()
+
   protected def getIndexer(indexName: String) = new Indexer(indexName)
 
   protected def getJobModelDAO = injector.getInstance(classOf[JobModelDAO])
+
+  def sendIngestedMessage(entry:ArchiveEntry) = {
+    val client = getSqsClient()
+    val taskId = entry.id
+    println(s"Ingest has task ID $taskId")
+    val msg = IngestMessage(entry, taskId)
+    val rq = new SendMessageRequest()
+      .withQueueUrl(getNotificationQueue)
+      .withMessageBody(msg.asJson.toString())
+      .withMessageDeduplicationId(taskId)
+
+    val r = client.sendMessage(rq)
+    println(s"Send message with ID ${r.getMessageId}")
+  }
 
   /**
     * returns a user-friendly string representing the event data, for debugging
@@ -64,6 +86,7 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId {
       case other:Throwable=>throw other
     }
   }
+
   /**
     * deal with an item created notification by adding it to the index
     * @param rec S3EventNotification record describing the event
@@ -86,15 +109,16 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId {
 
     ArchiveEntry.fromS3(rec.getS3.getBucket.getName, rec.getS3.getObject.getKey).flatMap(entry => {
       println(s"Going to index $entry")
-      i.indexSingleItem(entry)
-    }).map({
-      case Success(indexid) =>
-        println(s"Document indexed with ID $indexid")
-        indexid
-      case Failure(exception) =>
-        println(s"Could not index document: ${exception.toString}")
-        exception.printStackTrace()
-        throw exception //fail this future so we enter the recover block below
+      i.indexSingleItem(entry).map({
+        case Success(indexid) =>
+          println(s"Document indexed with ID $indexid")
+          sendIngestedMessage(entry)
+          indexid
+        case Failure(exception) =>
+          println(s"Could not index document: ${exception.toString}")
+          exception.printStackTrace()
+          throw exception //fail this future so we enter the recover block below
+      })
     })
   }
 
@@ -158,6 +182,16 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId {
         })
       }
     })
+  }
+
+  protected def getNotificationQueue = sys.env.get("NOTIFICATION_QUEUE") match {
+    case Some(name)=>name
+    case None=>
+      Option(System.getProperty("NOTIFICATION_QUEUE")) match {
+        case Some(name)=>name
+        case None=>
+          throw new RuntimeException("You must specify NOTIFICATION_QUEUE in the environment")
+      }
   }
 
   protected def getIndexName = sys.env.get("INDEX_NAME") match {

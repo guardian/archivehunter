@@ -490,6 +490,9 @@ Resources:
       Queues:
       - !GetAtt TranscodeUpdateMsg.QueueName
 
+  IngestTranscodeMsg:
+    Type: AWS::SQS::Queue
+
   #Autodowning lambda - receive events from autoscaling to tell us when nodes go away.
   ScalingRule:
     Type: AWS::Events::Rule
@@ -918,6 +921,11 @@ Resources:
              domain = "${DeploymentDomain}"
              userProfileTable = "${UserProfileTable}"
           }
+
+          ingest {
+            notificationsQueue = "${IngestTranscodeMsg.QueueName}"
+          }
+
           akka.actor {
             provider = "cluster"
 
@@ -1097,3 +1105,8 @@ Outputs:
     Value: !GetAtt AccessorSG.GroupId
     Export:
       Name: !Sub ${AWS::StackName}-AccessorSG
+  IngestMessageQueueUrl:
+    Description: URL of the message queue for notifications from the ingest lambda
+    Value: !Ref IngestTranscodeMsg
+    Export:
+      Name !Sub ${AWS::StackName}-IngestTranscodeMsg
