@@ -10,6 +10,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import io.circe.generic.auto._
 import io.circe.syntax._
 import com.sksamuel.elastic4s.circe._
+import com.sksamuel.elastic4s.searches.sort.SortOrder
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ArchiveEntryHitReader, StorageClassEncoder, ZonedDateTimeEncoder}
 import helpers.InjectableRefresher
 import play.api.libs.circe.Circe
@@ -101,7 +102,7 @@ with PanDomainAuthActions {
         esClient.execute {
           search(indexName) query {
             boolQuery().must(request.toSearchParams)
-          } from startAt size pageSize sortBy fieldSort("path.keyword")
+          } from startAt size pageSize sortBy fieldSort(request.toSortParam).order(request.toSortOrder)
         }.map({
           case Left(err) =>
             logger.error(s"Could not perform advanced search: $err")
