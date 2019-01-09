@@ -1,7 +1,7 @@
 package helpers
 
 import akka.actor.ActorSystem
-import akka.stream.{Attributes, FlowShape, Inlet, Outlet}
+import akka.stream._
 import akka.stream.stage.{AbstractInHandler, AbstractOutHandler, GraphStage, GraphStageLogic}
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ProxyLocationDAO, ProxyType}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, S3ClientManager}
@@ -20,7 +20,7 @@ import scala.concurrent.duration._
   * @param ddbClientMgr
   * @param proxyLocationDAO
   */
-class ProxyVerifyFlow @Inject()(config:Configuration, ddbClientMgr:DynamoClientManager, system:ActorSystem) extends GraphStage[FlowShape[ArchiveEntry,ArchiveEntry]]{
+class ProxyVerifyFlow @Inject()(config:Configuration, ddbClientMgr:DynamoClientManager)(implicit system:ActorSystem, proxyLocationDAO: ProxyLocationDAO) extends GraphStage[FlowShape[ArchiveEntry,ArchiveEntry]]{
   private val in:Inlet[ArchiveEntry] = Inlet.create("ProxyVerifyFlow.in")
   private val out:Outlet[ArchiveEntry] = Outlet.create("ProxyVerifyFlow.in")
 
@@ -28,12 +28,13 @@ class ProxyVerifyFlow @Inject()(config:Configuration, ddbClientMgr:DynamoClientM
   private val proxyTableName = config.get[String]("proxies.tableName")
   val logger = Logger(getClass)
 
-  implicit val ec:ExecutionContext = system.dispatcher
+  private implicit val ec:ExecutionContext = system.dispatcher
+  private implicit val mat:Materializer = ActorMaterializer.create(system)
+
   override def shape: FlowShape[ArchiveEntry, ArchiveEntry] = FlowShape.of(in,out)
 
   override def createLogic(inheritedAttributes: Attributes): GraphStageLogic = new GraphStageLogic(shape) {
-    private implicit val ddbClient = ddbClientMgr.getClient(awsProfile)
-    private implicit val proxyLocationDAO:ProxyLocationDAO = new ProxyLocationDAO(proxyTableName)
+    private implicit val ddbClient = ddbClientMgr.getNewAlpakkaDynamoClient(awsProfile)
 
     setHandler(in, new AbstractInHandler {
       override def onPush(): Unit = {

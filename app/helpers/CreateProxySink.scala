@@ -3,7 +3,7 @@ package helpers
 import akka.actor.ActorRef
 import akka.stream.{Attributes, Inlet, SinkShape}
 import akka.stream.stage.{AbstractInHandler, GraphStage, GraphStageLogic}
-import com.theguardian.multimedia.archivehunter.common.ArchiveEntry
+import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ProxyLocationDAO}
 import com.theguardian.multimedia.archivehunter.common.cmn_services.ProxyGenerators
 import javax.inject.{Inject, Named}
 import play.api.Logger
@@ -18,7 +18,7 @@ import scala.util.{Failure, Success}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
-class CreateProxySink @Inject() (proxyGenerators: ProxyGenerators, @Named("etsProxyActor")etsProxyActor:ActorRef) extends GraphStage[SinkShape[ArchiveEntry]]{
+class CreateProxySink @Inject() (proxyGenerators: ProxyGenerators, @Named("etsProxyActor")etsProxyActor:ActorRef)(implicit proxyLocationDAO:ProxyLocationDAO) extends GraphStage[SinkShape[ArchiveEntry]]{
   private final val in:Inlet[ArchiveEntry] = Inlet.create("CreateProxySink.in")
   private val logger = Logger(getClass)
 

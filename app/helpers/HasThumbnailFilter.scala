@@ -18,18 +18,19 @@ import scala.concurrent.duration._
   * @param ddbClientManager injected [[DynamoClientManager]] instance
   * @param config injected [[ArchiveHunterConfiguration]] instance
   */
-class HasThumbnailFilter @Inject() (ddbClientManager:DynamoClientManager, config:ArchiveHunterConfiguration) extends GraphStage[FlowShape[ArchiveEntry,ArchiveEntry]]{
+class HasThumbnailFilter @Inject() (ddbClientManager:DynamoClientManager, config:ArchiveHunterConfiguration, proxyLocationDAO: ProxyLocationDAO)(implicit system:ActorSystem) extends GraphStage[FlowShape[ArchiveEntry,ArchiveEntry]]{
   private final val in:Inlet[ArchiveEntry] = Inlet.create("HasProxyFilter.in")
   private final val out:Outlet[ArchiveEntry] = Outlet.create("HasProxyFilter.out")
   private val logger = Logger(getClass)
+
+  private implicit val mat:Materializer = ActorMaterializer.create(system)
 
   override def shape: FlowShape[ArchiveEntry, ArchiveEntry] = FlowShape.of(in,out)
 
   override def createLogic(inheritedAttributes: Attributes): GraphStageLogic = new GraphStageLogic(shape) {
     val awsProfile = config.getOptional("externalData.awsProfile").map(_.mkString)
     val tableName = config.get[String]("proxies.tableName")
-    implicit val ddbClient = ddbClientManager.getClient(awsProfile)
-    private val proxyLocationDAO = new ProxyLocationDAO(tableName)
+    implicit val ddbClient = ddbClientManager.getNewAlpakkaDynamoClient(awsProfile)
 
     setHandler(in, new AbstractInHandler {
       override def onPush(): Unit = {

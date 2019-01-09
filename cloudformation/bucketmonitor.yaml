@@ -18,7 +18,7 @@ Parameters:
     Description: Deployment stage
   BucketName:
     Type: String
-    Description: Name of the bucket to monitor (lambda will receive read-only access to this)
+    Description: Name of the buckets to monitor (lambda will receive read-only access to this)
   DeploymentBucket:
     Type: String
     Description: Name of the bucket where the deployment is stored
@@ -46,6 +46,8 @@ Resources:
               - "https://"
               - Fn::ImportValue: !Sub ${ArchiveHunterAppStack}-ESEndpoint
               - ":443"
+          NOTIFICATION_QUEUE:
+            Fn::ImportValue: !Sub ${ArchiveHunterAppStack}-IngestTranscodeMsg
       Handler: InputLambdaMain
       FunctionName: !Sub archivehunter-input-${Stage}
       MemorySize: 768
@@ -70,7 +72,11 @@ Resources:
       Action: lambda:InvokeFunction
       FunctionName: !Ref BucketMonitorLambda
       Principal: s3.amazonaws.com
-      SourceArn: !Sub arn:aws:s3:::${BucketName}
+      ###This InvokePermission used to have the SourceArn specified. But if you want to monitor lots of buckets,
+      ###you have to set BucketName to * for the policy below.  And that then means that including SourceArn here
+      ###breaks the lambda by not allowing it to trigger.
+      ###Kept in but commented, for future reference.
+      #SourceArn: !Sub arn:aws:s3:::${BucketName}
 
   MonitorLambdaRole:
     Type: AWS::IAM::Role
@@ -101,6 +107,11 @@ Resources:
                 - ec2:DescribeNetworkInterfaces
                 - ec2:DeleteNetworkInterface
               Resource: "*"
+            - Effect: Allow
+              Action:
+                - sqs:SendMessage
+              Resource:
+                - Fn::ImportValue: !Sub ${ArchiveHunterAppStack}-IngestTranscodeMsgArn
             - Effect: Allow
               Action:
                 - logs:CreateLogGroup

@@ -1,5 +1,6 @@
 package controllers
 
+import com.amazonaws.services.s3.AmazonS3
 import com.amazonaws.services.s3.model.ListObjectsRequest
 import com.sksamuel.elastic4s.http.search.TermsAggResult
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{ESClientManager, S3ClientManager}
@@ -85,6 +86,11 @@ extends AbstractController(controllerComponents) with PanDomainAuthActions with 
     }
   }
 
+  /**
+    * converts a TermsAggResult from Elasticsearch into a simple map of bucket->docCount
+    * @param result TermsAggResult from Elasticsearch
+    * @return a Map of String->Long
+    */
   def bucketsToCountMap(result:TermsAggResult) = {
     result.buckets.map(b=>Tuple2(b.key,b.docCount)).toMap
   }
@@ -132,7 +138,7 @@ extends AbstractController(controllerComponents) with PanDomainAuthActions with 
             val allowedCollections = if(profile.allCollectionsVisible){
               collectionsList
             } else {
-              profile.visibleCollections
+              collectionsList.intersect(profile.visibleCollections)
             }
             Ok(ObjectListResponse("ok", "collection", allowedCollections.sorted, allowedCollections.length).asJson)
           }

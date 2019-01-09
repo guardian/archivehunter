@@ -86,7 +86,6 @@ class AutoDowningLambdaMain extends RequestHandler[java.util.LinkedHashMap[Strin
     * @param instance instance of the `Instance` class from EC2. Get this by calling `getEc2Info`
     * @return a Sequence of `Tag` instances.
     */
-  //def getEc2Tags(instance:Instance):Seq[Tag] = instance.getTags.asScala
   def getEc2Tags(instance:Instance):Seq[TagDescription] = {
     val rq = new DescribeTagsRequest().withFilters(
       new Filter().withName("resource-id").withValues(instance.getInstanceId),

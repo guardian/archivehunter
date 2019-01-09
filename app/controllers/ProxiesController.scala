@@ -32,7 +32,7 @@ import services.ETSProxyActor.{ETSMsg, ETSMsgReply, PreparationFailure, Preparat
 
 import scala.concurrent.duration._
 import scala.concurrent.Future
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
 
 @Singleton
 class ProxiesController @Inject()(override val config:Configuration,
@@ -45,8 +45,8 @@ class ProxiesController @Inject()(override val config:Configuration,
                                   override val refresher:InjectableRefresher,
                                   @Named("etsProxyActor") etsProxyActor:ActorRef,
                                   @Named("proxiesRelinker") proxiesRelinker:ActorRef)
-                                 (implicit actorSystem:ActorSystem, scanTargetDAO:ScanTargetDAO, jobModelDAO:JobModelDAO)
-  extends AbstractController(controllerComponents) with Circe with ProxyLocationEncoder with PanDomainAuthActions {
+                                 (implicit actorSystem:ActorSystem, scanTargetDAO:ScanTargetDAO, jobModelDAO:JobModelDAO, proxyLocationDAO:ProxyLocationDAO)
+  extends AbstractController(controllerComponents) with Circe with ProxyLocationEncoder with PanDomainAuthActions with AdminsOnly {
   import akka.pattern.ask
   implicit private val mat:Materializer = ActorMaterializer.create(actorSystem)
   private val logger=Logger(getClass)
@@ -55,6 +55,8 @@ class ProxiesController @Inject()(override val config:Configuration,
   private val awsProfile = config.getOptional[String]("externalData.awsProfile")
   protected val tableName:String = config.get[String]("proxies.tableName")
   private val table = Table[ProxyLocation](tableName)
+  private implicit val dynamoClient = ddbClientMgr.getNewAlpakkaDynamoClient(awsProfile)
+  private implicit val s3client = s3ClientMgr.getS3Client(awsProfile)
 
   def proxyForId(fileId:String, proxyType:Option[String]) = APIAuthAction.async {
     try {
@@ -95,7 +97,7 @@ class ProxiesController @Inject()(override val config:Configuration,
   def getPlayable(fileId:String, proxyType:Option[String]) = APIAuthAction.async {
     try {
       val ddbClient = ddbClientMgr.getNewAlpakkaDynamoClient(awsProfile)
-      val s3client = s3ClientMgr.getS3Client(awsProfile)
+
       val actualType = proxyType match {
         case None=>"VIDEO"
         case Some(t)=>t.toUpperCase
@@ -131,6 +133,7 @@ class ProxiesController @Inject()(override val config:Configuration,
         Future(InternalServerError(GenericErrorResponse("error",ex.toString).asJson))
     }
   }
+
   /**
     * endpoint that performs a scan for potential proxies for the given file.
     * if there is only one result, it is automatically associated.
@@ -140,9 +143,6 @@ class ProxiesController @Inject()(override val config:Configuration,
   def searchFor(fileId:String) = APIAuthAction.async {
     implicit val indexer = new Indexer(indexName)
     implicit val client = esClientMgr.getClient()
-    implicit val s3Client = s3ClientMgr.getS3Client(awsProfile)
-    implicit val dynamoClient = ddbClientMgr.getNewAlpakkaDynamoClient(awsProfile)
-    implicit val proxyLocationDAO = new ProxyLocationDAO(tableName)
 
     val resultFuture = indexer.getById(fileId).flatMap(entry=>{
       ProxyLocator.findProxyLocation(entry)
@@ -181,9 +181,6 @@ class ProxiesController @Inject()(override val config:Configuration,
   def associate(maybeFileId:Option[String], proxyId:String) = APIAuthAction.async {
     implicit val indexer = new Indexer(indexName)
     implicit val client = esClientMgr.getClient()
-    implicit val s3Client = s3ClientMgr.getS3Client(awsProfile)
-    implicit val dynamoClient = ddbClientMgr.getNewAlpakkaDynamoClient(awsProfile)
-    implicit val proxyLocationDAO = new ProxyLocationDAO(tableName)
 
     maybeFileId match {
       case None =>
@@ -323,4 +320,5 @@ class ProxiesController @Inject()(override val config:Configuration,
     })
 
   }
+
 }

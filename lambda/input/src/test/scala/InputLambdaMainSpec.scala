@@ -6,14 +6,18 @@ import com.amazonaws.services.s3.AmazonS3
 import com.amazonaws.services.s3.event.S3EventNotification
 import com.amazonaws.services.s3.event.S3EventNotification._
 import com.sksamuel.elastic4s.http.HttpClient
-import com.theguardian.multimedia.archivehunter.common.Indexer
+import com.theguardian.multimedia.archivehunter.common._
 import org.specs2.mock.Mockito
 import org.specs2.mutable._
 import com.amazonaws.services.lambda.runtime.Context
 import com.amazonaws.services.s3.model.ObjectMetadata
-import com.theguardian.multimedia.archivehunter.common.cmn_models.{JobModel, JobModelDAO, JobStatus, SourceType}
+import com.amazonaws.services.sqs.AmazonSQS
+import com.amazonaws.services.sqs.model.{SendMessageRequest, SendMessageResult}
+import com.theguardian.multimedia.archivehunter.common.cmn_models._
 import org.junit.runner.RunWith
 import org.specs2.runner.JUnitRunner
+import io.circe.syntax._
+import io.circe.generic.auto._
 
 import collection.JavaConverters._
 import scala.concurrent.Future
@@ -23,10 +27,10 @@ import scala.concurrent.Await
 import scala.concurrent.duration._
 
 @RunWith(classOf[JUnitRunner])
-class InputLambdaMainSpec extends Specification with Mockito {
+class InputLambdaMainSpec extends Specification with Mockito with ZonedDateTimeEncoder with StorageClassEncoder {
 
   "InputLambdaMain" should {
-    "call to index an item delivered via an S3Event" in {
+    "call to index an item delivered via an S3Event then call to dispatch a message to the main app" in {
       val fakeEvent = new S3Event(Seq(
         new S3EventNotificationRecord("aws-fake-region","ObjectCreated:Put","unit_test",
         "2018-01-01T11:12:13.000Z","1",
@@ -40,6 +44,8 @@ class InputLambdaMainSpec extends Specification with Mockito {
 
       val fakeContext = mock[Context]
       val mockIndexer = mock[Indexer]
+      val mockSendIngestedMessage = mock[Function1[ArchiveEntry, Unit]]
+
       mockIndexer.indexSingleItem(any,any,any)(any).returns(Future(Success("fake-entry-id")))
       val test = new InputLambdaMain {
         override protected def getElasticClient(clusterEndpoint: String): HttpClient = {
@@ -47,6 +53,8 @@ class InputLambdaMainSpec extends Specification with Mockito {
 
           m
         }
+
+        override def sendIngestedMessage(entry:ArchiveEntry) = mockSendIngestedMessage(entry)
 
         override protected def getClusterEndpoint = "testClusterEndpoint"
 
@@ -73,7 +81,7 @@ class InputLambdaMainSpec extends Specification with Mockito {
           ex.printStackTrace()
           throw ex
       }
-      1 mustEqual 1 //the actual test is that handleRequest does not raise an error
+      there was one(mockSendIngestedMessage).apply(any)
     }
   }
 
@@ -103,5 +111,40 @@ class InputLambdaMainSpec extends Specification with Mockito {
       there were two(mockDao).putJob(any[JobModel])
     }
 
+  }
+
+  "InputLambdaMain.sendIngestedMessage" should {
+    "send a message to SQS containing the created entry" in {
+      val testEntry = ArchiveEntry(
+        "test-id",
+        "fake-bucket",
+        "/path/to/file",
+        Some(".ext"),
+        1234L,
+        ZonedDateTime.now(),
+        "fake-etag",
+        MimeType("video","mp4"),
+        false,
+        StorageClass.STANDARD,
+        Seq(),
+        false
+      )
+
+      val mockSqsClient = mock[AmazonSQS]
+      val mockedResult = new SendMessageResult().withMessageId("fake-message-id")
+      mockSqsClient.sendMessage(any[SendMessageRequest]) returns mockedResult
+
+      val test = new InputLambdaMain {
+        override protected def getSqsClient() = mockSqsClient
+        override protected def getNotificationQueue() = "fake-queue"
+      }
+
+      val expectedMessageRequest = new SendMessageRequest()
+        .withQueueUrl("fake-queue")
+        .withMessageBody(IngestMessage(testEntry,"test-id").asJson.toString())
+
+      test.sendIngestedMessage(testEntry)
+      there was one(mockSqsClient).sendMessage(expectedMessageRequest)
+    }
   }
 }

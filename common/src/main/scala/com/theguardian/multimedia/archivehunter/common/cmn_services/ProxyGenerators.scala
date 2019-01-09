@@ -4,6 +4,9 @@ import java.net.URI
 import java.time.{Instant, ZonedDateTime}
 import java.util.{Date, UUID}
 
+import akka.actor.ActorSystem
+import akka.stream.{ActorMaterializer, Materializer}
+import akka.stream.alpakka.dynamodb.scaladsl.DynamoClient
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsync
 import com.amazonaws.services.elastictranscoder.AmazonElasticTranscoder
 import com.amazonaws.services.elastictranscoder.model._
@@ -58,7 +61,7 @@ object ProxyGenerators {
     * @param ddbClient implicitly provided [[AmazonDynamoDBAsync]] object
     * @return
     */
-  def getUriToProxy(entry: ArchiveEntry)(implicit proxyLocationDAO: ProxyLocationDAO, s3Client:AmazonS3, ddbClient:AmazonDynamoDBAsync, logger:Logger) = entry.storageClass match {
+  def getUriToProxy(entry: ArchiveEntry)(implicit proxyLocationDAO: ProxyLocationDAO, s3Client:AmazonS3, ddbClient:DynamoClient, logger:Logger) = entry.storageClass match {
     case StorageClass.GLACIER=>
       val haveRestore = haveGlacierRestore(entry) match {
         case Success(result)=>result
@@ -188,7 +191,7 @@ object ProxyGenerators {
 
 class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration, esClientMgr: ESClientManager, s3ClientMgr: S3ClientManager,
                                  ddbClientMgr: DynamoClientManager, scanTargetDAO: ScanTargetDAO, jobModelDAO:JobModelDAO,
-                                 containerTaskMgr:ContainerTaskManager, etsClientMgr:ETSClientManager) extends ZonedDateTimeEncoder with ProxyLocationEncoder {
+                                 containerTaskMgr:ContainerTaskManager, etsClientMgr:ETSClientManager)(implicit system:ActorSystem) extends ZonedDateTimeEncoder with ProxyLocationEncoder {
   private implicit val logger = LogManager.getLogger(getClass)
 
   private val indexName = config.getOptional[String]("elasticsearch.index").getOrElse("archivehunter")
@@ -196,6 +199,8 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration, esClientMgr:
   protected val tableName:String = config.get[String]("proxies.tableName")
   private val table = Table[ProxyLocation](tableName)
   private val etsClient = etsClientMgr.getClient(awsProfile)
+
+  implicit val mat:Materializer = ActorMaterializer.create(system)
 
   import ProxyGenerators._
 
@@ -206,7 +211,7 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration, esClientMgr:
     * @return Success with the ARN of the ECS job ID if we suceeded, otherwise a Failure containing a [[com.theguardian.multimedia.archivehunter.common.errors.GenericArchiveHunterError]]
     *         describing the failure
     */
-  def createThumbnailProxy(fileId:String):Future[Try[String]] = {
+  def createThumbnailProxy(fileId:String)(implicit proxyLocationDAO:ProxyLocationDAO):Future[Try[String]] = {
     implicit val client = esClientMgr.getClient()
     implicit val indexer = new Indexer(indexName)
 
@@ -220,10 +225,9 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration, esClientMgr:
     * @return Success with the ARN of the ECS job ID if we suceeded, otherwise a Failure containing a [[com.theguardian.multimedia.archivehunter.common.errors.GenericArchiveHunterError]]
     *         describing the failure
     */
-  def createThumbnailProxy(entry: ArchiveEntry):Future[Try[String]] = {
+  def createThumbnailProxy(entry: ArchiveEntry)(implicit proxyLocationDAO:ProxyLocationDAO):Future[Try[String]] = {
     implicit val s3Client = s3ClientMgr.getS3Client(awsProfile)
-    implicit val dynamoClient = ddbClientMgr.getClient(awsProfile)
-    implicit val proxyLocationDAO = new ProxyLocationDAO(tableName)
+    implicit val dynamoClient = ddbClientMgr.getNewAlpakkaDynamoClient(awsProfile)
 
     val callbackUrl=config.get[String]("proxies.appServerUrl")
     logger.info(s"callbackUrl is $callbackUrl")
