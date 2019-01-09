@@ -61,11 +61,11 @@ extends AbstractController(controllerComponents) with PanDomainAuthActions with 
 
   /**
     * iterate through the S3 bucket recursively, until there are no more prefixes available.
-    * @param baseRequest
-    * @param s3Client
-    * @param continuationToken
-    * @param currentSummaries
-    * @return
+    * @param baseRequest ListObjectsRequest that contains details of what we want to list. This is updated to add pagination before actual sending to S3
+    * @param s3Client AmazonS3 client object
+    * @param continuationToken Optional continuation token. Defaults to None; for recursion purposes, don't specify when calling
+    * @param currentSummaries List of current ObjectSummary. Defaults to empty sequence; for recursion purposes, don't specify when calling
+    * @return list of folder names ("common prefixes") from the S3 bucket, as a List of strings
     */
   def recurseGetFolders(baseRequest:ListObjectsRequest, s3Client:AmazonS3,
                         continuationToken:Option[String]=None, currentSummaries:Seq[String]=Seq()):Seq[String] =
