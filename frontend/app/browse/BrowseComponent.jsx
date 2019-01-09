@@ -8,6 +8,7 @@ import EntryDetails from "../Entry/EntryDetails.jsx";
 import BrowsePathSummary from "./BrowsePathSummary.jsx";
 import SearchManager from '../SearchManager/SearchManager.jsx';
 import CommonSearchView from "../common/CommonSearchView.jsx";
+import LoadingThrobber from "../common/LoadingThrobber.jsx";
 
 class BrowseComponent extends CommonSearchView {
     constructor(props){
@@ -344,6 +345,10 @@ class BrowseComponent extends CommonSearchView {
                         this.state.collectionNames.map(entry=><option id={entry} value={entry}>{entry}</option>)
                     }
                 </select>
+                <div className="fixed-row">
+                    <LoadingThrobber show={this.state.isLoading} small={true} caption="Loading..."/>
+                    <p className="information" style={{display: this.state.treeContents.length>0 || this.state.isLoading ? "none":"inline"}}>no folders to display</p>
+                </div>
                 <a style={{display: "none"}} onClick={this.doCancelAll}>{this.state.cancelUnderway ? "cancelling..." : "cancel all"}</a>
                 <Treebeard data={this.state.treeContents} onToggle={this.onToggle} style={this.treeStyle}/>
             </div>

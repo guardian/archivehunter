@@ -38,6 +38,7 @@ extends AbstractController(controllerComponents) with PanDomainAuthActions with 
 
   private val indexName = config.get[String]("externalData.indexName")
 
+
   /**
     * execute the provided body with a looked-up ScanTarget.
     * automatically return an error if the ScanTarget cannot be found.
@@ -59,6 +60,33 @@ extends AbstractController(controllerComponents) with PanDomainAuthActions with 
     withScanTargetAsync(collectionName){ target=> Future(block(target)) }
 
   /**
+    * iterate through the S3 bucket recursively, until there are no more prefixes available.
+    * @param baseRequest ListObjectsRequest that contains details of what we want to list. This is updated to add pagination before actual sending to S3
+    * @param s3Client AmazonS3 client object
+    * @param continuationToken Optional continuation token. Defaults to None; for recursion purposes, don't specify when calling
+    * @param currentSummaries List of current ObjectSummary. Defaults to empty sequence; for recursion purposes, don't specify when calling
+    * @return list of folder names ("common prefixes") from the S3 bucket, as a List of strings
+    */
+  def recurseGetFolders(baseRequest:ListObjectsRequest, s3Client:AmazonS3,
+                        continuationToken:Option[String]=None, currentSummaries:Seq[String]=Seq()):Seq[String] =
+  {
+    val finalRequest = continuationToken match {
+      case None=>baseRequest
+      case Some(token)=>baseRequest.withMarker(token)
+    }
+
+    val result = s3Client.listObjects(finalRequest)
+    val updatedList = currentSummaries ++ result.getCommonPrefixes.asScala
+
+    Option(result.getNextMarker) match {
+      case Some(marker) =>
+        recurseGetFolders(baseRequest, s3Client, Some(marker), updatedList)
+      case None=>
+        updatedList
+    }
+  }
+
+  /**
     * get all of the "subfolders" ("common prefix" in s3 parlance) for the provided bucket, but only if it
     * is one that is registered as managed by us.
     * this is to drive the tree view in the browse window
@@ -74,10 +102,10 @@ extends AbstractController(controllerComponents) with PanDomainAuthActions with 
         case None=>rq
       }
       try {
-        val result = s3Client.listObjects(finalRq)
+        val result = recurseGetFolders(finalRq,s3Client)
         logger.debug(s"Got result:")
-        result.getObjectSummaries.asScala.foreach(summ => logger.debug(s"\t$summ"))
-        Ok(ObjectListResponse("ok","folder",result.getCommonPrefixes.asScala, -1).asJson)
+        result.foreach(summ => logger.debug(s"\t$summ"))
+        Ok(ObjectListResponse("ok","folder",result, -1).asJson)
       } catch {
         case ex:Throwable=>
           logger.error("Could not list S3 bucket: ", ex)
