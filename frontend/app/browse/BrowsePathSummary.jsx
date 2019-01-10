@@ -85,14 +85,16 @@ class BrowsePathSummary extends React.Component {
 
         /*TODO: add in jschart and put a horizontal bar of the filetypes breakdown*/
         if(this.state.hasLoaded) return <div className="browse-path-summary">
+            <div style={{width: "80%", display: "inline-block"}}>
                 <p className="centered"><FontAwesomeIcon style={{marginRight: "0.5em"}} icon="hdd"/>{this.props.collectionName}</p>
                 <p className="centered" style={{marginTop: "0.1em"}}><FontAwesomeIcon icon="folder" style={{marginRight: "0.5em", display: this.props.path ? "inline":"none"}}/>{this.props.path ? this.props.path : ""}</p>
-            <p style={{width: "50%", display: "inline"}}>
+            <p>
                 Total of {this.state.totalHits} items occupying <BytesFormatter value={this.state.totalSize}/>
             </p>
-            <p style={{width: "50%", display: "inline"}}>
-                <span style={{float: "right"}}>
-                    <label htmlFor="sort-field-selector" style={{marginRight: "0.6em"}}>Sort by</label>
+            </div>
+
+            <div style={{width: "18%", display: "inline-block"}}>
+                    <label htmlFor="sort-field-selector" style={{marginRight: "0.4em"}}>Sort by</label>
                     <select id="sort-field-selector" value={this.props.sortField} onChange={this.sortFieldChanged}>
                         <option value="path">Filename</option>
                         <option value="last_modified">Age</option>
@@ -102,8 +104,7 @@ class BrowsePathSummary extends React.Component {
                                            options={["Ascending","Descending"]}
                                            value={this.props.sortOrder}
                                            isStateful={false} onChange={this.sortOrderChanged}/>
-                </span>
-            </p>
+            </div>
             <p style={{display: this.state.deletedCounts.hasOwnProperty("1") ? "inherit" : "none"}}>
                 {
                     this.state.deletedCounts.hasOwnProperty("1") ? this.state.deletedCounts["1"] : 0
