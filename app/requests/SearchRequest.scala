@@ -17,20 +17,20 @@ case class SearchRequest (q:Option[String], path:Option[String], collection:Opti
     ).collect({case Some(param)=>param})
   }
 
-  def toSortParam:String = {
-    sortBy.map({
-      case "path"=>Some("path.keyword")
-      case "lastModified"=>Some("lastModified")
-      case "size"=>Some("size")
-      case _=>None
-    }).getOrElse("path.keyword")
-  }
+  def toSortParam:String =
+    sortBy match {
+      case Some("path")=>"path.keyword"
+      case Some("last_modified")=>"last_modified"
+      case Some("size")=>"size"
+      case _=>"path.keyword"
+    }
 
-  def toSortOrder:SortOrder = {
+
+  def toSortOrder:SortOrder =
     sortOrder match {
       case Some("desc")=>SortOrder.Desc
-      case Some("descending")=>SortOrder.Desc
+      case Some("Descending")=>SortOrder.Desc
       case _=>SortOrder.Asc
     }
-  }
+
 }

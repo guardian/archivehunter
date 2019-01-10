@@ -27,7 +27,9 @@ class BrowseComponent extends CommonSearchView {
             searchResults: [],
             searching: false,
             cancelUnderway: false,
-            entriesCancelTokenSource: null
+            entriesCancelTokenSource: null,
+            sortOrder: "Ascending",
+            sortField: "last_modified"
         };
 
         this.treeStyle = Object.assign({}, defaultTheme);
@@ -52,6 +54,9 @@ class BrowseComponent extends CommonSearchView {
         this.onItemClose = this.onItemClose.bind(this);
         this.onItemOpen = this.onItemOpen.bind(this);
         this.addedToLightbox = this.addedToLightbox.bind(this);
+
+        /* callback for BrowsePathSummary */
+        this.sortUpdated = this.sortUpdated.bind(this);
 
         /* callbacks for Searcher */
         this.receivedNextPage = this.receivedNextPage.bind(this);
@@ -193,9 +198,19 @@ class BrowseComponent extends CommonSearchView {
     makeSearchJson(node) {
         if(node) {
             const pathToSearch = node.fullPath.endsWith("/") ? node.fullPath.slice(0, node.fullPath.length - 1) : node.fullPath;
-            return JSON.stringify({q: null, path: pathToSearch, collection: this.state.collectionName});
+            return JSON.stringify({q: null,
+                path: pathToSearch,
+                collection: this.state.collectionName,
+                sortBy: this.state.sortField,
+                sortOrder: this.state.sortOrder
+            });
         } else {
-            return JSON.stringify({q: null, path: null, collection: this.state.collectionName});
+            return JSON.stringify({q: null,
+                path: null,
+                collection: this.state.collectionName,
+                sortBy: this.state.sortField,
+                sortOrder: this.state.sortOrder
+            });
         }
     }
 
@@ -286,15 +301,14 @@ class BrowseComponent extends CommonSearchView {
                 console.error(err);
                 this.setState({error:err});
             })
-            // this.refreshCollectionNames().then(()=>{
-            //     axios.get("/api/entry/" + qp.open).then(response=>{
-            //         console.log("Switching to id ", response.data.entry.id, ", bucket ", response.data.entry.bucket);
-            //         this.setState({showingPreview: response.data.entry, collectionName: response.data.entry.bucket});
-            //     });
-            // })
         } else {
             this.refreshCollectionNames();
         }
+    }
+
+    sortUpdated(newSortField,newSortOrder) {
+        console.debug("sortUpdated: ", newSortField, "; ", newSortOrder);
+        this.setState({sortField: newSortField, sortOrder: newSortOrder, searchResults: []}, ()=>this.loadSpecificTreePath());
     }
 
     renderMainBody(){
@@ -302,7 +316,12 @@ class BrowseComponent extends CommonSearchView {
             return <ErrorViewComponent error={this.state.error}/>
         } else if(this.state.totalHits!==-1){
             return <div>
-                <BrowsePathSummary collectionName={this.state.collectionName} path={this.state.cursor ? this.state.cursor.fullPath : null}/>
+                <BrowsePathSummary collectionName={this.state.collectionName}
+                                   path={this.state.cursor ? this.state.cursor.fullPath : null}
+                                   onSortChanged={this.sortUpdated}
+                                   sortField={this.state.sortField}
+                                   sortOrder={this.state.sortOrder}
+                />
                 <SearchResultsComponent entries={this.state.searchResults} onItemOpen={this.onItemOpen} onItemClose={this.onItemClose} selectedEntry={this.state.showingPreview} cancelToken={this.entriesCancelTokenSource ? this.entriesCancelTokenSource.token : null}/>
             </div>
         } else if(this.state.searching) {
