@@ -265,9 +265,9 @@ class BrowseComponent extends CommonSearchView {
 
     postToggle(node){
         if (node.isLoaded) {
-            this.triggerSearch(node);
+            this.setState({openedPath: node.fullPath.split("/").slice(0,-1)}, ()=>this.triggerSearch(node));
         } else {
-            this.loadSubFolder(node).then(() => this.triggerSearch(node));
+            this.loadSubFolder(node).then(() => this.setState({openedPath: node.fullPath.split("/").slice(0,-1)}, ()=>this.triggerSearch(node)));
         }
     }
 
