@@ -45,7 +45,7 @@ class ClockSingleton @Inject() (@Named("dynamoCapacityActor") dynamoCapacityActo
       logger.debug("ClockSingleton: RapidClockTick")
       dynamoCapacityActor ! DynamoCapacityActor.TimedStateCheck
       etsProxyActor ! ETSProxyActor.CheckForNotifications
-      ingestProxyQueue ! IngestProxyQueue.CheckForNotifications
+      ingestProxyQueue ! GenericSqsActor.CheckForNotifications
     case SlowClockTick=>
       logger.debug("ClockSingleton: SlowClockTick")
       etsProxyActor ! ETSProxyActor.CheckPipelinesStatus

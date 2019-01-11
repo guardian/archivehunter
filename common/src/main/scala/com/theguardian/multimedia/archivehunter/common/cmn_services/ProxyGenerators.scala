@@ -53,6 +53,7 @@ object ProxyGenerators {
         }
     }
   }
+
   /**
     * try to find an applicable uri to use as the proxy source.  This will use the main media unless it's in the Glacier storage class;
     * otherwise it will try to find an existing proxy and use that.  Failing this, None will be returned

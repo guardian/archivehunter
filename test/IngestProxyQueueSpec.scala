@@ -9,7 +9,7 @@ import com.theguardian.multimedia.archivehunter.common.cmn_services.ProxyGenerat
 import org.specs2.mock.Mockito
 import org.specs2.mutable.Specification
 import play.api.Configuration
-import services.IngestProxyQueue
+import services.{GenericSqsActor, IngestProxyQueue}
 import akka.pattern.ask
 import akka.stream.alpakka.dynamodb.scaladsl.DynamoClient
 import com.amazonaws.services.dynamodbv2.{AmazonDynamoDB, AmazonDynamoDBAsync}
@@ -31,7 +31,7 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
     "request location from proxyLocationDAO and return Success with no further action if a thumb exists" in new AkkaTestkitSpecs2Support {
       implicit val ec=system.dispatcher
       implicit val timeout:akka.util.Timeout = 30 seconds
-      val testConfig = Configuration.empty
+      val testConfig = Configuration.from(Map("ingest.notificationsQueue"->"someQueue"))
       val mockSqsClientMgr = mock[SQSClientManager]
       val mockProxyGenerators = mock[ProxyGenerators]
       implicit val mockProxyLocationDAO = mock[ProxyLocationDAO]
@@ -45,7 +45,7 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
 
       val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
         mockDDBlientMgr, mockEtsProxyActor.ref) {
-        override protected val ipqActor = mockedSelf.ref
+        override protected val ownRef = mockedSelf.ref
       }))
 
       val mockProxyLocation = mock[ProxyLocation]
@@ -64,7 +64,7 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
     "request location from proxyLocationDAO and dispatch CheckNonRegisteredThumb if no thumb exists" in new AkkaTestkitSpecs2Support {
       implicit val ec=system.dispatcher
       implicit val timeout:akka.util.Timeout = 30 seconds
-      val testConfig = Configuration.empty
+      val testConfig = Configuration.from(Map("ingest.notificationsQueue"->"someQueue"))
       val mockSqsClientMgr = mock[SQSClientManager]
       val mockProxyGenerators = mock[ProxyGenerators]
       implicit val mockProxyLocationDAO = mock[ProxyLocationDAO]
@@ -78,7 +78,7 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
 
       val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
         mockDDBlientMgr, mockEtsProxyActor.ref) {
-        override protected val ipqActor = mockedSelf.ref
+        override protected val ownRef = mockedSelf.ref
       }))
 
       val mockProxyLocation = mock[ProxyLocation]
@@ -96,7 +96,7 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
     "signal a failure if the proxyLocationDAO lookup fails" in new AkkaTestkitSpecs2Support {
       implicit val ec=system.dispatcher
       implicit val timeout:akka.util.Timeout = 30 seconds
-      val testConfig = Configuration.empty
+      val testConfig = Configuration.from(Map("ingest.notificationsQueue"->"someQueue"))
       val mockSqsClientMgr = mock[SQSClientManager]
       val mockProxyGenerators = mock[ProxyGenerators]
       implicit val mockProxyLocationDAO = mock[ProxyLocationDAO]
@@ -110,7 +110,7 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
 
       val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
         mockDDBlientMgr, mockEtsProxyActor.ref) {
-        override protected val ipqActor = mockedSelf.ref
+        override protected val ownRef = mockedSelf.ref
       }))
 
       val mockProxyLocation = mock[ProxyLocation]
@@ -133,7 +133,7 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
     "call out to ProxyGenerators to initiate job and return success" in new AkkaTestkitSpecs2Support {
       implicit val ec=system.dispatcher
       implicit val timeout:akka.util.Timeout = 30 seconds
-      val testConfig = Configuration.empty
+      val testConfig = Configuration.from(Map("ingest.notificationsQueue"->"someQueue"))
       val mockSqsClientMgr = mock[SQSClientManager]
       val mockProxyGenerators = mock[ProxyGenerators]
       mockProxyGenerators.createThumbnailProxy(any[ArchiveEntry])(any) returns Future(Success("fake-job-id"))
@@ -148,7 +148,7 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
 
       val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
         mockDDBlientMgr, mockEtsProxyActor.ref) {
-        override protected val ipqActor = mockedSelf.ref
+        override protected val ownRef = mockedSelf.ref
       }))
 
       val mockProxyLocation = mock[ProxyLocation]
@@ -166,7 +166,7 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
     "return failure if the job does not trigger" in new AkkaTestkitSpecs2Support {
       implicit val ec=system.dispatcher
       implicit val timeout:akka.util.Timeout = 30 seconds
-      val testConfig = Configuration.empty
+      val testConfig = Configuration.from(Map("ingest.notificationsQueue"->"someQueue"))
       val mockSqsClientMgr = mock[SQSClientManager]
       val mockProxyGenerators = mock[ProxyGenerators]
       mockProxyGenerators.createThumbnailProxy(any[ArchiveEntry])(any) returns Future(Failure(new RuntimeException("boo!")))
@@ -181,7 +181,7 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
 
       val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
         mockDDBlientMgr, mockEtsProxyActor.ref) {
-        override protected val ipqActor = mockedSelf.ref
+        override protected val ownRef = mockedSelf.ref
       }))
 
       val mockProxyLocation = mock[ProxyLocation]
@@ -199,7 +199,7 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
     "return failure if the ProxyGenerators thread crashes" in new AkkaTestkitSpecs2Support {
       implicit val ec=system.dispatcher
       implicit val timeout:akka.util.Timeout = 30 seconds
-      val testConfig = Configuration.empty
+      val testConfig = Configuration.from(Map("ingest.notificationsQueue"->"someQueue"))
       val mockSqsClientMgr = mock[SQSClientManager]
       implicit val mockProxyLocationDAO = mock[ProxyLocationDAO]
       val mockProxyGenerators = mock[ProxyGenerators]
@@ -214,7 +214,7 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
 
       val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
         mockDDBlientMgr, mockEtsProxyActor.ref) {
-        override protected val ipqActor = mockedSelf.ref
+        override protected val ownRef = mockedSelf.ref
       }))
 
       val mockProxyLocation = mock[ProxyLocation]
@@ -236,7 +236,7 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
     "call to ProxyLocationDAO for video and audio proxies and dispatch CheckNonRegisteredProxy if neither is present" in new AkkaTestkitSpecs2Support {
       implicit val ec=system.dispatcher
       implicit val timeout:akka.util.Timeout = 30 seconds
-      val testConfig = Configuration.empty
+      val testConfig = Configuration.from(Map("ingest.notificationsQueue"->"someQueue"))
       val mockSqsClientMgr = mock[SQSClientManager]
       val mockProxyGenerators = mock[ProxyGenerators]
       implicit val mockProxyLocationDAO = mock[ProxyLocationDAO]
@@ -250,7 +250,7 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
 
       val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
         mockDDBlientMgr, mockEtsProxyActor.ref) {
-        override protected val ipqActor = mockedSelf.ref
+        override protected val ownRef = mockedSelf.ref
       }))
 
       val mockProxyLocation = mock[ProxyLocation]
@@ -268,7 +268,7 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
     "call to ProxyLocationDAO for video and audio proxies and dispatch Success back if either exists" in new AkkaTestkitSpecs2Support {
       implicit val ec=system.dispatcher
       implicit val timeout:akka.util.Timeout = 30 seconds
-      val testConfig = Configuration.empty
+      val testConfig = Configuration.from(Map("ingest.notificationsQueue"->"someQueue"))
       val mockSqsClientMgr = mock[SQSClientManager]
       val mockProxyGenerators = mock[ProxyGenerators]
       implicit val mockProxyLocationDAO = mock[ProxyLocationDAO]
@@ -282,7 +282,7 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
 
       val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
         mockDDBlientMgr, mockEtsProxyActor.ref) {
-        override protected val ipqActor = mockedSelf.ref
+        override protected val ownRef = mockedSelf.ref
       }))
 
       val mockProxyLocation = mock[ProxyLocation]
@@ -303,7 +303,7 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
     "call to ProxyLocationDAO for video and audio proxies and dispatch Failed back if any future returns a failure" in new AkkaTestkitSpecs2Support {
       implicit val ec=system.dispatcher
       implicit val timeout:akka.util.Timeout = 30 seconds
-      val testConfig = Configuration.empty
+      val testConfig = Configuration.from(Map("ingest.notificationsQueue"->"someQueue"))
       val mockSqsClientMgr = mock[SQSClientManager]
       val mockProxyGenerators = mock[ProxyGenerators]
       implicit val mockProxyLocationDAO = mock[ProxyLocationDAO]
@@ -317,7 +317,7 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
 
       val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
         mockDDBlientMgr, mockEtsProxyActor.ref) {
-        override protected val ipqActor = mockedSelf.ref
+        override protected val ownRef = mockedSelf.ref
       }))
 
       val mockProxyLocation = mock[ProxyLocation]
@@ -338,9 +338,9 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
 
   "IngestProxyQueue!HandleNextSqsMessage" should {
     "reply Success if the message list is empty" in new AkkaTestkitSpecs2Support {
-      implicit val ec=system.dispatcher
-      implicit val timeout:akka.util.Timeout = 30 seconds
-      val testConfig = Configuration.empty
+      implicit val ec = system.dispatcher
+      implicit val timeout: akka.util.Timeout = 30 seconds
+      val testConfig = Configuration.from(Map("ingest.notificationsQueue" -> "someQueue"))
       val mockSqsClientMgr = mock[SQSClientManager]
       val mockSqsClient = mock[AmazonSQS]
       mockSqsClientMgr.getClient(any) returns mockSqsClient
@@ -355,23 +355,25 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
 
       val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
         mockDDBlientMgr, mockEtsProxyActor.ref) {
-        override protected val ipqActor = mockedSelf.ref
+        override protected val ownRef = mockedSelf.ref
       }))
 
       val rq = new ReceiveMessageRequest()
-      val msgList:java.util.Collection[Message] = Seq().asJavaCollection
+      val msgList: java.util.Collection[Message] = Seq().asJavaCollection
 
       val msgResponse = new ReceiveMessageResult().withMessages(msgList)
       mockSqsClient.receiveMessage(rq) returns msgResponse
-      val response = Await.result(toTest ? IngestProxyQueue.HandleNextSqsMessage(rq), 30 seconds)
+      val response = Await.result(toTest ? GenericSqsActor.HandleNextSqsMessage(rq), 30 seconds)
 
       response mustEqual akka.actor.Status.Success
     }
+  }
 
+  "IngestProxyQueue!HandleDomainMessage" should {
     "dispatch CheckRegisteredThumb and CheckRegisteredProxy for each message, then dispatch HandleNextSqsMessage again" in new AkkaTestkitSpecs2Support {
-      implicit val ec=system.dispatcher
-      implicit val timeout:akka.util.Timeout = 30 seconds
-      val testConfig = Configuration.empty
+      implicit val ec = system.dispatcher
+      implicit val timeout: akka.util.Timeout = 30 seconds
+      val testConfig = Configuration.from(Map("ingest.notificationsQueue" -> "someQueue"))
       val mockSqsClientMgr = mock[SQSClientManager]
       val mockSqsClient = mock[AmazonSQS]
       mockSqsClientMgr.getClient(any) returns mockSqsClient
@@ -386,26 +388,26 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
 
       val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
         mockDDBlientMgr, mockEtsProxyActor.ref) {
-        override protected val ipqActor = mockedSelf.ref
+        override protected val ownRef = mockedSelf.ref
       }))
 
       //the match fails if you don't use withFixedOffsetZone as somewhere in the marshalling/unmarshalling the zone info is changed
-      val fakeEntry1 = ArchiveEntry("fake-id-1","fakebucket","/path/to/file",Some(".ext"),1234L,ZonedDateTime.now().withFixedOffsetZone(),"etag",MimeType("video","mp4"),false,StorageClass.STANDARD_IA,Seq(),false)
-      val fakeEntry2 = ArchiveEntry("fake-id-2","fakebucket","/path/to/file2",Some(".ext"),1234L,ZonedDateTime.now().withFixedOffsetZone(),"etag2",MimeType("video","mp4"),false,StorageClass.STANDARD_IA,Seq(),false)
+      val fakeEntry1 = ArchiveEntry("fake-id-1", "fakebucket", "/path/to/file", Some(".ext"), 1234L, ZonedDateTime.now().withFixedOffsetZone(), "etag", MimeType("video", "mp4"), false, StorageClass.STANDARD_IA, Seq(), false)
+      val fakeEntry2 = ArchiveEntry("fake-id-2", "fakebucket", "/path/to/file2", Some(".ext"), 1234L, ZonedDateTime.now().withFixedOffsetZone(), "etag2", MimeType("video", "mp4"), false, StorageClass.STANDARD_IA, Seq(), false)
 
       val rq = new ReceiveMessageRequest()
-      val msgList:java.util.Collection[Message] = Seq(
+      val msgList: java.util.Collection[Message] = Seq(
         new Message().withMessageId("fake-message-1")
           .withReceiptHandle("fake1")
-          .withMessageAttributes(Map().asInstanceOf[Map[String,MessageAttributeValue]].asJava)
+          .withMessageAttributes(Map().asInstanceOf[Map[String, MessageAttributeValue]].asJava)
           .withBody(
-              IngestMessage(fakeEntry1,"fake-id-1").asJson.toString,
+            IngestMessage(fakeEntry1, "fake-id-1").asJson.toString,
           ),
         new Message().withMessageId("fake-message-2")
           .withReceiptHandle("fake2")
-          .withMessageAttributes(Map().asInstanceOf[Map[String,MessageAttributeValue]].asJava)
+          .withMessageAttributes(Map().asInstanceOf[Map[String, MessageAttributeValue]].asJava)
           .withBody(
-              IngestMessage(fakeEntry2,"fake-id-2").asJson.toString
+            IngestMessage(fakeEntry2, "fake-id-2").asJson.toString
           )
       ).asJavaCollection
 
@@ -413,18 +415,18 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       mockSqsClient.receiveMessage(rq) returns msgResponse
       mockSqsClient.deleteMessage(any) returns new DeleteMessageResult()
 
-      toTest ! IngestProxyQueue.HandleNextSqsMessage(rq)
+      toTest ! GenericSqsActor.HandleDomainMessage(IngestMessage(fakeEntry1,"fake-id-1"), rq, "fake1")
 
       mockedSelf.expectMsg(IngestProxyQueue.CheckRegisteredThumb(fakeEntry1))
       mockedSelf.expectMsg(IngestProxyQueue.CheckRegisteredProxy(fakeEntry1))
 
-      mockedSelf.expectMsg(IngestProxyQueue.CheckRegisteredThumb(fakeEntry2))
-      mockedSelf.expectMsg(IngestProxyQueue.CheckRegisteredProxy(fakeEntry2))
+//      mockedSelf.expectMsg(IngestProxyQueue.CheckRegisteredThumb(fakeEntry2))
+//      mockedSelf.expectMsg(IngestProxyQueue.CheckRegisteredProxy(fakeEntry2))
 
-      mockedSelf.expectMsg(IngestProxyQueue.HandleNextSqsMessage(rq))
+//      mockedSelf.expectMsg(IngestProxyQueue.HandleNextSqsMessage(rq))
 
       there was one(mockSqsClient).deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle("fake1"))
-      there was one(mockSqsClient).deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle("fake2"))
+//      there was one(mockSqsClient).deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle("fake2"))
     }
   }
 
@@ -447,12 +449,12 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
 
       val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
         mockDDBlientMgr, mockEtsProxyActor.ref) {
-        override protected val ipqActor = mockedSelf.ref
+        override protected val ownRef = mockedSelf.ref
       }))
 
-      toTest ! IngestProxyQueue.CheckForNotifications
+      toTest ! GenericSqsActor.CheckForNotifications
 
-      mockedSelf.expectMsg(IngestProxyQueue.HandleNextSqsMessage(new ReceiveMessageRequest().withQueueUrl("testQueueUrl")
+      mockedSelf.expectMsg(GenericSqsActor.HandleNextSqsMessage(new ReceiveMessageRequest().withQueueUrl("testQueueUrl")
         .withWaitTimeSeconds(10)
         .withMaxNumberOfMessages(10)))
     }
@@ -475,10 +477,10 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
 
       val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
         mockDDBlientMgr, mockEtsProxyActor.ref) {
-        override protected val ipqActor = mockedSelf.ref
+        override protected val ownRef = mockedSelf.ref
       }))
 
-      val result = Await.result(toTest ? IngestProxyQueue.CheckForNotifications, 10 seconds)
+      val result = Await.result(toTest ? GenericSqsActor.CheckForNotifications, 10 seconds)
       result mustEqual akka.actor.Status.Failure
       mockedSelf.expectNoMessage()
     }
