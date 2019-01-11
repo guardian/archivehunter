@@ -28,7 +28,7 @@ object GenericSqsActor extends GenericSqsActorMessages {
   case class HandleDomainMessage[T](msg:T, rq:ReceiveMessageRequest, receiptHandle:String) extends SQSMsg
 }
 
-trait GenericSqsActor extends Actor {
+trait GenericSqsActor[MsgType] extends Actor {
   import GenericSqsActor._
   private val logger = Logger(getClass)
 
@@ -44,7 +44,7 @@ trait GenericSqsActor extends Actor {
   protected implicit val ec:ExecutionContext
 
   //override this when implementing, like this: io.circe.parser.parse(body).flatMap(_.as[MessageType])
-  def convertMessageBody[T](body:String):Either[Error,T] = Left(new Error())
+  def convertMessageBody(body:String):Either[io.circe.Error,MsgType]
 
   def handleGeneric(msg: SQSMsg) = msg match {
     //dispatched to pull all messages off the queue. This "recurses" by dispatching itself if there are messages left on the queue.

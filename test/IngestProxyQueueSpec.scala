@@ -420,13 +420,7 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       mockedSelf.expectMsg(IngestProxyQueue.CheckRegisteredThumb(fakeEntry1))
       mockedSelf.expectMsg(IngestProxyQueue.CheckRegisteredProxy(fakeEntry1))
 
-//      mockedSelf.expectMsg(IngestProxyQueue.CheckRegisteredThumb(fakeEntry2))
-//      mockedSelf.expectMsg(IngestProxyQueue.CheckRegisteredProxy(fakeEntry2))
-
-//      mockedSelf.expectMsg(IngestProxyQueue.HandleNextSqsMessage(rq))
-
-      there was one(mockSqsClient).deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle("fake1"))
-//      there was one(mockSqsClient).deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle("fake2"))
+      //this message does not delete the SQS message any more; this is only done on successful completion of processing
     }
   }
 

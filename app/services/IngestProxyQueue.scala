@@ -2,6 +2,8 @@ package services
 
 import akka.actor.{Actor, ActorRef, ActorSystem, Status}
 import akka.stream.{ActorMaterializer, Materializer}
+import io.circe.syntax._
+import io.circe.generic.auto._
 import com.amazonaws.services.sqs.model.{DeleteMessageRequest, ReceiveMessageRequest}
 import com.theguardian.multimedia.archivehunter.common.{cmn_models, _}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, S3ClientManager, SQSClientManager}
@@ -11,8 +13,7 @@ import helpers.ProxyLocator
 import javax.inject.{Inject, Named}
 import models.AwsSqsMsg
 import play.api.{Configuration, Logger}
-import io.circe.syntax._
-import io.circe.generic.auto._
+
 
 import scala.collection.JavaConverters._
 import scala.concurrent.{ExecutionContext, Future}
@@ -39,7 +40,7 @@ class IngestProxyQueue @Inject()(config: Configuration,
                                  dynamoClientMgr: DynamoClientManager,
                                  @Named("etsProxyActor") etsProxyActor: ActorRef
                                 )(implicit scanTargetDAO: ScanTargetDAO, proxyLocationDAO: ProxyLocationDAO)
-  extends GenericSqsActor with ZonedDateTimeEncoder with StorageClassEncoder {
+  extends GenericSqsActor[IngestMessage] with ZonedDateTimeEncoder with StorageClassEncoder {
 
   import IngestProxyQueue._
   import GenericSqsActor._
@@ -60,6 +61,9 @@ class IngestProxyQueue @Inject()(config: Configuration,
 
   private implicit val s3Client = s3ClientMgr.getClient(config.getOptional[String]("externalData.awsProfile"))
   private implicit val ddbClient = dynamoClientMgr.getNewAlpakkaDynamoClient(config.getOptional[String]("externalData.awsProfile"))
+
+  override def convertMessageBody(body: String): Either[io.circe.Error, IngestMessage] =
+    io.circe.parser.parse(body).flatMap(_.as[IngestMessage])
 
   override def receive: Receive = {
     case CheckRegisteredThumb(entry) =>
