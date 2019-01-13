@@ -65,6 +65,7 @@ lazy val `archivehunter` = (project in file("."))
       // Only if you are using Akka Testkit
       "com.typesafe.akka" %% "akka-testkit" % akkaVersion,
       "com.gu" %% "pan-domain-auth-play_2-6" % "0.7.1",
+      "com.amazonaws" % "aws-java-sdk-cloudformation" % awsSdkVersion,
         jdbc, ehcache, ws)
   )
 

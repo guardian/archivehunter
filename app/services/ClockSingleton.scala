@@ -29,6 +29,7 @@ class ClockSingleton @Inject() (@Named("dynamoCapacityActor") dynamoCapacityActo
                                 @Named("bucketScannerActor") bucketScanner:ActorRef,
                                 @Named("jobPurgerActor") jobPurgerActor: ActorRef,
                                 @Named("ingestProxyQueue") ingestProxyQueue: ActorRef,
+                                @Named("proxyFrameworkQueue") proxyFrameworkQueue:ActorRef,
                                 config:ArchiveHunterConfiguration,
                                ) extends Actor with Timers with ExtValueConverters{
   import ClockSingleton._
@@ -46,6 +47,7 @@ class ClockSingleton @Inject() (@Named("dynamoCapacityActor") dynamoCapacityActo
       dynamoCapacityActor ! DynamoCapacityActor.TimedStateCheck
       etsProxyActor ! ETSProxyActor.CheckForNotifications
       ingestProxyQueue ! GenericSqsActor.CheckForNotifications
+      proxyFrameworkQueue ! GenericSqsActor.CheckForNotifications
     case SlowClockTick=>
       logger.debug("ClockSingleton: SlowClockTick")
       etsProxyActor ! ETSProxyActor.CheckPipelinesStatus

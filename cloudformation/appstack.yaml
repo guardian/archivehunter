@@ -433,7 +433,7 @@ Resources:
   TranscodeUpdateMsg:
     Type: AWS::SQS::Queue
 
-  SNSSubscriptionPolicy:
+  TranscodeUpdateMsgSubs:
     Type: AWS::SQS::QueuePolicy
     Properties:
       PolicyDocument:
@@ -454,6 +454,26 @@ Resources:
 
   IngestTranscodeMsg:
     Type: AWS::SQS::Queue
+
+  ProxyFrameworkMsg:
+    Type: AWS::SQS::Queue
+
+  ProxyFrameworkMsgSubs:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      PolicyDocument:
+        Version: '2012-10-17'
+        Id: MyQueuePolicy
+        Statement:
+        - Sid: Allow-SendMessage-From-SNS-Topic
+          Effect: Allow
+          Principal: "*"
+          Action:
+          - sqs:SendMessage
+          #arn:aws:sns:region:account-id:topicname
+          Resource: !Sub arn:aws:sns:*:${AWS:AccountId}:*
+      Queues:
+      - !GetAtt ProxyFrameworkMsg.QueueName
 
   #Autodowning lambda - receive events from autoscaling to tell us when nodes go away.
   ScalingRule:
@@ -889,6 +909,10 @@ Resources:
             notificationsQueue = "${IngestTranscodeMsg.QueueName}"
           }
 
+          proxyFramework {
+            notificationsQueue = "${ProxyFrameworkMsg.QueueName}"
+          }
+
           akka.actor {
             provider = "cluster"
 
@@ -1040,6 +1064,10 @@ Outputs:
     Value: !Ref IngestTranscodeMsg
     Export:
       Name: !Sub ${AWS::StackName}-IngestTranscodeMsg
+  ProxyFrameworkMsgQueue:
+    Description: ARN of the message use for notifications from the Proxying Framework
+    Value: !GetAtt ProxyFrameworkMsg.Arn
+
   IngestMessageQueueArn:
     Description: URL of the message queue for notifications from the ingest lambda
     Value: !GetAtt IngestTranscodeMsg.Arn
