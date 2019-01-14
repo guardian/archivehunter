@@ -24,6 +24,9 @@ import { faStroopwafel, faCheckCircle, faCheck, faTimes, faTimesCircle, faRoad, 
 import { faChevronCircleDown,faChevronCircleRight,faTrashAlt, faFilm, faVolumeUp,faImage, faFile, faClock, faRunning, faExclamationTriangle, faHdd, faBalanceScale, faSyncAlt} from '@fortawesome/free-solid-svg-icons'
 import UserList from "./Users/UserList.jsx";
 
+import ProxyFrameworkList from "./ProxyFramework/ProxyFrameworkList.jsx";
+import ProxyFrameworkAdd from './ProxyFramework/ProxyFrameworkAdd.jsx';
+
 library.add(faStroopwafel, faCheckCircle, faCheck, faTimes, faTimesCircle, faRoad,faSearch,faThList,faWrench, faLightbulb, faChevronCircleDown, faChevronCircleRight, faTrashAlt, faFolderPlus, faFolderMinus, faFolder);
 library.add(faFilm, faVolumeUp, faImage, faFile, faClock, faRunning, faExclamationTriangle, faHdd, faBalanceScale, faSyncAlt, faBookReader);
 window.React = require('react');
@@ -68,6 +71,8 @@ class App extends React.Component {
             <TopMenu visible={true} isAdmin={this.state.userLogin ? this.state.userLogin.isAdmin : false}/>
             <LoginStatusComponent userData={this.state.userLogin} userLoggedOutCb={this.userLoggedOut}/>
             <Switch>
+                <Route path="/admin/proxyFramework/new" component={ProxyFrameworkAdd}/>
+                <Route path="/admin/proxyFramework" component={ProxyFrameworkList}/>
                 <Route path="/admin/about" component={AboutComponent}/>
                 <Route path="/admin/users" component={UserList}/>
                 <Route path="/admin/jobs/:jobid" component={JobsList}/>

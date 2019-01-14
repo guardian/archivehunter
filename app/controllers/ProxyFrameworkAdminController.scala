@@ -183,6 +183,7 @@ class ProxyFrameworkAdminController @Inject() (override val config:Configuration
           } else {
             ProxyFrameworkInstance.fromStackSummary(clientRequest.region, stacks.head) match {
               case Some(rec)=>
+                logger.debug(s"Got stack info: $rec")
                 proxyFrameworkInstanceDAO.put(rec).map({
                   case None=>
                     Ok(GenericErrorResponse("ok","Record saved").asJson)
@@ -195,7 +196,11 @@ class ProxyFrameworkAdminController @Inject() (override val config:Configuration
                 Future(BadRequest(GenericErrorResponse("invalid_request","Stack did not have the right outputs defined").asJson))
             }
           }
-        }
+        }.recover({
+          case err:Throwable=>
+            logger.error("Could not add new deployment from CF stack: ", err)
+            InternalServerError(GenericErrorResponse("error", err.toString).asJson)
+        })
       )
     }
   }

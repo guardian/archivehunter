@@ -25,7 +25,7 @@ object ProxyFrameworkInstance extends ((String,String , String,String, Option[St
       logger.error(s"Stack ${s.getStackName} did not have InputTopic, ReplyTopic and ManagementRole outputs defined")
       None
     } else {
-      Some((topicRefs.head.getOutputValue, topicRefs(1).getOutputValue, topicRefs(3).getOutputValue))
+      Some((topicRefs.head.getOutputValue, topicRefs(1).getOutputValue, topicRefs(2).getOutputValue))
     }
   }
 
