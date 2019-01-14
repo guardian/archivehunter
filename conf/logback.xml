@@ -48,7 +48,9 @@
     <logger name="controllers.BrowseCollectionController" level="INFO"/>
 
     <logger name="controllers.UserController" level="INFO"/>
-    <logger name="controllers.LightboxController" level="DEBUG"/>
+    <logger name="controllers.LightboxController" level="INFO"/>
+
+    <logger name="controllers.ProxyFrameworkAdminController" level="DEBUG"/>
 
     <logger name="controllers.Auth" level="INFO"/>
 
@@ -71,7 +73,6 @@
     <logger name="helpers.ProxyVerifyFlow" level="INFO"/>
     <logger name="services.JobPurgerActor" level="DEBUG"/>
     <logger name="services.IngestProxyQueue" level="DEBUG"/>
-
     <logger name="requests.JobSearchRequest" level="DEBUG"/>
 
     <logger name="com.theguardian.multimedia.archivehunter.cmn_services.ProxyGenerators" level="DEBUG"/>

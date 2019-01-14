@@ -5,9 +5,8 @@ import play.api.Logger
 
 import scala.collection.JavaConverters._
 
-case class AppStackStage(app:String,stack:String,stage:String)
 
-object ProxyFrameworkInstance extends ((String,AppStackStage , String,String)=>ProxyFrameworkInstance ){
+object ProxyFrameworkInstance extends ((String,String , String,String, Option[String])=>ProxyFrameworkInstance ){
   private val logger = Logger(getClass)
 
   /**
@@ -15,23 +14,24 @@ object ProxyFrameworkInstance extends ((String,AppStackStage , String,String)=>P
     * @param s Stack instance giving details of the CF stack
     * @return a Tuple of (InputTopicArn, ReplyTopicArn) or None if one or both was missing
     */
-  private def getTopicInfo(s:Stack):Option[(String,String)] = {
+  private def getTopicInfo(s:Stack):Option[(String,String,String)] = {
     val outs = s.getOutputs.asScala
 
-    val topicRefs = Seq("InputTopic","ReplyTopic")
+    val topicRefs = Seq("InputTopic","ReplyTopic","ManagementRole")
       .map(k=>outs.find(_.getOutputKey==k))
       .collect({case Some(value)=>value})
 
-    if(topicRefs.length!=2){
-      logger.error(s"Stack ${s.getStackName} did not have InputTopic and ReplyTopic outputs defined")
+    if(topicRefs.length!=3){
+      logger.error(s"Stack ${s.getStackName} did not have InputTopic, ReplyTopic and ManagementRole outputs defined")
       None
     } else {
-      Some((topicRefs.head.getOutputValue, topicRefs(1).getOutputValue))
+      Some((topicRefs.head.getOutputValue, topicRefs(1).getOutputValue, topicRefs(3).getOutputValue))
     }
   }
 
   /**
-    * builds a ProxyFrameworkInstance object from a Cloudformation Stack model
+    * builds a ProxyFrameworkInstance object from a Cloudformation Stack model.
+    * This assumes that it has NOT been subscribed yet
     * @param region region that this stack is in
     * @param summ Instance of Stack from cloudformation's .describeStacks method
     * @return populated ProxyFrameworkInstance, or None (with an error message emitted)
@@ -39,10 +39,10 @@ object ProxyFrameworkInstance extends ((String,AppStackStage , String,String)=>P
     */
   def fromStackSummary(region:String, summ:Stack) = {
     getTopicInfo(summ).map(infos=>
-      new ProxyFrameworkInstance(region, null, infos._1, infos._2)
+      new ProxyFrameworkInstance(region, infos._1, infos._2, infos._3, None)
     )
   }
 }
 
-case class ProxyFrameworkInstance (region:String, appStackStage: AppStackStage, inputTopicArn:String, outputTopicArn:String)
+case class ProxyFrameworkInstance (region:String, inputTopicArn:String, outputTopicArn:String, roleArn:String, subscriptionId:Option[String])
 

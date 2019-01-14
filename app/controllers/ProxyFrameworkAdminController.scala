@@ -4,6 +4,8 @@ import java.time.{Instant, ZoneId, ZonedDateTime}
 import java.util.Date
 
 import akka.actor.{ActorRef, ActorSystem}
+import com.amazonaws.auth.profile.ProfileCredentialsProvider
+import com.amazonaws.auth.{AWSCredentialsProviderChain, ContainerCredentialsProvider, InstanceProfileCredentialsProvider}
 import com.amazonaws.regions.{Region, Regions}
 import com.amazonaws.services.cloudformation.AmazonCloudFormationClientBuilder
 import com.amazonaws.services.cloudformation.model.{DescribeStacksRequest, ListStacksRequest, StackStatus, StackSummary}
@@ -35,6 +37,8 @@ class ProxyFrameworkAdminController @Inject() (override val config:Configuration
   private val logger = Logger(getClass)
   implicit val ec:ExecutionContext = controllerComponents.executionContext
 
+  private val awsProfile = config.getOptional[String]("externalData.awsProfile")
+
   def existingDeployments = APIAuthAction.async { request=>
     adminsOnlyAsync(request) {
       proxyFrameworkInstanceDAO.allRecords.map(result=>{
@@ -49,7 +53,16 @@ class ProxyFrameworkAdminController @Inject() (override val config:Configuration
     }
   }
 
-  protected def getCfClient(region:String) = AmazonCloudFormationClientBuilder.standard().withRegion(region).build()
+  def credentialsProvider(profileName:Option[String]=None) = new AWSCredentialsProviderChain(
+    new ProfileCredentialsProvider(profileName.getOrElse("default")),
+    new ContainerCredentialsProvider(),
+    new InstanceProfileCredentialsProvider()
+  )
+
+  protected def getCfClient(region:String) =
+    AmazonCloudFormationClientBuilder.standard()
+      .withCredentials(credentialsProvider(awsProfile))
+      .withRegion(region).build()
   /**
     * (asynchronously) scan cloudformation within the given region for deployments of the proxy framework
     * @param region String of the region to search
@@ -82,7 +95,14 @@ class ProxyFrameworkAdminController @Inject() (override val config:Configuration
           getNextPage(rq, Some(tok), currentValues ++ result.getStackSummaries.asScala.filter(_.getTemplateDescription.startsWith(searchParam)))
         case None=>
           logger.debug(s"No continuation token, reached end of results.")
-          currentValues ++ result.getStackSummaries.asScala.filter(_.getTemplateDescription.startsWith(searchParam))
+          val data = Option(result.getStackSummaries) match {
+            case Some(list) =>
+              list.asScala.filter(summ=>
+                Option(summ.getTemplateDescription).isDefined && summ.getTemplateDescription.startsWith(searchParam)
+              )
+            case None => Seq()
+          }
+          currentValues ++ data
       }
     }
 

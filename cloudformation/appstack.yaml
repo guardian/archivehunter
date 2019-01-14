@@ -321,6 +321,26 @@ Resources:
         - Key: Stage
           Value: !Ref Stage
 
+  ProxyFrameworkTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: region
+          AttributeType: S
+      KeySchema:
+        - AttributeName: region
+          KeyType: HASH
+      ProvisionedThroughput:
+        WriteCapacityUnits: 2
+        ReadCapacityUnits: 2
+      Tags:
+        - Key: App
+          Value : !Sub ${App}-webapp
+        - Key: Stack
+          Value: !Ref Stack
+        - Key: Stage
+          Value: !Ref Stage
+
   LoadBalancerSG:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -471,7 +491,7 @@ Resources:
           Action:
           - sqs:SendMessage
           #arn:aws:sns:region:account-id:topicname
-          Resource: !Sub arn:aws:sns:*:${AWS:AccountId}:*
+          Resource: !Sub arn:aws:sns:*:${AWS::AccountId}:*
       Queues:
       - !GetAtt ProxyFrameworkMsg.QueueName
 
@@ -698,28 +718,6 @@ Resources:
             Resource:
               - !GetAtt TranscodeUpdateMsg.Arn
               - !GetAtt IngestTranscodeMsg.Arn
-      - PolicyName: ContainerAccess
-        PolicyDocument:
-          Version: 2012-10-17
-          Statement:
-            Effect: Allow
-            Action:
-              - ecs:List*
-              - ecs:Describe*
-              - ecs:*Task
-            Resource:
-            - !GetAtt ProxyingCluster.Arn
-            - !Sub arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:task/*
-            - !Sub arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:task-definition/*
-      - PolicyName: ContainerRoleAccess
-        PolicyDocument:
-          Version: 2012-10-17
-          Statement:
-            Effect: Allow
-            Action:
-              - iam:PassRole
-            Resource:
-            - !GetAtt ProxyGeneratorRole.Arn
       - PolicyName: EC2InstanceDiscovery
         PolicyDocument:
           Version: 2012-10-17
@@ -867,7 +865,7 @@ Resources:
 
           proxies {
             tableName = "${ProxyLocationTable}"
-            ecsTaskDefinitionName = "${ProxyingTaskDefinition}"
+            ecsTaskDefinitionName = "nodefinition"
             #this should match the container name in ProxyingTaskDefinition
             taskContainerName = "${Stack}-${App}Proxy-${Stage}"
             appServerUrl = "https://${LoadBalancer.DNSName}"
@@ -888,7 +886,7 @@ Resources:
           }
 
           ecs {
-            cluster = "${ProxyingCluster}"
+            cluster = "unknown"
             subnets = "${DeploySubnetsString}"
           }
 
