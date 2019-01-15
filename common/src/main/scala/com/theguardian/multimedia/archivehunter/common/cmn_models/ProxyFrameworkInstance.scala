@@ -1,13 +1,12 @@
-package models
+package com.theguardian.multimedia.archivehunter.common.cmn_models
 
 import com.amazonaws.services.cloudformation.model.Stack
-import play.api.Logger
-
+import org.apache.logging.log4j.LogManager
 import scala.collection.JavaConverters._
 
 
 object ProxyFrameworkInstance extends ((String,String , String,String, Option[String])=>ProxyFrameworkInstance ){
-  private val logger = Logger(getClass)
+  private val logger = LogManager.getLogger(getClass)
 
   /**
     * gets the values of InputTopic and ReplyTopic outputs of the given stack and returns them as a tuple

@@ -8,7 +8,8 @@ import com.amazonaws.auth.profile.ProfileCredentialsProvider
 import com.amazonaws.auth.{AWSCredentialsProviderChain, ContainerCredentialsProvider, InstanceProfileCredentialsProvider}
 import com.amazonaws.regions.{Region, Regions}
 import com.amazonaws.services.cloudformation.AmazonCloudFormationClientBuilder
-import com.amazonaws.services.cloudformation.model.{DescribeStacksRequest, ListStacksRequest, StackStatus, StackSummary}
+import com.amazonaws.services.cloudformation.model._
+import com.theguardian.multimedia.archivehunter.common.cmn_models.{ProxyFrameworkInstance, ProxyFrameworkInstanceDAO}
 import com.typesafe.config.ConfigException.Generic
 import helpers.InjectableRefresher
 import javax.inject.{Inject, Named}
@@ -18,7 +19,6 @@ import play.api.libs.ws.WSClient
 import play.api.mvc.{AbstractController, ControllerComponents}
 import io.circe.syntax._
 import io.circe.generic.auto._
-import models.{ProxyFrameworkInstance, ProxyFrameworkInstanceDAO}
 import requests.AddPFDeploymentRequest
 import responses.{GenericErrorResponse, MultiResultResponse, ObjectListResponse, ProxyFrameworkDeploymentInfo}
 
@@ -30,7 +30,8 @@ class ProxyFrameworkAdminController @Inject() (override val config:Configuration
                                                override val controllerComponents:ControllerComponents,
                                                override val refresher:InjectableRefresher,
                                                override val wsClient:WSClient,
-                                               proxyFrameworkInstanceDAO: ProxyFrameworkInstanceDAO)
+                                               proxyFrameworkInstanceDAO: ProxyFrameworkInstanceDAO,
+                                               proxyFrameworkHelper: helpers.ProxyFramework)
                                               (implicit actorSystem:ActorSystem)
   extends AbstractController(controllerComponents) with Circe with PanDomainAuthActions with AdminsOnly {
 
@@ -182,18 +183,24 @@ class ProxyFrameworkAdminController @Inject() (override val config:Configuration
             Future(BadRequest(GenericErrorResponse("too_many","Multiple stacks found by that name").asJson))
           } else {
             ProxyFrameworkInstance.fromStackSummary(clientRequest.region, stacks.head) match {
-              case Some(rec)=>
-                logger.debug(s"Got stack info: $rec")
-                proxyFrameworkInstanceDAO.put(rec).map({
-                  case None=>
-                    Ok(GenericErrorResponse("ok","Record saved").asJson)
-                  case Some(Right(updatedRecord))=>
-                    Ok(GenericErrorResponse("ok","Record saved").asJson)
-                  case Some(Left(err))=>
+              case Some(rec) =>
+                //setupDeployment saves the created record to the DB and performs subscriptions/security policy updates
+                proxyFrameworkHelper.setupDeployment(rec).map({
+                  /*
+                              case None=>
+                Ok(GenericErrorResponse("ok","Record saved").asJson)
+              case Some(Right(updatedRecord))=>
+                Ok(GenericErrorResponse("ok","Record saved").asJson)
+              case Some(Left(err))=>
+                InternalServerError(GenericErrorResponse("db_error", err.toString).asJson)
+                     */
+                  case Success(results) =>
+                    Ok(GenericErrorResponse("ok", "Record saved").asJson)
+                  case Failure(err) =>
                     InternalServerError(GenericErrorResponse("db_error", err.toString).asJson)
                 })
-              case None=>
-                Future(BadRequest(GenericErrorResponse("invalid_request","Stack did not have the right outputs defined").asJson))
+              case None =>
+                Future(BadRequest(GenericErrorResponse("invalid_request", "Stack did not have the right outputs defined").asJson))
             }
           }
         }.recover({

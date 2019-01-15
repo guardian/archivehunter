@@ -39,11 +39,13 @@ class ProxyFrameworkList extends React.Component {
                 header: "Subscription",
                 key: "subscriptionId"
             },
-            // {
-            //     header: "Actions",
-            //     key: "region",
-            //     render: value=>
-            // }
+            {
+                header: "Actions",
+                key: "region",
+                render: value=><span>
+                    <FontAwesomeIcon icon="trash-alt" onClick={()=>this.callDelete(value)}/>
+                </span>
+            }
         ];
         this.style = {
             backgroundColor: '#eee',
@@ -56,17 +58,31 @@ class ProxyFrameworkList extends React.Component {
             paddingLeft: '5px',
             paddingRight: '5px'
         };
+
+        this.callDelete = this.callDelete.bind(this);
     }
 
-    componentWillMount(){
+    loadData(){
         this.setState({loading: true, lastError:null}, ()=>axios.get("/api/proxyFramework/deployments").then(response=>{
             this.setState({loading: false, lastError:null, currentDeployments: response.data.entries})
         }).catch(err=>{
             console.error(err);
             this.setState({loading: false, lastError: err});
-        }))
+        }));
     }
 
+    componentWillMount(){
+        this.loadData();
+    }
+
+    callDelete(region){
+        this.setState({loading:true, lastError:null}, ()=>axios.delete("/api/proxyFramework/deployments/" + region).then(response=>{
+            this.loadData();
+        }).catch(err=>{
+            console.error(err);
+            this.setState({loading: false, lastError: err});
+        }))
+    }
     render(){
         if(this.state.lastError) return <ErrorViewComponent error={this.state.lastError}/>;
         if(this.state.goToNew) return <Redirect to="/admin/proxyFramework/new"/>;

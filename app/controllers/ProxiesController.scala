@@ -26,7 +26,7 @@ import com.theguardian.multimedia.archivehunter.common.cmn_models._
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{JobModelDAO, ScanTargetDAO}
 import helpers.{InjectableRefresher, ProxyLocator}
 import services.{ETSProxyActor, ProxiesRelinker}
-import cmn_services.ProxyGenerators
+import com.theguardian.multimedia.archivehunter.common.ProxyTranscodeFramework.{ProxyGenerators, RequestType}
 import play.api.libs.ws.WSClient
 import services.ETSProxyActor.{ETSMsg, ETSMsgReply, PreparationFailure, PreparationSuccess}
 
@@ -213,7 +213,7 @@ class ProxiesController @Inject()(override val config:Configuration,
   }
 
   def generateThumbnail(fileId:String) = APIAuthAction.async {
-    proxyGenerators.createThumbnailProxy(fileId).map({
+    proxyGenerators.requestProxyJob(RequestType.THUMBNAIL, fileId).map({
       case Failure(NothingFoundError(objectType, msg))=>
         NotFound(GenericErrorResponse("not_found", msg.toString).asJson)
       case Failure(ExternalSystemError(systemName, msg))=>
@@ -269,7 +269,7 @@ class ProxiesController @Inject()(override val config:Configuration,
         canContinue match {
           case Right(_)=>
             if(pt==ProxyType.THUMBNAIL){
-              proxyGenerators.createThumbnailProxy(entry).map({
+              proxyGenerators.requestProxyJob(RequestType.THUMBNAIL,entry).map({
                 case Success(jobId)=>
                   Ok(TranscodeStartedResponse("transcode_started", jobId, None).asJson)
                 case Failure(err)=>

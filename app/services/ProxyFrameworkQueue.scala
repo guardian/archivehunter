@@ -3,13 +3,10 @@ package services
 import java.time.ZonedDateTime
 import akka.actor.{ActorRef, ActorSystem}
 import akka.stream.{ActorMaterializer, Materializer}
-import com.amazonaws.services.s3.AmazonS3
 import com.amazonaws.services.sqs.model.{DeleteMessageRequest, ReceiveMessageRequest}
-import com.sksamuel.elastic4s.http.HttpClient
 import com.theguardian.multimedia.archivehunter.common._
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager, SQSClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models._
-import com.theguardian.multimedia.archivehunter.common.cmn_services.ProxyGenerators
 import io.circe.generic.auto._
 import javax.inject.Inject
 import models.{AwsSqsMsg, JobReportNew}
@@ -90,10 +87,10 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
     * @param ec implicitly provided execution context
     * @return a Future with either an error string or a success containing the updated record (if available)
     */
-  def updateProxyRef(proxyUri:String, archiveEntry:ArchiveEntry) =
+  def updateProxyRef(proxyUri:String, archiveEntry:ArchiveEntry, proxyType:ProxyType.Value) =
     ProxyLocation.fromS3(
       proxyUri=proxyUri,
-      mainMediaUri=s"s3://${archiveEntry.bucket}/${archiveEntry.path}", Some(ProxyType.THUMBNAIL))
+      mainMediaUri=s"s3://${archiveEntry.bucket}/${archiveEntry.path}", Some(proxyType))
     .flatMap({
       case Left(err)=>
         logger.error(s"Could not get proxy location: $err")
@@ -122,9 +119,13 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
         logger.error(s"Message $msg logged as success but had no 'output' field!")
         originalSender ! akka.actor.Status.Failure(new RuntimeException(s"Message logged as success but had no 'output' field!"))
       } else {
+        val proxyType = jobDesc.jobType match {
+          case "thumbnail"=>ProxyType.THUMBNAIL
+          case "proxy"=>ProxyType.VIDEO //FIXME: need to get data from transcode framework to determine what this actually is
+        }
         val proxyUpdateFuture = thumbnailJobOriginalMedia(jobDesc).flatMap({
           case Left(err) => Future(Left(err))
-          case Right(archiveEntry) => updateProxyRef(msg.output.get, archiveEntry)
+          case Right(archiveEntry) => updateProxyRef(msg.output.get, archiveEntry, proxyType)
         })
         proxyUpdateFuture.map({
           case Left(err) =>
@@ -153,8 +154,10 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
       * route a success message to the appropriate handler
       */
     case HandleSuccess(msg, jobDesc, rq, receiptHandle, originalSender)=>
+      logger.debug(s"Got success for jobDesc $jobDesc")
       jobDesc.jobType match {
-        case "PROXY"=>self ! HandleSuccessfulProxy(msg, jobDesc, rq, receiptHandle, originalSender)
+        case "proxy"=>self ! HandleSuccessfulProxy(msg, jobDesc, rq, receiptHandle, originalSender)
+        case "thumbnail"=>self ! HandleSuccessfulProxy(msg, jobDesc, rq, receiptHandle, originalSender)
       }
 
     /**
@@ -199,6 +202,7 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
       })
 
     case HandleDomainMessage(msg: JobReportNew, rq, receiptHandle)=>
+      logger.debug(s"HandleDomainMessage: $msg")
       val originalSender=sender()
       jobModelDAO.jobForId(msg.jobId).map({
         case None =>
@@ -208,11 +212,16 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
           logger.error(s"Could not look up job for $msg: ${err.toString}")
           originalSender ! akka.actor.Status.Failure(new RuntimeException(s"Could not look up job for $msg: ${err.toString}"))
         case Some(Right(jobDesc)) =>
+          logger.debug(s"Got jobDesc $jobDesc")
           msg.status match {
             case "success" => ownRef ! HandleSuccess(msg, jobDesc, rq, receiptHandle, originalSender)
             case "failure" => ownRef ! HandleFailure(msg, jobDesc, rq, receiptHandle, originalSender)
+            case "error" => ownRef ! HandleFailure(msg, jobDesc, rq, receiptHandle, originalSender)
             case "running" => ownRef ! HandleRunning(msg, jobDesc, rq, receiptHandle, originalSender)
           }
+      }).recover({
+        case err:Throwable=>
+          logger.error(s"Could not look up job for $msg in database", err)
       })
     case other:GenericSqsActor.SQSMsg => handleGeneric(other)
   }

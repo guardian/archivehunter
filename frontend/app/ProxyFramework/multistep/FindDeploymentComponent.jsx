@@ -82,13 +82,13 @@ class FindDeploymentComponent extends React.Component {
         return <div>
             <h3>Search for deployment</h3>
             <p></p>
-            <LoadingThrobber show={this.state.loading} large={true} caption="Searching..."/>
             <SortableTable
                 data={this.state.foundDeployments}
                 columns={this.searchTableColumns}
                 style={this.style}
                 iconStyle={this.iconStyle}
                 tableProps={{className: "dashboardpanel", display: this.state.foundDeployments.length>0 ? "block":"none"}}/>
+            <LoadingThrobber show={this.state.loading} large={true} caption="Searching..."/>
             <div style={{display: this.state.regionErrors.length>0 ? "block" : "none"}}>
                 <h4 style={{fontSize: "1.0em"}}>The following regions failed: </h4>
                 <ul>

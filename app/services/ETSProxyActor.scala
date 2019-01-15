@@ -7,12 +7,13 @@ import java.util.UUID
 import akka.actor.{Actor, ActorRef, ActorSystem}
 import akka.stream.alpakka.s3.auth.AWSSessionCredentials
 import akka.stream.{ActorMaterializer, Materializer}
+import com.amazonaws.services.elastictranscoder.AmazonElasticTranscoder
 import com.amazonaws.services.elastictranscoder.model._
 import com.amazonaws.services.sqs.model.{DeleteMessageRequest, ReceiveMessageRequest}
+import com.theguardian.multimedia.archivehunter.common.ProxyTranscodeFramework.ProxyGenerators
 import com.theguardian.multimedia.archivehunter.common.clientManagers._
 import com.theguardian.multimedia.archivehunter.common.cmn_models._
 import com.theguardian.multimedia.archivehunter.common.errors.NothingFoundError
-import com.theguardian.multimedia.archivehunter.common.cmn_services.ProxyGenerators
 import com.theguardian.multimedia.archivehunter.common._
 import javax.inject.Inject
 import models.{AwsSqsMsg, TranscoderState}
@@ -21,7 +22,7 @@ import play.api.Logger
 
 import scala.collection.JavaConverters._
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
 
 object ETSProxyActor {
   trait ETSMsg
@@ -123,6 +124,7 @@ object ETSProxyActor {
 class ETSProxyActor @Inject() (implicit config:ArchiveHunterConfiguration,
                                sqsClientMgr:SQSClientManager, etsClientMgr: ETSClientManager, s3ClientMgr:S3ClientManager, esClientMgr:ESClientManager,
                                scanTargetDAO: ScanTargetDAO, jobModelDAO: JobModelDAO, proxyLocationDAO:ProxyLocationDAO,
+                              proxyGenerators:ProxyGenerators,
                             ddbClientMgr:DynamoClientManager, actorSystem: ActorSystem) extends Actor{
   import ETSProxyActor._
 
@@ -141,6 +143,103 @@ class ETSProxyActor @Inject() (implicit config:ArchiveHunterConfiguration,
   private val indexer = new Indexer(config.get[String]("externalData.indexName"))
   var pipelinesToCheck:Seq[WaitingOperation] = Seq()
 
+
+  /**
+    * checks existing pipelines in the account to try to find one that goes from the selected input to the selected
+    * output bucket
+    * @param inputBucket name of the required source bucket
+    * @param outputBucket name of the required destination bucket
+    * @return a Sequence containing zero or more pipelines. If no pipelines are found, the sequence is empty.
+    */
+  protected def findPipelineFor(inputBucket:String, outputBucket:String) = {
+    def getNextPage(matches:Seq[Pipeline], pageToken: Option[String]):Seq[Pipeline] = {
+      val rq = new ListPipelinesRequest()
+      val updatedRq = pageToken match {
+        case None=>rq
+        case Some(token)=>rq.withPageToken(token)
+      }
+
+      val result = etsClient.listPipelines(updatedRq).getPipelines.asScala
+      logger.debug(s"findPipelineFor: checking in $result")
+      if(result.isEmpty){
+        logger.debug(s"findPipelineFor: returning $matches")
+        matches
+      } else {
+        val newMatches = result.filter(p=>p.getOutputBucket==outputBucket && p.getInputBucket==inputBucket)
+        logger.debug(s"findPipelineFor: got $newMatches to add")
+        matches ++ newMatches
+      }
+    }
+
+    Try {
+      val initialResult = getNextPage(Seq(), None)
+      logger.debug(s"findPipelineFor: initial result is $initialResult")
+      val finalResult = initialResult.filter(p => p.getName.contains("archivehunter")) //filter out anything that is not ours
+      logger.debug(s"findPipelineFor: final result is $finalResult")
+      finalResult
+    }
+  }
+
+  protected def getPipelineStatus(pipelineId:String)(implicit etsClient:AmazonElasticTranscoder) = Try {
+    val rq = new ReadPipelineRequest().withId(pipelineId)
+
+    val result = etsClient.readPipeline(rq)
+    result.getPipeline.getStatus
+  }
+
+  /**
+    * kick of the creation of a pipeline. NOTE: the Pipeline object returned will not be usable until it's in an active state.
+    * @param pipelineName name of the pipeline to create
+    * @param inputBucket input bucket it should point to
+    * @param outputBucket output bucket it should point to
+    * @return
+    */
+  protected def createEtsPipeline(pipelineName:String, inputBucket:String, outputBucket:String) = {
+    val completionNotificationTopic = config.get[String]("proxies.completionNotification")
+    val errorNotificationTopic = config.get[String]("proxies.errorNotification")
+    val warningNotificationTopic = config.get[String]("proxies.warningNotification")
+    val transcodingRole = config.get[String]("proxies.transcodingRole")
+
+    val createRq = new CreatePipelineRequest()
+      .withInputBucket(inputBucket)
+      .withName(pipelineName)
+      .withNotifications(new Notifications().withCompleted(completionNotificationTopic).withError(errorNotificationTopic).withWarning(warningNotificationTopic).withProgressing(warningNotificationTopic))
+      .withOutputBucket(outputBucket)
+      .withRole(transcodingRole)
+
+    Try {
+      val result = etsClient.createPipeline(createRq)
+      val warnings = result.getWarnings.asScala
+      if(warnings.nonEmpty){
+        logger.warn("Warnings were receieved when creating pipeline:")
+        warnings.foreach(warning=>logger.warn(warning.toString))
+      }
+      result.getPipeline
+    }
+  }
+
+  private val extensionExtractor = "^(.*)\\.([^\\.]+)$".r
+
+  /**
+    * check the provided preset ID to get the container format, and use this to put the correct file extension onto the input path
+    * @param presetId preset ID that will be used
+    * @param inputPath bucket path to the input media
+    * @return the output path, if we could get the preset. Otherwise a Failure with the ETS exception.
+    */
+  protected def outputFilenameFor(presetId:String,inputPath:String):Try[String] = Try {
+    val rq = new ReadPresetRequest().withId(presetId)
+    val presetResult = etsClient.readPreset(rq)
+    val properExtension = presetResult.getPreset.getContainer
+    logger.debug(s"Extension for ${presetResult.getPreset.getDescription} ($presetId) is $properExtension")
+
+    inputPath match {
+      case extensionExtractor(barePath:String,xtn:String)=>
+        barePath + "." + properExtension
+      case _=>
+        inputPath + "." + properExtension
+    }
+  }
+
   /**
     * recursively check the pipelinesToCheck list, removing from the list any that have become ready
     * @param moreToCheck
@@ -151,7 +250,7 @@ class ETSProxyActor @Inject() (implicit config:ArchiveHunterConfiguration,
     if(moreToCheck.isEmpty) return notReady
     val checking = moreToCheck.head
     val pipelineId = checking.pipelineId
-    ProxyGenerators.getPipelineStatus(pipelineId) match {
+    getPipelineStatus(pipelineId) match {
       case Success(status)=>
         logger.info(s"Status for $pipelineId is $status")
         if(status.toLowerCase()=="active") {
@@ -333,14 +432,14 @@ class ETSProxyActor @Inject() (implicit config:ArchiveHunterConfiguration,
       */
     case GetTranscodePipeline(entry:ArchiveEntry, targetProxyBucket:String, jobDesc:JobModel, proxyType, originalSender)=>
       logger.info(s"Looking for pipeline for $entry")
-      ProxyGenerators.findPipelineFor(entry.bucket, targetProxyBucket) match {
+      findPipelineFor(entry.bucket, targetProxyBucket) match {
         case Failure(err)=>
           logger.error(s"Could not look up pipelines for $entry", err)
           originalSender ! PreparationFailure(err)
         case Success(pipelines)=>
           if(pipelines.isEmpty){  //nothing present, so we must create a pipeline.
             val newPipelineName = s"archivehunter_${randomAlphaNumericString(10)}"
-            ProxyGenerators.createEtsPipeline(newPipelineName, entry.bucket, targetProxyBucket) match {
+            createEtsPipeline(newPipelineName, entry.bucket, targetProxyBucket) match {
               case Success(pipeline)=>
                 logger.info(s"Initiated creation of $newPipelineName, starting status check")
                 pipelinesToCheck = pipelinesToCheck ++ Seq(WaitingOperation(entry, jobDesc, pipeline.getId, targetProxyBucket, proxyType, originalSender))
@@ -363,7 +462,7 @@ class ETSProxyActor @Inject() (implicit config:ArchiveHunterConfiguration,
           case _ => throw new RuntimeException(s"Request for incompatible proxy type $proxyType")
         }
 
-        ProxyGenerators.outputFilenameFor(presetId, entry.path) match {
+        outputFilenameFor(presetId, entry.path) match {
           case Failure(err) =>
             logger.error(s"Could not look up preset ID $presetId", err)
           case Success(outputPath) =>
@@ -419,7 +518,7 @@ class ETSProxyActor @Inject() (implicit config:ArchiveHunterConfiguration,
       scanTargetDAO.targetForBucket(entry.bucket).map({
         case Some(Right(target)) =>
           val targetProxyBucket = target.proxyBucket
-          val preparationFuture = ProxyGenerators.getUriToProxy(entry).flatMap(maybeUriToProxy => {
+          val preparationFuture = proxyGenerators.getUriToProxy(entry).flatMap(maybeUriToProxy => {
             logger.info(s"Target proxy bucket is $targetProxyBucket")
             logger.info(s"Source media is $maybeUriToProxy")
             maybeUriToProxy match {

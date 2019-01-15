@@ -34,7 +34,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito{
       mockedUpdateProxyRef.apply(any,any) returns Future(Right(None))
 
       val testProbe = TestProbe()
-      val fakeIncoming = JobReportNew("success",None,"fake-job-id",Some("input-uri"),Some("output-uri"))
+      val fakeIncoming = JobReportNew("success",None,"fake-job-id",Some("input-uri"),Some("output-uri"),None)
 
       val fakeMessage = ProxyFrameworkQueue.HandleSuccessfulProxy(fakeIncoming, mockedJd, mock[ReceiveMessageRequest], "receipt-handle", testProbe.ref)
 
@@ -76,7 +76,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito{
       mockedUpdateProxyRef.apply(any,any) returns Future(Right(None))
 
       val testProbe = TestProbe()
-      val fakeIncoming = JobReportNew("success",None,"fake-job-id",Some("input-uri"),Some("output-uri"))
+      val fakeIncoming = JobReportNew("success",None,"fake-job-id",Some("input-uri"),Some("output-uri"),None)
 
       val fakeMessage = ProxyFrameworkQueue.HandleSuccessfulProxy(fakeIncoming, mockedJd, mock[ReceiveMessageRequest], "receipt-handle", testProbe.ref)
 
@@ -121,7 +121,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito{
       mockedUpdateProxyRef.apply(any,any) returns Future(Right(None))
 
       val testProbe = TestProbe()
-      val fakeIncoming = JobReportNew("running",None,"fake-job-id",Some("input-uri"),None)
+      val fakeIncoming = JobReportNew("running",None,"fake-job-id",Some("input-uri"),None,None)
 
       val fakeMessage = ProxyFrameworkQueue.HandleRunning(fakeIncoming, mockedJd, mock[ReceiveMessageRequest], "receipt-handle", testProbe.ref)
 
@@ -160,7 +160,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito{
       mockedUpdateProxyRef.apply(any,any) returns Future(Right(None))
 
       val testProbe = TestProbe()
-      val fakeIncoming = JobReportNew("running",None,"fake-job-id",Some("input-uri"),None)
+      val fakeIncoming = JobReportNew("running",None,"fake-job-id",Some("input-uri"),None,None)
 
       val fakeMessage = ProxyFrameworkQueue.HandleRunning(fakeIncoming, mockedJd, mock[ReceiveMessageRequest], "receipt-handle", testProbe.ref)
 
@@ -188,7 +188,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito{
     }
   }
 
-  "ProxyFrameworkQueue!HandleFailure" should {
-
-  }
+//  "ProxyFrameworkQueue!HandleFailure" should {
+//
+//  }
 }

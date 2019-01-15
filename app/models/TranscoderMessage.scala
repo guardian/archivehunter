@@ -40,7 +40,7 @@ case class AwsSqsMsg (
                        Type: String,
                        MessageId: String,
                        TopicArn: String,
-                       Subject: String,
+                       Subject: Option[String],
                        Message: String,
                        Timestamp: String,
                      )

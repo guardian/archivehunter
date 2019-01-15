@@ -61,6 +61,7 @@ trait GenericSqsActor[MsgType] extends Actor {
            convertMessageBody(msg.getBody) match {
             case Left(err)=>
               logger.error(s"Could not decode message from queue: $err")
+              logger.error(s"Message was ${msg.getBody}")
               sender ! Status.Failure
             case Right(finalMsg)=>
               ownRef ! HandleDomainMessage(finalMsg, rq, msg.getReceiptHandle)

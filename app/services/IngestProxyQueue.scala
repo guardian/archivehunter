@@ -5,15 +5,14 @@ import akka.stream.{ActorMaterializer, Materializer}
 import io.circe.syntax._
 import io.circe.generic.auto._
 import com.amazonaws.services.sqs.model.{DeleteMessageRequest, ReceiveMessageRequest}
+import com.theguardian.multimedia.archivehunter.common.ProxyTranscodeFramework.{ProxyGenerators, RequestType}
 import com.theguardian.multimedia.archivehunter.common.{cmn_models, _}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, S3ClientManager, SQSClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{IngestMessage, ScanTargetDAO}
-import com.theguardian.multimedia.archivehunter.common.cmn_services.ProxyGenerators
 import helpers.ProxyLocator
 import javax.inject.{Inject, Named}
 import models.AwsSqsMsg
 import play.api.{Configuration, Logger}
-
 
 import scala.collection.JavaConverters._
 import scala.concurrent.{ExecutionContext, Future}
@@ -102,7 +101,7 @@ class IngestProxyQueue @Inject()(config: Configuration,
 
     case CreateNewThumbnail(entry) =>
       val originalSender = sender()
-      proxyGenerators.createThumbnailProxy(entry).onComplete({
+      proxyGenerators.requestProxyJob(RequestType.THUMBNAIL,entry).onComplete({
         case Success(Success(result)) => //thread completed and we got a result
           logger.info(s"${entry.bucket}:${entry.path}: started thumbnailing with ECS id $result")
           originalSender ! Status.Success
