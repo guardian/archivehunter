@@ -1,7 +1,10 @@
 package com.theguardian.multimedia.archivehunter.common.ProxyTranscodeFramework
 
 //This should be kept in-sync with the corresponding file in the ProxyFramework source
+import com.theguardian.multimedia.archivehunter.common.ProxyType
 import io.circe.{Decoder, Encoder}
+
+case class CreatePipeline (fromBucket:String, toBucket:String)
 
 //This should be kept in-sync with the corresponding file in the main ArchiveHunter source
 object RequestType extends Enumeration {
@@ -9,7 +12,9 @@ object RequestType extends Enumeration {
   val THUMBNAIL, PROXY, ANALYSE = Value
 }
 
-case class RequestModel (requestType: RequestType.Value, inputMediaUri: String, targetLocation:String, jobId:String)
+case class RequestModel (requestType: RequestType.Value, inputMediaUri: String,
+                         targetLocation:String, jobId:String,
+                         createPipelineRequest: Option[CreatePipeline], proxyType:Option[ProxyType.Value])
 
 trait RequestModelEncoder {
   implicit val requestTypeEncoder = Encoder.enumEncoder(RequestType)

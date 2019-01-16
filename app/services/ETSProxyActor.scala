@@ -526,7 +526,7 @@ class ETSProxyActor @Inject() (implicit config:ArchiveHunterConfiguration,
                 logger.error("Nothing found to proxy")
                 Future(Failure(NothingFoundError("media", "Nothing found to proxy")))
               case Some(uriToProxy) =>
-                val jobDesc = JobModel(UUID.randomUUID().toString, "proxy", Some(ZonedDateTime.now()), None, JobStatus.ST_PENDING, None, entry.id, None, SourceType.SRC_MEDIA)
+                val jobDesc = JobModel(jobUuid.toString, "proxy", Some(ZonedDateTime.now()), None, JobStatus.ST_PENDING, None, entry.id, None, SourceType.SRC_MEDIA)
                 jobModelDAO.putJob(jobDesc).map({
                   case Some(Left(dynamoError)) =>
                     logger.error(s"Could not save new job description: $dynamoError")
