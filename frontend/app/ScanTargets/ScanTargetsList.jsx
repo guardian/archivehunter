@@ -214,7 +214,7 @@ class ScanTargetsList extends React.Component {
                                                            closeOnEscape={true}
                                                            hasCloseIcon={true}
                                                            isDraggable={true}
-                                                           position={{x: window.innerWidth/2-250, y:0}}
+                                                           position={{x: window.innerWidth/2-250, y:window.innerHeight}}
                                                            buttons={
                                                                [{
                                                                    text: "Cancel",
