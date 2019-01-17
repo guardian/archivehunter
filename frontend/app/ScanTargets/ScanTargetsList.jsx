@@ -91,6 +91,7 @@ class ScanTargetsList extends React.Component {
                     <span data-tip="Full scan"><FontAwesomeIcon icon="folder" className="clickable button-row " onClick={()=>this.triggerFullScan(value)}/></span>
                     <br/>
                     <span data-tip="Proxy generation"><FontAwesomeIcon icon="balance-scale" className="clickable button-row" onClick={()=>this.triggerProxyGen(value)}/></span>
+                    <span data-tip="Relink proxies"><FontAwesomeIcon icon="book-reader" className="clickable button-row" onClick={()=>this.triggerProxyRelink(value)}/></span>
                 </span>
             }
         ];
@@ -127,6 +128,21 @@ class ScanTargetsList extends React.Component {
             .catch(err=>{
                 console.error(err);
                 this.setState({loading: false, lastError: err});
+            }))
+    }
+
+    /**
+     * FIXME: this does not belong in this UI location.
+     * @param targetId
+     */
+    triggerProxyRelink(targetId){
+        this.setState({loading:true}, ()=>axios.post("/api/proxy/relink/global")
+            .then(result=>{
+                console.log("Global proxy relink has been triggered");
+                this.setState({loading: false, lastError:null});
+            }).catch(err=>{
+                console.error(err);
+                this.setState({loading: false, lastError:err});
             }))
     }
 
