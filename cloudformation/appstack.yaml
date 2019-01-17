@@ -108,11 +108,26 @@ Resources:
           SourceSecurityGroupId: !GetAtt AccessorSG.GroupId
           FromPort: 443
           ToPort: 443
+        - IpProtocol: tcp
+          SourceSecurityGroupId: !GetAtt InstanceSecurityGroup.GroupId
+          FromPort: 443
+          ToPort: 443
       VpcId: !Ref VPCID
 
   SearchDomain:
     Type: AWS::Elasticsearch::Domain
     Properties:
+      AccessPolicies:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            #security is provided via firewalling the security groups
+            AWS: "*"
+          Action:
+          - es:*
+          Resource: arn:aws:es:eu-west-1:855023211239:domain/archive-search-whu36ioqc84w/*
+
       EBSOptions:
         EBSEnabled: true
         VolumeSize: !Ref ESVolumeSize

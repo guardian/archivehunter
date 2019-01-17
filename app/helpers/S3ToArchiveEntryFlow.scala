@@ -38,7 +38,7 @@ class S3ToArchiveEntryFlow @Inject() (s3ClientMgr: S3ClientManager, config:Confi
           try {
             //we need to do a metadata lookup to get the MIME type anyway, so we may as well just call out here.
             //it appears that you can't push() to a port from in a Future thread, so doing it the crappy way and blocking here.
-            val mappedElem = Await.result(ArchiveEntry.fromS3(elem.bucketName, elem.key), 3.seconds)
+            val mappedElem = Await.result(ArchiveEntry.fromS3(elem.bucketName, elem.key), 10.seconds)
             logger.debug(s"Mapped $elem to $mappedElem")
 
             while (!isAvailable(out)) {
