@@ -25,7 +25,6 @@ object ClockSingleton {
   * but the actors doing the work can fan-out and run in parallel.
   */
 class ClockSingleton @Inject() (@Named("dynamoCapacityActor") dynamoCapacityActor:ActorRef,
-                                @Named("etsProxyActor") etsProxyActor:ActorRef,
                                 @Named("bucketScannerActor") bucketScanner:ActorRef,
                                 @Named("jobPurgerActor") jobPurgerActor: ActorRef,
                                 @Named("ingestProxyQueue") ingestProxyQueue: ActorRef,
@@ -45,12 +44,10 @@ class ClockSingleton @Inject() (@Named("dynamoCapacityActor") dynamoCapacityActo
     case RapidClockTick=>
       logger.debug("ClockSingleton: RapidClockTick")
       dynamoCapacityActor ! DynamoCapacityActor.TimedStateCheck
-      etsProxyActor ! ETSProxyActor.CheckForNotifications
       ingestProxyQueue ! GenericSqsActor.CheckForNotifications
       proxyFrameworkQueue ! GenericSqsActor.CheckForNotifications
     case SlowClockTick=>
       logger.debug("ClockSingleton: SlowClockTick")
-      etsProxyActor ! ETSProxyActor.CheckPipelinesStatus
     case VerySlowClockTick=>
       logger.debug("ClockSingleton: VerySlowClockTick")
       jobPurgerActor ! JobPurgerActor.StartJobPurge

@@ -18,6 +18,7 @@ import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
 import scala.concurrent.ExecutionContext.Implicits.global
 
+
 @Singleton
 class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration,
                                  snsClientMgr:SNSClientManager,
@@ -32,13 +33,13 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration,
                                 (implicit system:ActorSystem) extends RequestModelEncoder {
   private implicit val logger = LogManager.getLogger(getClass)
 
-  private implicit val mat:Materializer = ActorMaterializer.create(system)
+  protected implicit val mat:Materializer = ActorMaterializer.create(system)
 
-  private val awsProfile = config.getOptional[String]("externalData.awsProfile")
-  private implicit val s3Client = s3ClientMgr.getClient(awsProfile)
-  private implicit val dynamoClient = ddbClientManager.getNewAlpakkaDynamoClient(awsProfile)
-  private implicit val esClient = esClientMgr.getClient()
-  private val indexer = new Indexer(config.get[String]("externalData.indexName"))
+  protected val awsProfile = config.getOptional[String]("externalData.awsProfile")
+  protected implicit val s3Client = s3ClientMgr.getClient(awsProfile)
+  protected implicit val dynamoClient = ddbClientManager.getNewAlpakkaDynamoClient(awsProfile)
+  protected implicit val esClient = esClientMgr.getClient()
+  protected val indexer = new Indexer(config.get[String]("externalData.indexName"))
 
 
   protected def haveGlacierRestore(entry:ArchiveEntry)(implicit s3Client:AmazonS3) = Try {
@@ -107,6 +108,30 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration,
   }
 
   /**
+    * checks the MIME type of the ArchiveEntry and returns the default proxy type for that kind of file, or None
+    * if not recognised
+    * @param entry ArchiveEntry instance
+    * @return an Option of ProxyType
+    */
+  def defaultProxyType(entry:ArchiveEntry):Option[ProxyType.Value] = entry.mimeType.major match {
+    case "video"=>Some(ProxyType.VIDEO)
+    case "audio"=>Some(ProxyType.AUDIO)
+    case "image"=>None
+    case "application"=>
+      if(entry.mimeType.minor=="octet-stream"){
+        Some(ProxyType.VIDEO)
+      } else {
+        None
+      }
+    case "binary"=>
+      if(entry.mimeType.minor=="octet-stream"){
+        Some(ProxyType.VIDEO)
+      } else {
+        None
+      }
+    case _=>None
+  }
+  /**
     * try to start a thumbnail proxy job.  This will use the main media if available; if it's in Glacier an existing proxy will be tried.
     * If no media is available without cost, will return a Failure(NothingFoundError).
     * Convenience method for when no ArchiveEntry is available to the called; the fileId is looked up and then the main createThumbnailProxy is called
@@ -114,8 +139,8 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration,
     * @return Success with the ARN of the ECS job ID if we suceeded, otherwise a Failure containing a [[com.theguardian.multimedia.archivehunter.common.errors.GenericArchiveHunterError]]
     *         describing the failure
     */
-  def requestProxyJob(requestType: RequestType.Value,fileId:String)(implicit proxyLocationDAO:ProxyLocationDAO):Future[Try[String]] =
-    indexer.getById(fileId).flatMap(entry=>requestProxyJob(requestType, entry))
+  def requestProxyJob(requestType: RequestType.Value,fileId:String, proxyType: Option[ProxyType.Value])(implicit proxyLocationDAO:ProxyLocationDAO):Future[Try[String]] =
+    indexer.getById(fileId).flatMap(entry=>requestProxyJob(requestType, entry, proxyType))
 
   /**
     * try to start a thumbnail proxy job.  This will use the main media if available; if it's in Glacier an existing proxy will be tried.
@@ -124,7 +149,7 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration,
     * @return Success with the ARN of the ECS job ID if we suceeded, otherwise a Failure containing a [[com.theguardian.multimedia.archivehunter.common.errors.GenericArchiveHunterError]]
     *         describing the failure
     */
-  def requestProxyJob(requestType: RequestType.Value,entry: ArchiveEntry):Future[Try[String]] = {
+  def requestProxyJob(requestType: RequestType.Value,entry: ArchiveEntry, proxyType: Option[ProxyType.Value]):Future[Try[String]] = {
     val jobUuid = UUID.randomUUID()
 
     val targetFuture = scanTargetDAO.targetForBucket(entry.bucket).map({
@@ -156,7 +181,7 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration,
           jobModelDAO.deleteJob(jobDesc.jobId)  //ignore the result, this is non-essential but there to prevent the jobs list getting clogged up
           Future(Failure(NothingFoundError("media", "Nothing found to proxy")))
         case Some(uriString) =>
-          val rq = RequestModel(requestType,uriString,targetProxyBucket,jobUuid.toString)
+          val rq = RequestModel(requestType,uriString,targetProxyBucket,jobUuid.toString,None,proxyType)
           sendRequest(rq, target.region).map(result=>Success(result))
       }
     }).recoverWith({

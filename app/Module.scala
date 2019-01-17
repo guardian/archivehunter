@@ -14,7 +14,6 @@ class Module extends AbstractModule with AkkaGuiceSupport {
     bindActor[LegacyProxiesScanner]("legacyProxiesScannerActor")
     bindActor[BulkThumbnailer]("bulkThumbnailerActor")
     bindActor[DynamoCapacityActor]("dynamoCapacityActor")
-    bindActor[ETSProxyActor]("etsProxyActor")
     bindActor[ProxiesRelinker]("proxiesRelinker")
     bindActor[GlacierRestoreActor]("glacierRestoreActor")
     bindActor[JobPurgerActor]("jobPurgerActor")

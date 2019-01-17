@@ -28,8 +28,6 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.Future
 import akka.pattern.ask
-import services.ETSProxyActor
-import services.ETSProxyActor.ETSMsgReply
 
 @Singleton
 class JobController @Inject() (override val config:Configuration, override val controllerComponents:ControllerComponents, jobModelDAO: JobModelDAO,
@@ -37,7 +35,6 @@ class JobController @Inject() (override val config:Configuration, override val c
                                ddbClientManager:DynamoClientManager,
                                override val refresher:InjectableRefresher,
                                override val wsClient:WSClient,
-                              @Named("etsProxyActor") etsProxyActor:ActorRef,
                                proxyLocationDAO:ProxyLocationDAO)
                               (implicit actorSystem:ActorSystem)
   extends AbstractController(controllerComponents) with Circe with JobModelEncoder with ZonedDateTimeEncoder with PanDomainAuthActions with QueryRemaps {
@@ -166,21 +163,22 @@ class JobController @Inject() (override val config:Configuration, override val c
   def refreshTranscodeInfo(jobId:String) = APIAuthAction.async { request=>
     implicit val timeout:akka.util.Timeout = 30 seconds
 
-    jobModelDAO.jobForId(jobId).flatMap({
-      case None=>
-        Future(NotFound(GenericErrorResponse("not_found","job ID not found").asJson))
-      case Some(Left(err))=>
-        logger.error(s"Could not read from jobs database: ${err.toString}")
-        Future(InternalServerError(GenericErrorResponse("db_error", err.toString).asJson))
-      case Some(Right(jobModel))=>
-        val resultFuture = (etsProxyActor ? ETSProxyActor.ManualJobStatusRefresh(jobModel)).mapTo[ETSMsgReply]
-        resultFuture.map({
-          case ETSProxyActor.PreparationFailure(err)=>
-            logger.error("Could not refresh transcode info", err)
-            InternalServerError(GenericErrorResponse("error", err.toString).asJson)
-          case ETSProxyActor.PreparationSuccess(transcodeId, rtnJobId)=>
-            Ok(ObjectGetResponse("ok","job_id",rtnJobId).asJson)
-        })
-    })
+//    jobModelDAO.jobForId(jobId).flatMap({
+//      case None=>
+//        Future(NotFound(GenericErrorResponse("not_found","job ID not found").asJson))
+//      case Some(Left(err))=>
+//        logger.error(s"Could not read from jobs database: ${err.toString}")
+//        Future(InternalServerError(GenericErrorResponse("db_error", err.toString).asJson))
+//      case Some(Right(jobModel))=>
+//        val resultFuture = (etsProxyActor ? ETSProxyActor.ManualJobStatusRefresh(jobModel)).mapTo[ETSMsgReply]
+//        resultFuture.map({
+//          case ETSProxyActor.PreparationFailure(err)=>
+//            logger.error("Could not refresh transcode info", err)
+//            InternalServerError(GenericErrorResponse("error", err.toString).asJson)
+//          case ETSProxyActor.PreparationSuccess(transcodeId, rtnJobId)=>
+//            Ok(ObjectGetResponse("ok","job_id",rtnJobId).asJson)
+//        })
+//    })
+    Future(InternalServerError(GenericErrorResponse("not_implemented","Not currently implemented").asJson))
   }
 }

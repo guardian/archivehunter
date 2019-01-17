@@ -37,7 +37,6 @@ class IngestProxyQueue @Inject()(config: Configuration,
                                  proxyGenerators: ProxyGenerators,
                                  s3ClientMgr: S3ClientManager,
                                  dynamoClientMgr: DynamoClientManager,
-                                 @Named("etsProxyActor") etsProxyActor: ActorRef
                                 )(implicit scanTargetDAO: ScanTargetDAO, proxyLocationDAO: ProxyLocationDAO)
   extends GenericSqsActor[IngestMessage] with ZonedDateTimeEncoder with StorageClassEncoder {
 
@@ -101,7 +100,7 @@ class IngestProxyQueue @Inject()(config: Configuration,
 
     case CreateNewThumbnail(entry) =>
       val originalSender = sender()
-      proxyGenerators.requestProxyJob(RequestType.THUMBNAIL,entry).onComplete({
+      proxyGenerators.requestProxyJob(RequestType.THUMBNAIL,entry,None).onComplete({
         case Success(Success(result)) => //thread completed and we got a result
           logger.info(s"${entry.bucket}:${entry.path}: started thumbnailing with ECS id $result")
           originalSender ! Status.Success
@@ -119,7 +118,13 @@ class IngestProxyQueue @Inject()(config: Configuration,
         val foundProxies = results.collect({ case Right(loc) => loc }).filter(loc => loc.proxyType != ProxyType.THUMBNAIL)
         if (foundProxies.isEmpty) {
           logger.info(s"${entry.bucket}:${entry.path} has no locatable proxies in expected locations. Generating a new one...")
-          etsProxyActor ! ETSProxyActor.CreateDefaultMediaProxy(entry)
+          proxyGenerators.defaultProxyType(entry) match {
+            case Some(proxyType) =>
+              proxyGenerators.requestProxyJob(RequestType.PROXY, entry, Some(proxyType))
+            case None=>
+              logger.error(s"No default proxy type available for ${entry.bucket}:${entry.path} (${entry.mimeType.toString})")
+              throw new RuntimeException("No default proxy type available")
+          }
         } else {
           logger.info(s"${entry.bucket}:${entry.path} has unregistered proxies: $foundProxies")
           //FIXME: need to register proxies here

@@ -19,4 +19,7 @@ case class RequestModel (requestType: RequestType.Value, inputMediaUri: String,
 trait RequestModelEncoder {
   implicit val requestTypeEncoder = Encoder.enumEncoder(RequestType)
   implicit val requestTypeDecoder = Decoder.enumDecoder(RequestType)
+
+  implicit val proxyTypeEncoder = Encoder.enumEncoder(ProxyType)
+  implicit val proxyTypeDecoder = Decoder.enumDecoder(ProxyType)
 }

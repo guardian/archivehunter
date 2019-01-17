@@ -1,12 +1,10 @@
 import akka.actor.Props
 import akka.testkit.TestProbe
 import com.amazonaws.services.dynamodbv2.model.AttributeValue
-import com.amazonaws.services.s3.AmazonS3
 import com.amazonaws.services.sqs.AmazonSQS
 import com.amazonaws.services.sqs.model.{DeleteMessageResult, ReceiveMessageRequest}
 import com.gu.scanamo.error.{DynamoReadError, NoPropertyOfType}
-import com.sksamuel.elastic4s.http.HttpClient
-import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer, ProxyLocation, ProxyLocationDAO}
+import com.theguardian.multimedia.archivehunter.common._
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager, SQSClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{JobModel, JobModelDAO, JobStatus, SourceType}
 import models.JobReportNew
@@ -30,8 +28,8 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito{
       mockedJobModelDAO.putJob(any) returns Future(None)
 
       val mockedArchiveEntry = mock[ArchiveEntry]
-      val mockedUpdateProxyRef = mock[Function2[String,ArchiveEntry,Future[Either[String, Option[ProxyLocation]]]]]
-      mockedUpdateProxyRef.apply(any,any) returns Future(Right(None))
+      val mockedUpdateProxyRef = mock[Function3[String,ArchiveEntry,ProxyType.Value,Future[Either[String, Option[ProxyLocation]]]]]
+      mockedUpdateProxyRef.apply(any,any,any) returns Future(Right(None))
 
       val testProbe = TestProbe()
       val fakeIncoming = JobReportNew("success",None,"fake-job-id",Some("input-uri"),Some("output-uri"),None)
@@ -53,13 +51,13 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito{
         override val sqsClient = mockedSqsClient
         override def thumbnailJobOriginalMedia(jobDesc: JobModel): Future[Either[String, ArchiveEntry]] = Future(Right(mockedArchiveEntry))
 
-        override def updateProxyRef(proxyUri: String, archiveEntry: ArchiveEntry): Future[Either[String, Option[ProxyLocation]]] = mockedUpdateProxyRef(proxyUri, archiveEntry)
+        override def updateProxyRef(proxyUri: String, archiveEntry: ArchiveEntry, proxyType: ProxyType.Value): Future[Either[String, Option[ProxyLocation]]] = mockedUpdateProxyRef(proxyUri, archiveEntry, proxyType)
       }))
 
       toTest ! fakeMessage
 
       testProbe.expectMsg(10 seconds, akka.actor.Status.Success())
-      there was one(mockedUpdateProxyRef).apply("output-uri",mockedArchiveEntry)
+      there was one(mockedUpdateProxyRef).apply("output-uri",mockedArchiveEntry, ProxyType.VIDEO)
       there was one(mockedJobModelDAO).putJob(any)
       there was one(mockedSqsClient).deleteMessage(any)
     }
@@ -95,7 +93,6 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito{
         override val sqsClient = mockedSqsClient
         override def thumbnailJobOriginalMedia(jobDesc: JobModel): Future[Either[String, ArchiveEntry]] = Future(Left("So there"))
 
-        override def updateProxyRef(proxyUri: String, archiveEntry: ArchiveEntry): Future[Either[String, Option[ProxyLocation]]] = mockedUpdateProxyRef(proxyUri, archiveEntry)
       }))
 
       toTest ! fakeMessage

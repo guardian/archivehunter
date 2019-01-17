@@ -119,7 +119,7 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
         logger.error(s"Message $msg logged as success but had no 'output' field!")
         originalSender ! akka.actor.Status.Failure(new RuntimeException(s"Message logged as success but had no 'output' field!"))
       } else {
-        val proxyType = jobDesc.jobType match {
+        val proxyType = jobDesc.jobType.toLowerCase match {
           case "thumbnail"=>ProxyType.THUMBNAIL
           case "proxy"=>ProxyType.VIDEO //FIXME: need to get data from transcode framework to determine what this actually is
         }
@@ -158,6 +158,8 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
       jobDesc.jobType match {
         case "proxy"=>self ! HandleSuccessfulProxy(msg, jobDesc, rq, receiptHandle, originalSender)
         case "thumbnail"=>self ! HandleSuccessfulProxy(msg, jobDesc, rq, receiptHandle, originalSender)
+          //TODO
+        //case "analyze"=>self ! HandleSuccessfulAnalyse
       }
 
     /**

@@ -25,11 +25,9 @@ import com.theguardian.multimedia.archivehunter.common.errors.{ExternalSystemErr
 import com.theguardian.multimedia.archivehunter.common.cmn_models._
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{JobModelDAO, ScanTargetDAO}
 import helpers.{InjectableRefresher, ProxyLocator}
-import services.{ETSProxyActor, ProxiesRelinker}
+import services.ProxiesRelinker
 import com.theguardian.multimedia.archivehunter.common.ProxyTranscodeFramework.{ProxyGenerators, RequestType}
 import play.api.libs.ws.WSClient
-import services.ETSProxyActor.{ETSMsg, ETSMsgReply, PreparationFailure, PreparationSuccess}
-
 import scala.concurrent.duration._
 import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
@@ -43,7 +41,6 @@ class ProxiesController @Inject()(override val config:Configuration,
                                   proxyGenerators: ProxyGenerators,
                                   override val wsClient:WSClient,
                                   override val refresher:InjectableRefresher,
-                                  @Named("etsProxyActor") etsProxyActor:ActorRef,
                                   @Named("proxiesRelinker") proxiesRelinker:ActorRef)
                                  (implicit actorSystem:ActorSystem, scanTargetDAO:ScanTargetDAO, jobModelDAO:JobModelDAO, proxyLocationDAO:ProxyLocationDAO)
   extends AbstractController(controllerComponents) with Circe with ProxyLocationEncoder with PanDomainAuthActions with AdminsOnly {
@@ -213,7 +210,7 @@ class ProxiesController @Inject()(override val config:Configuration,
   }
 
   def generateThumbnail(fileId:String) = APIAuthAction.async {
-    proxyGenerators.requestProxyJob(RequestType.THUMBNAIL, fileId).map({
+    proxyGenerators.requestProxyJob(RequestType.THUMBNAIL, fileId, None).map({
       case Failure(NothingFoundError(objectType, msg))=>
         NotFound(GenericErrorResponse("not_found", msg.toString).asJson)
       case Failure(ExternalSystemError(systemName, msg))=>
@@ -268,22 +265,16 @@ class ProxiesController @Inject()(override val config:Configuration,
 
         canContinue match {
           case Right(_)=>
-            if(pt==ProxyType.THUMBNAIL){
-              proxyGenerators.requestProxyJob(RequestType.THUMBNAIL,entry).map({
-                case Success(jobId)=>
-                  Ok(TranscodeStartedResponse("transcode_started", jobId, None).asJson)
-                case Failure(err)=>
-                  InternalServerError(GenericErrorResponse("not_started", err.toString).asJson)
-              })
-            } else {
-              val result = (etsProxyActor ? ETSProxyActor.CreateMediaProxy(entry, pt)).mapTo[ETSMsgReply]
-              result.map({
-                case PreparationSuccess(transcodeId, jobId)=>
-                  Ok(TranscodeStartedResponse("transcode_started", jobId, Some(transcodeId)).asJson)
-                case PreparationFailure(err)=>
-                  InternalServerError(GenericErrorResponse("not_started", err.toString).asJson)
-              })
+            val requestType = pt match {
+              case ProxyType.THUMBNAIL=>RequestType.THUMBNAIL
+              case _=>RequestType.PROXY
             }
+            proxyGenerators.requestProxyJob(requestType,entry,Some(pt)).map({
+              case Success(jobId)=>
+                Ok(TranscodeStartedResponse("transcode_started", jobId, None).asJson)
+              case Failure(err)=>
+                InternalServerError(GenericErrorResponse("not_started", err.toString).asJson)
+            })
           case Left(err)=>
             Future(BadRequest(GenericErrorResponse("bad_request",err).asJson))
         }

@@ -5,7 +5,6 @@ import akka.testkit.TestProbe
 import com.theguardian.multimedia.archivehunter.common._
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, S3ClientManager, SQSClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{IngestMessage, ScanTargetDAO}
-import com.theguardian.multimedia.archivehunter.common.cmn_services.ProxyGenerators
 import org.specs2.mock.Mockito
 import org.specs2.mutable.Specification
 import play.api.Configuration
@@ -15,6 +14,7 @@ import akka.stream.alpakka.dynamodb.scaladsl.DynamoClient
 import com.amazonaws.services.dynamodbv2.{AmazonDynamoDB, AmazonDynamoDBAsync}
 import com.amazonaws.services.sqs.AmazonSQS
 import com.amazonaws.services.sqs.model._
+import com.theguardian.multimedia.archivehunter.common.ProxyTranscodeFramework.{ProxyGenerators, RequestType}
 import io.circe.syntax._
 import io.circe.generic.auto._
 import models.AwsSqsMsg
@@ -44,7 +44,7 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       val mockedSelf = TestProbe()
 
       val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
-        mockDDBlientMgr, mockEtsProxyActor.ref) {
+        mockDDBlientMgr) {
         override protected val ownRef = mockedSelf.ref
       }))
 
@@ -77,7 +77,7 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       val mockedSelf = TestProbe()
 
       val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
-        mockDDBlientMgr, mockEtsProxyActor.ref) {
+        mockDDBlientMgr) {
         override protected val ownRef = mockedSelf.ref
       }))
 
@@ -109,7 +109,7 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       val mockedSelf = TestProbe()
 
       val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
-        mockDDBlientMgr, mockEtsProxyActor.ref) {
+        mockDDBlientMgr) {
         override protected val ownRef = mockedSelf.ref
       }))
 
@@ -136,7 +136,7 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       val testConfig = Configuration.from(Map("ingest.notificationsQueue"->"someQueue"))
       val mockSqsClientMgr = mock[SQSClientManager]
       val mockProxyGenerators = mock[ProxyGenerators]
-      mockProxyGenerators.createThumbnailProxy(any[ArchiveEntry])(any) returns Future(Success("fake-job-id"))
+      mockProxyGenerators.requestProxyJob(any,any[ArchiveEntry],any) returns Future(Success("fake-job-id"))
       implicit val mockProxyLocationDAO = mock[ProxyLocationDAO]
       val mockS3ClientMgr = mock[S3ClientManager]
       val mockDDBlientMgr = mock[DynamoClientManager]
@@ -147,7 +147,7 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       val mockedSelf = TestProbe()
 
       val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
-        mockDDBlientMgr, mockEtsProxyActor.ref) {
+        mockDDBlientMgr) {
         override protected val ownRef = mockedSelf.ref
       }))
 
@@ -158,7 +158,7 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
 
       mockedSelf.expectNoMessage(2 seconds)
       val result = Await.result(toTest ? IngestProxyQueue.CreateNewThumbnail(mockEntry), 30 seconds)
-      there was one(mockProxyGenerators).createThumbnailProxy(mockEntry)
+      there was one(mockProxyGenerators).requestProxyJob(RequestType.THUMBNAIL,mockEntry,None)
 
       result mustEqual akka.actor.Status.Success
     }
@@ -169,7 +169,7 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       val testConfig = Configuration.from(Map("ingest.notificationsQueue"->"someQueue"))
       val mockSqsClientMgr = mock[SQSClientManager]
       val mockProxyGenerators = mock[ProxyGenerators]
-      mockProxyGenerators.createThumbnailProxy(any[ArchiveEntry])(any) returns Future(Failure(new RuntimeException("boo!")))
+      mockProxyGenerators.requestProxyJob(any,any[ArchiveEntry],any) returns Future(Failure(new RuntimeException("boo!")))
       implicit val mockProxyLocationDAO = mock[ProxyLocationDAO]
       val mockS3ClientMgr = mock[S3ClientManager]
       val mockDDBlientMgr = mock[DynamoClientManager]
@@ -180,7 +180,7 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       val mockedSelf = TestProbe()
 
       val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
-        mockDDBlientMgr, mockEtsProxyActor.ref) {
+        mockDDBlientMgr) {
         override protected val ownRef = mockedSelf.ref
       }))
 
@@ -191,7 +191,7 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
 
       mockedSelf.expectNoMessage(2 seconds)
       val result = Await.result(toTest ? IngestProxyQueue.CreateNewThumbnail(mockEntry), 30 seconds)
-      there was one(mockProxyGenerators).createThumbnailProxy(mockEntry)
+      there was one(mockProxyGenerators).requestProxyJob(RequestType.THUMBNAIL,mockEntry,None)
 
       result mustEqual akka.actor.Status.Failure
     }
@@ -203,7 +203,7 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       val mockSqsClientMgr = mock[SQSClientManager]
       implicit val mockProxyLocationDAO = mock[ProxyLocationDAO]
       val mockProxyGenerators = mock[ProxyGenerators]
-      mockProxyGenerators.createThumbnailProxy(any[ArchiveEntry])(any) returns Future.failed(new RuntimeException("my hovercraft is full of eels"))
+      mockProxyGenerators.requestProxyJob(any,any[ArchiveEntry],any) returns Future.failed(new RuntimeException("my hovercraft is full of eels"))
       val mockS3ClientMgr = mock[S3ClientManager]
       val mockDDBlientMgr = mock[DynamoClientManager]
       val mockDDBClient = mock[DynamoClient]
@@ -213,7 +213,7 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       val mockedSelf = TestProbe()
 
       val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
-        mockDDBlientMgr, mockEtsProxyActor.ref) {
+        mockDDBlientMgr) {
         override protected val ownRef = mockedSelf.ref
       }))
 
@@ -224,7 +224,7 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
 
       mockedSelf.expectNoMessage(2 seconds)
       val result = Await.result(toTest ? IngestProxyQueue.CreateNewThumbnail(mockEntry), 30 seconds)
-      there was one(mockProxyGenerators).createThumbnailProxy(mockEntry)
+      there was one(mockProxyGenerators).requestProxyJob(RequestType.THUMBNAIL, mockEntry,None)
 
       result mustEqual akka.actor.Status.Failure
     }
@@ -249,7 +249,7 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       val mockedSelf = TestProbe()
 
       val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
-        mockDDBlientMgr, mockEtsProxyActor.ref) {
+        mockDDBlientMgr) {
         override protected val ownRef = mockedSelf.ref
       }))
 
@@ -281,7 +281,7 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       val mockedSelf = TestProbe()
 
       val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
-        mockDDBlientMgr, mockEtsProxyActor.ref) {
+        mockDDBlientMgr) {
         override protected val ownRef = mockedSelf.ref
       }))
 
@@ -316,7 +316,7 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       val mockedSelf = TestProbe()
 
       val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
-        mockDDBlientMgr, mockEtsProxyActor.ref) {
+        mockDDBlientMgr) {
         override protected val ownRef = mockedSelf.ref
       }))
 
@@ -354,7 +354,7 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       val mockedSelf = TestProbe()
 
       val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
-        mockDDBlientMgr, mockEtsProxyActor.ref) {
+        mockDDBlientMgr) {
         override protected val ownRef = mockedSelf.ref
       }))
 
@@ -387,7 +387,7 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       val mockedSelf = TestProbe()
 
       val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
-        mockDDBlientMgr, mockEtsProxyActor.ref) {
+        mockDDBlientMgr) {
         override protected val ownRef = mockedSelf.ref
       }))
 
@@ -442,7 +442,7 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       val mockedSelf = TestProbe()
 
       val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
-        mockDDBlientMgr, mockEtsProxyActor.ref) {
+        mockDDBlientMgr) {
         override protected val ownRef = mockedSelf.ref
       }))
 
@@ -470,7 +470,7 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       val mockedSelf = TestProbe()
 
       val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
-        mockDDBlientMgr, mockEtsProxyActor.ref) {
+        mockDDBlientMgr) {
         override protected val ownRef = mockedSelf.ref
       }))
 
