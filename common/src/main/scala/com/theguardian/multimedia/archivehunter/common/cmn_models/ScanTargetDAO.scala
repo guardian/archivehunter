@@ -23,7 +23,7 @@ import org.apache.logging.log4j.LogManager
 
 @Singleton
 class ScanTargetDAO @Inject()(config:ArchiveHunterConfiguration, ddbClientMgr: DynamoClientManager)(implicit actorSystem:ActorSystem)
-  extends ZonedDateTimeEncoder with ZonedTimeFormat with ExtValueConverters {
+  extends ZonedDateTimeEncoder with ZonedTimeFormat with JobModelEncoder with ExtValueConverters {
   private val logger = LogManager.getLogger(getClass)
 
   val table = Table[ScanTarget](config.get[String]("externalData.scanTargets"))
@@ -93,6 +93,8 @@ class ScanTargetDAO @Inject()(config:ArchiveHunterConfiguration, ddbClientMgr: D
     }
   }
 
+  def put(tgt:ScanTarget) = doNextRetry(tgt,1,1)
+
   /**
     * gets the [[ScanTarget]] record for the given bucket name
     * @param bucketName bucket name to search for
@@ -102,6 +104,22 @@ class ScanTargetDAO @Inject()(config:ArchiveHunterConfiguration, ddbClientMgr: D
     ScanamoAlpakka.exec(alpakkaClient)(
       table.get('bucketName->bucketName)
     )
+  }
+
+  /**
+    * gets the [[ScanTarget]] record for that is waiting for the given job ID
+    * @param jobId
+    */
+  def waitingForJobId(jobId:String):Future[Either[List[DynamoReadError],Option[ScanTarget]]] = {
+    allScanTargets().map(results=>{
+      val failures = results.collect({case Left(err)=>err})
+      if(failures.nonEmpty){
+        Left(failures)
+      } else {
+        val finalResults = results.collect({case Right(tgt)=>tgt}).filter(tgt=>tgt.pendingJobIds.isDefined && tgt.pendingJobIds.get.contains(jobId))
+        Right(finalResults.headOption)
+      }
+    })
   }
 
   def allScanTargets():Future[List[Either[DynamoReadError,ScanTarget]]] = ScanamoAlpakka.exec(alpakkaClient)(table.scan())

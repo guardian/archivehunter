@@ -2,8 +2,10 @@ package com.theguardian.multimedia.archivehunter.common.ProxyTranscodeFramework
 
 import java.time.{Instant, ZonedDateTime}
 import java.util.UUID
+
 import akka.actor.ActorSystem
 import akka.stream.{ActorMaterializer, Materializer}
+import com.amazonaws.services.elastictranscoder.model.CreatePipelineRequest
 import com.amazonaws.services.s3.AmazonS3
 import com.amazonaws.services.sns.model.PublishRequest
 import com.theguardian.multimedia.archivehunter.common.clientManagers._
@@ -182,7 +184,7 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration,
           Future(Failure(NothingFoundError("media", "Nothing found to proxy")))
         case Some(uriString) =>
           val rq = RequestModel(requestType,uriString,targetProxyBucket,jobUuid.toString,None,proxyType)
-          sendRequest(rq, target.region).map(result=>Success(result))
+          sendRequest(rq, target.region)
       }
     }).recoverWith({
       case err:Throwable=>
@@ -195,7 +197,7 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration,
     * sends the given request to a Proxy Framework instance.
     * @param rq RequestModel that will be received by Proxy Framework
     * @param region region to look in
-    * @return a Future with the message ID. The future fails if an error occurs, use .recover() / .recoverWith() to catch this.
+    * @return a Future with the message ID or a Failure if it errors
     */
   protected def sendRequest(rq:RequestModel,region:String) = {
     proxyFrameworkInstanceDAO.recordsForRegion(region).map(recordList=>{
@@ -211,15 +213,80 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration,
 
       val pfInst = records.head
       implicit val stsClient = stsClientMgr.getClientForRegion(awsProfile, region)
-      snsClientMgr.getTemporaryClient(region, pfInst.roleArn) match {
-        case Failure(err)=>throw err
-        case Success(snsClient)=>
+      snsClientMgr.getTemporaryClient(region, pfInst.roleArn).map(snsClient=>{
           val pubRq = new PublishRequest().withTopicArn(pfInst.inputTopicArn).withMessage(rq.asJson.toString)
           val result = snsClient.publish(pubRq)
           result.getMessageId
-      }
+      })
 
     })
-
   }
+
+  def updateJobFailed(jobDesc:JobModel,log:Option[String]) = {
+    val updatedJob = jobDesc.copy(jobStatus = JobStatus.ST_ERROR,log=log)
+    jobModelDAO.putJob(updatedJob)
+  }
+
+  def requestCheckJob(sourceBucket:String, destBucket:String, region:String) = {
+    val jobUuid = UUID.randomUUID()
+    val jobDesc = JobModel(jobUuid.toString,"CheckSetup",Some(ZonedDateTime.now()),None,JobStatus.ST_PENDING,None,"none",None,SourceType.SRC_GLOBAL)
+
+    val rq = RequestModel(RequestType.CHECK_SETUP,s"s3://$sourceBucket",destBucket,jobUuid.toString,None,None)
+
+    jobModelDAO.putJob(jobDesc).flatMap({
+      case None=>
+        sendRequest(rq, region).map({
+          case Success(msgId)=>
+            Right(jobUuid)
+          case Failure(err)=>
+            logger.error(s"Could not send request to $region: ", err)
+            updateJobFailed(jobDesc, Some(err.toString))
+            Left(err.toString)
+        })
+      case Some(Right(updatedRecord))=>
+        sendRequest(rq, region).map({
+          case Success(msgId)=>Right(jobUuid)
+          case Failure(err)=>
+            logger.error(s"Could not send request to $region: ", err)
+            updateJobFailed(jobDesc, Some(err.toString))
+            Left(err.toString)
+        })
+      case Some(Left(err))=>
+        logger.error("Could not save job: ", err)
+        //no point in updating the job if it didn't save in the first place
+        Future(Left(err.toString))
+    })
+  }
+
+  def requestPipelineCreate(inputBucket:String,outputBucket:String,region:String) = {
+    val jobUuid = UUID.randomUUID()
+    val jobDesc = JobModel(jobUuid.toString,"SetupTranscoding",Some(ZonedDateTime.now()),None,JobStatus.ST_PENDING,None,"",None,SourceType.SRC_GLOBAL)
+
+    val pipelineRequest = CreatePipeline(inputBucket,outputBucket)
+    val rq = RequestModel(RequestType.SETUP_PIPELINE,"","",jobUuid.toString,Some(pipelineRequest),None)
+
+    jobModelDAO.putJob(jobDesc).flatMap({
+      case None=>
+        sendRequest(rq, region).map({
+          case Success(msgId)=>Right(jobUuid.toString)
+          case Failure(err)=>
+            logger.error(s"Could not send request to $region: ", err)
+            updateJobFailed(jobDesc, Some(err.toString))
+            Left(err.toString)
+        })
+      case Some(Right(updatedRecord))=>
+        sendRequest(rq, region).map({
+          case Success(msgId)=>Right(jobUuid)
+          case Failure(err)=>
+            logger.error(s"Could not send request to $region: ", err)
+            updateJobFailed(jobDesc, Some(err.toString))
+            Left(err.toString)
+        })
+      case Some(Left(err))=>
+        logger.error("Could not save job: ", err)
+        //no point in updating the job if it didn't save in the first place
+        Future(Left(err.toString))
+    })
+  }
+
 }

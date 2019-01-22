@@ -19,14 +19,17 @@ import akka.stream.alpakka.dynamodb.scaladsl._
 import akka.stream.alpakka.dynamodb.impl._
 import com.theguardian.multimedia.archivehunter.common.clientManagers.DynamoClientManager
 import com.amazonaws.auth.{AWSStaticCredentialsProvider, InstanceProfileCredentialsProvider}
+import com.gu.pandomainauth.action.AuthActions
+import com.theguardian.multimedia.archivehunter.common.ProxyTranscodeFramework.ProxyGenerators
 import com.theguardian.multimedia.archivehunter.common.cmn_helpers.ZonedTimeFormat
-import com.theguardian.multimedia.archivehunter.common.cmn_models.ScanTarget
+import com.theguardian.multimedia.archivehunter.common.cmn_models.{JobModelEncoder, ScanTarget, ScanTargetDAO}
 import helpers.InjectableRefresher
 import play.api.libs.ws.WSClient
 import services.{BucketScanner, BulkThumbnailer, LegacyProxiesScanner}
 
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.util.{Failure, Success}
 
 @Singleton
 class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner:ActorRef,
@@ -36,9 +39,11 @@ class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner
                                       override val controllerComponents:ControllerComponents,
                                       override val wsClient:WSClient,
                                       override val refresher:InjectableRefresher,
-                                      ddbClientMgr:DynamoClientManager)
+                                      ddbClientMgr:DynamoClientManager,
+                                      proxyGenerators:ProxyGenerators,
+                                      scanTargetDAO:ScanTargetDAO)
                                      (implicit system:ActorSystem)
-  extends AbstractController(controllerComponents) with PanDomainAuthActions with Circe with ZonedDateTimeEncoder with ZonedTimeFormat with AdminsOnly {
+  extends AbstractController(controllerComponents) with PanDomainAuthActions with Circe with ZonedDateTimeEncoder with ZonedTimeFormat with JobModelEncoder with AdminsOnly {
   private val logger=Logger(getClass)
   implicit val mat:Materializer = ActorMaterializer.create(system)
 
@@ -104,6 +109,13 @@ class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner
       block(tgt)
   }).getOrElse(NotFound(ObjectCreatedResponse[String]("not_found","scan_target",targetName).asJson))
 
+  private def withLookupAsync(targetName:String)(block: ScanTarget=>Future[Result]) = Scanamo.exec(conventionalClient)(table.get('bucketName -> targetName )).map({
+    case Left(error)=>
+      Future(InternalServerError(GenericErrorResponse("error", error.toString).asJson))
+    case Right(tgt)=>
+      block(tgt)
+  }).getOrElse(Future(NotFound(ObjectCreatedResponse[String]("not_found","scan_target",targetName).asJson)))
+
   def manualTrigger(targetName:String) = APIAuthAction { request=>
     adminsOnlySync(request) {
       withLookup(targetName) { tgt =>
@@ -145,6 +157,34 @@ class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner
       withLookup(targetName) { tgt =>
         bulkThumbnailer ! new BulkThumbnailer.DoThumbnails(tgt)
         Ok(GenericErrorResponse("ok", "proxy run started").asJson)
+      }
+    }
+  }
+
+  /**
+    * ask the proxy framework to validate this configuration.
+    * @param targetName
+    * @return
+    */
+  def initiateCheckJob(targetName:String) = APIAuthAction.async { request=>
+    adminsOnlyAsync(request) {
+      withLookupAsync(targetName){ tgt =>
+        proxyGenerators.requestCheckJob(tgt.bucketName, tgt.proxyBucket, tgt.region).map({
+          case Left(err) =>
+            InternalServerError(GenericErrorResponse("error", err.toString).asJson)
+          case Right(jobId) =>
+            val updatedJobIds = tgt.pendingJobIds match {
+              case Some(existingSeq) => existingSeq ++ Seq(jobId.toString)
+              case None => Seq(jobId.toString)
+            }
+            val updatedTarget = tgt.copy(pendingJobIds = Some(updatedJobIds))
+            scanTargetDAO.put(updatedTarget) match {
+              case Success(record) =>
+                Ok(ObjectCreatedResponse("ok", "jobId", jobId).asJson)
+              case Failure(err) =>
+                InternalServerError(GenericErrorResponse("error", err.toString).asJson)
+            }
+        })
       }
     }
   }

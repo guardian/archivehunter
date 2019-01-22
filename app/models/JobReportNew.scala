@@ -2,9 +2,19 @@ package models
 
 import java.util.Base64
 
+import com.theguardian.multimedia.archivehunter.common.ProxyType
 import io.circe.{Decoder, Encoder}
 
-case class JobReportNew(status:String, log:Option[String], jobId:String, input:Option[String], output:Option[String], metadata:Option[String]) {
+object JobReportStatus extends Enumeration {
+  val SUCCESS,FAILURE,RUNNING,WARNING = Value
+}
+
+trait JobReportStatusEncoder {
+  implicit val jobReportStatusEncoder = Encoder.enumEncoder(JobReportStatus)
+  implicit val jobReportStatusDecoder = Decoder.enumDecoder(JobReportStatus)
+}
+
+case class JobReportNew(status:JobReportStatus.Value, log:Option[String], jobId:String, input:Option[String], output:Option[String], proxyType:Option[ProxyType.Value], metadata:Option[String]) {
   /**
     * performs base64 decoding on the log field and returns the result.
     * @return None if there was no log field. Some(Right(data)) if there was log data or Some(Left(errorString)) if there was an error

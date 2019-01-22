@@ -52,14 +52,10 @@ class BucketScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientMan
   implicit val mat = ActorMaterializer.create(system)
   implicit val ec:ExecutionContext = system.dispatcher
 
-  val table = Table[ScanTarget](config.get[String]("externalData.scanTargets"))
-
   override val indexName: String = config.get[String]("externalData.indexName")
 
-  def listScanTargets() = {
-    val alpakkaClient = ddbClientMgr.getNewAlpakkaDynamoClient(config.getOptional[String]("externalData.awsProfile"))
-
-    ScanamoAlpakka.exec(alpakkaClient)(table.scan()).map(result=>{
+  def listScanTargets() =
+    scanTargetDAO.allScanTargets().map(result=>{
       val errors = result.collect({
         case Left(readError)=>readError
       })
@@ -72,7 +68,7 @@ class BucketScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientMan
         throw new RuntimeException(errors.map(_.toString).mkString(","))
       }
     })
-  }
+
 
   /**
     * returns a boolean indicating whether the given target is due a scan, i.e. last_scan + scan_interval < now OR

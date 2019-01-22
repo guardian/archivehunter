@@ -9,7 +9,7 @@ case class CreatePipeline (fromBucket:String, toBucket:String)
 //This should be kept in-sync with the corresponding file in the main ArchiveHunter source
 object RequestType extends Enumeration {
   type RequestType = Value
-  val THUMBNAIL, PROXY, ANALYSE = Value
+  val THUMBNAIL, PROXY, ANALYSE, SETUP_PIPELINE, CHECK_SETUP = Value
 }
 
 case class RequestModel (requestType: RequestType.Value, inputMediaUri: String,

@@ -6,7 +6,7 @@ import com.amazonaws.services.sqs.model.{DeleteMessageResult, ReceiveMessageRequ
 import com.gu.scanamo.error.{DynamoReadError, NoPropertyOfType}
 import com.theguardian.multimedia.archivehunter.common._
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager, SQSClientManager}
-import com.theguardian.multimedia.archivehunter.common.cmn_models.{JobModel, JobModelDAO, JobStatus, SourceType}
+import com.theguardian.multimedia.archivehunter.common.cmn_models._
 import models.JobReportNew
 import org.specs2.mock.Mockito
 import org.specs2.mutable.Specification
@@ -27,6 +27,8 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito{
       val mockedJobModelDAO = mock[JobModelDAO]
       mockedJobModelDAO.putJob(any) returns Future(None)
 
+      val mockedScanTargetDAO = mock[ScanTargetDAO]
+
       val mockedArchiveEntry = mock[ArchiveEntry]
       val mockedUpdateProxyRef = mock[Function3[String,ArchiveEntry,ProxyType.Value,Future[Either[String, Option[ProxyLocation]]]]]
       mockedUpdateProxyRef.apply(any,any,any) returns Future(Right(None))
@@ -46,6 +48,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito{
         mock[S3ClientManager],
         mock[DynamoClientManager],
         mockedJobModelDAO,
+        mockedScanTargetDAO,
         mock[ESClientManager]
       )(mock[ProxyLocationDAO]) {
         override val sqsClient = mockedSqsClient
@@ -69,6 +72,8 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito{
       val mockedJobModelDAO = mock[JobModelDAO]
       mockedJobModelDAO.putJob(any) returns Future(None)
 
+      val mockedScanTargetDAO = mock[ScanTargetDAO]
+
       val mockedArchiveEntry = mock[ArchiveEntry]
       val mockedUpdateProxyRef = mock[Function2[String,ArchiveEntry,Future[Either[String, Option[ProxyLocation]]]]]
       mockedUpdateProxyRef.apply(any,any) returns Future(Right(None))
@@ -88,6 +93,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito{
         mock[S3ClientManager],
         mock[DynamoClientManager],
         mockedJobModelDAO,
+        mockedScanTargetDAO,
         mock[ESClientManager]
       )(mock[ProxyLocationDAO]) {
         override val sqsClient = mockedSqsClient
@@ -112,6 +118,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito{
 
       val mockedJobModelDAO = mock[JobModelDAO]
       mockedJobModelDAO.putJob(any) returns Future(None)
+      val mockedScanTargetDAO = mock[ScanTargetDAO]
 
       val mockedArchiveEntry = mock[ArchiveEntry]
       val mockedUpdateProxyRef = mock[Function2[String,ArchiveEntry,Future[Either[String, Option[ProxyLocation]]]]]
@@ -132,6 +139,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito{
         mock[S3ClientManager],
         mock[DynamoClientManager],
         mockedJobModelDAO,
+        mockedScanTargetDAO,
         mock[ESClientManager]
       )(mock[ProxyLocationDAO]){
         override protected val sqsClient = mockedSqsClient
@@ -151,6 +159,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito{
 
       val mockedJobModelDAO = mock[JobModelDAO]
       mockedJobModelDAO.putJob(any) returns Future(Some(Left(NoPropertyOfType("something",new AttributeValue()))))
+      val mockedScanTargetDAO = mock[ScanTargetDAO]
 
       val mockedArchiveEntry = mock[ArchiveEntry]
       val mockedUpdateProxyRef = mock[Function2[String,ArchiveEntry,Future[Either[String, Option[ProxyLocation]]]]]
@@ -171,6 +180,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito{
         mock[S3ClientManager],
         mock[DynamoClientManager],
         mockedJobModelDAO,
+        mockedScanTargetDAO,
         mock[ESClientManager]
       )(mock[ProxyLocationDAO]){
         override protected val sqsClient = mockedSqsClient

@@ -19,6 +19,7 @@ POST    /api/scanTarget/:id/deletionScan  @controllers.ScanTargetController.manu
 POST    /api/scanTarget/:id/additionScan  @controllers.ScanTargetController.manualTriggerAdditionScan(id)
 POST    /api/scanTarget/:id/legacyProxiesScan @controllers.ScanTargetController.scanForLegacyProxies(id)
 POST    /api/scanTarget/:id/genProxies  @controllers.ScanTargetController.genProxies(id)
+POST    /api/scanTarget/:id/checkTranscoder @controllers.ScanTargetController.initiateCheckJob(id)
 
 GET     /api/search/basic      @controllers.SearchController.simpleStringSearch(q:Option[String],start:Option[Int],length:Option[Int])
 GET     /api/entry/:id                  @controllers.SearchController.getEntry(id)

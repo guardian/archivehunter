@@ -10,6 +10,7 @@ import ErrorViewComponent from '../common/ErrorViewComponent.jsx';
 import BreadcrumbComponent from "../common/BreadcrumbComponent.jsx";
 import Dialog from 'react-dialog';
 import ReactTooltip from 'react-tooltip'
+import TranscoderCheckComponent from "./TranscoderCheckComponent.jsx";
 
 class ScanTargetsList extends React.Component {
     constructor(props){
@@ -82,6 +83,12 @@ class ScanTargetsList extends React.Component {
                 headerProps: {className: "dashboardheader"}
             },
             {
+                header: "Transcoder check",
+                headerProps: {className: "dashboardheader"},
+                key: "transcoderCheck",
+                render: value=> value ? <TranscoderCheckComponent status={value.status} checkedAt={value.checkedAt}/> : <p className="information">Not checked</p>
+            },
+            {
                 header: "Trigger",
                 key: "bucketName",
                 headerProps: {className: "dashboardheader"},
@@ -90,8 +97,10 @@ class ScanTargetsList extends React.Component {
                     <span data-tip="Removal scan"><FontAwesomeIcon icon="folder-minus" className="clickable button-row" onClick={()=>this.triggerRemovedScan(value)}/></span>
                     <span data-tip="Full scan"><FontAwesomeIcon icon="folder" className="clickable button-row " onClick={()=>this.triggerFullScan(value)}/></span>
                     <br/>
-                    <span data-tip="Proxy generation"><FontAwesomeIcon icon="balance-scale" className="clickable button-row" onClick={()=>this.triggerProxyGen(value)}/></span>
+                    <span data-tip="Proxy generation"><FontAwesomeIcon icon="compress-arrows-alt" className="clickable button-row" onClick={()=>this.triggerProxyGen(value)}/></span>
                     <span data-tip="Relink proxies"><FontAwesomeIcon icon="book-reader" className="clickable button-row" onClick={()=>this.triggerProxyRelink(value)}/></span>
+                    <br/>
+                    <span data-tip="Validate transcode config"><FontAwesomeIcon icon="bug" className="clickable button-row" onClick={()=>this.triggerValidateConfig(value)}/></span>
                 </span>
             }
         ];
@@ -119,6 +128,16 @@ class ScanTargetsList extends React.Component {
         return this.generalScanTrigger(targetId,"scan")
     }
 
+    triggerValidateConfig(targetId){
+        this.setState({loading: true}, ()=>axios.post("/api/scanTarget/" + encodeURIComponent(targetId) + "/" + "checkTranscoder")
+            .then(result=>{
+                console.log("Config validation has been started with job ID " + result.data.entity);
+                this.setState({loading: false, lastError: null});
+            }).catch(err=>{
+                console.error(err);
+                this.setState({loading: false, lastError: err});
+            }))
+    }
     triggerProxyGen(targetId){
         this.setState({loading: true},()=>axios.post("/api/scanTarget/" + encodeURIComponent(targetId) + "/" + "genProxies")
             .then(result=>{

@@ -1,6 +1,7 @@
 package services
 
 import java.time.ZonedDateTime
+
 import akka.actor.{ActorRef, ActorSystem}
 import akka.stream.{ActorMaterializer, Materializer}
 import com.amazonaws.services.sqs.model.{DeleteMessageRequest, ReceiveMessageRequest}
@@ -9,7 +10,7 @@ import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoCli
 import com.theguardian.multimedia.archivehunter.common.cmn_models._
 import io.circe.generic.auto._
 import javax.inject.Inject
-import models.{AwsSqsMsg, JobReportNew}
+import models.{AwsSqsMsg, JobReportNew, JobReportStatus, JobReportStatusEncoder}
 import play.api.{Configuration, Logger}
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -19,6 +20,7 @@ object ProxyFrameworkQueue extends GenericSqsActorMessages {
   trait PFQMsg extends SQSMsg
 
   case class HandleSuccess(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
+  case class HandleCheckSetup(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
   case class HandleSuccessfulProxy(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
   case class HandleFailure(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
   case class HandleRunning(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
@@ -30,9 +32,10 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
                                      s3ClientMgr: S3ClientManager,
                                      dynamoClientMgr: DynamoClientManager,
                                      jobModelDAO: JobModelDAO,
+                                     scanTargetDAO: ScanTargetDAO,
                                      esClientMgr:ESClientManager
                                     )(implicit proxyLocationDAO: ProxyLocationDAO)
-  extends GenericSqsActor[JobReportNew] {
+  extends GenericSqsActor[JobReportNew] with ProxyTypeEncoder with JobReportStatusEncoder {
   import ProxyFrameworkQueue._
   import GenericSqsActor._
 
@@ -151,6 +154,57 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
       }
 
     /**
+      * handle response message from a "check setup" request
+      */
+    case HandleCheckSetup(msg, jobDesc, rq, receiptHandle, originalSender)=>
+      scanTargetDAO.waitingForJobId(jobDesc.jobId).map({
+        case Left(errList)=>
+          logger.error(s"Could not find scan target: $errList")
+          val updatedLog = jobDesc.log match {
+            case Some(existingLog)=>existingLog + "\n" + s"Database error: $errList"
+            case None=>s"Database error: $errList"
+          }
+
+          val updatedJobDesc = jobDesc.copy(jobStatus = JobStatus.ST_ERROR, log=Some(updatedLog))
+          jobModelDAO.putJob(updatedJobDesc)
+          ownRef ! HandleFailure(msg, jobDesc, rq, receiptHandle, originalSender)
+          originalSender ! akka.actor.Status.Failure(new RuntimeException(s"Could not locate scan target: $errList"))
+        case Right(None)=>
+          logger.error(s"No scanTarget is waiting for ${jobDesc.jobId} so nothing to update")
+          val updatedLog = jobDesc.log match {
+            case Some(existingLog)=>existingLog + "\n" +s"No scanTarget is waiting for ${jobDesc.jobId} so nothing to update"
+            case None=>s"No scanTarget is waiting for ${jobDesc.jobId} so nothing to update"
+          }
+
+          val updatedJobDesc = jobDesc.copy(jobStatus = JobStatus.ST_ERROR, log=Some(updatedLog))
+          jobModelDAO.putJob(updatedJobDesc)
+
+          ownRef ! HandleFailure(msg, jobDesc, rq, receiptHandle, originalSender)
+          originalSender ! akka.actor.Status.Failure(new RuntimeException(s"No scanTarget is waiting for ${jobDesc.jobId} so nothing to update"))
+        case Right(Some(scanTarget))=>
+          val actualStatus = msg.status match {
+            case JobReportStatus.SUCCESS=>JobStatus.ST_SUCCESS
+            case JobReportStatus.FAILURE=>JobStatus.ST_ERROR
+            case JobReportStatus.RUNNING=>JobStatus.ST_RUNNING
+            case JobReportStatus.WARNING=>JobStatus.ST_RUNNING
+          }
+          val updatedPendingJobIds = scanTarget.pendingJobIds.map(_.filter(value=>value!=jobDesc.jobId))
+          val tcReport = TranscoderCheck(ZonedDateTime.now(),actualStatus,jobDesc.log)
+          val updatedScanTarget = scanTarget.copy(pendingJobIds = updatedPendingJobIds, transcoderCheck = Some(tcReport))
+          scanTargetDAO.put(updatedScanTarget)
+
+          val updatedJobDesc = jobDesc.copy(jobStatus = JobStatus.ST_SUCCESS)
+          jobModelDAO.putJob(updatedJobDesc)
+
+          if(jobDesc.jobStatus==JobStatus.ST_ERROR){
+            ownRef ! HandleFailure(msg, jobDesc, rq, receiptHandle, originalSender)
+          } else {
+            sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle(receiptHandle))
+            originalSender ! akka.actor.Status.Success()
+          }
+      })
+
+    /**
       * route a success message to the appropriate handler
       */
     case HandleSuccess(msg, jobDesc, rq, receiptHandle, originalSender)=>
@@ -209,17 +263,25 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
       jobModelDAO.jobForId(msg.jobId).map({
         case None =>
           logger.error(s"Could not process $msg: No job found for ${msg.jobId}")
+          if(msg.jobId == "test-job"){
+            //delete out "test-job" which are used for manual testing
+            sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle(receiptHandle))
+          }
           originalSender ! akka.actor.Status.Failure(new RuntimeException(s"Could not process $msg: No job found for ${msg.jobId}"))
         case Some(Left(err)) =>
           logger.error(s"Could not look up job for $msg: ${err.toString}")
           originalSender ! akka.actor.Status.Failure(new RuntimeException(s"Could not look up job for $msg: ${err.toString}"))
         case Some(Right(jobDesc)) =>
           logger.debug(s"Got jobDesc $jobDesc")
-          msg.status match {
-            case "success" => ownRef ! HandleSuccess(msg, jobDesc, rq, receiptHandle, originalSender)
-            case "failure" => ownRef ! HandleFailure(msg, jobDesc, rq, receiptHandle, originalSender)
-            case "error" => ownRef ! HandleFailure(msg, jobDesc, rq, receiptHandle, originalSender)
-            case "running" => ownRef ! HandleRunning(msg, jobDesc, rq, receiptHandle, originalSender)
+          logger.debug(s"jobType: ${jobDesc.jobType} jobReportStatus: ${msg.status}")
+          if(jobDesc.jobType=="CheckSetup"){
+            ownRef ! HandleCheckSetup(msg,jobDesc, rq, receiptHandle, originalSender)
+          } else {
+            msg.status match {
+              case JobReportStatus.SUCCESS => ownRef ! HandleSuccess(msg, jobDesc, rq, receiptHandle, originalSender)
+              case JobReportStatus.FAILURE => ownRef ! HandleFailure(msg, jobDesc, rq, receiptHandle, originalSender)
+              case JobReportStatus.RUNNING => ownRef ! HandleRunning(msg, jobDesc, rq, receiptHandle, originalSender)
+            }
           }
       }).recover({
         case err:Throwable=>
