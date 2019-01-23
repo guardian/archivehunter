@@ -20,6 +20,7 @@ POST    /api/scanTarget/:id/additionScan  @controllers.ScanTargetController.manu
 POST    /api/scanTarget/:id/legacyProxiesScan @controllers.ScanTargetController.scanForLegacyProxies(id)
 POST    /api/scanTarget/:id/genProxies  @controllers.ScanTargetController.genProxies(id)
 POST    /api/scanTarget/:id/checkTranscoder @controllers.ScanTargetController.initiateCheckJob(id)
+POST    /api/scanTarget/:id/createPipelines @controllers.ScanTargetController.createPipelines(id, force:Boolean ?=false)
 
 GET     /api/search/basic      @controllers.SearchController.simpleStringSearch(q:Option[String],start:Option[Int],length:Option[Int])
 GET     /api/entry/:id                  @controllers.SearchController.getEntry(id)
@@ -66,6 +67,7 @@ GET     /api/proxyFramework/deploymentScan          @controllers.ProxyFrameworkA
 POST    /api/proxyFramework/deployments             @controllers.ProxyFrameworkAdminController.addDeployment
 POST    /api/proxyFramework/deploymentDirect        @controllers.ProxyFrameworkAdminController.addDeploymentDirect
 DELETE  /api/proxyFramework/deployments/:forRegion  @controllers.ProxyFrameworkAdminController.removeDeployment(forRegion)
+GET     /api/regions                    @controllers.ProxyFrameworkAdminController.getRegions
 
 # Map static resources from the /public folder to the /assets URL path
 GET     /assets/*file               controllers.Assets.at(path="/public", file)

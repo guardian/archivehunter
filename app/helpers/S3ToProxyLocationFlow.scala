@@ -36,20 +36,20 @@ class S3ToProxyLocationFlow (s3ClientMgr: S3ClientManager, config:Configuration,
             //we need to do a metadata lookup to get the MIME type anyway, so we may as well just call out here.
             //it appears that you can't push() to a port from in a Future thread, so doing it the crappy way and blocking here.
             throw new RuntimeException("FIXME: no media item key at this point so can't work.")
-            val proxyLocationFuture = ProxyLocation.fromS3(elem.bucketName, elem.key, mainMediaBucket, "INVALIDMEDIAITEM")
-            val mappedElem = Await.result(proxyLocationFuture, 3.seconds)
-            logger.debug(s"Mapped $elem to $mappedElem")
-
-            while (!isAvailable(out)) {
-              logger.debug("waiting for output port to be available")
-              Thread.sleep(500L)
-            }
-            mappedElem match {
-              case Right(el)=>push(out, el)
-              case Left(err)=>
-                logger.error(s"could not map element: $err")
-                pull(in)
-            }
+//            val proxyLocationFuture = ProxyLocation.fromS3(elem.bucketName, elem.key, mainMediaBucket, "INVALIDMEDIAITEM")
+//            val mappedElem = Await.result(proxyLocationFuture, 3.seconds)
+//            logger.debug(s"Mapped $elem to $mappedElem")
+//
+//            while (!isAvailable(out)) {
+//              logger.debug("waiting for output port to be available")
+//              Thread.sleep(500L)
+//            }
+//            mappedElem match {
+//              case Right(el)=>push(out, el)
+//              case Left(err)=>
+//                logger.error(s"could not map element: $err")
+//                pull(in)
+//            }
 
           } catch {
             case ex:Throwable=>

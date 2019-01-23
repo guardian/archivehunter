@@ -13,7 +13,7 @@ object RequestType extends Enumeration {
 }
 
 case class RequestModel (requestType: RequestType.Value, inputMediaUri: String,
-                         targetLocation:String, jobId:String,
+                         targetLocation:String, jobId:String, force:Option[Boolean],
                          createPipelineRequest: Option[CreatePipeline], proxyType:Option[ProxyType.Value])
 
 trait RequestModelEncoder {

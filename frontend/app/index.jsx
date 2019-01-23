@@ -21,7 +21,7 @@ import MyLightbox from './Lightbox/MyLightbox.jsx';
 import { library } from '@fortawesome/fontawesome-svg-core'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faStroopwafel, faCheckCircle, faCheck, faTimes, faTimesCircle, faRoad, faSearch,faThList,faWrench, faLightbulb, faFolderPlus, faFolderMinus, faFolder, faBookReader } from '@fortawesome/free-solid-svg-icons'
-import { faChevronCircleDown,faChevronCircleRight,faTrashAlt, faFilm, faVolumeUp,faImage, faFile, faClock, faRunning, faExclamationTriangle, faHdd, faBalanceScale, faSyncAlt} from '@fortawesome/free-solid-svg-icons'
+import { faChevronCircleDown,faChevronCircleRight,faTrashAlt, faFilm, faVolumeUp,faImage, faFile, faClock, faRunning, faExclamationTriangle, faHdd, faBalanceScale, faSyncAlt, faIndustry} from '@fortawesome/free-solid-svg-icons'
 import { faCompressArrowsAlt, faBug } from '@fortawesome/free-solid-svg-icons'
 import UserList from "./Users/UserList.jsx";
 
@@ -29,7 +29,7 @@ import ProxyFrameworkList from "./ProxyFramework/ProxyFrameworkList.jsx";
 import ProxyFrameworkAdd from './ProxyFramework/ProxyFrameworkAdd.jsx';
 
 library.add(faStroopwafel, faCheckCircle, faCheck, faTimes, faTimesCircle, faRoad,faSearch,faThList,faWrench, faLightbulb, faChevronCircleDown, faChevronCircleRight, faTrashAlt, faFolderPlus, faFolderMinus, faFolder);
-library.add(faFilm, faVolumeUp, faImage, faFile, faClock, faRunning, faExclamationTriangle, faHdd, faBalanceScale, faSyncAlt, faBookReader, faBug, faCompressArrowsAlt);
+library.add(faFilm, faVolumeUp, faImage, faFile, faClock, faRunning, faExclamationTriangle, faHdd, faBalanceScale, faSyncAlt, faBookReader, faBug, faCompressArrowsAlt, faIndustry);
 window.React = require('react');
 
 class App extends React.Component {

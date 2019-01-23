@@ -21,6 +21,8 @@ object ProxyFrameworkQueue extends GenericSqsActorMessages {
 
   case class HandleSuccess(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
   case class HandleCheckSetup(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
+  case class HandleGenericSuccess(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
+  case class HandleTranscodingSetup(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
   case class HandleSuccessfulProxy(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
   case class HandleFailure(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
   case class HandleRunning(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
@@ -53,11 +55,12 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
 
   override protected val notificationsQueue = config.get[String]("proxyFramework.notificationsQueue")
 
-  private implicit val s3Client = s3ClientMgr.getClient(config.getOptional[String]("externalData.awsProfile"))
   private implicit val ddbClient = dynamoClientMgr.getNewAlpakkaDynamoClient(config.getOptional[String]("externalData.awsProfile"))
 
   private implicit val esClient = esClientMgr.getClient()
   private implicit val indexer = new Indexer(config.get[String]("externalData.indexName"))
+
+  lazy val defaultRegion = config.getOptional[String]("externalData.awsRegion").getOrElse("eu-west-1")
 
   override def convertMessageBody(body: String) =
     AwsSqsMsg.fromJsonString(body).flatMap(snsMsg=>{
@@ -82,34 +85,76 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
   }
 
   /**
+    * looks up a ScanTarget waiting for this job and executes the provided block on it if the lookup succeeds.
+    * if the lookup does not succeed then mark the job as failed.
+    * @param msg
+    * @param jobDesc
+    * @param rq
+    * @param receiptHandle
+    * @param originalSender
+    * @param block
+    * @return
+    */
+  def withScanTarget(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef)(block:ScanTarget=>Unit) =
+    scanTargetDAO.waitingForJobId(jobDesc.jobId).map({
+      case Left(errList) =>
+        logger.error(s"Could not find scan target: $errList")
+        val updatedLog = jobDesc.log match {
+          case Some(existingLog) => existingLog + "\n" + s"Database error: $errList"
+          case None => s"Database error: $errList"
+        }
+
+        val updatedJobDesc = jobDesc.copy(jobStatus = JobStatus.ST_ERROR, log = Some(updatedLog))
+        jobModelDAO.putJob(updatedJobDesc)
+        ownRef ! HandleFailure(msg, jobDesc, rq, receiptHandle, originalSender)
+        originalSender ! akka.actor.Status.Failure(new RuntimeException(s"Could not locate scan target: $errList"))
+      case Right(None) =>
+        logger.error(s"No scanTarget is waiting for ${jobDesc.jobId} so nothing to update")
+        val updatedLog = jobDesc.log match {
+          case Some(existingLog) => existingLog + "\n" + s"No scanTarget is waiting for ${jobDesc.jobId} so nothing to update"
+          case None => s"No scanTarget is waiting for ${jobDesc.jobId} so nothing to update"
+        }
+
+        val updatedJobDesc = jobDesc.copy(jobStatus = JobStatus.ST_ERROR, log = Some(updatedLog))
+        jobModelDAO.putJob(updatedJobDesc)
+
+        ownRef ! HandleFailure(msg, jobDesc, rq, receiptHandle, originalSender)
+        originalSender ! akka.actor.Status.Failure(new RuntimeException(s"No scanTarget is waiting for ${jobDesc.jobId} so nothing to update"))
+      case Right(Some(scanTarget)) =>
+        block(scanTarget)
+    })
+
+  /**
     * update the proxy location in the database
     * @param proxyUri new proxy location URI
     * @param archiveEntry ArchiveEntry instance of the media that this proxy is for
-    * @param proxyLocationDAO proxy location Data Access Object
-    * @param s3Client implicitly provided S3 client object
-    * @param ec implicitly provided execution context
     * @return a Future with either an error string or a success containing the updated record (if available)
     */
-  def updateProxyRef(proxyUri:String, archiveEntry:ArchiveEntry, proxyType:ProxyType.Value) =
+  def updateProxyRef(proxyUri:String, archiveEntry:ArchiveEntry, proxyType:ProxyType.Value) = {
+    logger.debug(s"updateProxyRef: got $proxyUri in with archive entry in region ${archiveEntry.region}")
+    implicit val s3Client = s3ClientMgr.getS3Client(config.getOptional[String]("externalData.awsProfile"), archiveEntry.region)
     ProxyLocation.fromS3(
-      proxyUri=proxyUri,
-      mainMediaUri=s"s3://${archiveEntry.bucket}/${archiveEntry.path}", Some(proxyType))
-    .flatMap({
-      case Left(err)=>
-        logger.error(s"Could not get proxy location: $err")
-        Future(Left(err))
-      case Right(proxyLocation)=>
-        logger.info("Saving proxy location...")
-        proxyLocationDAO.saveProxy(proxyLocation).map({
-          case None=>
-            Right(None)
-          case Some(Left(err))=>
-            Left(err.toString)
-          case Some(Right(updatedLocation))=>
-            logger.info(s"Updated location: $updatedLocation")
-            Right(Some(updatedLocation))
-        })
-    })
+      proxyUri = proxyUri,
+      mainMediaUri = s"s3://${archiveEntry.bucket}/${archiveEntry.path}",
+      proxyType = Some(proxyType)
+    )
+      .flatMap({
+        case Left(err) =>
+          logger.error(s"Could not get proxy location: $err")
+          Future(Left(err))
+        case Right(proxyLocation) =>
+          logger.info("Saving proxy location...")
+          proxyLocationDAO.saveProxy(proxyLocation).map({
+            case None =>
+              Right(None)
+            case Some(Left(err)) =>
+              Left(err.toString)
+            case Some(Right(updatedLocation)) =>
+              logger.info(s"Updated location: $updatedLocation")
+              Right(Some(updatedLocation))
+          })
+      })
+  }
 
   override def receive: Receive = {
     /**
@@ -150,58 +195,59 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
               case Failure(dbErr) =>
                 originalSender ! akka.actor.Status.Failure(dbErr)
             })
+        }).recover({
+          case err:Throwable=>
+            logger.error("Could not update proxy: ", err)
+            originalSender ! akka.actor.Status.Failure(err)
         })
       }
 
     /**
-      * handle response message from a "check setup" request
+      * handle response message from a "check setup" or "setup transcoder" request
       */
     case HandleCheckSetup(msg, jobDesc, rq, receiptHandle, originalSender)=>
-      scanTargetDAO.waitingForJobId(jobDesc.jobId).map({
-        case Left(errList)=>
-          logger.error(s"Could not find scan target: $errList")
-          val updatedLog = jobDesc.log match {
-            case Some(existingLog)=>existingLog + "\n" + s"Database error: $errList"
-            case None=>s"Database error: $errList"
-          }
+      withScanTarget(msg, jobDesc, rq, receiptHandle, originalSender) {scanTarget=>
+        val actualStatus = msg.status match {
+          case JobReportStatus.SUCCESS=>JobStatus.ST_SUCCESS
+          case JobReportStatus.FAILURE=>JobStatus.ST_ERROR
+          case JobReportStatus.RUNNING=>JobStatus.ST_RUNNING
+          case JobReportStatus.WARNING=>JobStatus.ST_RUNNING
+        }
+        val updatedPendingJobIds = scanTarget.pendingJobIds.map(_.filter(value=>value!=jobDesc.jobId))
+        val tcReport = TranscoderCheck(ZonedDateTime.now(),actualStatus,msg.decodedLog.collect({
+          case Left(err)=>err
+          case Right(msg)=>msg
+        }))
 
-          val updatedJobDesc = jobDesc.copy(jobStatus = JobStatus.ST_ERROR, log=Some(updatedLog))
-          jobModelDAO.putJob(updatedJobDesc)
+        val updatedScanTarget = scanTarget.copy(pendingJobIds = updatedPendingJobIds, transcoderCheck = Some(tcReport))
+        scanTargetDAO.put(updatedScanTarget)
+
+        val updatedJobDesc = jobDesc.copy(jobStatus = JobStatus.ST_SUCCESS, completedAt = Some(ZonedDateTime.now()))
+        jobModelDAO.putJob(updatedJobDesc)
+
+        if(jobDesc.jobStatus==JobStatus.ST_ERROR){
           ownRef ! HandleFailure(msg, jobDesc, rq, receiptHandle, originalSender)
-          originalSender ! akka.actor.Status.Failure(new RuntimeException(s"Could not locate scan target: $errList"))
-        case Right(None)=>
-          logger.error(s"No scanTarget is waiting for ${jobDesc.jobId} so nothing to update")
-          val updatedLog = jobDesc.log match {
-            case Some(existingLog)=>existingLog + "\n" +s"No scanTarget is waiting for ${jobDesc.jobId} so nothing to update"
-            case None=>s"No scanTarget is waiting for ${jobDesc.jobId} so nothing to update"
-          }
+        } else {
+          sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle(receiptHandle))
+          originalSender ! akka.actor.Status.Success()
+        }
+      }
 
-          val updatedJobDesc = jobDesc.copy(jobStatus = JobStatus.ST_ERROR, log=Some(updatedLog))
-          jobModelDAO.putJob(updatedJobDesc)
-
-          ownRef ! HandleFailure(msg, jobDesc, rq, receiptHandle, originalSender)
-          originalSender ! akka.actor.Status.Failure(new RuntimeException(s"No scanTarget is waiting for ${jobDesc.jobId} so nothing to update"))
-        case Right(Some(scanTarget))=>
-          val actualStatus = msg.status match {
-            case JobReportStatus.SUCCESS=>JobStatus.ST_SUCCESS
-            case JobReportStatus.FAILURE=>JobStatus.ST_ERROR
-            case JobReportStatus.RUNNING=>JobStatus.ST_RUNNING
-            case JobReportStatus.WARNING=>JobStatus.ST_RUNNING
-          }
-          val updatedPendingJobIds = scanTarget.pendingJobIds.map(_.filter(value=>value!=jobDesc.jobId))
-          val tcReport = TranscoderCheck(ZonedDateTime.now(),actualStatus,jobDesc.log)
-          val updatedScanTarget = scanTarget.copy(pendingJobIds = updatedPendingJobIds, transcoderCheck = Some(tcReport))
-          scanTargetDAO.put(updatedScanTarget)
-
-          val updatedJobDesc = jobDesc.copy(jobStatus = JobStatus.ST_SUCCESS)
-          jobModelDAO.putJob(updatedJobDesc)
-
-          if(jobDesc.jobStatus==JobStatus.ST_ERROR){
-            ownRef ! HandleFailure(msg, jobDesc, rq, receiptHandle, originalSender)
-          } else {
-            sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle(receiptHandle))
-            originalSender ! akka.actor.Status.Success()
-          }
+    case HandleGenericSuccess(msg, jobDesc, rq, receiptHandle, originalSender)=>
+      val updatedJob = jobDesc.copy(jobStatus = JobStatus.ST_SUCCESS, completedAt = Some(ZonedDateTime.now()), log=msg.decodedLog.collect({
+        case Left(err)=>err
+        case Right(log)=>log
+      }))
+      jobModelDAO.putJob(jobDesc).map({
+        case None=>
+          sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle(receiptHandle))
+          originalSender ! akka.actor.Status.Success()
+        case Some(Right(mdl))=>
+          sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle(receiptHandle))
+          originalSender ! akka.actor.Status.Success()
+        case Some(Left(err))=>
+          logger.error(s"Could not update job description: $err")
+          originalSender ! akka.actor.Status.Failure(new RuntimeException(err.toString))
       })
 
     /**
@@ -274,7 +320,7 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
         case Some(Right(jobDesc)) =>
           logger.debug(s"Got jobDesc $jobDesc")
           logger.debug(s"jobType: ${jobDesc.jobType} jobReportStatus: ${msg.status}")
-          if(jobDesc.jobType=="CheckSetup"){
+          if(jobDesc.jobType=="CheckSetup" || jobDesc.jobType=="SetupTranscoding"){
             ownRef ! HandleCheckSetup(msg,jobDesc, rq, receiptHandle, originalSender)
           } else {
             msg.status match {

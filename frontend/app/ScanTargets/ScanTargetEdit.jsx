@@ -6,6 +6,7 @@ import axios from 'axios';
 import {Redirect} from 'react-router-dom';
 import ErrorViewComponent from "../common/ErrorViewComponent.jsx";
 import BreadcrumbComponent from "../common/BreadcrumbComponent.jsx";
+import RegionSelector from "../common/RegionSelector.jsx";
 
 class ScanTargetEdit extends React.Component {
     constructor(props){
@@ -15,6 +16,7 @@ class ScanTargetEdit extends React.Component {
             bucketName: "",
             proxyBucket: "",
             enabled: false,
+            region: "eu-west-1",
             lastScanned: null,
             scanInterval: 7200,
             scanInProgress: false,
@@ -31,6 +33,7 @@ class ScanTargetEdit extends React.Component {
 
         this.updateBucketname = this.updateBucketname.bind(this);
         this.updateProxyBucket = this.updateProxyBucket.bind(this);
+        this.updateRegion = this.updateRegion.bind(this);
         this.toggleEnabled = this.toggleEnabled.bind(this);
         this.timeIntervalUpdate = this.timeIntervalUpdate.bind(this);
 
@@ -70,6 +73,12 @@ class ScanTargetEdit extends React.Component {
     updateProxyBucket(evt){
         const newEntry = Object.assign({}, this.state.entry, {proxyBucket: evt.target.value});
         this.setState({entry:newEntry},()=>console.log("state has been set"));
+    }
+
+    updateRegion(evt){
+        console.log("updateRegion: ", evt.target);
+        const newEntry = Object.assign({}, this.state.entry, {region: evt.target.value});
+        this.setState({entry: newEntry},()=>console.log("state has been set"));
     }
 
     toggleEnabled(evt){
@@ -139,6 +148,10 @@ class ScanTargetEdit extends React.Component {
                 <tr>
                     <td>Proxy bucket</td>
                     <td><input value={this.state.entry.proxyBucket} onChange={this.updateProxyBucket} style={{width: "95%"}}/></td>
+                </tr>
+                <tr>
+                    <td>Region</td>
+                    <td><RegionSelector value={this.state.entry.region} onChange={this.updateRegion}/></td>
                 </tr>
                 <tr>
                     <td>Enabled</td>

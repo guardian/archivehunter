@@ -134,14 +134,15 @@ class JobController @Inject() (override val config:Configuration, override val c
 
             case report:JobReportSuccess=>
               implicit val esClient = esClientManager.getClient()
-              implicit val s3Client = s3ClientManager.getClient(awsProfile)
               implicit val ddbClient = ddbClientManager.getNewAlpakkaDynamoClient(awsProfile)
 
               logger.info(s"Outboard process indicated job success: $report")
 
               val proxyUpdateFuture = JobControllerHelper.thumbnailJobOriginalMedia(jobDesc).flatMap({
                 case Left(err)=>Future(Left(err))
-                case Right(archiveEntry)=>JobControllerHelper.updateProxyRef(report, archiveEntry, proxyLocationDAO)
+                case Right(archiveEntry)=>
+                  implicit val s3Client = s3ClientManager.getS3Client(awsProfile, archiveEntry.region)
+                  JobControllerHelper.updateProxyRef(report, archiveEntry, proxyLocationDAO, config.getOptional[String]("externalData.region").getOrElse("eu-west-1"))
               })
 
               proxyUpdateFuture.flatMap({

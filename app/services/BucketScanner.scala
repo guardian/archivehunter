@@ -7,7 +7,7 @@ import akka.NotUsed
 import akka.actor.{Actor, ActorSystem, Timers}
 import akka.http.scaladsl.Http
 import akka.stream.scaladsl.{GraphDSL, Keep, RunnableGraph, Sink, Source}
-import akka.stream.{ActorMaterializer, ClosedShape, KillSwitches, Materializer}
+import akka.stream._
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager}
 import com.amazonaws.regions.{Region, Regions}
 import com.google.inject.Injector
@@ -143,7 +143,7 @@ class BucketScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientMan
     val completionPromise = Promise[Unit]()
 
     logger.info(s"Started scan for $target")
-    val client = s3ClientMgr.getAlpakkaS3Client(config.getOptional[String]("externalData.awsProfile"))
+    val client = s3ClientMgr.getAlpakkaS3Client(config.getOptional[String]("externalData.awsProfile"), region=Some(target.region))
     val esclient = esClientMgr.getClient()
 
     val keySource = client.listBucket(target.bucketName, None)
@@ -151,7 +151,7 @@ class BucketScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientMan
 
     val indexSink = getElasticSearchSink(esclient, completionPromise)
 
-    keySource.via(converterFlow).log("S3ToArchiveEntryFlow").to(indexSink).run()
+    keySource.via(converterFlow).named(target.region).log("S3ToArchiveEntryFlow").to(indexSink).run()
 
     completionPromise
   }

@@ -188,4 +188,21 @@ class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner
       }
     }
   }
+
+  def createPipelines(targetName:String, force:Boolean) = APIAuthAction.async { request=>
+    adminsOnlyAsync(request){
+      withLookupAsync(targetName){ tgt =>
+        proxyGenerators.requestPipelineCreate(tgt.bucketName, tgt.proxyBucket, tgt.region, force).map({
+          case Left(err)=>
+            InternalServerError(GenericErrorResponse("error",err).asJson)
+          case Right(jobId)=>
+            val updatedScanTarget = tgt.withAnotherPendingJob(jobId)
+            scanTargetDAO.put(updatedScanTarget) match {
+              case Success(scanTarget)=>Ok(ObjectCreatedResponse("ok","job",jobId).asJson)
+              case Failure(err)=>InternalServerError(GenericErrorResponse("error", err.toString).asJson)
+            }
+        })
+      }
+    }
+  }
 }

@@ -34,8 +34,8 @@ class ClockSingleton @Inject() (@Named("dynamoCapacityActor") dynamoCapacityActo
   import ClockSingleton._
   private val logger=Logger(getClass)
 
-  timers.startPeriodicTimer(RapidClockTick, RapidClockTick, 10.seconds)
-  timers.startPeriodicTimer(SlowClockTick, SlowClockTick, 1.minutes)
+  timers.startPeriodicTimer(RapidClockTick, RapidClockTick, 30.seconds)
+  timers.startPeriodicTimer(SlowClockTick, SlowClockTick, 2.minutes)
   timers.startPeriodicTimer(VerySlowClockTick, VerySlowClockTick, 1.hours)
 
   timers.startPeriodicTimer(ScanTick, ScanTick, Duration(config.get[Long]("scanner.masterSchedule"),SECONDS))

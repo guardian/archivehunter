@@ -4,6 +4,7 @@ import java.net.URI
 
 import com.amazonaws.services.s3.AmazonS3
 import com.gu.scanamo.DynamoFormat
+import com.theguardian.multimedia.archivehunter.common.clientManagers.S3ClientManager
 import io.circe.{Decoder, Encoder}
 import org.apache.logging.log4j.LogManager
 
@@ -34,7 +35,7 @@ object ProxyLocation extends DocId {
     new URI(proto, host, "/"+path, "")
   }
 
-  def newInS3(proxyLocationString:String, mainMediaId:String, proxyType:ProxyType.Value)(implicit s3Client:AmazonS3) = Try {
+  def newInS3(proxyLocationString:String, mainMediaId:String, region:String, proxyType:ProxyType.Value)(implicit s3Client:AmazonS3) = Try {
     val proxyLocationURI = getUrlElems(proxyLocationString)
     logger.debug(s"newInS3: bucket is ${proxyLocationURI.getHost} path is ${proxyLocationURI.getPath}")
     val fixedPath = if(proxyLocationURI.getPath.startsWith("/")){
@@ -44,7 +45,7 @@ object ProxyLocation extends DocId {
     }
 
     val storageClassValue = s3Client.getObjectMetadata(proxyLocationURI.getHost,fixedPath).getStorageClass
-    new ProxyLocation(mainMediaId, makeDocId(proxyLocationURI.getHost, fixedPath),proxyType, proxyLocationURI.getHost,fixedPath, StorageClass.safeWithName(storageClassValue))
+    new ProxyLocation(mainMediaId, makeDocId(proxyLocationURI.getHost, fixedPath),proxyType, proxyLocationURI.getHost,fixedPath, Some(region), StorageClass.safeWithName(storageClassValue))
   }
 
   def fromS3(proxyUri: String, mainMediaUri: String, proxyType:Option[ProxyType.Value])(implicit client:AmazonS3):Future[Either[String, ProxyLocation]] = {
@@ -99,7 +100,7 @@ object ProxyLocation extends DocId {
         case Some(value) => value
       }
       logger.debug(s"doc ID is ${makeDocId(mainMediaBucket, mediaItemKey)} from $mainMediaBucket and $key")
-      Right(new ProxyLocation(makeDocId(mainMediaBucket, mediaItemKey), makeDocId(proxyBucket, key), pt, proxyBucket, key, StorageClass.safeWithName(meta.getStorageClass)))
+      Right(new ProxyLocation(makeDocId(mainMediaBucket, mediaItemKey), makeDocId(proxyBucket, key), pt, proxyBucket, key, Some(client.getRegionName), StorageClass.safeWithName(meta.getStorageClass)))
     } catch {
       case ex:Throwable=>
         logger.error("could not find proxyLocation in s3: ", ex)
@@ -109,7 +110,7 @@ object ProxyLocation extends DocId {
 
 }
 
-case class ProxyLocation (fileId:String, proxyId: String, proxyType: ProxyType.Value, bucketName:String, bucketPath:String, storageClass: StorageClass.Value) {}
+case class ProxyLocation (fileId:String, proxyId: String, proxyType: ProxyType.Value, bucketName:String, bucketPath:String, region:Option[String], storageClass: StorageClass.Value) {}
 trait ProxyLocationEncoder extends StorageClassEncoder {
   implicit val proxyTypeEncoder = Encoder.enumEncoder(ProxyType)
   implicit val proxyTypeDecoder = Decoder.enumDecoder(ProxyType)

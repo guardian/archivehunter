@@ -183,7 +183,7 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration,
           jobModelDAO.deleteJob(jobDesc.jobId)  //ignore the result, this is non-essential but there to prevent the jobs list getting clogged up
           Future(Failure(NothingFoundError("media", "Nothing found to proxy")))
         case Some(uriString) =>
-          val rq = RequestModel(requestType,uriString,targetProxyBucket,jobUuid.toString,None,proxyType)
+          val rq = RequestModel(requestType,uriString,targetProxyBucket,jobUuid.toString,None,None,proxyType)
           sendRequest(rq, target.region)
       }
     }).recoverWith({
@@ -231,7 +231,7 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration,
     val jobUuid = UUID.randomUUID()
     val jobDesc = JobModel(jobUuid.toString,"CheckSetup",Some(ZonedDateTime.now()),None,JobStatus.ST_PENDING,None,"none",None,SourceType.SRC_GLOBAL)
 
-    val rq = RequestModel(RequestType.CHECK_SETUP,s"s3://$sourceBucket",destBucket,jobUuid.toString,None,None)
+    val rq = RequestModel(RequestType.CHECK_SETUP,s"s3://$sourceBucket",destBucket,jobUuid.toString,None,None,None)
 
     jobModelDAO.putJob(jobDesc).flatMap({
       case None=>
@@ -258,12 +258,12 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration,
     })
   }
 
-  def requestPipelineCreate(inputBucket:String,outputBucket:String,region:String) = {
+  def requestPipelineCreate(inputBucket:String,outputBucket:String,region:String,force:Boolean) = {
     val jobUuid = UUID.randomUUID()
-    val jobDesc = JobModel(jobUuid.toString,"SetupTranscoding",Some(ZonedDateTime.now()),None,JobStatus.ST_PENDING,None,"",None,SourceType.SRC_GLOBAL)
+    val jobDesc = JobModel(jobUuid.toString,"SetupTranscoding",Some(ZonedDateTime.now()),None,JobStatus.ST_PENDING,None,"none",None,SourceType.SRC_GLOBAL)
 
     val pipelineRequest = CreatePipeline(inputBucket,outputBucket)
-    val rq = RequestModel(RequestType.SETUP_PIPELINE,"","",jobUuid.toString,Some(pipelineRequest),None)
+    val rq = RequestModel(RequestType.SETUP_PIPELINE,"","",jobUuid.toString,Some(force),Some(pipelineRequest),None)
 
     jobModelDAO.putJob(jobDesc).flatMap({
       case None=>
@@ -276,7 +276,7 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration,
         })
       case Some(Right(updatedRecord))=>
         sendRequest(rq, region).map({
-          case Success(msgId)=>Right(jobUuid)
+          case Success(msgId)=>Right(jobUuid.toString)
           case Failure(err)=>
             logger.error(s"Could not send request to $region: ", err)
             updateJobFailed(jobDesc, Some(err.toString))

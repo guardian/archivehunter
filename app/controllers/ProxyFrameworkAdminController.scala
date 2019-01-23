@@ -125,7 +125,7 @@ class ProxyFrameworkAdminController @Inject() (override val config:Configuration
     * @return
     */
   def getRegions = APIAuthAction { request=>
-    Ok(ObjectListResponse("ok","regions",Regions.values().map(_.toString),Regions.values().length).asJson)
+    Ok(ObjectListResponse("ok","regions",Regions.values().map(_.toString.replace("_","-").toLowerCase),Regions.values().length).asJson)
   }
 
   def convertJavaDate(date:Date) = ZonedDateTime.ofInstant(Instant.ofEpochMilli(date.getTime),ZoneId.of("UTC"))

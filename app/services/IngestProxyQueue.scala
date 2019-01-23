@@ -57,8 +57,8 @@ class IngestProxyQueue @Inject()(config: Configuration,
 
   override protected val notificationsQueue = config.get[String]("ingest.notificationsQueue")
 
-  private implicit val s3Client = s3ClientMgr.getClient(config.getOptional[String]("externalData.awsProfile"))
   private implicit val ddbClient = dynamoClientMgr.getNewAlpakkaDynamoClient(config.getOptional[String]("externalData.awsProfile"))
+  lazy val defaultRegion = config.getOptional[String]("externalData.awsRegion").getOrElse("eu-west-1")
 
   override def convertMessageBody(body: String): Either[io.circe.Error, IngestMessage] =
     io.circe.parser.parse(body).flatMap(_.as[IngestMessage])
@@ -82,6 +82,7 @@ class IngestProxyQueue @Inject()(config: Configuration,
 
     case CheckNonRegisteredThumb(entry) =>
       val originalSender = sender()
+      implicit val s3Client = s3ClientMgr.getS3Client(config.getOptional[String]("externalData.awsProfile"), entry.region)
       ProxyLocator.findProxyLocation(entry).map(results => {
         val foundProxies = results.collect({ case Right(loc) => loc }).filter(loc => loc.proxyType == ProxyType.THUMBNAIL)
         if (foundProxies.isEmpty) {
@@ -114,6 +115,7 @@ class IngestProxyQueue @Inject()(config: Configuration,
 
     case CheckNonRegisteredProxy(entry) =>
       val originalSender = sender()
+      implicit val s3Client = s3ClientMgr.getS3Client(config.getOptional[String]("externalData.awsProfile"), entry.region)
       ProxyLocator.findProxyLocation(entry).map(results => {
         val foundProxies = results.collect({ case Right(loc) => loc }).filter(loc => loc.proxyType != ProxyType.THUMBNAIL)
         if (foundProxies.isEmpty) {

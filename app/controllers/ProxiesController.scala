@@ -53,7 +53,6 @@ class ProxiesController @Inject()(override val config:Configuration,
   protected val tableName:String = config.get[String]("proxies.tableName")
   private val table = Table[ProxyLocation](tableName)
   private implicit val dynamoClient = ddbClientMgr.getNewAlpakkaDynamoClient(awsProfile)
-  private implicit val s3client = s3ClientMgr.getS3Client(awsProfile)
 
   def proxyForId(fileId:String, proxyType:Option[String]) = APIAuthAction.async {
     try {
@@ -106,6 +105,7 @@ class ProxiesController @Inject()(override val config:Configuration,
         case None=>
           NotFound(GenericErrorResponse("not_found",s"no $proxyType proxy found for $fileId").asJson)
         case Some(Right(proxyLocation))=>
+          implicit val s3client = s3ClientMgr.getS3Client(awsProfile, proxyLocation.region)
           val expiration = new java.util.Date()
           expiration.setTime(expiration.getTime + (1000 * 60 * 60)) //expires in 1 hour
 
@@ -131,6 +131,8 @@ class ProxiesController @Inject()(override val config:Configuration,
     }
   }
 
+  lazy val defaultRegion = config.getOptional[String]("externalData.awsRegion").getOrElse("eu-west-1")
+
   /**
     * endpoint that performs a scan for potential proxies for the given file.
     * if there is only one result, it is automatically associated.
@@ -142,6 +144,7 @@ class ProxiesController @Inject()(override val config:Configuration,
     implicit val client = esClientMgr.getClient()
 
     val resultFuture = indexer.getById(fileId).flatMap(entry=>{
+      implicit val s3client = s3ClientMgr.getS3Client(awsProfile, entry.region)
       ProxyLocator.findProxyLocation(entry)
     })
 
@@ -185,7 +188,10 @@ class ProxiesController @Inject()(override val config:Configuration,
       case Some(fileId) =>
         val proxyLocationFuture = proxyLocationDAO.getProxyByProxyId(proxyId).flatMap({
           case None => //no proxy with this ID in the database yet; do an S3 scan to try to find the requested id
-            val potentialProxyOrErrorList = indexer.getById(fileId).flatMap(ProxyLocator.findProxyLocation(_))
+            val potentialProxyOrErrorList = indexer.getById(fileId).flatMap(entry=>{
+              implicit val s3client = s3ClientMgr.getS3Client(awsProfile, entry.region)
+              ProxyLocator.findProxyLocation(entry)
+            })
             potentialProxyOrErrorList.map(_.collect({case Right(loc)=>loc})).map(_.find(_.proxyId==proxyId))
 
           case Some(proxyLocation) => //found it in the database
