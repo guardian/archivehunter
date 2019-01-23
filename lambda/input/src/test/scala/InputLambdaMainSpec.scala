@@ -119,6 +119,7 @@ class InputLambdaMainSpec extends Specification with Mockito with ZonedDateTimeE
         "test-id",
         "fake-bucket",
         "/path/to/file",
+        Some("region"),
         Some(".ext"),
         1234L,
         ZonedDateTime.now(),
@@ -134,8 +135,12 @@ class InputLambdaMainSpec extends Specification with Mockito with ZonedDateTimeE
       val mockedResult = new SendMessageResult().withMessageId("fake-message-id")
       mockSqsClient.sendMessage(any[SendMessageRequest]) returns mockedResult
 
+      val mockS3Client = mock[AmazonS3]
+      mockS3Client.getRegionName returns "region"
+
       val test = new InputLambdaMain {
         override protected def getSqsClient() = mockSqsClient
+        override protected def getS3Client() = mockS3Client
         override protected def getNotificationQueue() = "fake-queue"
       }
 

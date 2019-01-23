@@ -7,7 +7,7 @@ import com.gu.scanamo.error.{DynamoReadError, NoPropertyOfType}
 import com.theguardian.multimedia.archivehunter.common._
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager, SQSClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models._
-import models.JobReportNew
+import models.{JobReportNew, JobReportStatus}
 import org.specs2.mock.Mockito
 import org.specs2.mutable.Specification
 import play.api.Configuration
@@ -34,8 +34,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito{
       mockedUpdateProxyRef.apply(any,any,any) returns Future(Right(None))
 
       val testProbe = TestProbe()
-      val fakeIncoming = JobReportNew("success",None,"fake-job-id",Some("input-uri"),Some("output-uri"),None)
-
+      val fakeIncoming = JobReportNew(JobReportStatus.SUCCESS,None,"fake-job-id",Some("input-uri"),Some("output-uri"),None,None)
       val fakeMessage = ProxyFrameworkQueue.HandleSuccessfulProxy(fakeIncoming, mockedJd, mock[ReceiveMessageRequest], "receipt-handle", testProbe.ref)
 
       val mockedSqsClient = mock[AmazonSQS]
@@ -79,7 +78,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito{
       mockedUpdateProxyRef.apply(any,any) returns Future(Right(None))
 
       val testProbe = TestProbe()
-      val fakeIncoming = JobReportNew("success",None,"fake-job-id",Some("input-uri"),Some("output-uri"),None)
+      val fakeIncoming = JobReportNew(JobReportStatus.SUCCESS,None,"fake-job-id",Some("input-uri"),Some("output-uri"),None,None)
 
       val fakeMessage = ProxyFrameworkQueue.HandleSuccessfulProxy(fakeIncoming, mockedJd, mock[ReceiveMessageRequest], "receipt-handle", testProbe.ref)
 
@@ -125,7 +124,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito{
       mockedUpdateProxyRef.apply(any,any) returns Future(Right(None))
 
       val testProbe = TestProbe()
-      val fakeIncoming = JobReportNew("running",None,"fake-job-id",Some("input-uri"),None,None)
+      val fakeIncoming = JobReportNew(JobReportStatus.RUNNING,None,"fake-job-id",Some("input-uri"),None,None,None)
 
       val fakeMessage = ProxyFrameworkQueue.HandleRunning(fakeIncoming, mockedJd, mock[ReceiveMessageRequest], "receipt-handle", testProbe.ref)
 
@@ -166,7 +165,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito{
       mockedUpdateProxyRef.apply(any,any) returns Future(Right(None))
 
       val testProbe = TestProbe()
-      val fakeIncoming = JobReportNew("running",None,"fake-job-id",Some("input-uri"),None,None)
+      val fakeIncoming = JobReportNew(JobReportStatus.RUNNING,None,"fake-job-id",Some("input-uri"),None,None,None)
 
       val fakeMessage = ProxyFrameworkQueue.HandleRunning(fakeIncoming, mockedJd, mock[ReceiveMessageRequest], "receipt-handle", testProbe.ref)
 

@@ -37,6 +37,7 @@ class IndexerSpec extends Specification with AfterAll {
         "sfdfsdjfsdhjfsd",
         "mybucket",
         "path/to/my/file",
+        Some("region"),
         Some("ext"),
         12345L,
         ZonedDateTime.now(),

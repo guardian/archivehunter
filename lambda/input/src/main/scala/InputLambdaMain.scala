@@ -102,7 +102,7 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
         mt
     }
 
-    ArchiveEntry.fromS3(rec.getS3.getBucket.getName, rec.getS3.getObject.getKey).flatMap(entry => {
+    ArchiveEntry.fromS3(rec.getS3.getBucket.getName, rec.getS3.getObject.getKey, s3Client.getRegionName).flatMap(entry => {
       println(s"Going to index $entry")
       i.indexSingleItem(entry).map({
         case Success(indexid) =>
