@@ -4,6 +4,15 @@ import org.apache.logging.log4j.LogManager
 
 
 trait MediaMetadataMapConverters {
+
+  /**
+    * sometimes, these values come through with an explicit NULL value; the normal handling then converts this to Some(null)
+    * which is incorrect and breaks stuff. This method converts Some(null) to None, and if there is a value then it typecasts
+    * it to the final type provided as type parameter T
+    * @param value Optional value to convert
+    * @tparam T type to convert it to
+    * @return an Option[T], which is guaranteed to be None if the value is actually null instead of None
+    */
   protected def safeMap[T](value:Option[Any]) = value match {
     case None=>None
     case Some(null)=>None
@@ -18,34 +27,35 @@ trait MediaMetadataMapConverters {
 
   protected def mappingToStreamSeq(value:Seq[Map[String,AnyVal]]) =
     value.map(entry=>
-      MediaStream(safeMap[String](entry.get("profile")),
-        entry.get("codec_type").map(_.asInstanceOf[String]),
-        entry.get("codec_width").map(_.asInstanceOf[Int]),
-        entry.get("codec_height").map(_.asInstanceOf[Int]),
-        entry.get("bit_rate").map(_.asInstanceOf[Double]),
-        entry.get("codec_name").map(_.asInstanceOf[String]),
-        entry.get("duration").map(_.asInstanceOf[Double]),
-        entry.get("codec_time_base").map(_.asInstanceOf[String]),
+      MediaStream(
+        safeMap[String](entry.get("profile")),
+        safeMap[String](entry.get("codec_type")),
+        safeMap[Int](entry.get("coded_width")),
+        safeMap[Int](entry.get("coded_height")),
+        safeMap[Double](entry.get("bit_rate")),
+        safeMap[String](entry.get("codec_name")),
+        safeMap[Double](entry.get("duration")),
+        safeMap[String](entry.get("codec_time_base")),
         entry("index").asInstanceOf[Int],
-        entry.get("width").map(_.asInstanceOf[Int]),
-        entry.get("pix_fmt").map(_.asInstanceOf[String]),
+        safeMap[Int](entry.get("width")),
+        safeMap[String](entry.get("pix_fmt")),
         entry("tags").asInstanceOf[Map[String,String]],
-        entry.get("r_frame_rate").map(_.asInstanceOf[String]),
-        entry.get("start_time").map(_.asInstanceOf[Double]),
-        entry.get("time_base").map(_.asInstanceOf[String]),
-        entry.get("codec_tag_string").map(_.asInstanceOf[String]),
-        entry.get("duration_ts").map(_.asInstanceOf[Long]),
-        entry.get("codec_long_name").map(_.asInstanceOf[String]),
-        entry.get("display_aspect_ratio").map(_.asInstanceOf[String]),
-        entry.get("height").map(_.asInstanceOf[Int]),
-        entry.get("avg_frame_rate").map(_.asInstanceOf[String]),
-        entry.get("level").map(_.asInstanceOf[Int]),
-        entry.get("bits_per_sample").map(_.asInstanceOf[Int]),
+        safeMap[String](entry.get("r_frame_rate")),
+        safeMap[Double](entry.get("start_time")),
+        safeMap[String](entry.get("time_base")),
+        safeMap[String](entry.get("codec_tag_string")),
+        None, //this field is causing ClassCastException(null) errors
+        safeMap[String](entry.get("codec_long_name")),
+        safeMap[String](entry.get("display_aspect_ratio")),
+        safeMap[Int](entry.get("height")),
+        safeMap[String](entry.get("avg_frame_rate")),
+        safeMap[Int](entry.get("level")),
+        safeMap[Int](entry.get("bits_per_raw_sample")),
         entry.get("disposition").map(value=>mappingToStreamDisposition(value.asInstanceOf[Map[String,Boolean]])),
-        entry.get("sample_fmt").map(_.asInstanceOf[String]),
-        entry.get("channels").map(_.asInstanceOf[Int]),
-        entry.get("channel_layout").map(_.asInstanceOf[String]),
-        entry.get("sample_rate").map(_.asInstanceOf[Int])
+        safeMap[String](entry.get("sample_fmt")),
+        safeMap[Int](entry.get("channels")),
+        safeMap[String](entry.get("channel_layout")),
+        safeMap[Int](entry.get("sample_rate"))
       )
     )
   
@@ -63,7 +73,6 @@ trait MediaMetadataMapConverters {
     )
 
   protected def mappingToMediaMetadata(value:Map[String,AnyVal]) = {
-    println(value.toString)
     MediaMetadata(
       mappingToMediaFormat(value("format").asInstanceOf[Map[String, AnyVal]]),
       mappingToStreamSeq(value("streams").asInstanceOf[Seq[Map[String, AnyVal]]])
