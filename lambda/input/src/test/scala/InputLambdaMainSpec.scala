@@ -128,7 +128,8 @@ class InputLambdaMainSpec extends Specification with Mockito with ZonedDateTimeE
         false,
         StorageClass.STANDARD,
         Seq(),
-        false
+        false,
+        None
       )
 
       val mockSqsClient = mock[AmazonSQS]
