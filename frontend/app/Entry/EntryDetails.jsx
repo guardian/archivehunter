@@ -7,6 +7,8 @@ import EntryJobs from "./EntryJobs.jsx";
 import axios from 'axios';
 import EntryLightboxBanner from "./EntryLightboxBanner.jsx";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import MediaDurationComponent from "../common/MediaDurationComponent.jsx";
+import ErrorViewComponent from "../common/ErrorViewComponent.jsx";
 
 class EntryDetails extends React.Component {
     static propTypes = {
@@ -27,14 +29,22 @@ class EntryDetails extends React.Component {
     constructor(props){
         super(props);
         this.state = {
+            loading: false,
+            lastError: null,
             jobsAutorefresh: false,
-            lightboxSaving: false
+            lightboxSaving: false,
+
+            firstVideoStream: null,
+            firstAudioStream: null,
+            videoStreamCount: null,
+            audioStreamCount: null
         };
 
         this.jobsAutorefreshUpdated = this.jobsAutorefreshUpdated.bind(this);
         this.proxyGenerationWasTriggered = this.proxyGenerationWasTriggered.bind(this);
         this.putToLightbox = this.putToLightbox.bind(this);
         this.removeFromLightbox = this.removeFromLightbox.bind(this);
+        this.triggerAnalyse = this.triggerAnalyse.bind(this);
     }
 
     componentWillMount(){
@@ -72,9 +82,55 @@ class EntryDetails extends React.Component {
         this.setState({jobsAutorefresh: true});
     }
 
+    triggerAnalyse(){
+        this.setState({loading: true}, ()=>axios.post("/api/proxy/analyse/" + this.props.entry.id)
+            .then(response=>{
+                console.log("Media analyse started");
+                this.setState({loading: false, jobsAutorefresh: true});
+            }).catch(err=>{
+                console.error(err);
+                this.setState({loading: false, lastError: err});
+            }));
+    }
+    /**
+     * refreshes the component's shortcuts to any media stream data held within the entry metadata.
+     * returns a Promise which resolves once all updates are complete.
+     */
+    refreshStreamsState(){
+        return new Promise((resolve,reject)=>{
+            if(!this.props.entry.mediaMetadata){
+                this.setState({
+                    firstVideoStream: null,
+                    firstAudioStream: null,
+                    videoStreamCount: null,
+                    audioStreamCount: null
+                }, ()=>resolve())
+            } else {
+                const vStreams = this.props.entry.mediaMetadata.streams.filter(entry=>entry.codec_type==="video");
+                const aStreams = this.props.entry.mediaMetadata.streams.filter(entry=>entry.codec_type==="audio");
+                this.setState({
+                    firstVideoStream: vStreams.length>0 ? vStreams[0] : null,
+                    firstAudioStream: aStreams.length>0 ? aStreams[0] : null,
+                    videoStreamCount: vStreams.length,
+                    audioStreamCount: aStreams.length
+                }, ()=>resolve())
+            }
+        })
+    }
+
     componentDidUpdate(oldProps,oldState){
-        //if the highlighted media changes, then disable auto-refresh
-        if(oldProps.entry !== this.props.entry && this.state.jobsAutorefresh) this.setState({jobsAutorefresh: false});
+        new Promise((resolve,reject)=> {
+            //if the highlighted media changes, refresh our knowledge of the media streams
+            if (oldProps.entry !== this.props.entry){
+                this.refreshStreamsState().then(()=>resolve());
+            } else {
+                resolve()
+            }
+        }).then(()=> {
+            //if the highlighted media changes, then disable auto-refresh
+            if (oldProps.entry !== this.props.entry && this.state.jobsAutorefresh) this.setState({jobsAutorefresh: false});
+        });
+
     }
 
     putToLightbox(){
@@ -152,19 +208,57 @@ class EntryDetails extends React.Component {
                         </td>
                     </tr>
                     <tr>
-                        <td className="metadata-heading">Name</td>
+                        <td className="metadata-heading spacebelow">Name</td>
                         <td className="metadata-entry">{fileinfo.filename}</td>
                     </tr>
                     <tr>
-                        <td className="metadata-heading">File path</td>
-                        <td className="metadata-entry">{fileinfo.filepath}</td>
-                    </tr>
-                    <tr>
-                        <td className="metadata-heading">Catalogue</td>
+                        <td className="metadata-heading spacebelow">Catalogue</td>
                         <td className="metadata-entry">{this.props.entry.bucket}</td>
                     </tr>
                     <tr>
-                        <td className="metadata-heading">File size</td>
+                        <td className="metadata-heading">Channels</td>
+                        <td className="metadata-entry">{
+                            this.state.videoStreamCount && this.state.audioStreamCount ? <span>{this.state.videoStreamCount} video,  {this.state.videoStreamCount} audio</span> :
+                                <p className="information dont-expand">no data</p>
+                        }</td>
+                    </tr>
+                    <tr>
+                        <td className="metadata-heading">Format</td>
+                        <td className="metadata-entry">{
+                            this.state.firstVideoStream && this.state.firstAudioStream ? <span>{this.state.firstVideoStream.codec_name} / {this.state.firstAudioStream.codec_name}</span> :
+                                <p className="information dont-expand">no data</p>
+                        }</td>
+                    </tr>
+                    <tr>
+                        <td className="metadata-heading">Resolution</td>
+                        <td className="metadata-entry">{
+                            this.state.firstVideoStream ? <span>{this.state.firstVideoStream.width} x {this.state.firstVideoStream.height}</span> :
+                                <p className="information dont-expand">no data</p>
+                        }</td>
+                    </tr>
+                    <tr>
+                        <td className="metadata-heading">Duration</td>
+                        <td className="metadata-entry">{
+                            this.props.entry.mediaMetadata && this.props.entry.mediaMetadata.format ?
+                                <MediaDurationComponent value={this.props.entry.mediaMetadata.format.duration}/> :
+                                <p className="information dont-expand">no data</p>
+                        }</td>
+                    </tr>
+
+                    <tr>
+                        <td className="metadata-heading spacebelow">Audio</td>
+                        <td className="metadata-entry">{
+                            this.state.firstAudioStream ? this.state.firstAudioStream.channel_layout :
+                                <p className="information dont-expand">no data</p>
+                        }</td>
+                    </tr>
+                    <tr>
+                        <td className="metadata-heading">File path</td>
+                        <td className="metadata-entry">{fileinfo.filepath==="" ? <i>root</i> : fileinfo.filepath}</td>
+                    </tr>
+
+                    <tr>
+                        <td className="metadata-heading spacebelow">File size</td>
                         <td className="metadata-entry"><FileSizeView rawSize={this.props.entry.size}/></td>
                     </tr>
                     <tr>
@@ -178,6 +272,12 @@ class EntryDetails extends React.Component {
                     { this.props.tableRowsInsert ? this.props.tableRowsInsert : "" }
                     </tbody>
                 </table>
+            <p className="information">
+                <a onClick={this.triggerAnalyse} style={{cursor: "pointer"}}>Refresh metadata</a>
+            </p>
+            {
+                this.state.lastError ? <ErrorViewComponent error={this.state.lastError}/> : <span/>
+            }
         </div>
     }
 }

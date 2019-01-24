@@ -301,6 +301,10 @@ td.metadata-entry {
     padding-bottom: 0;
 }
 
+td.spacebelow {
+    padding-bottom: 0.8em;
+}
+
 .entry-details {
     float: right;
     height: 100%;
@@ -348,6 +352,10 @@ p.information {
     font-size: 0.8em;
 }
 
+p.dont-expand {
+    margin-bottom: 0;
+    margin-top: 0;
+}
 .entry-jobs-list {
     margin-left: 1.5em;
 }

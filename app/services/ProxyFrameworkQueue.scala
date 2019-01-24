@@ -280,8 +280,7 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
             originalSender ! akka.actor.Status.Failure(err)
           case Success(newId)=>
             logger.info(s"Updated media metadata for $newId")
-            sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle(receiptHandle))
-            originalSender ! akka.actor.Status.Success()
+            ownRef ! HandleGenericSuccess(msg, jobDesc, rq, receiptHandle, originalSender)
         })
       }
 
@@ -311,6 +310,7 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
         case "proxy"=>self ! HandleSuccessfulProxy(msg, jobDesc, rq, receiptHandle, originalSender)
         case "thumbnail"=>self ! HandleSuccessfulProxy(msg, jobDesc, rq, receiptHandle, originalSender)
         case "analyse"=>self ! HandleSuccessfulAnalyse(msg, jobDesc, rq, receiptHandle, originalSender)
+        case "Analyse"=>self ! HandleSuccessfulAnalyse(msg, jobDesc, rq, receiptHandle, originalSender)
         case _=>
           logger.error(s"Don't know how to handle job type ${jobDesc.jobType} coming back from transcoder")
           originalSender ! akka.actor.Status.Failure(new RuntimeException(s"Don't know how to handle job type ${jobDesc.jobType} coming back from transcoder"))

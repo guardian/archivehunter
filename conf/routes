@@ -36,6 +36,7 @@ POST    /api/proxy/relink/global        @controllers.ProxiesController.relinkAll
 
 POST    /api/proxy/generate/:id/thumbnail   @controllers.ProxiesController.generateThumbnail(id)
 POST    /api/proxy/generate/:id/:typeStr     @controllers.ProxiesController.generateProxy(id, typeStr)
+POST    /api/proxy/analyse/:id          @controllers.ProxiesController.analyseMetadata(id)
 
 POST    /api/job/:jobid/report          @controllers.JobController.updateStatus(jobid)
 GET     /api/job/all                    @controllers.JobController.getAllJobs(limit:Int ?=100, scanFrom:Option[String])
