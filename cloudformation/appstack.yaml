@@ -126,7 +126,7 @@ Resources:
             AWS: "*"
           Action:
           - es:*
-          Resource: arn:aws:es:eu-west-1:855023211239:domain/archive-search-whu36ioqc84w/*
+          Resource: "*"
 
       EBSOptions:
         EBSEnabled: true
@@ -660,6 +660,8 @@ Resources:
             - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${UserProfileTable}/index/*
             - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${LightboxTable}
             - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${LightboxTable}/index/*
+            - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ProxyFrameworkTable}
+            - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ProxyFrameworkTable}/index/*
       - PolicyName: TranscoderAccess
         PolicyDocument:
           Version: 2012-10-17
@@ -718,6 +720,7 @@ Resources:
             Resource:
               - !GetAtt TranscodeUpdateMsg.Arn
               - !GetAtt IngestTranscodeMsg.Arn
+              - !GetAtt ProxyFrameworkMsg.Arn
       - PolicyName: EC2InstanceDiscovery
         PolicyDocument:
           Version: 2012-10-17
@@ -885,22 +888,10 @@ Resources:
             tableName = "${LightboxTable}"
           }
 
-          ecs {
-            cluster = "unknown"
-            subnets = "${DeploySubnetsString}"
-          }
-
           elasticsearch {
             hostname = "${SearchDomain.DomainEndpoint}"
             port = 443
             ssl = true
-          }
-
-          auth {
-             panDomainBucket = "${PandaBucket}"
-             deployedUrl = "https://${App}.${DeploymentDomain}"
-             domain = "${DeploymentDomain}"
-             userProfileTable = "${UserProfileTable}"
           }
 
           ingest {
@@ -908,7 +899,16 @@ Resources:
           }
 
           proxyFramework {
-            notificationsQueue = "${ProxyFrameworkMsg.QueueName}"
+            notificationsQueue = "${ProxyFrameworkMsg}"
+            notificationsQueueArn = "${ProxyFrameworkMsg.Arn}"
+            trackingTable = "${ProxyFrameworkTable}"
+          }
+
+          auth {
+             panDomainBucket = "${PandaBucket}"
+             deployedUrl = "https://${App}.${DeploymentDomain}"
+             domain = "${DeploymentDomain}"
+             userProfileTable = "${UserProfileTable}"
           }
 
           akka.actor {

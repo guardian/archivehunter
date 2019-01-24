@@ -54,6 +54,10 @@ class ProxiesController @Inject()(override val config:Configuration,
   private val table = Table[ProxyLocation](tableName)
   private implicit val dynamoClient = ddbClientMgr.getNewAlpakkaDynamoClient(awsProfile)
 
+  implicit val esClient = esClientMgr.getClient()
+  implicit val timeout:Timeout = 55 seconds
+  implicit val indexer = new Indexer(indexName)
+
   def proxyForId(fileId:String, proxyType:Option[String]) = APIAuthAction.async {
     try {
       val ddbClient = ddbClientMgr.getNewAlpakkaDynamoClient(awsProfile)
@@ -140,9 +144,6 @@ class ProxiesController @Inject()(override val config:Configuration,
     * @return
     */
   def searchFor(fileId:String) = APIAuthAction.async {
-    implicit val indexer = new Indexer(indexName)
-    implicit val client = esClientMgr.getClient()
-
     val resultFuture = indexer.getById(fileId).flatMap(entry=>{
       implicit val s3client = s3ClientMgr.getS3Client(awsProfile, entry.region)
       ProxyLocator.findProxyLocation(entry)
@@ -179,9 +180,6 @@ class ProxiesController @Inject()(override val config:Configuration,
     * @param proxyId Proxy ID of the proxy to link to fileId. Get this from `searchFor`.
     */
   def associate(maybeFileId:Option[String], proxyId:String) = APIAuthAction.async {
-    implicit val indexer = new Indexer(indexName)
-    implicit val client = esClientMgr.getClient()
-
     maybeFileId match {
       case None =>
         Future(BadRequest(GenericErrorResponse("bad_request", "you must specify fileId={es-id}").asJson))
@@ -229,10 +227,6 @@ class ProxiesController @Inject()(override val config:Configuration,
   }
 
   def generateProxy(fileId:String, typeStr:String) = APIAuthAction.async {
-    implicit val indexer = new Indexer(indexName)
-    implicit val client = esClientMgr.getClient()
-    implicit val timeout:Timeout = 55 seconds
-
     try {
       val pt = ProxyType.withName(typeStr.toUpperCase)
       indexer.getById(fileId).flatMap(entry=>{
@@ -318,4 +312,21 @@ class ProxiesController @Inject()(override val config:Configuration,
 
   }
 
+  def analyseMetadata(entryId:String) = APIAuthAction.async {
+    indexer.getById(entryId).flatMap(entry=>{
+      proxyGenerators
+        .requestMetadataAnalyse(entry,config.getOptional[String]("externalData.awsRegion").getOrElse("eu-west-1"))
+        .map({
+          case Left(err)=>
+            logger.error(s"Could not request analyse: $err")
+            InternalServerError(GenericErrorResponse("error", err).asJson)
+          case Right(jobId)=>
+            Ok(ObjectCreatedResponse("ok","job",jobId).asJson)
+        })
+    }).recover({
+      case err:Throwable=>
+        logger.error("Could not request analyse: ", err)
+        InternalServerError(GenericErrorResponse("error", err.toString).asJson)
+    })
+  }
 }

@@ -4,8 +4,9 @@ import java.time.format.DateTimeFormatter
 import java.time.{Instant, ZoneId, ZonedDateTime}
 
 import com.sksamuel.elastic4s.{Hit, HitReader}
+import com.theguardian.multimedia.archivehunter.common.cmn_models.{MediaMetadata, MediaMetadataMapConverters, StreamDisposition}
 
-trait ArchiveEntryHitReader {
+trait ArchiveEntryHitReader extends MediaMetadataMapConverters {
   private def mappingToMimeType(value:Map[String,String]) =
     MimeType(value("major"),value("minor"))
 
@@ -38,7 +39,12 @@ trait ArchiveEntryHitReader {
           hit.sourceField("proxied").asInstanceOf[Boolean],
           StorageClass.withName(hit.sourceField("storageClass").asInstanceOf[String]),
           mappingToLightboxes(hit.sourceField("lightboxEntries").asInstanceOf[Seq[Map[String,String]]]),
-          hit.sourceField("beenDeleted").asInstanceOf[Boolean]
+          hit.sourceField("beenDeleted").asInstanceOf[Boolean],
+          hit.sourceFieldOpt("mediaMetadata").asInstanceOf[Option[Map[String,AnyVal]]] match {
+            case None=>None
+            case Some(null)=>None
+            case Some(other)=>Some(mappingToMediaMetadata(other))
+          }
         ))
       } catch {
         case ex:Throwable=>

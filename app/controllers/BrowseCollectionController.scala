@@ -102,7 +102,8 @@ extends AbstractController(controllerComponents) with PanDomainAuthActions with 
         case None=>rq
       }
       try {
-        val result = recurseGetFolders(finalRq,s3Client)
+        val localS3Client = s3ClientMgr.getS3Client(awsProfile, Some(target.region))
+        val result = recurseGetFolders(finalRq,localS3Client)
         logger.debug(s"Got result:")
         result.foreach(summ => logger.debug(s"\t$summ"))
         Ok(ObjectListResponse("ok","folder",result, -1).asJson)

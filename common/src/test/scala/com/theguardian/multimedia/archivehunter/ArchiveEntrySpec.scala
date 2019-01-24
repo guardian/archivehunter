@@ -25,7 +25,7 @@ class ArchiveEntrySpec extends Specification with Mockito {
 
       val newEntry = Await.result(ArchiveEntry.fromS3("test-bucket","test/path/to/file.ext", "eu-west-1"), 5 seconds)
 
-      newEntry mustEqual ArchiveEntry(ArchiveEntry.makeDocId("test-bucket","test/path/to/file.ext"),"test-bucket","test/path/to/file.ext",Some("eu-west-1"), Some("ext"),123456L,ZonedDateTime.of(2018,1,1,23,21,0,0,ZoneId.systemDefault()),"test-etag", MimeType("application","octet-stream") ,false, StorageClass.STANDARD, Seq())
+      newEntry mustEqual ArchiveEntry(ArchiveEntry.makeDocId("test-bucket","test/path/to/file.ext"),"test-bucket","test/path/to/file.ext",Some("eu-west-1"), Some("ext"),123456L,ZonedDateTime.of(2018,1,1,23,21,0,0,ZoneId.systemDefault()),"test-etag", MimeType("application","octet-stream") ,false, StorageClass.STANDARD, Seq(),false,None)
     }
 
     "return any exception in the AWS SDK as a failed Try" in {

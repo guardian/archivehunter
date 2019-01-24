@@ -108,6 +108,7 @@ with PanDomainAuthActions {
             logger.error(s"Could not perform advanced search: $err")
             InternalServerError(GenericErrorResponse("search_error", err.toString).asJson)
           case Right(results) =>
+            results.result.to[ArchiveEntry].foreach(result=>logger.debug(result.toString))
             Ok(ObjectListResponse("ok", "entry", results.result.to[ArchiveEntry], results.result.totalHits.toInt).asJson)
         })
       }

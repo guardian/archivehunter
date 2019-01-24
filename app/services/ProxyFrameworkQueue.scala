@@ -24,6 +24,7 @@ object ProxyFrameworkQueue extends GenericSqsActorMessages {
   case class HandleGenericSuccess(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
   case class HandleTranscodingSetup(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
   case class HandleSuccessfulProxy(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
+  case class HandleSuccessfulAnalyse(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
   case class HandleFailure(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
   case class HandleRunning(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
 }
@@ -37,7 +38,7 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
                                      scanTargetDAO: ScanTargetDAO,
                                      esClientMgr:ESClientManager
                                     )(implicit proxyLocationDAO: ProxyLocationDAO)
-  extends GenericSqsActor[JobReportNew] with ProxyTypeEncoder with JobReportStatusEncoder {
+  extends GenericSqsActor[JobReportNew] with ProxyTypeEncoder with JobReportStatusEncoder with MediaMetadataEncoder {
   import ProxyFrameworkQueue._
   import GenericSqsActor._
 
@@ -82,6 +83,36 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
       Future(Left("need original media!"))
     case SourceType.SRC_THUMBNAIL=>
       Future(Left("need original media!"))
+  }
+
+  /**
+    * looks up the ArchiveEntry referenced by the job model and executes the provided block on it if the lookup succeeds.
+    * If not, updates the job to a failed status and signals the sender that the operation failed, but does not delete the
+    * message from the queue
+    * @param msg
+    * @param jobDesc
+    * @param rq
+    * @param receiptHandle
+    * @param originalSender
+    * @param block
+    * @return
+    */
+  def withArchiveEntry(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef)(block:ArchiveEntry=>Unit) = {
+    indexer.getById(jobDesc.sourceId)
+      .map(entry=>block(entry))
+      .recover({
+        case err:Throwable=>
+          logger.error("Could not look up archive entry: ", err)
+          val updatedLog = jobDesc.log match {
+            case Some(existingLog) => existingLog + "\n" + s"Could not look up archive entry: ${err.toString}"
+            case None => s"Could not look up archive entry: ${err.toString}"
+          }
+
+          val updatedJobDesc = jobDesc.copy(jobStatus = JobStatus.ST_ERROR, log = Some(updatedLog))
+          jobModelDAO.putJob(updatedJobDesc)
+          ownRef ! HandleFailure(msg, jobDesc, rq, receiptHandle, originalSender)
+          originalSender ! akka.actor.Status.Failure(err)
+      })
   }
 
   /**
@@ -233,6 +264,27 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
         }
       }
 
+    case HandleSuccessfulAnalyse(msg, jobDesc, rq, receiptHandle, originalSender)=>
+      withArchiveEntry(msg, jobDesc, rq, receiptHandle, originalSender) { entry=>
+        val updatedEntry = entry.copy(mediaMetadata = msg.metadata)
+        indexer.indexSingleItem(updatedEntry).map({
+          case Failure(err)=>
+            logger.error("Could not update index: ", err)
+            val updatedLog = jobDesc.log match {
+              case Some(existingLog) => existingLog + "\n" + s"Could not update index: ${err.toString}"
+              case None => s"Could not update index: ${err.toString}"
+            }
+            val updatedJobDesc = jobDesc.copy(jobStatus = JobStatus.ST_ERROR, log = Some(updatedLog))
+            jobModelDAO.putJob(updatedJobDesc)
+            ownRef ! HandleFailure(msg, jobDesc, rq, receiptHandle, originalSender)
+            originalSender ! akka.actor.Status.Failure(err)
+          case Success(newId)=>
+            logger.info(s"Updated media metadata for $newId")
+            sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle(receiptHandle))
+            originalSender ! akka.actor.Status.Success()
+        })
+      }
+
     case HandleGenericSuccess(msg, jobDesc, rq, receiptHandle, originalSender)=>
       val updatedJob = jobDesc.copy(jobStatus = JobStatus.ST_SUCCESS, completedAt = Some(ZonedDateTime.now()), log=msg.decodedLog.collect({
         case Left(err)=>err
@@ -258,8 +310,10 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
       jobDesc.jobType match {
         case "proxy"=>self ! HandleSuccessfulProxy(msg, jobDesc, rq, receiptHandle, originalSender)
         case "thumbnail"=>self ! HandleSuccessfulProxy(msg, jobDesc, rq, receiptHandle, originalSender)
-          //TODO
-        //case "analyze"=>self ! HandleSuccessfulAnalyse
+        case "analyse"=>self ! HandleSuccessfulAnalyse(msg, jobDesc, rq, receiptHandle, originalSender)
+        case _=>
+          logger.error(s"Don't know how to handle job type ${jobDesc.jobType} coming back from transcoder")
+          originalSender ! akka.actor.Status.Failure(new RuntimeException(s"Don't know how to handle job type ${jobDesc.jobType} coming back from transcoder"))
       }
 
     /**

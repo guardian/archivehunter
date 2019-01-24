@@ -392,8 +392,8 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       }))
 
       //the match fails if you don't use withFixedOffsetZone as somewhere in the marshalling/unmarshalling the zone info is changed
-      val fakeEntry1 = ArchiveEntry("fake-id-1", "fakebucket", "/path/to/file", Some("region"), Some(".ext"), 1234L, ZonedDateTime.now().withFixedOffsetZone(), "etag", MimeType("video", "mp4"), false, StorageClass.STANDARD_IA, Seq(), false)
-      val fakeEntry2 = ArchiveEntry("fake-id-2", "fakebucket", "/path/to/file2", Some("region"),Some(".ext"), 1234L, ZonedDateTime.now().withFixedOffsetZone(), "etag2", MimeType("video", "mp4"), false, StorageClass.STANDARD_IA, Seq(), false)
+      val fakeEntry1 = ArchiveEntry("fake-id-1", "fakebucket", "/path/to/file", Some("region"), Some(".ext"), 1234L, ZonedDateTime.now().withFixedOffsetZone(), "etag", MimeType("video", "mp4"), false, StorageClass.STANDARD_IA, Seq(), false, None)
+      val fakeEntry2 = ArchiveEntry("fake-id-2", "fakebucket", "/path/to/file2", Some("region"),Some(".ext"), 1234L, ZonedDateTime.now().withFixedOffsetZone(), "etag2", MimeType("video", "mp4"), false, StorageClass.STANDARD_IA, Seq(), false, None)
 
       val rq = new ReceiveMessageRequest()
       val msgList: java.util.Collection[Message] = Seq(
