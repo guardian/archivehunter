@@ -38,7 +38,6 @@ POST    /api/proxy/generate/:id/thumbnail   @controllers.ProxiesController.gener
 POST    /api/proxy/generate/:id/:typeStr     @controllers.ProxiesController.generateProxy(id, typeStr)
 POST    /api/proxy/analyse/:id          @controllers.ProxiesController.analyseMetadata(id)
 
-POST    /api/job/:jobid/report          @controllers.JobController.updateStatus(jobid)
 GET     /api/job/all                    @controllers.JobController.getAllJobs(limit:Int ?=100, scanFrom:Option[String])
 GET     /api/job/:jobId                 @controllers.JobController.getJob(jobId)
 GET     /api/job/forFile/:fileId        @controllers.JobController.jobsFor(fileId)

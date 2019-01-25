@@ -66,6 +66,9 @@ class JobsFilterComponent extends React.Component {
                     <option value="proxy">Proxy</option>
                     <option value="thumbnail">Thumbnail</option>
                     <option value="RESTORE">Restore</option>
+                    <option value="Analyse">Analyse</option>
+                    <option value="CheckSetup">Check setup</option>
+                    <option value="SetupTranscoding">Set up transcoding</option>
                 </select>
             </span>
             <span className="filter-entry">

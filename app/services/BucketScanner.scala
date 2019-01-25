@@ -163,7 +163,8 @@ class BucketScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientMan
     */
   def doScanParanoid(target:ScanTarget):Promise[Unit] = {
     logger.warn(s"Configured to do paranoid scan on $target")
-    val region = Region.getRegion(Regions.fromName(config.get[String]("externalData.awsRegion")))
+
+    val region = Region.getRegion(Regions.fromName(target.region))
 //    val hostname = s"s3-$region.amazonaws.com"
 //    val urlString = s"https://$hostname/${target.bucketName}"
 //
@@ -196,7 +197,7 @@ class BucketScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientMan
   def doScanDeleted(target:ScanTarget):Promise[Unit] = {
     val completionPromise = Promise[Unit]()
 
-    val client = s3ClientMgr.getAlpakkaS3Client(config.getOptional[String]("externalData.awsProfile"))
+    val client = s3ClientMgr.getAlpakkaS3Client(config.getOptional[String]("externalData.awsProfile"), region=Some(target.region))
     val esclient = esClientMgr.getClient()
 
     val esSource = Source.fromPublisher(esclient.publisher(search(indexName) query s"bucket:${target.bucketName} AND beenDeleted:false" scroll "1m"))
