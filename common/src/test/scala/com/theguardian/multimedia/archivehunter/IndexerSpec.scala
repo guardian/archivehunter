@@ -37,6 +37,7 @@ class IndexerSpec extends Specification with AfterAll {
         "sfdfsdjfsdhjfsd",
         "mybucket",
         "path/to/my/file",
+        Some("region"),
         Some("ext"),
         12345L,
         ZonedDateTime.now(),
@@ -44,7 +45,9 @@ class IndexerSpec extends Specification with AfterAll {
         MimeType("application","octet-stream"),
         proxied=false,
         storageClass = StorageClass.STANDARD,
-        Seq()
+        Seq(),
+        false,
+        None
       )
 
       val i = new Indexer("testindex")

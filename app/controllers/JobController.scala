@@ -28,8 +28,6 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.Future
 import akka.pattern.ask
-import services.ETSProxyActor
-import services.ETSProxyActor.ETSMsgReply
 
 @Singleton
 class JobController @Inject() (override val config:Configuration, override val controllerComponents:ControllerComponents, jobModelDAO: JobModelDAO,
@@ -37,7 +35,6 @@ class JobController @Inject() (override val config:Configuration, override val c
                                ddbClientManager:DynamoClientManager,
                                override val refresher:InjectableRefresher,
                                override val wsClient:WSClient,
-                              @Named("etsProxyActor") etsProxyActor:ActorRef,
                                proxyLocationDAO:ProxyLocationDAO)
                               (implicit actorSystem:ActorSystem)
   extends AbstractController(controllerComponents) with Circe with JobModelEncoder with ZonedDateTimeEncoder with PanDomainAuthActions with QueryRemaps {
@@ -106,81 +103,26 @@ class JobController @Inject() (override val config:Configuration, override val c
         })
     }
   }
-  /**
-    * receive a JSON report from an outboard process and handle it
-    * @param jobId
-    * @return
-    */
-  def updateStatus(jobId:String) = Action.async(circe.json(2048)) { request=>
-    jobModelDAO.jobForId(jobId).flatMap({
-      case None=>
-        Future(NotFound(GenericErrorResponse("not_found",s"no job found for id $jobId").asJson))
-      case Some(Left(err))=>
-        Future(InternalServerError(GenericErrorResponse("error", err.toString).asJson))
-      case Some(Right(jobDesc))=>
-        JobReport.getResult(request.body) match {
-          case None=>
-            Future(BadRequest(GenericErrorResponse("error","Could not decode any job report from input").asJson))
-          case Some(result)=>result match {
-            case report:JobReportError=>
-              val finalReport = report.decodeLog match {
-                case Success(decodedReport)=>
-                  logger.error(s"Outboard process indicated job failure (successfully decoded): $decodedReport")
-                  decodedReport
-                case Failure(err)=>
-                  logger.warn(s"Could not decode report: ", err)
-                  report
-              }
-              val updatedJd = jobDesc.copy(completedAt = Some(ZonedDateTime.now),jobStatus = JobStatus.ST_ERROR, log=Some(finalReport.log))
-              jobModelDAO.putJob(updatedJd)
-                .map(result=>Ok(GenericErrorResponse("ok","received report").asJson))
-
-            case report:JobReportSuccess=>
-              implicit val esClient = esClientManager.getClient()
-              implicit val s3Client = s3ClientManager.getClient(awsProfile)
-              implicit val ddbClient = ddbClientManager.getNewAlpakkaDynamoClient(awsProfile)
-
-              logger.info(s"Outboard process indicated job success: $report")
-
-              val proxyUpdateFuture = JobControllerHelper.thumbnailJobOriginalMedia(jobDesc).flatMap({
-                case Left(err)=>Future(Left(err))
-                case Right(archiveEntry)=>JobControllerHelper.updateProxyRef(report, archiveEntry, proxyLocationDAO)
-              })
-
-              proxyUpdateFuture.flatMap({
-                case Left(err)=>
-                  logger.error(s"Could not update proxy: $err")
-                  val updatedJd = jobDesc.copy(completedAt = Some(ZonedDateTime.now),log=Some(s"Could not update proxy: $err"), jobStatus = JobStatus.ST_ERROR)
-                  jobModelDAO.putJob(updatedJd)
-                    .map(result=>Ok(GenericErrorResponse("ok",s"received report but could not update proxy: $err").asJson))
-                case Right(msg)=>
-                  val updatedJd = jobDesc.copy(completedAt = Some(ZonedDateTime.now),jobStatus = JobStatus.ST_SUCCESS)
-                  jobModelDAO.putJob(updatedJd)
-                    .map(result=>Ok(GenericErrorResponse("ok","received report").asJson))
-              })
-          }
-        }
-    })
-  }
 
   def refreshTranscodeInfo(jobId:String) = APIAuthAction.async { request=>
     implicit val timeout:akka.util.Timeout = 30 seconds
 
-    jobModelDAO.jobForId(jobId).flatMap({
-      case None=>
-        Future(NotFound(GenericErrorResponse("not_found","job ID not found").asJson))
-      case Some(Left(err))=>
-        logger.error(s"Could not read from jobs database: ${err.toString}")
-        Future(InternalServerError(GenericErrorResponse("db_error", err.toString).asJson))
-      case Some(Right(jobModel))=>
-        val resultFuture = (etsProxyActor ? ETSProxyActor.ManualJobStatusRefresh(jobModel)).mapTo[ETSMsgReply]
-        resultFuture.map({
-          case ETSProxyActor.PreparationFailure(err)=>
-            logger.error("Could not refresh transcode info", err)
-            InternalServerError(GenericErrorResponse("error", err.toString).asJson)
-          case ETSProxyActor.PreparationSuccess(transcodeId, rtnJobId)=>
-            Ok(ObjectGetResponse("ok","job_id",rtnJobId).asJson)
-        })
-    })
+//    jobModelDAO.jobForId(jobId).flatMap({
+//      case None=>
+//        Future(NotFound(GenericErrorResponse("not_found","job ID not found").asJson))
+//      case Some(Left(err))=>
+//        logger.error(s"Could not read from jobs database: ${err.toString}")
+//        Future(InternalServerError(GenericErrorResponse("db_error", err.toString).asJson))
+//      case Some(Right(jobModel))=>
+//        val resultFuture = (etsProxyActor ? ETSProxyActor.ManualJobStatusRefresh(jobModel)).mapTo[ETSMsgReply]
+//        resultFuture.map({
+//          case ETSProxyActor.PreparationFailure(err)=>
+//            logger.error("Could not refresh transcode info", err)
+//            InternalServerError(GenericErrorResponse("error", err.toString).asJson)
+//          case ETSProxyActor.PreparationSuccess(transcodeId, rtnJobId)=>
+//            Ok(ObjectGetResponse("ok","job_id",rtnJobId).asJson)
+//        })
+//    })
+    Future(InternalServerError(GenericErrorResponse("not_implemented","Not currently implemented").asJson))
   }
 }

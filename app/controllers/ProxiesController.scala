@@ -25,11 +25,9 @@ import com.theguardian.multimedia.archivehunter.common.errors.{ExternalSystemErr
 import com.theguardian.multimedia.archivehunter.common.cmn_models._
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{JobModelDAO, ScanTargetDAO}
 import helpers.{InjectableRefresher, ProxyLocator}
-import services.{ETSProxyActor, ProxiesRelinker}
-import cmn_services.ProxyGenerators
+import services.ProxiesRelinker
+import com.theguardian.multimedia.archivehunter.common.ProxyTranscodeFramework.{ProxyGenerators, RequestType}
 import play.api.libs.ws.WSClient
-import services.ETSProxyActor.{ETSMsg, ETSMsgReply, PreparationFailure, PreparationSuccess}
-
 import scala.concurrent.duration._
 import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
@@ -43,7 +41,6 @@ class ProxiesController @Inject()(override val config:Configuration,
                                   proxyGenerators: ProxyGenerators,
                                   override val wsClient:WSClient,
                                   override val refresher:InjectableRefresher,
-                                  @Named("etsProxyActor") etsProxyActor:ActorRef,
                                   @Named("proxiesRelinker") proxiesRelinker:ActorRef)
                                  (implicit actorSystem:ActorSystem, scanTargetDAO:ScanTargetDAO, jobModelDAO:JobModelDAO, proxyLocationDAO:ProxyLocationDAO)
   extends AbstractController(controllerComponents) with Circe with ProxyLocationEncoder with PanDomainAuthActions with AdminsOnly {
@@ -56,7 +53,10 @@ class ProxiesController @Inject()(override val config:Configuration,
   protected val tableName:String = config.get[String]("proxies.tableName")
   private val table = Table[ProxyLocation](tableName)
   private implicit val dynamoClient = ddbClientMgr.getNewAlpakkaDynamoClient(awsProfile)
-  private implicit val s3client = s3ClientMgr.getS3Client(awsProfile)
+
+  implicit val esClient = esClientMgr.getClient()
+  implicit val timeout:Timeout = 55 seconds
+  implicit val indexer = new Indexer(indexName)
 
   def proxyForId(fileId:String, proxyType:Option[String]) = APIAuthAction.async {
     try {
@@ -109,6 +109,7 @@ class ProxiesController @Inject()(override val config:Configuration,
         case None=>
           NotFound(GenericErrorResponse("not_found",s"no $proxyType proxy found for $fileId").asJson)
         case Some(Right(proxyLocation))=>
+          implicit val s3client = s3ClientMgr.getS3Client(awsProfile, proxyLocation.region)
           val expiration = new java.util.Date()
           expiration.setTime(expiration.getTime + (1000 * 60 * 60)) //expires in 1 hour
 
@@ -134,6 +135,8 @@ class ProxiesController @Inject()(override val config:Configuration,
     }
   }
 
+  lazy val defaultRegion = config.getOptional[String]("externalData.awsRegion").getOrElse("eu-west-1")
+
   /**
     * endpoint that performs a scan for potential proxies for the given file.
     * if there is only one result, it is automatically associated.
@@ -141,10 +144,8 @@ class ProxiesController @Inject()(override val config:Configuration,
     * @return
     */
   def searchFor(fileId:String) = APIAuthAction.async {
-    implicit val indexer = new Indexer(indexName)
-    implicit val client = esClientMgr.getClient()
-
     val resultFuture = indexer.getById(fileId).flatMap(entry=>{
+      implicit val s3client = s3ClientMgr.getS3Client(awsProfile, entry.region)
       ProxyLocator.findProxyLocation(entry)
     })
 
@@ -179,16 +180,16 @@ class ProxiesController @Inject()(override val config:Configuration,
     * @param proxyId Proxy ID of the proxy to link to fileId. Get this from `searchFor`.
     */
   def associate(maybeFileId:Option[String], proxyId:String) = APIAuthAction.async {
-    implicit val indexer = new Indexer(indexName)
-    implicit val client = esClientMgr.getClient()
-
     maybeFileId match {
       case None =>
         Future(BadRequest(GenericErrorResponse("bad_request", "you must specify fileId={es-id}").asJson))
       case Some(fileId) =>
         val proxyLocationFuture = proxyLocationDAO.getProxyByProxyId(proxyId).flatMap({
           case None => //no proxy with this ID in the database yet; do an S3 scan to try to find the requested id
-            val potentialProxyOrErrorList = indexer.getById(fileId).flatMap(ProxyLocator.findProxyLocation(_))
+            val potentialProxyOrErrorList = indexer.getById(fileId).flatMap(entry=>{
+              implicit val s3client = s3ClientMgr.getS3Client(awsProfile, entry.region)
+              ProxyLocator.findProxyLocation(entry)
+            })
             potentialProxyOrErrorList.map(_.collect({case Right(loc)=>loc})).map(_.find(_.proxyId==proxyId))
 
           case Some(proxyLocation) => //found it in the database
@@ -213,7 +214,7 @@ class ProxiesController @Inject()(override val config:Configuration,
   }
 
   def generateThumbnail(fileId:String) = APIAuthAction.async {
-    proxyGenerators.createThumbnailProxy(fileId).map({
+    proxyGenerators.requestProxyJob(RequestType.THUMBNAIL, fileId, None).map({
       case Failure(NothingFoundError(objectType, msg))=>
         NotFound(GenericErrorResponse("not_found", msg.toString).asJson)
       case Failure(ExternalSystemError(systemName, msg))=>
@@ -226,10 +227,6 @@ class ProxiesController @Inject()(override val config:Configuration,
   }
 
   def generateProxy(fileId:String, typeStr:String) = APIAuthAction.async {
-    implicit val indexer = new Indexer(indexName)
-    implicit val client = esClientMgr.getClient()
-    implicit val timeout:Timeout = 55 seconds
-
     try {
       val pt = ProxyType.withName(typeStr.toUpperCase)
       indexer.getById(fileId).flatMap(entry=>{
@@ -268,22 +265,16 @@ class ProxiesController @Inject()(override val config:Configuration,
 
         canContinue match {
           case Right(_)=>
-            if(pt==ProxyType.THUMBNAIL){
-              proxyGenerators.createThumbnailProxy(entry).map({
-                case Success(jobId)=>
-                  Ok(TranscodeStartedResponse("transcode_started", jobId, None).asJson)
-                case Failure(err)=>
-                  InternalServerError(GenericErrorResponse("not_started", err.toString).asJson)
-              })
-            } else {
-              val result = (etsProxyActor ? ETSProxyActor.CreateMediaProxy(entry, pt)).mapTo[ETSMsgReply]
-              result.map({
-                case PreparationSuccess(transcodeId, jobId)=>
-                  Ok(TranscodeStartedResponse("transcode_started", jobId, Some(transcodeId)).asJson)
-                case PreparationFailure(err)=>
-                  InternalServerError(GenericErrorResponse("not_started", err.toString).asJson)
-              })
+            val requestType = pt match {
+              case ProxyType.THUMBNAIL=>RequestType.THUMBNAIL
+              case _=>RequestType.PROXY
             }
+            proxyGenerators.requestProxyJob(requestType,entry,Some(pt)).map({
+              case Success(jobId)=>
+                Ok(TranscodeStartedResponse("transcode_started", jobId, None).asJson)
+              case Failure(err)=>
+                InternalServerError(GenericErrorResponse("not_started", err.toString).asJson)
+            })
           case Left(err)=>
             Future(BadRequest(GenericErrorResponse("bad_request",err).asJson))
         }
@@ -321,4 +312,21 @@ class ProxiesController @Inject()(override val config:Configuration,
 
   }
 
+  def analyseMetadata(entryId:String) = APIAuthAction.async {
+    indexer.getById(entryId).flatMap(entry=>{
+      proxyGenerators
+        .requestMetadataAnalyse(entry,config.getOptional[String]("externalData.awsRegion").getOrElse("eu-west-1"))
+        .map({
+          case Left(err)=>
+            logger.error(s"Could not request analyse: $err")
+            InternalServerError(GenericErrorResponse("error", err).asJson)
+          case Right(jobId)=>
+            Ok(ObjectCreatedResponse("ok","job",jobId).asJson)
+        })
+    }).recover({
+      case err:Throwable=>
+        logger.error("Could not request analyse: ", err)
+        InternalServerError(GenericErrorResponse("error", err.toString).asJson)
+    })
+  }
 }

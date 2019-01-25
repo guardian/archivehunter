@@ -10,6 +10,9 @@ import ErrorViewComponent from '../common/ErrorViewComponent.jsx';
 import BreadcrumbComponent from "../common/BreadcrumbComponent.jsx";
 import Dialog from 'react-dialog';
 import ReactTooltip from 'react-tooltip'
+import TranscoderCheckComponent from "./TranscoderCheckComponent.jsx";
+import LoadingThrobber from "../common/LoadingThrobber.jsx";
+import JobEntry from "../common/JobEntry.jsx";
 
 class ScanTargetsList extends React.Component {
     constructor(props){
@@ -20,7 +23,8 @@ class ScanTargetsList extends React.Component {
             lastError: null,
             scanTargets: [],
             showingDeleteConfirm: false,
-            deletionTarget:null
+            deletionTarget:null,
+            currentActionCaption: null
         };
 
         /*
@@ -45,6 +49,11 @@ class ScanTargetsList extends React.Component {
                 defaultSorting: "desc",
                 headerProps: {className: "dashboardheader"},
                 render: value=><Link to={"scanTargets/" + value}>{value}</Link>
+            },
+            {
+                header: "Region",
+                key: "region",
+                headerProps: {className: "dashboardheader"}
             },
             {
                 header: "Enabled",
@@ -82,6 +91,20 @@ class ScanTargetsList extends React.Component {
                 headerProps: {className: "dashboardheader"}
             },
             {
+                header: "Transcoder check",
+                headerProps: {className: "dashboardheader"},
+                key: "transcoderCheck",
+                render: value=> value ? <TranscoderCheckComponent status={value.status} checkedAt={value.checkedAt} log={value.log}/> : <p className="information">Not checked</p>
+            },
+            {
+                header: "Pending jobs",
+                headerProps: {className: "dashboardheader"},
+                key: "pendingJobIds",
+                render: value=> value ? <ul className="jobs-list">{
+                    value.map(entry=><li key={entry}><JobEntry jobId={entry}/></li>)
+                }</ul> : <ul className="jobs-list"/>
+            },
+            {
                 header: "Trigger",
                 key: "bucketName",
                 headerProps: {className: "dashboardheader"},
@@ -90,8 +113,11 @@ class ScanTargetsList extends React.Component {
                     <span data-tip="Removal scan"><FontAwesomeIcon icon="folder-minus" className="clickable button-row" onClick={()=>this.triggerRemovedScan(value)}/></span>
                     <span data-tip="Full scan"><FontAwesomeIcon icon="folder" className="clickable button-row " onClick={()=>this.triggerFullScan(value)}/></span>
                     <br/>
-                    <span data-tip="Proxy generation"><FontAwesomeIcon icon="balance-scale" className="clickable button-row" onClick={()=>this.triggerProxyGen(value)}/></span>
+                    <span data-tip="Proxy generation"><FontAwesomeIcon icon="compress-arrows-alt" className="clickable button-row" onClick={()=>this.triggerProxyGen(value)}/></span>
                     <span data-tip="Relink proxies"><FontAwesomeIcon icon="book-reader" className="clickable button-row" onClick={()=>this.triggerProxyRelink(value)}/></span>
+                    <br/>
+                    <span data-tip="Validate transcode config"><FontAwesomeIcon icon="bug" className="clickable button-row" onClick={()=>this.triggerValidateConfig(value)}/></span>
+                    <FontAwesomeIcon icon="industry" className="clickable button-row" data-tip="(Redo) Transcode Setup" onClick={()=>this.triggerTranscodeSetup(value)}/>
                 </span>
             }
         ];
@@ -119,15 +145,37 @@ class ScanTargetsList extends React.Component {
         return this.generalScanTrigger(targetId,"scan")
     }
 
+    triggerValidateConfig(targetId){
+        this.setState({loading: true, currentActionCaption: "Validating config..."}, ()=>axios.post("/api/scanTarget/" + encodeURIComponent(targetId) + "/" + "checkTranscoder")
+            .then(result=>{
+                console.log("Config validation has been started with job ID " + result.data.entity);
+                this.setState({loading: false, lastError: null, currentActionCaption: null});
+            }).catch(err=>{
+                console.error(err);
+                this.setState({loading: false, lastError: err, currentActionCaption: null});
+            }))
+    }
+
+    triggerTranscodeSetup(targetId){
+        this.setState({loading:true, currentActionCaption: "Starting setup..."}, ()=>axios.post("/api/scanTarget/" + encodeURIComponent(targetId) + "/" + "createPipelines?force=true")
+            .then(result=>{
+                console.log("Transcode setup has been started with job ID " + result.data.entity);
+                this.setState({loading: false, lastError: null, currentActionCaption: null});
+            }).catch(err=>{
+                console.error(err);
+                this.setState({loading: false, lastError: err, currentActionCaption: null});
+            }))
+    }
+
     triggerProxyGen(targetId){
-        this.setState({loading: true},()=>axios.post("/api/scanTarget/" + encodeURIComponent(targetId) + "/" + "genProxies")
+        this.setState({loading: true, currentActionCaption: "Starting proxy generation..."},()=>axios.post("/api/scanTarget/" + encodeURIComponent(targetId) + "/" + "genProxies")
             .then(result=>{
                 console.log("Proxy generation has been triggered");
-                this.setState({loading:false, lastError:null, scanTargets:[]}, ()=>setTimeout(()=>this.componentWillMount(),1000));
+                this.setState({loading:false, lastError:null, scanTargets:[],currentActionCaption: null}, ()=>setTimeout(()=>this.componentWillMount(),1000));
             })
             .catch(err=>{
                 console.error(err);
-                this.setState({loading: false, lastError: err});
+                this.setState({loading: false, lastError: err,currentActionCaption: null});
             }))
     }
 
@@ -147,14 +195,14 @@ class ScanTargetsList extends React.Component {
     }
 
     generalScanTrigger(targetId,type){
-        this.setState({loading: true},()=>axios.post("/api/scanTarget/" + encodeURIComponent(targetId) + "/" + type)
+        this.setState({loading: true,currentActionCaption: "Starting scan..."},()=>axios.post("/api/scanTarget/" + encodeURIComponent(targetId) + "/" + type)
             .then(result=>{
                 console.log("Manual rescan has been triggered");
-                this.setState({loading:false, lastError:null, scanTargets:[]}, ()=>setTimeout(()=>this.componentWillMount(),1000));
+                this.setState({lastError:null,currentActionCaption: "Refreshing..."}, ()=>setTimeout(()=>this.componentWillMount(),1000));
             })
             .catch(err=>{
                 console.error(err);
-                this.setState({loading: false, lastError: err});
+                this.setState({loading: false, lastError: err, currentActionCaption: null});
             }))
     }
 
@@ -163,7 +211,7 @@ class ScanTargetsList extends React.Component {
     }
 
     componentWillMount(){
-        this.setState({loading: true}, ()=>axios.get("/api/scanTarget").then(response=>{
+        this.setState({loading: true, currentActionCaption: null}, ()=>axios.get("/api/scanTarget").then(response=>{
             this.setState({loading: false, lastError: null, scanTargets: response.data.entries});
         }).catch(err=>{
             console.error(err);
@@ -176,10 +224,10 @@ class ScanTargetsList extends React.Component {
     }
 
     doDelete(){
-        this.setState({loading: true}, ()=>axios.delete("/api/scanTarget/" + this.state.deletionTarget)
+        this.setState({loading: true, currentActionCaption: "Deleting..."}, ()=>axios.delete("/api/scanTarget/" + this.state.deletionTarget)
             .then(response=>{
                 console.log("Delete request successful");
-                this.setState({loading: false, deletionTarget: null, showingDeleteConfirm: false, scanTargets:[]}, ()=>this.componentWillMount())
+                this.setState({loading: false, deletionTarget: null, showingDeleteConfirm: false}, ()=>this.componentWillMount())
             }).catch(err=>{
                 console.error(err);
                 this.setState({loading: false, deletionTarget: null, showingDeleteConfirm: false, lastError: err});
@@ -191,14 +239,14 @@ class ScanTargetsList extends React.Component {
     }
 
     render(){
-        if(this.state.error){
-            return <ErrorViewComponent error={this.state.error}/>
-        }
-
         return <div>
             <BreadcrumbComponent path={this.props.location.pathname}/>
-            <div style={{float: "right"}}>
+            <div id="right-button-holder" style={{float: "right"}}>
                 <button type="button" onClick={this.newButtonClicked}>New</button>
+            </div>
+            <div>
+                <LoadingThrobber show={this.state.loading} small={true} caption={this.state.currentActionCaption ? this.state.currentActionCaption : "Loading..."}/>
+                <ErrorViewComponent error={this.state.lastError}/>
             </div>
             <SortableTable
             data={this.state.scanTargets}

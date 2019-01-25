@@ -14,12 +14,11 @@ class Module extends AbstractModule with AkkaGuiceSupport {
     bindActor[LegacyProxiesScanner]("legacyProxiesScannerActor")
     bindActor[BulkThumbnailer]("bulkThumbnailerActor")
     bindActor[DynamoCapacityActor]("dynamoCapacityActor")
-    bindActor[ETSProxyActor]("etsProxyActor")
     bindActor[ProxiesRelinker]("proxiesRelinker")
     bindActor[GlacierRestoreActor]("glacierRestoreActor")
     bindActor[JobPurgerActor]("jobPurgerActor")
     bindActor[IngestProxyQueue]("ingestProxyQueue")
-
+    bindActor[ProxyFrameworkQueue]("proxyFrameworkQueue")
     bind(classOf[AppStartup]).asEagerSingleton() //do app startup
   }
 }

@@ -27,6 +27,7 @@ class IndexManagement @Inject() (config:Configuration, esClientMgr:ESClientManag
           fields=Seq(
             BasicFieldDefinition("id","keyword"),
             BasicFieldDefinition("etag","keyword"),
+            BasicFieldDefinition("region","keyword"),
             NestedFieldDefinition("lightboxEntries", fields=Seq(
               BasicFieldDefinition("owner","keyword"),
               BasicFieldDefinition("avatarUrl","keyword"),

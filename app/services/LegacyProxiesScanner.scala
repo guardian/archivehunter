@@ -165,7 +165,6 @@ class LegacyProxiesScanner @Inject()(config:Configuration, ddbClientMgr:DynamoCl
         val ddbSink = injector.getInstance(classOf[DDBSink])
         val streamCompletionPromise = Promise[Unit]()
         val eosDetect = new EOSDetect[Unit, ProxyLocation](streamCompletionPromise, ())
-        val converter = new S3ToProxyLocationFlow(s3ClientMgr, config, tgt.bucketName, Seq())
 
         //keySource.via(converter).log("legacy-proxies-scanner").via(eosDetect).to(ddbSink).run()
         searchHitSource

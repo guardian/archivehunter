@@ -81,6 +81,8 @@ h2.inline-dialog-title {
     border-top-left-radius: 30px;
 }
 
+h3 { font-size: 2.0em ; }
+
 h4 {
     margin: 0 0 0.5em 0.5em;
     display: inline;
@@ -288,11 +290,19 @@ td.metadata-heading {
     border: none;
     text-align: right;
     padding-right: 0.8em;
+    padding-top: 0;
+    padding-bottom: 0;
 }
 
 td.metadata-entry {
     border: none;
     text-align: left;
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+td.spacebelow {
+    padding-bottom: 0.8em;
 }
 
 .entry-details {
@@ -342,6 +352,10 @@ p.information {
     font-size: 0.8em;
 }
 
+p.dont-expand {
+    margin-bottom: 0;
+    margin-top: 0;
+}
 .entry-jobs-list {
     margin-left: 1.5em;
 }
@@ -498,4 +512,11 @@ p.inline {
 div.fixed-row {
     width: 100%;
     height: 32px;
+}
+
+pre.inline-log {
+    display: block;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
 }

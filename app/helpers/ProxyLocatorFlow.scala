@@ -21,14 +21,15 @@ class ProxyLocatorFlow @Inject() (playConfig:Configuration, s3ClientManager: S3C
 
   val awsProfile = playConfig.getOptional[String]("externalData.awsProfile")
 
+  lazy val defaultRegion = playConfig.getOptional[String]("externalData.awsRegion").getOrElse("eu-west-1")
+
   override def createLogic(inheritedAttributes: Attributes): GraphStageLogic = new GraphStageLogic(shape) {
 
-    private implicit val s3Client = s3ClientManager.getS3Client(awsProfile)
     setHandler(in, new AbstractInHandler {
       override def onPush(): Unit = {
         val elem = grab(in)
         logger.debug(s"Got archive entry $elem")
-
+        implicit val s3Client = s3ClientManager.getS3Client(awsProfile, elem.region)
         val potentialProxyLocationsResult = Await.result(ProxyLocator.findProxyLocation(elem), 10 seconds)
 
         val potentialProxyLocations = potentialProxyLocationsResult.collect({case Right(thing)=>thing})

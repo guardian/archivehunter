@@ -65,7 +65,7 @@ lazy val `archivehunter` = (project in file("."))
       // Only if you are using Akka Testkit
       "com.typesafe.akka" %% "akka-testkit" % akkaVersion,
       "com.gu" %% "pan-domain-auth-play_2-6" % "0.7.1",
-        jdbc, ehcache, ws)
+      jdbc, ehcache, ws)
   )
 
 
@@ -85,7 +85,9 @@ lazy val common = (project in file("common"))
       "io.circe" %% "circe-java8" % circeVersion,
       "com.gu" %% "scanamo" % "1.0.0-M8",
       "com.google.inject" % "guice" % "4.1.0",  //keep this in sync with play version
-      "com.amazonaws" % "aws-java-sdk-ecs" % awsSdkVersion
+      "com.amazonaws" % "aws-java-sdk-sns" % awsSdkVersion,
+      "com.amazonaws" % "aws-java-sdk-sts" % awsSdkVersion,
+      "com.amazonaws" % "aws-java-sdk-cloudformation" % awsSdkVersion,
     )
   )
 

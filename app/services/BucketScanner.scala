@@ -7,7 +7,7 @@ import akka.NotUsed
 import akka.actor.{Actor, ActorSystem, Timers}
 import akka.http.scaladsl.Http
 import akka.stream.scaladsl.{GraphDSL, Keep, RunnableGraph, Sink, Source}
-import akka.stream.{ActorMaterializer, ClosedShape, KillSwitches, Materializer}
+import akka.stream._
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager}
 import com.amazonaws.regions.{Region, Regions}
 import com.google.inject.Injector
@@ -52,14 +52,10 @@ class BucketScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientMan
   implicit val mat = ActorMaterializer.create(system)
   implicit val ec:ExecutionContext = system.dispatcher
 
-  val table = Table[ScanTarget](config.get[String]("externalData.scanTargets"))
-
   override val indexName: String = config.get[String]("externalData.indexName")
 
-  def listScanTargets() = {
-    val alpakkaClient = ddbClientMgr.getNewAlpakkaDynamoClient(config.getOptional[String]("externalData.awsProfile"))
-
-    ScanamoAlpakka.exec(alpakkaClient)(table.scan()).map(result=>{
+  def listScanTargets() =
+    scanTargetDAO.allScanTargets().map(result=>{
       val errors = result.collect({
         case Left(readError)=>readError
       })
@@ -72,7 +68,7 @@ class BucketScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientMan
         throw new RuntimeException(errors.map(_.toString).mkString(","))
       }
     })
-  }
+
 
   /**
     * returns a boolean indicating whether the given target is due a scan, i.e. last_scan + scan_interval < now OR
@@ -147,7 +143,7 @@ class BucketScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientMan
     val completionPromise = Promise[Unit]()
 
     logger.info(s"Started scan for $target")
-    val client = s3ClientMgr.getAlpakkaS3Client(config.getOptional[String]("externalData.awsProfile"))
+    val client = s3ClientMgr.getAlpakkaS3Client(config.getOptional[String]("externalData.awsProfile"), region=Some(target.region))
     val esclient = esClientMgr.getClient()
 
     val keySource = client.listBucket(target.bucketName, None)
@@ -155,7 +151,7 @@ class BucketScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientMan
 
     val indexSink = getElasticSearchSink(esclient, completionPromise)
 
-    keySource.via(converterFlow).log("S3ToArchiveEntryFlow").to(indexSink).run()
+    keySource.via(converterFlow).named(target.region).log("S3ToArchiveEntryFlow").to(indexSink).run()
 
     completionPromise
   }
@@ -167,7 +163,8 @@ class BucketScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientMan
     */
   def doScanParanoid(target:ScanTarget):Promise[Unit] = {
     logger.warn(s"Configured to do paranoid scan on $target")
-    val region = Region.getRegion(Regions.fromName(config.get[String]("externalData.awsRegion")))
+
+    val region = Region.getRegion(Regions.fromName(target.region))
 //    val hostname = s"s3-$region.amazonaws.com"
 //    val urlString = s"https://$hostname/${target.bucketName}"
 //
@@ -200,7 +197,7 @@ class BucketScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientMan
   def doScanDeleted(target:ScanTarget):Promise[Unit] = {
     val completionPromise = Promise[Unit]()
 
-    val client = s3ClientMgr.getAlpakkaS3Client(config.getOptional[String]("externalData.awsProfile"))
+    val client = s3ClientMgr.getAlpakkaS3Client(config.getOptional[String]("externalData.awsProfile"), region=Some(target.region))
     val esclient = esClientMgr.getClient()
 
     val esSource = Source.fromPublisher(esclient.publisher(search(indexName) query s"bucket:${target.bucketName} AND beenDeleted:false" scroll "1m"))

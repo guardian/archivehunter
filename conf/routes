@@ -19,6 +19,8 @@ POST    /api/scanTarget/:id/deletionScan  @controllers.ScanTargetController.manu
 POST    /api/scanTarget/:id/additionScan  @controllers.ScanTargetController.manualTriggerAdditionScan(id)
 POST    /api/scanTarget/:id/legacyProxiesScan @controllers.ScanTargetController.scanForLegacyProxies(id)
 POST    /api/scanTarget/:id/genProxies  @controllers.ScanTargetController.genProxies(id)
+POST    /api/scanTarget/:id/checkTranscoder @controllers.ScanTargetController.initiateCheckJob(id)
+POST    /api/scanTarget/:id/createPipelines @controllers.ScanTargetController.createPipelines(id, force:Boolean ?=false)
 
 GET     /api/search/basic      @controllers.SearchController.simpleStringSearch(q:Option[String],start:Option[Int],length:Option[Int])
 GET     /api/entry/:id                  @controllers.SearchController.getEntry(id)
@@ -34,8 +36,8 @@ POST    /api/proxy/relink/global        @controllers.ProxiesController.relinkAll
 
 POST    /api/proxy/generate/:id/thumbnail   @controllers.ProxiesController.generateThumbnail(id)
 POST    /api/proxy/generate/:id/:typeStr     @controllers.ProxiesController.generateProxy(id, typeStr)
+POST    /api/proxy/analyse/:id          @controllers.ProxiesController.analyseMetadata(id)
 
-POST    /api/job/:jobid/report          @controllers.JobController.updateStatus(jobid)
 GET     /api/job/all                    @controllers.JobController.getAllJobs(limit:Int ?=100, scanFrom:Option[String])
 GET     /api/job/:jobId                 @controllers.JobController.getJob(jobId)
 GET     /api/job/forFile/:fileId        @controllers.JobController.jobsFor(fileId)
@@ -59,6 +61,13 @@ GET     /api/download/:fileId           @controllers.LightboxController.getDownl
 GET     /api/archive/status/:fileId     @controllers.LightboxController.checkRestoreStatus(fileId)
 
 GET     /api/version                    @controllers.VersionController.getInfo
+
+GET     /api/proxyFramework/deployments             @controllers.ProxyFrameworkAdminController.existingDeployments
+GET     /api/proxyFramework/deploymentScan          @controllers.ProxyFrameworkAdminController.lookupPotentialDeployments
+POST    /api/proxyFramework/deployments             @controllers.ProxyFrameworkAdminController.addDeployment
+POST    /api/proxyFramework/deploymentDirect        @controllers.ProxyFrameworkAdminController.addDeploymentDirect
+DELETE  /api/proxyFramework/deployments/:forRegion  @controllers.ProxyFrameworkAdminController.removeDeployment(forRegion)
+GET     /api/regions                    @controllers.ProxyFrameworkAdminController.getRegions
 
 # Map static resources from the /public folder to the /assets URL path
 GET     /assets/*file               controllers.Assets.at(path="/public", file)
