@@ -30,6 +30,60 @@ import scala.concurrent.duration._
 class InputLambdaMainSpec extends Specification with Mockito with ZonedDateTimeEncoder with StorageClassEncoder {
 
   "InputLambdaMain" should {
+    "handle paths with spaces encoded to +" in {
+      val fakeEvent = new S3Event(Seq(
+        new S3EventNotificationRecord("aws-fake-region","ObjectCreated:Put","unit_test",
+          "2018-01-01T11:12:13.000Z","1",
+          new RequestParametersEntity("localhost"),
+          new ResponseElementsEntity("none","fake-req-id"),
+          new S3Entity("fake-config-id",
+            new S3BucketEntity("my-bucket", new UserIdentityEntity("owner"),"arn"),
+            new S3ObjectEntity("path/to/object+with+spaces",1234L,"fakeEtag","v1"),"1"),
+          new UserIdentityEntity("no-principal"))
+      ).asJava)
+
+      val fakeContext = mock[Context]
+      val mockIndexer = mock[Indexer]
+      val mockSendIngestedMessage = mock[Function1[ArchiveEntry, Unit]]
+
+      mockIndexer.indexSingleItem(any,any,any)(any).returns(Future(Success("fake-entry-id")))
+      val test = new InputLambdaMain {
+        override protected def getElasticClient(clusterEndpoint: String): HttpClient = {
+          val m = mock[HttpClient]
+
+          m
+        }
+
+        override def sendIngestedMessage(entry:ArchiveEntry) = mockSendIngestedMessage(entry)
+
+        override protected def getClusterEndpoint = "testClusterEndpoint"
+
+        override protected def getIndexName = "testIndexName"
+
+        override protected def getIndexer(indexName: String): Indexer = mockIndexer
+
+        override protected def getS3Client: AmazonS3 = {
+          val m = mock[AmazonS3]
+          val fakeMd = new ObjectMetadata()
+          fakeMd.setContentType("video/mp4")
+          fakeMd.setContentLength(1234L)
+          fakeMd.setLastModified(Date.from(Instant.now()))
+
+          m.getObjectMetadata("my-bucket","path/to/object with spaces").returns(fakeMd)
+          m
+        }
+      }
+
+      try {
+        test.handleRequest(fakeEvent, fakeContext)
+      } catch {
+        case ex:Throwable=>
+          ex.printStackTrace()
+          throw ex
+      }
+      there was one(mockSendIngestedMessage).apply(any)
+    }
+
     "call to index an item delivered via an S3Event then call to dispatch a message to the main app" in {
       val fakeEvent = new S3Event(Seq(
         new S3EventNotificationRecord("aws-fake-region","ObjectCreated:Put","unit_test",
@@ -107,7 +161,7 @@ class InputLambdaMainSpec extends Specification with Mockito with ZonedDateTimeE
         override def makeDocId(bucket:String,path:String) = "test-source-id"
       }
 
-      Await.ready(test.handleRestored(mockRecord), 5 seconds)
+      Await.ready(test.handleRestored(mockRecord,"somepath/to/media"), 5 seconds)
       there were two(mockDao).putJob(any[JobModel])
     }
 
