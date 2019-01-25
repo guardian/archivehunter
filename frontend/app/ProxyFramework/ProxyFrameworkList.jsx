@@ -21,27 +21,34 @@ class ProxyFrameworkList extends React.Component {
         this.columns = [
             {
                 header: "Region",
-                key: "region"
+                key: "region",
+                headerProps: {className: "dashboardheader"}
+
             },
             {
                 header: "Input Topic",
-                key: "inputTopicArn"
+                key: "inputTopicArn",
+                headerProps: {className: "dashboardheader"}
             },
             {
                 header: "Reply Topic",
-                key: "outputTopicArn"
+                key: "outputTopicArn",
+                headerProps: {className: "dashboardheader"}
             },
             {
                 header: "Management Role",
-                key: "roleArn"
+                key: "roleArn",
+                headerProps: {className: "dashboardheader"}
             },
             {
                 header: "Subscription",
-                key: "subscriptionId"
+                key: "subscriptionId",
+                headerProps: {className: "dashboardheader"}
             },
             {
                 header: "Actions",
                 key: "region",
+                headerProps: {className: "dashboardheader"},
                 render: value=><span>
                     <FontAwesomeIcon icon="trash-alt" onClick={()=>this.callDelete(value)}/>
                 </span>

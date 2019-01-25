@@ -100,9 +100,6 @@ class ScanTargetsList extends React.Component {
                 header: "Pending jobs",
                 headerProps: {className: "dashboardheader"},
                 key: "pendingJobIds",
-                // render: value=>value ? <ul className="jobs-list">{
-                //     value.map(entry=><li key={entry}><Link to={"/admin/jobs/" + entry}>{entry}</Link></li>)
-                // }</ul> : <ul className="jobs-list"/>
                 render: value=> value ? <ul className="jobs-list">{
                     value.map(entry=><li key={entry}><JobEntry jobId={entry}/></li>)
                 }</ul> : <ul className="jobs-list"/>

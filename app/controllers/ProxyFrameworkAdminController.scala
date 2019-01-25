@@ -186,14 +186,6 @@ class ProxyFrameworkAdminController @Inject() (override val config:Configuration
               case Some(rec) =>
                 //setupDeployment saves the created record to the DB and performs subscriptions/security policy updates
                 proxyFrameworkHelper.setupDeployment(rec).map({
-                  /*
-                              case None=>
-                Ok(GenericErrorResponse("ok","Record saved").asJson)
-              case Some(Right(updatedRecord))=>
-                Ok(GenericErrorResponse("ok","Record saved").asJson)
-              case Some(Left(err))=>
-                InternalServerError(GenericErrorResponse("db_error", err.toString).asJson)
-                     */
                   case Success(results) =>
                     Ok(GenericErrorResponse("ok", "Record saved").asJson)
                   case Failure(err) =>
@@ -236,12 +228,36 @@ class ProxyFrameworkAdminController @Inject() (override val config:Configuration
 
   def removeDeployment(forRegion:String) = APIAuthAction.async { request=>
     adminsOnlyAsync(request) {
-      proxyFrameworkInstanceDAO.remove(forRegion)
-        .map(result=>Ok(GenericErrorResponse("ok","Record deleted").asJson))
-        .recoverWith({
-          case err:Throwable=>
-            Future(InternalServerError(GenericErrorResponse("db_error",err.toString).asJson))
-        })
+      proxyFrameworkInstanceDAO.recordsForRegion(forRegion).flatMap(results=>{
+        val failures = results.collect({case Left(err)=>err})
+        if(failures.nonEmpty){
+          logger.error(s"Could not locate deployment to remove: $failures")
+          Future(InternalServerError(GenericErrorResponse("error", failures.head.toString).asJson))
+        } else {
+          val frameworks = results.collect({case Right(pt)=>pt})
+          if(frameworks.isEmpty){
+            logger.error(s"Could not find any frameworks for region $forRegion")
+            Future(NotFound(GenericErrorResponse("error", s"Could not find any frameworks for region $forRegion").asJson))
+          } else {
+            logger.info(s"Attempting to detach framework instance ${frameworks.head}...")
+            proxyFrameworkHelper.detachFramework(frameworks.head).flatMap({
+              case Success(_)=>
+                logger.info(s"Detach succeeded. Deleting reference...")
+                proxyFrameworkInstanceDAO.remove(forRegion)
+                  .map(result=> {
+                    logger.info("Reference deleted from database; remove deployment complete")
+                    Ok(GenericErrorResponse("ok", "Record deleted").asJson)
+                  })
+                  .recoverWith({
+                    case err:Throwable=>
+                      logger.error("Could not remove reference from database: ", err)
+                      Future(InternalServerError(GenericErrorResponse("db_error",err.toString).asJson))
+                  })
+            })
+          }
+        }
+      })
+
     }
   }
 }

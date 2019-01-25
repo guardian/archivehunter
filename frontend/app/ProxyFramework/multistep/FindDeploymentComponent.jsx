@@ -26,29 +26,35 @@ class FindDeploymentComponent extends React.Component {
             {
                 header: "Select",
                 key: "stackId",
+                headerProps: {className: "dashboardheader"},
                 render: value=><input type="radio"
                                       checked={this.props.currentSelectedDeployment===value}
                                       onChange={evt=>this.props.deploymentSelected(value)}/>
             },
             {
                 header: "Stack Name",
-                key: "stackName"
+                key: "stackName",
+                headerProps: {className: "dashboardheader"}
             },
             {
                 header: "Description",
-                key: "templateDescription"
+                key: "templateDescription",
+                headerProps: {className: "dashboardheader"}
             },
             {
                 header: "Region",
-                key: "region"
+                key: "region",
+                headerProps: {className: "dashboardheader"}
             },
             {
                 header: "Status",
-                key: "stackStatus"
+                key: "stackStatus",
+                headerProps: {className: "dashboardheader"}
             },
             {
                 header: "Created",
-                key: "creationTime"
+                key: "creationTime",
+                headerProps: {className: "dashboardheader"}
             }
         ];
 
