@@ -763,6 +763,15 @@ Resources:
           - Effect: Deny
             Action: es:DeleteElasticSearchDomain
             Resource: !Sub arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/${SearchDomain}
+      - PolicyName: ClouformationList
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+            - Effect: Allow
+              Action:
+              - cloudformation:ListStacks
+              - cloudformation:DescribeStacks
+              Resource: "*"
 
   InstanceProfile:
     Type: AWS::IAM::InstanceProfile
