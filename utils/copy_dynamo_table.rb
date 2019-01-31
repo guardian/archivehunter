@@ -1,11 +1,11 @@
 #!/usr/bin/env ruby
 
-require 'trollop'
+require 'optimist'
 require 'aws-sdk'
 require 'awesome_print'
 require 'json'
 
-opts = Trollop::options do
+opts = Optimist::options do
   opt :from, "Table to copy from", :type=>:string
   opt :to, "Table to copy to", :type=>:string
   opt :region, "Region to work in", :type=>:string, :default=>"eu-west-1"
@@ -18,11 +18,7 @@ def recursively_get_next_page(client, tableName, lastEvaluatedKey, pageNumber, e
   result = client.scan(:table_name=>tableName,:exclusive_start_key=>lastEvaluatedKey)
   puts "get_next_page got #{result.items.length} #{result.count} items"
 
-  if(existingResults)
-    updatedResults = existingResults.concat result.items
-  else
-    updatedResults = result.items
-  end
+  updatedResults = existingResults ? existingResults.concat result.items : result.items
 
   if result.last_evaluated_key
     recursively_get_next_page(client, tableName, result.last_evaluated_key, pageNumber+1, updatedResults)
