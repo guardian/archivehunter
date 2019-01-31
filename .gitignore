@@ -20,3 +20,4 @@ node_modules
 /frontend/yarn-error.log
 /frontend/junit.xml
 /cloudformation/appstack-dev.yaml
+/conf/application-DEV.conf
