@@ -98,7 +98,12 @@ $ gem install optimist aws-sdk awesome_print
 
 Run `utils/copy_dynamo_table.rb --help` to see the usage instructions.
 
+### 6. Run local Elasticsearch cluster
 
+Fortunately, Docker makes this very easy. Just run `utils/run_local_elasticsearch.sh`.  This will start up a single-node dev
+cluster in Docker, storing its data in a subdirectory called `esdata` which is included in the .gitignore file.
+
+ 
 -----------------
 
 ## Notification lambdas
