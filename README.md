@@ -6,6 +6,16 @@ It's expected that you'll be developing on this on your local machine; but since
 AWS resources in order to function (DynamoDB, SQS, etc.) you'll need some of these that you can mess around with and not
 break anything else.
 
+### 0. Before you begin
+You'll need the following prerequisites installed on your dev environment:
+
+- ruby 2.x for helper scripts, with `aws-sdk optimist awesome_print` gems
+- AWS commandline utilities (`pip install awscli` helps)
+- AWS commandline access.  We use temporary credentials based on AWS commandline profiles; set the `externalData.awsProfile` option
+in your settings file (see step 2) to the profile name you are using on the commandline if you need this
+- SBT or similar Scala build environment
+- nodejs v6 or above with npm installed. I use `nvm` to manage my nodejs versions, and v10 for development.
+
 ### 1. Generate dev stack Cloudformation
 
 There is a helper script provided that takes the main app cloudformation and strips out everything you don't need for a
@@ -103,8 +113,21 @@ Run `utils/copy_dynamo_table.rb --help` to see the usage instructions.
 Fortunately, Docker makes this very easy. Just run `utils/run_local_elasticsearch.sh`.  This will start up a single-node dev
 cluster in Docker, storing its data in a subdirectory called `esdata` which is included in the .gitignore file.
 
+### 7. Build the UI in development mode
+
+The UI is provided by nodejs, and needs transpiling from JSX:
+
+```
+[checkout-root] $ cd frontend/
+[checkout-root]/frontend $ npm install
+[checkout-root]/frontend $ npm run dev
+```
  
------------------
+This will build the file `[checkout-root]/public/javascripts/bundle.js` with all of the UI in it and will keep running, rebuilding
+it every time the contents of the JSX files change.
+
+
+=============
 
 ## Notification lambdas
 While periodic scanning is all very well, it's usually a better idea to pick up incoming events as they happen rather than bundle them into large infrequent updates.
