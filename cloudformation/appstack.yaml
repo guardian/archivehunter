@@ -453,25 +453,6 @@ Resources:
   TranscodeUpdateMsg:
     Type: AWS::SQS::Queue
 
-  TranscodeUpdateMsgSubs:
-    Type: AWS::SQS::QueuePolicy
-    Properties:
-      PolicyDocument:
-        Version: '2012-10-17'
-        Id: MyQueuePolicy
-        Statement:
-        - Sid: Allow-SendMessage-From-SNS-Topic
-          Effect: Allow
-          Principal: "*"
-          Action:
-          - sqs:SendMessage
-          Resource: !GetAtt TranscodeUpdateMsg.Arn
-          Condition:
-            ArnEquals:
-              aws:SourceArn: !Ref TranscodeUpdateTopic
-      Queues:
-      - !GetAtt TranscodeUpdateMsg.QueueName
-
   IngestTranscodeMsg:
     Type: AWS::SQS::Queue
 
