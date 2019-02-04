@@ -266,6 +266,7 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
 
     case HandleSuccessfulAnalyse(msg, jobDesc, rq, receiptHandle, originalSender)=>
       withArchiveEntry(msg, jobDesc, rq, receiptHandle, originalSender) { entry=>
+        logger.info(s"Received updated metadata ${msg.metadata} for ${entry.id}")
         val updatedEntry = entry.copy(mediaMetadata = msg.metadata)
         indexer.indexSingleItem(updatedEntry).map({
           case Failure(err)=>
@@ -280,6 +281,17 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
             originalSender ! akka.actor.Status.Failure(err)
           case Success(newId)=>
             logger.info(s"Updated media metadata for $newId")
+            val updatedJobDesc = jobDesc.copy(jobStatus = JobStatus.ST_SUCCESS)
+            jobModelDAO.putJob(updatedJobDesc).onComplete({
+              case Success(Some(Left(err)))=>
+                logger.error(s"Could not update job model: $err")
+              case Success(Some(Right(rec)))=>
+                logger.info("Job model updated successfully")
+              case Success(None)=>
+                logger.info("Job model updated successfully")
+              case Failure(err)=>
+                logger.error("Job model update thread failed", err)
+            })
             ownRef ! HandleGenericSuccess(msg, jobDesc, rq, receiptHandle, originalSender)
         })
       }
