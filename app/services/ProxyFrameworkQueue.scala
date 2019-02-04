@@ -281,32 +281,23 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
             originalSender ! akka.actor.Status.Failure(err)
           case Success(newId)=>
             logger.info(s"Updated media metadata for $newId")
-            val updatedJobDesc = jobDesc.copy(jobStatus = JobStatus.ST_SUCCESS)
-            jobModelDAO.putJob(updatedJobDesc).onComplete({
-              case Success(Some(Left(err)))=>
-                logger.error(s"Could not update job model: $err")
-              case Success(Some(Right(rec)))=>
-                logger.info("Job model updated successfully")
-              case Success(None)=>
-                logger.info("Job model updated successfully")
-              case Failure(err)=>
-                logger.error("Job model update thread failed", err)
-            })
             ownRef ! HandleGenericSuccess(msg, jobDesc, rq, receiptHandle, originalSender)
         })
       }
 
     case HandleGenericSuccess(msg, jobDesc, rq, receiptHandle, originalSender)=>
-      logger.info("Job completed successfully, updating job")
+      logger.info(s"HandleGenericSuccess for $jobDesc")
       val updatedJob = jobDesc.copy(jobStatus = JobStatus.ST_SUCCESS, completedAt = Some(ZonedDateTime.now()), log=msg.decodedLog.collect({
-        case Left(err)=>err
+        case Left(err)=>s"$err for ${msg.log}"
         case Right(log)=>log
       }))
       jobModelDAO.putJob(updatedJob).map({
         case None=>
+          logger.info(s"Job ${jobDesc.jobId} updated")
           sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle(receiptHandle))
           originalSender ! akka.actor.Status.Success()
         case Some(Right(mdl))=>
+          logger.info(s"Job ${jobDesc.jobId} updated")
           sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle(receiptHandle))
           originalSender ! akka.actor.Status.Success()
         case Some(Left(err))=>
