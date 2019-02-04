@@ -480,12 +480,12 @@ Resources:
   ScalingRule:
     Type: AWS::Events::Rule
     Properties:
-      Description: Remove terminated instances from Akka cluster
+      Description: Notify on EC2 events
       EventPattern:
         source:
-        - aws.autoscaling
+        - aws.ec2
         detail-type:
-        - "EC2 Instance-terminate Lifecycle Action"
+        - "EC2 Instance State-change Notification"
       State: ENABLED
       Targets:
         - Arn: !GetAtt AutodowningLambda.Arn
