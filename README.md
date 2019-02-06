@@ -89,11 +89,52 @@ link above.
 
 ### 4. Set up reverse proxy (dev-nginx)
 
+#### Option 1
 The Guardian provides a sample nginx configuration to make setting up the https reverse proxy simple.  Go and grab https://github.com/guardian/dev-nginx and follow the instructions there.
 
 The config for ArchiveHunter is in `nginx-mapping.yaml` in the root of the sources.
 
 If you're not developing within the Guardian you'll have to make some modifications to the nginx configurations.
+
+#### Option 2 (simpler)
+We have had issues with some Macs refusing to run Homebrew or Macports, and with old SSL versions that cause a multitude of
+problems trying to install nginx.
+
+Fortunately docker provides a solution, which is available in the source tree at `utils/revproxy`
+
+Before you start, you must check on the "external" ip address that Docker can communicate back to your machine with.
+It can be done like this:
+
+```
+docker run --rm -it nginx:alpine /bin/sh
+/ # route
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+default         172.17.0.1      0.0.0.0         UG    0      0        0 eth0
+172.17.0.0      *               255.255.0.0     U     0      0        0 eth0
+/ #
+```
+
+In this example, the address is `172.17.0.1`.
+
+Edit the file `utils/revproxy/server.conf` and update the `proxy_pass` line to point to this IP address.
+Then, set up both `server_name` parameters to the "local" domain you're using for testing.  This hostname should ultimately
+resolve to `localhost`.
+Finally, add the certificates for the domain name you specified (.crt and .key) to the `utils/revproxy/certs` directory,
+and add the filenames to the `ssl_certificate` and `ssl_certificate_key` entries, including the `certs/` prefix.
+Gitignore is set up to not include .crt or .key files.
+
+Now you're ready to run it: `cd utils/revproxy; ./revproxy.sh`.  At the time of writing the script depends on being in that directory
+in order to resolve mount paths for Docker.
+
+With it running, you should be able to start up the app in Intellij (serving to port 9000) and access it in a browser at 
+https://{your-local-domain-name}.
+
+**Troubleshooting option 2**
+If you get "502 Server not available" when trying to access https://{your-local-domain-name}, it means that nginx is not getting
+a response from port 9000 on the local host. Check that the app is running, and that is is correctly binding to the port.
+If you get "504 Server timeout" then the host IP address is likely incorrect.  Re-do the instructions at the top of this section
+to find out the correct IP address
 
 ### 5. Copy in data (optional)
 
