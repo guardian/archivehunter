@@ -102,9 +102,7 @@ problems trying to install nginx.
 
 Fortunately docker provides a solution, which is available in the source tree at `utils/revproxy`.
 
-- Before you start, you must check on the "external" ip address that Docker can communicate back to your machine with.
-It can be done like this:
-
+- Before you start, you must check on the "external" ip address that Docker can communicate back to your machine with.  This _should_ be as simple as setting it to "docker.for.mac.localhost" (without the quotes); or "docker.for.win.localhost" on Windows.  However, you may have to fire up a container and run something like this:
 ```
 docker run --rm -it nginx:alpine /bin/sh
 / # route
@@ -115,9 +113,7 @@ default         172.17.0.1      0.0.0.0         UG    0      0        0 eth0
 / #
 ```
 
-*In this example, the address is `172.17.0.1`*.
-
-- Edit the file `utils/revproxy/server.conf` and update the `proxy_pass` line to point to this IP address.
+- Edit the file `utils/revproxy/server.conf` and update the `proxy_pass` line to point to either `docker.for.mac.localhost` or this IP address.
 - Then, set up both `server_name` parameters to the "local" domain you're using for testing.
    - This hostname must ultimately resolve to `localhost`.
 - Finally, add the certificates for the domain name you specified (.crt and .key) to the `utils/revproxy/certs` directory,
