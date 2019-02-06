@@ -21,3 +21,5 @@ node_modules
 /frontend/junit.xml
 /cloudformation/appstack-dev.yaml
 /conf/application-DEV.conf
+*.crt
+*.key
