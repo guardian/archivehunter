@@ -12,7 +12,7 @@ import com.google.inject.Guice
 import com.theguardian.multimedia.archivehunter.common._
 import org.apache.logging.log4j.LogManager
 import com.sksamuel.elastic4s.http.{HttpClient, HttpRequestClient}
-import com.theguardian.multimedia.archivehunter.common.cmn_models.{IngestMessage, JobModelDAO, JobStatus}
+import com.theguardian.multimedia.archivehunter.common.cmn_models.{IngestMessage, ItemNotFound, JobModelDAO, JobStatus}
 import org.apache.http.HttpHost
 import org.elasticsearch.client.RestClient
 import io.circe.syntax._
@@ -119,22 +119,25 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
   }
 
   /**
-    * deal with an item deleted notification by removing it from the index
+    * deal with an item deleted notification by removing it from the index.  If the item does not exist, don't treat it
+    * as a failure, simply note in the log.
     * @param rec S3EventNotificationRecord describing the event
     * @param i implictly provided [[Indexer]] instance
     * @param elasticHttpClient implicitly provided HttpClient instance for ElasticSearch
     * @return a Future, containing a summary string if successful. The Future fails if the operation fails.
     */
   def handleRemoved(rec: S3EventNotification.S3EventNotificationRecord,path: String)(implicit i:Indexer, elasticHttpClient:HttpClient):Future[String] = {
-//    val docId = ArchiveEntry.makeDocId(rec.getS3.getBucket.getName, rec.getS3.getObject.getKey)
-//    println(s"Going to remove $docId")
-//    i.removeSingleItem(docId)
-    ArchiveEntry.fromIndex(rec.getS3.getBucket.getName, path).flatMap(entry=>{
-      println(s"$entry has been removed, updating record to tombstone")
-      i.indexSingleItem(entry.copy(beenDeleted = true),Some(entry.id)).map({
-        case Success(result)=>result
-        case Failure(err)=> throw err
-      })
+    ArchiveEntry.fromIndexFull(rec.getS3.getBucket.getName, path).flatMap({
+      case Right(entry)=>
+        println(s"$entry has been removed, updating record to tombstone")
+        i.indexSingleItem(entry.copy(beenDeleted = true),Some(entry.id)).map({
+          case Success(result)=>result
+          case Failure(err)=> throw err
+        })
+      case Left(ItemNotFound(docId))=>
+        Future(s"$docId did not exist in the index, returning")
+      case Left(other)=>
+        throw new RuntimeException(other.toString)
     })
   }
 
