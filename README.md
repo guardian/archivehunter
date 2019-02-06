@@ -89,11 +89,58 @@ link above.
 
 ### 4. Set up reverse proxy (dev-nginx)
 
+#### Option 1
 The Guardian provides a sample nginx configuration to make setting up the https reverse proxy simple.  Go and grab https://github.com/guardian/dev-nginx and follow the instructions there.
 
 The config for ArchiveHunter is in `nginx-mapping.yaml` in the root of the sources.
 
 If you're not developing within the Guardian you'll have to make some modifications to the nginx configurations.
+
+#### Option 2 (simpler)
+We have had issues with some Macs refusing to run Homebrew or Macports, and with old SSL versions that cause a multitude of
+problems trying to install nginx.
+
+Fortunately docker provides a solution, which is available in the source tree at `utils/revproxy`.
+
+- Before you start, you must check on the "external" ip address that Docker can communicate back to your machine with.  This _should_ be as simple as setting it to "docker.for.mac.localhost" (without the quotes); or "docker.for.win.localhost" on Windows.  However, you may have to fire up a container and run something like this:
+```
+docker run --rm -it nginx:alpine /bin/sh
+/ # route
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+default         172.17.0.1      0.0.0.0         UG    0      0        0 eth0
+172.17.0.0      *               255.255.0.0     U     0      0        0 eth0
+/ #
+```
+
+- Edit the file `utils/revproxy/server.conf` and update the `proxy_pass` line to point to either `docker.for.mac.localhost` or this IP address.
+- Then, set up both `server_name` parameters to the "local" domain you're using for testing.
+   - This hostname must ultimately resolve to `localhost`.
+- Finally, add the certificates for the domain name you specified (.crt and .key) to the `utils/revproxy/certs` directory,
+and add the filenames to the `ssl_certificate` and `ssl_certificate_key` entries, including the `certs/` prefix.
+   - Generating self-signed certificates is out of the scope of this documentation, but there is plenty of information
+   available on the web how to do this on nginx.
+   - the `certs/` directory is bound to the `/etc/nginx/certs` directory in the container
+   - Gitignore is set up to not include .crt or .key files.
+
+Now you're ready to run it: `cd utils/revproxy; ./revproxy.sh`.  At the time of writing the script depends on being in that directory
+in order to resolve mount paths for Docker.
+
+With it running, you should be able to start up the app in Intellij (serving to port 9000) and access it in a browser at 
+https://{your-local-domain-name}.
+
+Remember that Intellij or sbt will compile everything _after first access_, so you may have to wait a while until you see something in the browser.
+Check the compilation console to be sure that the message got through
+
+**Troubleshooting**
+
+If you get "**502 Server not available**" when trying to access https://{your-local-domain-name}, it means that nginx is not getting
+a response from port 9000 on the local host. Check that the app is running, and that is is correctly binding to the port.
+
+If you get "**504 Server timeout**" then the host IP address is likely incorrect.  Re-do the instructions at the top of this section
+to find out the correct IP address
+
+If your browser can't resolve the domain name, then you probably need to put it either into `/etc/hosts` or into your local DNS, pointing to 127.0.0.1.  Either way this is not normally an issue with the container itself but with the DNS configuration on your dev machine.
 
 ### 5. Copy in data (optional)
 
@@ -126,8 +173,7 @@ The UI is provided by nodejs, and needs transpiling from JSX:
 This will build the file `[checkout-root]/public/javascripts/bundle.js` with all of the UI in it and will keep running, rebuilding
 it every time the contents of the JSX files change.
 
-
-=============
+---------
 
 ## Notification lambdas
 While periodic scanning is all very well, it's usually a better idea to pick up incoming events as they happen rather than bundle them into large infrequent updates.
