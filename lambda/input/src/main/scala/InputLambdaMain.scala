@@ -135,7 +135,9 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
           case Failure(err)=> throw err
         })
       case Left(ItemNotFound(docId))=>
-        Future(s"$docId did not exist in the index, returning")
+        val msg = s"$docId did not exist in the index, returning"
+        println(msg)
+        Future(msg)
       case Left(other)=>
         throw new RuntimeException(other.toString)
     })
