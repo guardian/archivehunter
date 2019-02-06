@@ -20,7 +20,8 @@ class ScanTargetEdit extends React.Component {
             lastScanned: null,
             scanInterval: 7200,
             scanInProgress: false,
-            lastError: ""
+            lastError: "",
+            paranoid: null
         };
 
         this.state = {
@@ -36,6 +37,7 @@ class ScanTargetEdit extends React.Component {
         this.updateRegion = this.updateRegion.bind(this);
         this.toggleEnabled = this.toggleEnabled.bind(this);
         this.timeIntervalUpdate = this.timeIntervalUpdate.bind(this);
+        this.toggleParanoid = this.toggleParanoid.bind(this);
 
         this.formSubmit = this.formSubmit.bind(this);
     }
@@ -83,6 +85,11 @@ class ScanTargetEdit extends React.Component {
 
     toggleEnabled(evt){
         const newEntry = Object.assign({}, this.state.entry, {enabled: !this.state.entry.enabled});
+        this.setState({entry: newEntry});
+    }
+
+    toggleParanoid(evt){
+        const newEntry = Object.assign({}, this.state.entry, {paranoid: !this.state.entry.paranoid});
         this.setState({entry: newEntry});
     }
 
@@ -169,6 +176,10 @@ class ScanTargetEdit extends React.Component {
                     <td>Last Error</td>
                     <td><textarea contentEditable={false} readOnly={true} value={this.state.entry.lastError ? this.state.entry.lastError : ""} style={{width: "85%", verticalAlign:"middle"}}/>
                         <button type="button" onClick={this.clearErrorLog} style={{marginLeft: "0.5em", verticalAlign: "middle"}}>Clear</button></td>
+                </tr>
+                <tr>
+                    <td>Paranoid Mode</td>
+                    <td><input type="checkbox" checked={this.state.entry.paranoid} onChange={this.toggleParanoid}/></td>
                 </tr>
                 </tbody>
             </table>
