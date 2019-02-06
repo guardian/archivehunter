@@ -140,6 +140,8 @@ a response from port 9000 on the local host. Check that the app is running, and 
 If you get "**504 Server timeout**" then the host IP address is likely incorrect.  Re-do the instructions at the top of this section
 to find out the correct IP address
 
+If your browser can't resolve the domain name, then you probably need to put it either into `/etc/hosts` or into your local DNS, pointing to 127.0.0.1.  Either way this is not normally an issue with the container itself but with the DNS configuration on your dev machine.
+
 ### 5. Copy in data (optional)
 
 A script is provided at `utils/copy_dynamo_table.rb` so you can copy the contents of e.g. your CODE environment proxies, jobs, etc. into
