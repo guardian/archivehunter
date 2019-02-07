@@ -6,6 +6,7 @@
 #NOTE: this expects to be run from npm as a script, and therefore have babel-cli on the path.
 # Obviously, it must be run AFTER npm install, and BEFORE build.
 
+exit 0
 cd node_modules/react-multistep
 if [ -f src/index.jsx ]; then
     echo It looks like react-multistep has already been modified and compiled. Moving on.

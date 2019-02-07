@@ -22,6 +22,10 @@ var config = {
                 loader : 'babel-loader'
             },
             {
+                test : /react-multistep\/.*\.js/,
+                loader: 'babel-loader'
+            },
+            {
                 test: /\.css$/,
                 use: ['style-loader', 'css-loader']
             }
