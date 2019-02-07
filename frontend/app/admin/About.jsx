@@ -3,6 +3,7 @@ import axios from 'axios';
 import BreadcrumbComponent from "../common/BreadcrumbComponent.jsx";
 import ErrorViewComponent from "../common/ErrorViewComponent.jsx";
 import TimestampFormatter from "../common/TimestampFormatter.jsx";
+import {handle419} from "../common/Handle419.jsx";
 
 class AboutComponent extends React.Component {
     constructor(props){
@@ -24,7 +25,13 @@ class AboutComponent extends React.Component {
             this.setState({loading: false, lastError: false, versionInfo: response.data})
         }).catch(err=>{
             console.error(err);
-            this.setState({loading: false, lastError: err})
+            handle419(err).then(didRefresh=>{
+                if(didRefresh){
+                    this.componentWillMount();
+                } else {
+                    this.setState({loading: false, lastError: err});
+                }
+            });
         }));
     }
 

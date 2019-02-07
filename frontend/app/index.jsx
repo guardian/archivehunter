@@ -27,6 +27,7 @@ import UserList from "./Users/UserList.jsx";
 
 import ProxyFrameworkList from "./ProxyFramework/ProxyFrameworkList.jsx";
 import ProxyFrameworkAdd from './ProxyFramework/ProxyFrameworkAdd.jsx';
+import {handle419} from "./common/Handle419.jsx";
 
 library.add(faStroopwafel, faCheckCircle, faCheck, faTimes, faTimesCircle, faRoad,faSearch,faThList,faWrench, faLightbulb, faChevronCircleDown, faChevronCircleRight, faTrashAlt, faFolderPlus, faFolderMinus, faFolder);
 library.add(faFilm, faVolumeUp, faImage, faFile, faClock, faRunning, faExclamationTriangle, faHdd, faBalanceScale, faSyncAlt, faBookReader, faBug, faCompressArrowsAlt, faIndustry);
@@ -59,7 +60,13 @@ class App extends React.Component {
                 this.setState({userLogin: response.data})
             }).catch(err=>{
                 console.error(err);
-                this.setState({lastError: err})
+                handle419(err).then(didRefresh=>{
+                    if(didRefresh){
+                        this.componentWillMount();
+                    } else {
+                        this.setState({lastError: err});
+                    }
+                })
             }));
     }
 

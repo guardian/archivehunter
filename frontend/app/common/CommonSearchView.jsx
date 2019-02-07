@@ -2,6 +2,7 @@ import React from "react";
 import ErrorViewComponent from '../common/ErrorViewComponent.jsx';
 import SearchResultsComponent from '../search/SearchResultsComponent.jsx';
 import axios from "axios";
+import {handle419} from "./Handle419.jsx";
 
 /**
  * this class abstracts functions that are common to all the search/browse views
@@ -75,6 +76,13 @@ class CommonSearchView extends React.Component {
                     } else {
                         this.setState({searchResults: this.state.searchResults.concat([response.data.entry])}, ()=>resolve());
                     }
+                }).catch(err=>{
+                    console.error(err);
+                    handle419(err).then(didRefresh=>{
+                        if(didRefresh){
+                            this.addedToLightbox(entryId);
+                        }
+                    })
                 }))
             }, 1000);
         });

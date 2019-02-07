@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import axios from 'axios';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import ReactTooltip from 'react-tooltip';
+import {handle419} from "../common/Handle419.jsx";
 
 class EntryThumbnail extends React.Component {
     static propTypes = {
@@ -57,7 +58,13 @@ class EntryThumbnail extends React.Component {
                 .then(result=>{
                     this.setState({loading: false, lastError: null, thumbnailUri: result.data.uri})
                 }).catch(err=>{
-                    this.setState({loading: false, lastError: err})
+                    handle419(err).then(didRefresh=>{
+                        if(didRefresh){
+                            this.componentWillMount();
+                        } else {
+                            this.setState({loading: false, lastError: err});
+                        }
+                    })
                 })
         })
     }

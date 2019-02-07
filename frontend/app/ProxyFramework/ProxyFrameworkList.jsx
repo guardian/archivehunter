@@ -6,6 +6,7 @@ import BreadcrumbComponent from "../common/BreadcrumbComponent.jsx";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import LoadingThrobber from "../common/LoadingThrobber.jsx";
 import SortableTable from 'react-sortable-table';
+import {handle419} from "../common/Handle419.jsx";
 
 class ProxyFrameworkList extends React.Component {
     constructor(props){
@@ -74,7 +75,13 @@ class ProxyFrameworkList extends React.Component {
             this.setState({loading: false, lastError:null, currentDeployments: response.data.entries})
         }).catch(err=>{
             console.error(err);
-            this.setState({loading: false, lastError: err});
+            handle419(err).then(didRefresh=>{
+                if(didRefresh){
+                    this.loadData();
+                } else {
+                    this.setState({loading: false, lastError: err});
+                }
+            });
         }));
     }
 
@@ -87,7 +94,13 @@ class ProxyFrameworkList extends React.Component {
             this.loadData();
         }).catch(err=>{
             console.error(err);
-            this.setState({loading: false, lastError: err});
+            handle419(err).then(didRefresh=>{
+                if(didRefresh){
+                    this.callDelete(region);
+                } else {
+                    this.setState({loading: false, lastError: err});
+                }
+            });
         }))
     }
     render(){

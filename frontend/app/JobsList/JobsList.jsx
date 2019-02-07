@@ -14,6 +14,7 @@ import LoadingThrobber from "../common/LoadingThrobber.jsx";
 import Dialog from 'react-dialog';
 import JobsFilterComponent from "./JobsFilterComponent.jsx";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {handle419} from "../common/Handle419.jsx";
 
 class JobsList extends  React.Component {
     constructor(props){
@@ -140,18 +141,30 @@ class JobsList extends  React.Component {
                     this.updateJobList(response.data.entry).then(()=>{
                         this.setState({loading: false});
                     }).catch(err=>{
-                        this.setState({loading:false, lastError: err});
+                        handle419(err).then(didRefresh=> {
+                            if(didRefresh){
+                                this.refreshJob(jobId);
+                            } else {
+                                this.setState({loading: false, lastError: err});
+                            }
+                        });
                     })
                 })
             }, 1000)
         }).catch(err=>{
             console.error(err);
-            axios.get("/api/job/" + jobId).then(response=>{
-                this.updateJobList(response.data.entry).then(()=>{
-                    this.setState({loading: false});
-                }).catch(err=>{
-                    this.setState({loading:false, lastError: err});
-                })
+            handle419(err).then(didRefresh=> {
+                if(didRefresh){
+                    this.refreshJob(jobId);
+                } else {
+                    axios.get("/api/job/" + jobId).then(response => {
+                        this.updateJobList(response.data.entry).then(() => {
+                            this.setState({loading: false});
+                        }).catch(err => {
+                            this.setState({loading: false, lastError: err});
+                        })
+                    });
+                }
             });
         }))
     }
@@ -197,14 +210,26 @@ class JobsList extends  React.Component {
                 this.setState({lastError: null, jobsList: [result.data.entry], loading: false})
             ).catch(err=>{
                 console.error(err);
-                this.setState({lastError: err, loading: false});
+                handle419(err).then(didRefresh=>{
+                    if(didRefresh){
+                        this.refreshData();
+                    } else {
+                        this.setState({lastError: err, loading: false});
+                    }
+                });
             }))
         } else {
             this.setState({lastError: null, loading: true}, () => this.makeUpdateRequest().then(result => {
                 this.setState({lastError: null, jobsList: result.data.entries, loading: false})
             }).catch(err => {
                 console.error(err);
-                this.setState({loading: false, lastError: err});
+                handle419(err).then(didRefresh=>{
+                    if(didRefresh){
+                        this.refreshData();
+                    } else {
+                        this.setState({lastError: err, loading: false});
+                    }
+                });
             }))
         }
     }

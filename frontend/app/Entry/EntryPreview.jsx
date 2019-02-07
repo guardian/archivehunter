@@ -5,6 +5,7 @@ import EntryThumbnail from './EntryThumbnail.jsx';
 import ErrorViewComponent from '../common/ErrorViewComponent.jsx';
 import ReactTooltip from 'react-tooltip';
 import EntryPreviewSwitcher from './EntryPreviewSwitcher.jsx';
+import {handle419} from "../common/Handle419.jsx";
 
 class EntryPreview extends React.Component {
     static propTypes = {
@@ -40,7 +41,13 @@ class EntryPreview extends React.Component {
                 this.setState({didLoad: true, previewData: result.data, loading:false, lastError: null});
             }).catch(err=>{
                 console.error(err);
-                this.setState({didLoad: true, previewData: null, loading: false, lastError: err});
+                handle419(err).then(didRefresh=> {
+                    if(didRefresh){
+                        this.getPreview(previewType);
+                    } else {
+                        this.setState({didLoad: true, previewData: null, loading: false, lastError: err});
+                    }
+                })
             })
         );
     }
@@ -61,7 +68,13 @@ class EntryPreview extends React.Component {
                     this.setState({proxyTypes: proxyTypes, selectedType: this.bestAvailablePreview(proxyTypes), loading: false, didLoad:true}, ()=>resolve());
                 }).catch(err=>{
                     console.error(err);
-                    this.setState({proxyTypes: [], loading: false, lastError: err, didLoad: true}, ()=>reject());
+                    handle419(err).then(didRefresh=>{
+                        if(didRefresh){
+                            this.updateData();
+                        } else {
+                            this.setState({proxyTypes: [], loading: false, lastError: err, didLoad: true}, ()=>reject());
+                        }
+                    });
                 }))
         );
     }
@@ -81,7 +94,13 @@ class EntryPreview extends React.Component {
             })
         }).catch(err=>{
             console.log(err);
-            this.setState({processMessage: "Proxy generation failed, see console log"})
+            handle419(err).then(didRefresh=>{
+                if(didRefresh){
+                    this.initiateCreateProxy();
+                } else {
+                    this.setState({processMessage: "Proxy generation failed, see console log"});
+                }
+            });
         })
     }
 

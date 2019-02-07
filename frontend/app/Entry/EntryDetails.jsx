@@ -9,6 +9,7 @@ import EntryLightboxBanner from "./EntryLightboxBanner.jsx";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import MediaDurationComponent from "../common/MediaDurationComponent.jsx";
 import ErrorViewComponent from "../common/ErrorViewComponent.jsx";
+import {handle419} from "../common/Handle419.jsx";
 
 class EntryDetails extends React.Component {
     static propTypes = {
@@ -52,8 +53,14 @@ class EntryDetails extends React.Component {
             .then(response=> {
                 this.setState({userLogin: response.data})
             }).catch(err=>{
-                console.error(err);
-                this.setState({lastError: err})
+                handle419(err).then(didRefresh=>{
+                    if(didRefresh){
+                        this.componentWillMount();
+                    } else {
+                        console.error(err);
+                        this.setState({lastError: err})
+                    }
+                });
             }));
     }
 
@@ -88,8 +95,14 @@ class EntryDetails extends React.Component {
                 console.log("Media analyse started");
                 this.setState({loading: false, jobsAutorefresh: true});
             }).catch(err=>{
-                console.error(err);
-                this.setState({loading: false, lastError: err});
+                handle419(err).then(didRefresh=>{
+                    if(didRefresh){
+                        this.triggerAnalyse();
+                    } else {
+                        console.error(err);
+                        this.setState({loading: false, lastError: err});
+                    }
+                });
             }));
     }
     /**
@@ -143,6 +156,11 @@ class EntryDetails extends React.Component {
             }
         }).catch(err=>{
             console.error(err);
+            handle419(err).then(didRefresh=>{
+                if(didRefresh){
+                    this.putToLightbox();
+                }
+            })
         }));
     }
 
@@ -158,6 +176,9 @@ class EntryDetails extends React.Component {
             })
         }).catch(err=>{
             console.error(err);
+            handle419(err).then(didRefresh=>{
+                if(didRefresh) this.removeFromLightbox();
+            })
         }))
     }
 

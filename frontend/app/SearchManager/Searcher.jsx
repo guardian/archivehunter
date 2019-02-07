@@ -1,4 +1,5 @@
 import axios from 'axios';
+import {handle419} from "../common/Handle419.jsx";
 
 class Searcher {
     /**
@@ -102,7 +103,13 @@ class Searcher {
                     this.terminationCompletedCb=null;
                 }
             } else {
-                this.errorCb(err, this.searchId);
+                handle419(err).then(didRefresh=>{
+                    if(didRefresh){
+                        this.getNextPage();
+                    } else {
+                        this.errorCb(err, this.searchId);
+                    }
+                });
             }
         })
     }
