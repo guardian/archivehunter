@@ -285,11 +285,12 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
       }
 
     case HandleGenericSuccess(msg, jobDesc, rq, receiptHandle, originalSender)=>
+      logger.info("Job completed successfully, updating job")
       val updatedJob = jobDesc.copy(jobStatus = JobStatus.ST_SUCCESS, completedAt = Some(ZonedDateTime.now()), log=msg.decodedLog.collect({
         case Left(err)=>err
         case Right(log)=>log
       }))
-      jobModelDAO.putJob(jobDesc).map({
+      jobModelDAO.putJob(updatedJob).map({
         case None=>
           sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle(receiptHandle))
           originalSender ! akka.actor.Status.Success()
