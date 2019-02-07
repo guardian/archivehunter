@@ -5,8 +5,11 @@ import java.time.{Instant, ZoneId, ZonedDateTime}
 
 import com.sksamuel.elastic4s.{Hit, HitReader}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{MediaMetadata, MediaMetadataMapConverters, StreamDisposition}
+import org.apache.logging.log4j.LogManager
 
 trait ArchiveEntryHitReader extends MediaMetadataMapConverters {
+  private val ownLogger = LogManager.getLogger(getClass)
+
   private def mappingToMimeType(value:Map[String,String]) =
     MimeType(value("major"),value("minor"))
 
@@ -43,7 +46,14 @@ trait ArchiveEntryHitReader extends MediaMetadataMapConverters {
           hit.sourceFieldOpt("mediaMetadata").asInstanceOf[Option[Map[String,AnyVal]]] match {
             case None=>None
             case Some(null)=>None
-            case Some(other)=>Some(mappingToMediaMetadata(other))
+            case Some(other)=>
+              try {
+                Some(mappingToMediaMetadata(other))
+              } catch {
+                case err:ClassCastException=>
+                  ownLogger.error(s"Class Cast exception converting metadata for ${hit.sourceField("id").asInstanceOf[String]}: ",err)
+                  None
+              }
           }
         ))
       } catch {
