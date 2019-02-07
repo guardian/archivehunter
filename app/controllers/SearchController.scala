@@ -111,7 +111,11 @@ with PanDomainAuthActions {
             Ok(ObjectListResponse("ok", "entry", results.result.to[ArchiveEntry], results.result.totalHits.toInt).asJson)
         })
       }
-    )
+    ).recover({
+      case err:Throwable=>
+        logger.error("Could not do browse search: ", err)
+        InternalServerError(GenericErrorResponse("error", err.toString).asJson)
+    })
   }
 
   def lightboxSearch(startAt:Int, pageSize:Int) = APIAuthAction.async {request=>
