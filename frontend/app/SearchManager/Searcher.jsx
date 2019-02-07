@@ -33,7 +33,7 @@ class Searcher {
 
         this.cancelTokenSource = axios.CancelToken.source();
 
-        console.log("Searcher body content: ", bodyContent);
+        //console.log("Searcher body content: ", bodyContent);
     }
 
     /**
@@ -72,8 +72,8 @@ class Searcher {
         const staticHeaders = {};
         const updateHeaders = this.bodyContent && this.bodyContent.contentType ? Object.assign(staticHeaders, {"Content-Type": this.bodyContent.contentType}) : staticHeaders;
 
-        console.log("getNextPage: headers ", updateHeaders);
-        console.log("getNextPage: body content ", this.bodyContent ? this.bodyContent.data : null);
+        //console.log("getNextPage: headers ", updateHeaders);
+        //console.log("getNextPage: body content ", this.bodyContent ? this.bodyContent.data : null);
 
         axios.request({
             method: this.method,
