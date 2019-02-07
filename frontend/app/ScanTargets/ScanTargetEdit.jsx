@@ -21,7 +21,7 @@ class ScanTargetEdit extends React.Component {
             scanInterval: 7200,
             scanInProgress: false,
             lastError: "",
-            paranoid: null
+            paranoid: false
         };
 
         this.state = {
