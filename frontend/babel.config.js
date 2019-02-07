@@ -1,4 +1,4 @@
-{
+module.exports = {
   "presets": [
     "@babel/env",
     "@babel/react"
@@ -7,4 +7,4 @@
     "@babel/plugin-proposal-function-bind",
     "@babel/plugin-proposal-class-properties"
   ]
-}
+};

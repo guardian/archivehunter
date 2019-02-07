@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "jest",
+    "test": "jest --runInBand",
     "dev": "./script/fix-multistep.sh && webpack -d --watch",
     "build": "./script/fix-multistep.sh && webpack -p"
   },
@@ -13,7 +13,8 @@
       "\\.(css|less)$": "identity-obj-proxy"
     },
     "transformIgnorePatterns": [
-      "/node_modules/(?!(react-treebeard|panda-session))"
+      "node_modules/react-treebeard/.+\\\\.js$",
+      "node_modules/(?!panda-session).+\\\\.js$"
     ],
     "testResultsProcessor": "jest-junit",
     "setupFiles": [
@@ -24,6 +25,7 @@
   "devDependencies": {
     "@babel/plugin-proposal-class-properties": "^7.3.0",
     "@babel/plugin-proposal-function-bind": "^7.2.0",
+    "babel-core": "^7.0.0-bridge.0",
     "enzyme": "^3.7.0",
     "enzyme-adapter-react-16": "^1.6.0",
     "jest": "^20.0.4",
