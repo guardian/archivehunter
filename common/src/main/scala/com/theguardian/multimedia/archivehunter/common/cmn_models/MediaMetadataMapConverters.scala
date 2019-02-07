@@ -19,6 +19,20 @@ trait MediaMetadataMapConverters {
     case Some(actualValue)=>Some(actualValue.asInstanceOf[T])
   }
 
+  /**
+    * we have been having trouble with some values coming through as Int and some as Long. In order to cast these safely,
+    * this method first attempts to cast as Long and if that fails, cast as Int then convert to Long
+    * @param value
+    * @return
+    */
+  protected def intLongMap(value: AnyVal):Long = {
+    try {
+      value.asInstanceOf[Long]
+    } catch {
+      case err:java.lang.ClassCastException=>
+        value.asInstanceOf[Int].toLong
+    }
+  }
   protected def mappingToStreamDisposition(value:Map[String,Boolean]) =
     StreamDisposition(value.getOrElse("comment", false),value.getOrElse("forced", false),value.getOrElse("lyrics", false),
       value.getOrElse("default", false),value.getOrElse("dub", false),value.getOrElse("original", false),
@@ -69,7 +83,7 @@ trait MediaMetadataMapConverters {
       value("bit_rate").asInstanceOf[Double],
       value("nb_programs").asInstanceOf[Int],
       value("duration").asInstanceOf[Double],
-      value("size").asInstanceOf[Long],
+      intLongMap(value("size")),
     )
 
   protected def mappingToMediaMetadata(value:Map[String,AnyVal]) = {
