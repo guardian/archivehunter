@@ -69,7 +69,7 @@ trait MediaMetadataMapConverters {
       value("bit_rate").asInstanceOf[Double],
       value("nb_programs").asInstanceOf[Int],
       value("duration").asInstanceOf[Double],
-      value("size").asInstanceOf[Int],
+      value("size").asInstanceOf[Long],
     )
 
   protected def mappingToMediaMetadata(value:Map[String,AnyVal]) = {

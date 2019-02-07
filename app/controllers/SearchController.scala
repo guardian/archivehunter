@@ -50,6 +50,10 @@ with PanDomainAuthActions {
           case None =>
             NotFound(GenericErrorResponse("not_found", fileId).asJson)
         }
+    }).recover({
+      case err:Throwable=>
+        logger.error("Could not get entry: ", err)
+        InternalServerError(GenericErrorResponse("error", err.toString).asJson)
     })
   }
 
@@ -71,6 +75,10 @@ with PanDomainAuthActions {
           case Right(results) =>
             val resultList = results.result.to[ArchiveEntry] //using the ArchiveEntryHitReader trait
             Ok(ObjectListResponse[IndexedSeq[ArchiveEntry]]("ok","entry",resultList,results.result.totalHits.toInt).asJson)
+        }).recover({
+          case err:Throwable=>
+            logger.error("Could not do browse search: ", err)
+            InternalServerError(GenericErrorResponse("error", err.toString).asJson)
         })
       case None => Future(BadRequest(GenericErrorResponse("error", "you must specify a query string with ?q={string}").asJson))
     }
@@ -90,6 +98,10 @@ with PanDomainAuthActions {
         logger.info("Got ES response:")
         logger.info(results.body.getOrElse("[empty body]"))
         Ok(BasicSuggestionsResponse.fromEsResponse(results.result.termSuggestion("sg")).asJson)
+    }).recover({
+      case err:Throwable=>
+        logger.error("Could not do suggestions search: ", err)
+        InternalServerError(GenericErrorResponse("error", err.toString).asJson)
     })
   }
 
@@ -99,6 +111,7 @@ with PanDomainAuthActions {
         Future(BadRequest(GenericErrorResponse("bad_request", error.toString).asJson))
       },
       request=> {
+        logger.info(s"search params are ${request.toSearchParams}")
         esClient.execute {
           search(indexName) query {
             boolQuery().must(request.toSearchParams)
@@ -111,7 +124,11 @@ with PanDomainAuthActions {
             Ok(ObjectListResponse("ok", "entry", results.result.to[ArchiveEntry], results.result.totalHits.toInt).asJson)
         })
       }
-    )
+    ).recover({
+      case err:Throwable=>
+        logger.error("Could not do browse search: ", err)
+        InternalServerError(GenericErrorResponse("error", err.toString).asJson)
+    })
   }
 
   def lightboxSearch(startAt:Int, pageSize:Int) = APIAuthAction.async {request=>
@@ -127,6 +144,10 @@ with PanDomainAuthActions {
         InternalServerError(GenericErrorResponse("search_error", err.toString).asJson)
       case Right(results)=>
         Ok(ObjectListResponse("ok","entry", results.result.to[ArchiveEntry], results.result.totalHits.toInt).asJson)
+    }).recover({
+      case err:Throwable=>
+        logger.error("Could not do browse search: ", err)
+        InternalServerError(GenericErrorResponse("error", err.toString).asJson)
     })
   }
 }
