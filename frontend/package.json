@@ -13,7 +13,7 @@
       "\\.(css|less)$": "identity-obj-proxy"
     },
     "transformIgnorePatterns": [
-      "/node_modules/(?!react-treebeard)"
+      "/node_modules/(?!(react-treebeard|panda-session))"
     ],
     "testResultsProcessor": "jest-junit",
     "setupFiles": [
@@ -60,6 +60,7 @@
     "lodash.omit": "^4.5.0",
     "moment": "^2.20.1",
     "moment-duration-format": "2.2.2",
+    "panda-session": "^0.1.6",
     "raven-js": "^3.24.1",
     "react": "^16.6.1",
     "react-dialog": "^1.0.2",

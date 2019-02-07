@@ -33,7 +33,7 @@ class Searcher {
 
         this.cancelTokenSource = axios.CancelToken.source();
 
-        console.log("Searcher body content: ", bodyContent);
+        //console.log("Searcher body content: ", bodyContent);
     }
 
     /**
@@ -74,7 +74,7 @@ class Searcher {
 
         // console.log("getNextPage: headers ", updateHeaders);
         // console.log("getNextPage: body content ", this.bodyContent ? this.bodyContent.data : null);
-
+        
         axios.request({
             method: this.method,
             url: this.url + "?" + urlParamsString,
