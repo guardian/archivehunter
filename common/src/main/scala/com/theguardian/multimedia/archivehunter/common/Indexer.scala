@@ -9,8 +9,11 @@ import scala.util.{Failure, Success, Try}
 import scala.concurrent.ExecutionContext.Implicits.global
 import com.sksamuel.elastic4s.http.{HttpClient, RequestFailure}
 import com.sksamuel.elastic4s.mappings.FieldType._
+import com.theguardian.multimedia.archivehunter.common.cmn_models._
 import io.circe.generic.auto._
 import io.circe.syntax._
+
+import scala.annotation.switch
 
 class Indexer(indexName:String) extends ZonedDateTimeEncoder with StorageClassEncoder with ArchiveEntryHitReader {
   import com.sksamuel.elastic4s.http.ElasticDsl._
@@ -73,15 +76,32 @@ class Indexer(indexName:String) extends ZonedDateTimeEncoder with StorageClassEn
     * @param client implicitly provided index client
     * @return a Future containing an ArchiveEntry.  The future is cancelled if anything fails - use .recover or .recoverWith to pick this up.
     */
-  def getById(docId:String)(implicit client:HttpClient):Future[ArchiveEntry] = client.execute {
+  def getById(docId:String)(implicit client:HttpClient):Future[ArchiveEntry] = getByIdFull(docId).map({
+    case Left(err)=> throw new RuntimeException(err.toString)
+    case Right(entry)=>entry
+  })
+
+  /**
+    * Perform an index lookup by ID, with error handling
+    * @param docId document ID to find
+    * @param client implicitly provided index client
+    * @return a Future containing either an ArchiveEntry or a subclass of IndexerError describing the actual error.
+    */
+  def getByIdFull(docId:String)(implicit client:HttpClient):Future[Either[IndexerError,ArchiveEntry]] = client.execute {
     get(indexName, "entry", docId)
   }.map({
-    case Left(failure)=>
-      throw new RuntimeException(failure.toString)
+    case Left(failure)=>Left(ESError(docId, failure))
     case Right(success)=>
-      ArchiveEntryHR.read(success.result) match {
-        case Left(err)=>throw err
-        case Right(entry)=>entry
+      (success.status: @switch) match {
+        case 200 =>
+          ArchiveEntryHR.read(success.result) match {
+            case Left(err) => Left(SystemError(docId, err))
+            case Right(entry) => Right(entry)
+          }
+        case 404 =>
+          Left(ItemNotFound(docId))
+        case other =>
+          Left(UnexpectedReturnCode(docId, other))
       }
   })
 }

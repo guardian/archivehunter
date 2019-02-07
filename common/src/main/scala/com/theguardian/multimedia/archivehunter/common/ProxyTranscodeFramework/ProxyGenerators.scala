@@ -2,7 +2,7 @@ package com.theguardian.multimedia.archivehunter.common.ProxyTranscodeFramework
 
 import java.time.{Instant, ZonedDateTime}
 import java.util.UUID
-
+import java.net.URLEncoder
 import akka.actor.ActorSystem
 import akka.stream.{ActorMaterializer, Materializer}
 import com.amazonaws.services.elastictranscoder.model.CreatePipelineRequest
@@ -80,6 +80,7 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration,
     */
   def getUriToProxy(entry: ArchiveEntry) = entry.storageClass match {
     case StorageClass.GLACIER=>
+      val url = s"s3://${URLEncoder.encode(entry.bucket,"UTF-8")}/${URLEncoder.encode(entry.path,"UTF-8")}"
       val haveRestore = haveGlacierRestore(entry) match {
         case Success(result)=>result
         case Failure(err)=>
@@ -87,26 +88,29 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration,
           false
       }
       if(haveRestore){
-        logger.info(s"s3://${entry.bucket}/${entry.path} is in Glacier but has been restored. Trying to proxy directly.")
-        Future(Some(s"s3://${entry.bucket}/${entry.path}"))
+        logger.info(s"$url is in Glacier but has been restored. Trying to proxy directly.")
+        Future(Some(url))
       } else {
-        logger.info(s"s3://${entry.bucket}/${entry.path} is in Glacier, can't proxy directly. Looking up any existing video proxy")
+        logger.info(s"$url is in Glacier, can't proxy directly. Looking up any existing video proxy")
         proxyLocationDAO.getProxy(entry.id, ProxyType.VIDEO).flatMap({
           case None =>
             proxyLocationDAO.getProxy(entry.id, ProxyType.AUDIO).map({
               case None => None
               case Some(proxyLocation) =>
-                logger.info(s"Found audio proxy at s3://${proxyLocation.bucketName}/${proxyLocation.bucketPath}")
-                Some(s"s3://${proxyLocation.bucketName}/${proxyLocation.bucketPath}")
+                val proxUrl = s"s3://${URLEncoder.encode(proxyLocation.bucketName,"UTF-8")}/${URLEncoder.encode(proxyLocation.bucketPath,"UTF-8")}"
+                logger.info(s"Found audio proxy at $proxUrl")
+                Some(proxUrl)
             })
           case Some(proxyLocation) =>
-            logger.info(s"Found video proxy at s3://${proxyLocation.bucketName}/${proxyLocation.bucketPath}")
-            Future(Some(s"s3://${proxyLocation.bucketName}/${proxyLocation.bucketPath}"))
+            val proxUrl = s"s3://${URLEncoder.encode(proxyLocation.bucketName,"UTF-8")}/${URLEncoder.encode(proxyLocation.bucketPath,"UTF-8")}"
+            logger.info(s"Found video proxy at $proxUrl")
+            Future(Some(proxUrl))
         })
       }
     case _=>
-      logger.info(s"s3://${entry.bucket}/${entry.path} is in ${entry.storageClass}, will try to proxy directly")
-      Future(Some(s"s3://${entry.bucket}/${entry.path}"))
+      val url = s"s3://${URLEncoder.encode(entry.bucket,"UTF-8")}/${URLEncoder.encode(entry.path,"UTF-8")}"
+      logger.info(s"$url is in ${entry.storageClass}, will try to proxy directly")
+      Future(Some(url))
   }
 
   /**

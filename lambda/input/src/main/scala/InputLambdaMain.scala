@@ -1,3 +1,4 @@
+import java.net.URLDecoder
 import java.time.ZonedDateTime
 
 import com.amazonaws.services.lambda.runtime.{Context, RequestHandler}
@@ -11,7 +12,7 @@ import com.google.inject.Guice
 import com.theguardian.multimedia.archivehunter.common._
 import org.apache.logging.log4j.LogManager
 import com.sksamuel.elastic4s.http.{HttpClient, HttpRequestClient}
-import com.theguardian.multimedia.archivehunter.common.cmn_models.{IngestMessage, JobModelDAO, JobStatus}
+import com.theguardian.multimedia.archivehunter.common.cmn_models.{IngestMessage, ItemNotFound, JobModelDAO, JobStatus}
 import org.apache.http.HttpHost
 import org.elasticsearch.client.RestClient
 import io.circe.syntax._
@@ -63,7 +64,7 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
     * @param event S3Event instance
     */
   def dumpEventData(event: S3Event, indentChar:Option[String]=None) =
-    event.getRecords.asScala.foldLeft("")((acc,record)=>acc + s"${indentChar.getOrElse("")}${record.getEventName} on ${record.getEventSource} in ${record.getAwsRegion} at ${record.getEventTime} with ${record.getS3.getObject.getKey}\n")
+    event.getRecords.asScala.foldLeft("")((acc,record)=>acc + s"${indentChar.getOrElse("")}${record.getEventName} on ${record.getEventSource} in ${record.getAwsRegion} at ${record.getEventTime} with ${URLDecoder.decode(record.getS3.getObject.getKey,"UTF-8")}\n")
 
   def getMetadataWithRetry(bucket:String, key:String, retryNumber:Int=0)(implicit s3Client:AmazonS3):ObjectMetadata = {
     try{
@@ -90,19 +91,19 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
     * @param elasticHttpClient implicitly provided HttpClient instance for Elastic Search
     * @return a Future, containing the ID of the new/updated record as a String.  If the operation fails, the Future will fail; pick this up with .onComplete or .recover
     */
-  def handleCreated(rec:S3EventNotification.S3EventNotificationRecord)(implicit i:Indexer, s3Client:AmazonS3, elasticHttpClient:HttpClient):Future[String] = {
-    val md = getMetadataWithRetry(rec.getS3.getBucket.getName, rec.getS3.getObject.getKey)
+  def handleCreated(rec:S3EventNotification.S3EventNotificationRecord,path: String)(implicit i:Indexer, s3Client:AmazonS3, elasticHttpClient:HttpClient):Future[String] = {
+    val md = getMetadataWithRetry(rec.getS3.getBucket.getName, path)
 
     val mimeType = MimeType.fromString(md.getContentType) match {
       case Left(error) =>
-        println(s"Could not get MIME type for s3://${rec.getS3.getBucket.getName}/${rec.getS3.getObject.getKey}: $error")
+        println(s"Could not get MIME type for s3://${rec.getS3.getBucket.getName}/$path: $error")
         MimeType("application", "octet-stream")
       case Right(mt) =>
-        println(s"MIME type for s3://${rec.getS3.getBucket.getName}/${rec.getS3.getObject.getKey} is ${mt.toString}")
+        println(s"MIME type for s3://${rec.getS3.getBucket.getName}/$path is ${mt.toString}")
         mt
     }
 
-    ArchiveEntry.fromS3(rec.getS3.getBucket.getName, rec.getS3.getObject.getKey, s3Client.getRegionName).flatMap(entry => {
+    ArchiveEntry.fromS3(rec.getS3.getBucket.getName, path, s3Client.getRegionName).flatMap(entry => {
       println(s"Going to index $entry")
       i.indexSingleItem(entry).map({
         case Success(indexid) =>
@@ -118,22 +119,27 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
   }
 
   /**
-    * deal with an item deleted notification by removing it from the index
+    * deal with an item deleted notification by removing it from the index.  If the item does not exist, don't treat it
+    * as a failure, simply note in the log.
     * @param rec S3EventNotificationRecord describing the event
     * @param i implictly provided [[Indexer]] instance
     * @param elasticHttpClient implicitly provided HttpClient instance for ElasticSearch
     * @return a Future, containing a summary string if successful. The Future fails if the operation fails.
     */
-  def handleRemoved(rec: S3EventNotification.S3EventNotificationRecord)(implicit i:Indexer, elasticHttpClient:HttpClient):Future[String] = {
-//    val docId = ArchiveEntry.makeDocId(rec.getS3.getBucket.getName, rec.getS3.getObject.getKey)
-//    println(s"Going to remove $docId")
-//    i.removeSingleItem(docId)
-    ArchiveEntry.fromIndex(rec.getS3.getBucket.getName, rec.getS3.getObject.getKey).flatMap(entry=>{
-      println(s"$entry has been removed, updating record to tombstone")
-      i.indexSingleItem(entry.copy(beenDeleted = true),Some(entry.id)).map({
-        case Success(result)=>result
-        case Failure(err)=> throw err
-      })
+  def handleRemoved(rec: S3EventNotification.S3EventNotificationRecord,path: String)(implicit i:Indexer, elasticHttpClient:HttpClient):Future[String] = {
+    ArchiveEntry.fromIndexFull(rec.getS3.getBucket.getName, path).flatMap({
+      case Right(entry)=>
+        println(s"$entry has been removed, updating record to tombstone")
+        i.indexSingleItem(entry.copy(beenDeleted = true),Some(entry.id)).map({
+          case Success(result)=>result
+          case Failure(err)=> throw err
+        })
+      case Left(ItemNotFound(docId))=>
+        val msg = s"$docId did not exist in the index, returning"
+        println(msg)
+        Future(msg)
+      case Left(other)=>
+        throw new RuntimeException(other.toString)
     })
   }
 
@@ -143,9 +149,9 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
     * @param rec S3EventNotification.S3EventNotificationRecord instance
     * @return a Future that completes when the operations have finished. No useful contents.
     */
-  def handleRestored(rec:S3EventNotification.S3EventNotificationRecord) = {
+  def handleRestored(rec:S3EventNotification.S3EventNotificationRecord,path: String) = {
     val jobModelDAO = getJobModelDAO
-    val docId = makeDocId(rec.getS3.getBucket.getName, rec.getS3.getObject.getKey)
+    val docId = makeDocId(rec.getS3.getBucket.getName, path)
 
     jobModelDAO.jobsForSource(docId).flatMap(resultList=>{
       val failures = resultList.collect({case Left(err)=>err})
@@ -220,18 +226,20 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
     println(s"Lambda was triggered with: \n${dumpEventData(event, Some("\t"))}")
     val resultList = event.getRecords.asScala.map(rec=>{
 
-      println(s"Source object is s3://${rec.getS3.getBucket.getName}/${rec.getS3.getObject.getKey} in ${rec.getAwsRegion}")
+      val path = URLDecoder.decode(rec.getS3.getObject.getKey,"UTF-8")
+
+      println(s"Source object is s3://${rec.getS3.getBucket.getName}/$path in ${rec.getAwsRegion}")
       println(s"Event was sent by ${rec.getUserIdentity.getPrincipalId}")
 
       rec.getEventName match {
         case "ObjectCreated:Put"=>
-          handleCreated(rec)
+          handleCreated(rec, path)
         case "ObjectCreated:CompleteMultipartUpload"=>
-          handleCreated(rec)
+          handleCreated(rec, path)
         case "ObjectRemoved:Delete"=>
-          handleRemoved(rec)
+          handleRemoved(rec, path)
         case "ObjectRestore:Completed"=>
-          handleRestored(rec)
+          handleRestored(rec, path)
         case other:String=>
           println(s"ERROR: received unknown event $other")
           throw new RuntimeException(s"unknown event $other received")

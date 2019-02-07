@@ -116,15 +116,15 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
   }
 
   /**
-    * looks up a ScanTarget waiting for this job and executes the provided block on it if the lookup succeeds.
+    * looks up a ScanTarget waiting for this job and executes the provided block on it (within a Future) if the lookup succeeds.
     * if the lookup does not succeed then mark the job as failed.
-    * @param msg
-    * @param jobDesc
-    * @param rq
-    * @param receiptHandle
-    * @param originalSender
-    * @param block
-    * @return
+    * @param msg JobReportNew describing the results of the job from the proxy framework
+    * @param jobDesc JobModel from the database
+    * @param rq ReceiveMessageRequest object from SQS, this is passed straight on to the block
+    * @param receiptHandle receipt handle from SQS, to ensure that the message is deleted after successful processing
+    * @param originalSender the actor that originally sent us the message. sender() refs get nullified when we go into threads.
+    * @param block block to call if ScanTarget can be found.  Must accept the ScanTarget as its only argument, and return unit (i.e. nothing)
+    * @return Future of Unit.
     */
   def withScanTarget(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef)(block:ScanTarget=>Unit) =
     scanTargetDAO.waitingForJobId(jobDesc.jobId).map({
@@ -285,11 +285,12 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
       }
 
     case HandleGenericSuccess(msg, jobDesc, rq, receiptHandle, originalSender)=>
+      logger.info("Job completed successfully, updating job")
       val updatedJob = jobDesc.copy(jobStatus = JobStatus.ST_SUCCESS, completedAt = Some(ZonedDateTime.now()), log=msg.decodedLog.collect({
         case Left(err)=>err
         case Right(log)=>log
       }))
-      jobModelDAO.putJob(jobDesc).map({
+      jobModelDAO.putJob(updatedJob).map({
         case None=>
           sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle(receiptHandle))
           originalSender ! akka.actor.Status.Success()

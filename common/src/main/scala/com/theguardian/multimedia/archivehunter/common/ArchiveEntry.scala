@@ -3,20 +3,15 @@ package com.theguardian.multimedia.archivehunter.common
 import java.time.{ZoneId, ZonedDateTime}
 
 import akka.stream.alpakka.dynamodb.scaladsl.DynamoClient
-import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsync
 import com.amazonaws.services.s3.{AmazonS3, AmazonS3Client}
 import com.sksamuel.elastic4s.http.HttpClient
-import com.theguardian.multimedia.archivehunter.common.ArchiveEntry.getClass
 import com.theguardian.multimedia.archivehunter.common.StorageClass.StorageClass
-import com.theguardian.multimedia.archivehunter.common.cmn_models.MediaMetadata
-
+import com.theguardian.multimedia.archivehunter.common.cmn_models.{IndexerError, MediaMetadata}
 import scala.concurrent.Future
-import scala.util.{Failure, Success, Try}
 import scala.concurrent.ExecutionContext.Implicits.global
 import org.apache.logging.log4j.LogManager
 //needed to serialize/deserialize ZonedDateTime, even if Intellij says it's not
 import io.circe.java8.time._
-import java.util.Base64
 import io.circe.generic.semiauto._
 
 object ArchiveEntry extends ((String, String, String, Option[String], Option[String], Long, ZonedDateTime, String, MimeType, Boolean, StorageClass, Seq[LightboxIndex], Boolean, Option[MediaMetadata])=>ArchiveEntry) with DocId {
@@ -65,6 +60,8 @@ object ArchiveEntry extends ((String, String, String, Option[String], Option[Str
   def fromIndex(bucket:String, key:String)(implicit indexer:Indexer, httpClient: HttpClient):Future[ArchiveEntry] =
     indexer.getById(makeDocId(bucket, key))
 
+  def fromIndexFull(bucket:String, key:String)(implicit indexer:Indexer, httpClient: HttpClient):Future[Either[IndexerError,ArchiveEntry]] =
+    indexer.getByIdFull(makeDocId(bucket, key))
 }
 
 case class ArchiveEntry(id:String, bucket: String, path: String, region:Option[String], file_extension: Option[String], size: scala.Long, last_modified: ZonedDateTime, etag: String, mimeType: MimeType, proxied: Boolean, storageClass:StorageClass, lightboxEntries:Seq[LightboxIndex], beenDeleted:Boolean=false, mediaMetadata:Option[MediaMetadata]) {
