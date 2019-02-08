@@ -5,8 +5,8 @@
   "main": "index.js",
   "scripts": {
     "test": "jest --runInBand",
-    "dev": "./script/fix-multistep.sh && webpack -d --watch",
-    "build": "./script/fix-multistep.sh && webpack -p"
+    "dev": "webpack -d --watch",
+    "build": "webpack -p"
   },
   "jest": {
     "moduleNameMapper": {

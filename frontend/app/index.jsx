@@ -27,10 +27,17 @@ import UserList from "./Users/UserList.jsx";
 
 import ProxyFrameworkList from "./ProxyFramework/ProxyFrameworkList.jsx";
 import ProxyFrameworkAdd from './ProxyFramework/ProxyFrameworkAdd.jsx';
+import {handle419, setupInterceptor} from "./common/Handle419.jsx";
 
 library.add(faStroopwafel, faCheckCircle, faCheck, faTimes, faTimesCircle, faRoad,faSearch,faThList,faWrench, faLightbulb, faChevronCircleDown, faChevronCircleRight, faTrashAlt, faFolderPlus, faFolderMinus, faFolder);
 library.add(faFilm, faVolumeUp, faImage, faFile, faClock, faRunning, faExclamationTriangle, faHdd, faBalanceScale, faSyncAlt, faBookReader, faBug, faCompressArrowsAlt, faIndustry, faRedoAlt, faHome);
 window.React = require('react');
+
+/**
+ * set up an Axios Interceptor to handle automatic refreshing of credentials when a 419 (credentials expired)
+ * is received.  This is done in the Handle419 module, seperated into named functions for ease of testing
+ */
+setupInterceptor();
 
 class App extends React.Component {
     constructor(props){

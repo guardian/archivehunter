@@ -1,6 +1,7 @@
 import {reEstablishSession} from "panda-session";
+import axios from 'axios';
 
-const reAuthUrl = "/api/loginStatus";
+const reAuthUrl = "/loginAuthStub";
 
 /**
  * call this from all Axios error handlers, passing the error object in.
@@ -18,13 +19,43 @@ function handle419(err){
                 console.log("Re-established session");
                 resolve(true);
             }).catch(err=>{
-                console.log("Could not re-establish session");
-                reject(err);
+                console.log("Could not re-establish session", err);
+                reject("Could not re-establish session");
             })
         } else {
-            resolve(false, false);
+            resolve(false);
         }
     });
 }
 
-export {handle419};
+function rejectedCallback(err){
+    const originalRequest = err.config;
+    return new Promise((resolve,reject)=>{
+        handle419(err).then(didRefresh=>{
+            if(didRefresh){
+                axios.request(originalRequest).then(result=>resolve(result)).catch(err=>reject(err));
+            } else {
+                reject(err);
+            }
+        }).catch(err=>{
+            if(err==="Could not re-establish session"){
+                window.location.reload(true);   //forcing a reload should get the user to log in again, if we couldn't re-establish
+                resolve("reloading");   //this should not get called in the browser, but is necessary for testing.
+            } else {
+                reject(err);
+            }
+        })
+    });
+}
+
+function setupInterceptor(){
+    /**
+     * Axios interceptor function to handle 419 credential timeout errors.
+     * Any axios error will get filtered through the callback here, which will check if the error is a 419
+     * and attempt to refresh the session if so.
+     * If we could not do an automatic refresh, the page is reloaded; otherwise the error is passed back to the caller
+     */
+    axios.interceptors.response.use(null, rejectedCallback);
+}
+
+export {handle419, setupInterceptor, rejectedCallback};

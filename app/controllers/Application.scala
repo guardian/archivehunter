@@ -20,6 +20,15 @@ class Application @Inject() (override val controllerComponents:ControllerCompone
     Ok(views.html.index("Archive Hunter")("fake-cachebuster"))
   }
 
+  /**
+    * provides a standard html page behind google auth.  The frontend passes this to the panda-session library to refresh
+    * credentials; the refresh is all done by AuthAction, then the content is loaded into an invisible iframe which is deleted again.
+    * @return
+    */
+  def authstub = AuthAction {
+    Ok(views.html.authstub())
+  }
+
   def healthcheck = Action {
     //basic healthcheck endpoint, will extend later
     Ok("online")
