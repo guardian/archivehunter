@@ -218,7 +218,11 @@ class BrowseComponent extends CommonSearchView {
 
     receivedNextPage(response, searchId){
         if(searchId===this.state.currentSearch) {
-            this.setState({searchResults: this.state.searchResults.concat(response.data.entries)});
+            this.setState({
+                searchResults: this.state.searchResults.concat(
+                    response.data.entries.filter(ent=>ent.mimeType.minor!=="x-directory")
+                )
+            });
         } else {
             console.error("Received data for stale search " + searchId + ". Current search is " + this.state.currentSearch)
         }
