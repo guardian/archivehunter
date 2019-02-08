@@ -35,6 +35,7 @@ class FileSizeView extends React.Component {
      * @returns {*} rounded number
      */
     withPrecision(num, precision){
+        if(precision===0) return num;
         const rounded = num.toPrecision(precision);
         const asString = rounded.toString();
         if(asString.endsWith("0") || asString.endsWith(".")) return this.withPrecision(num, precision-1);
