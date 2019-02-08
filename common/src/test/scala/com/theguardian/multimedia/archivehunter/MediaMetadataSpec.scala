@@ -17,5 +17,17 @@ class MediaMetadataSpec extends Specification with MediaMetadataEncoder{
       decodedData.format.format_long_name mustEqual "WAV / WAVE (Waveform Audio)"
       decodedData.format.start_time must beNone
     }
+
+    "parse metadata from another sample WAV file" in {
+      val sample_meta = """{"streams": [{"disposition": {"comment": 0, "forced": 0, "lyrics": 0, "default": 0, "visual_impaired": 0, "dub": 0, "karaoke": 0, "clean_effects": 0, "attached_pic": 0, "original": 0, "hearing_impaired": 0}, "index": 0, "sample_fmt": "s16", "codec_tag": "0x0001", "bits_per_sample": 16, "r_frame_rate": "0/0", "extradata": "\n", "time_base": "1/44100", "codec_tag_string": "[1][0][0][0]", "codec_type": "audio", "channels": 2, "bit_rate": "1411200", "duration_ts": 773245, "codec_long_name": "PCM signed 16-bit little-endian", "codec_name": "pcm_s16le", "duration": "17.533900", "sample_rate": "44100", "codec_time_base": "1/44100", "avg_frame_rate": "0/0"}], "format": {"nb_streams": 1, "format_long_name": "WAV / WAVE (Waveform Audio)", "format_name": "wav", "filename": "/tmp/mediafile", "bit_rate": "1411220", "nb_programs": 0, "duration": "17.533900", "probe_score": 99, "size": "3093024"}}"""
+
+      val result = io.circe.parser.parse(sample_meta).flatMap(_.as[MediaMetadata])
+      result must beRight
+
+      val decodedData = result.right.get
+      decodedData.format.duration mustEqual 17.533900
+      decodedData.format.format_long_name mustEqual "WAV / WAVE (Waveform Audio)"
+      decodedData.format.start_time must beNone
+    }
   }
 }

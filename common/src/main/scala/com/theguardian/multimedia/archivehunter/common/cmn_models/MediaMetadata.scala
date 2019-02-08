@@ -147,6 +147,21 @@ case class MediaMetadata (
 trait MediaMetadataEncoder {
   import io.circe.generic.auto._
 
+  implicit val mediaFormatDecoder  = new Decoder[MediaFormat] {
+    override def apply(c: HCursor): Result[MediaFormat] = for {
+        tags <- c.downField("tags").as[Option[Map[String,String]]].map(_.getOrElse(Map()))
+        nb_streams <- c.downField("nb_streams").as[Int]
+        start_time <- c.downField("start_time").as[Option[Double]]
+        format_long_name <- c.downField("format_long_name").as[Option[String]].map(_.getOrElse(""))
+        format_name <- c.downField("format_name").as[Option[String]].map(_.getOrElse(""))
+        bit_rate <- c.downField("bit_rate").as[Option[Double]].map(_.getOrElse(0.0))
+        nb_programs <- c.downField("nb_programs").as[Option[Int]].map(_.getOrElse(0))
+        duration <- c.downField("duration").as[Option[Double]].map(_.getOrElse(0.0))
+        size <- c.downField("size").as[Option[Long]].map(_.getOrElse(0L))
+      } yield MediaFormat(tags,nb_streams, start_time, format_long_name, format_name, bit_rate, nb_programs, duration, size)
+  }
+
+
   implicit val streamDispositionDecoder = new Decoder[StreamDisposition] {
     override def apply(c: HCursor): Result[StreamDisposition] = for {
       comment <- c.downField("comment").as[Option[Int]].map(_.map(value=>if(value==1) true else false).getOrElse(false))
