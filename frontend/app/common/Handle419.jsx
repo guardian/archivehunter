@@ -13,6 +13,7 @@ const reAuthUrl = "/loginAuthStub";
  */
 function handle419(err){
     return new Promise((resolve,reject)=> {
+        console.log(err);
         if (err.response.status === 419) {
             console.log("Received 419 error indicating expired credentials");
             reEstablishSession(reAuthUrl).then(result=>{
@@ -39,7 +40,8 @@ function rejectedCallback(err){
             }
         }).catch(err=>{
             if(err==="Could not re-establish session"){
-                window.location.reload(true);   //forcing a reload should get the user to log in again, if we couldn't re-establish
+                console.log("Would normally reload now");
+                //window.location.reload(true);   //forcing a reload should get the user to log in again, if we couldn't re-establish
                 resolve("reloading");   //this should not get called in the browser, but is necessary for testing.
             } else {
                 reject(err);
