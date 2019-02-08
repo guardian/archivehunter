@@ -128,12 +128,12 @@ case class StreamDisposition(comment:Boolean,forced:Boolean,lyrics:Boolean,defau
                              original:Boolean,karaoke:Boolean,clean_effects:Boolean,attached_pic:Boolean,
                              visual_impaired:Boolean,hearing_impaired:Boolean)
 
-case class MediaFormat (tags:Map[String,String],nb_streams:Int,start_time:Double,format_long_name:String,
+case class MediaFormat (tags:Map[String,String],nb_streams:Int,start_time:Option[Double],format_long_name:String,
                         format_name:String, bit_rate: Double, nb_programs:Int, duration:Double, size:Long)
 
 case class MediaStream(profile:Option[String],codec_type:Option[String],coded_width:Option[Int],coded_height:Option[Int],
                        bit_rate:Option[Double],codec_name:Option[String],duration:Option[Double],codec_time_base:Option[String],
-                       index:Int, width:Option[Int],pix_fmt:Option[String],tags:Map[String,String],r_frame_rate:Option[String],
+                       index:Int, width:Option[Int],pix_fmt:Option[String],tags:Option[Map[String,String]],r_frame_rate:Option[String],
                        start_time:Option[Double],time_base:Option[String],codec_tag_string:Option[String],duration_ts:Option[Long],
                        codec_long_name:Option[String],display_aspect_ratio:Option[String],height:Option[Int],avg_frame_rate:Option[String],
                        level:Option[Int],bits_per_raw_sample:Option[Int],disposition:Option[StreamDisposition],
@@ -146,6 +146,21 @@ case class MediaMetadata (
 
 trait MediaMetadataEncoder {
   import io.circe.generic.auto._
+
+  implicit val mediaFormatDecoder  = new Decoder[MediaFormat] {
+    override def apply(c: HCursor): Result[MediaFormat] = for {
+        tags <- c.downField("tags").as[Option[Map[String,String]]].map(_.getOrElse(Map()))
+        nb_streams <- c.downField("nb_streams").as[Int]
+        start_time <- c.downField("start_time").as[Option[Double]]
+        format_long_name <- c.downField("format_long_name").as[Option[String]].map(_.getOrElse(""))
+        format_name <- c.downField("format_name").as[Option[String]].map(_.getOrElse(""))
+        bit_rate <- c.downField("bit_rate").as[Option[Double]].map(_.getOrElse(0.0))
+        nb_programs <- c.downField("nb_programs").as[Option[Int]].map(_.getOrElse(0))
+        duration <- c.downField("duration").as[Option[Double]].map(_.getOrElse(0.0))
+        size <- c.downField("size").as[Option[Long]].map(_.getOrElse(0L))
+      } yield MediaFormat(tags,nb_streams, start_time, format_long_name, format_name, bit_rate, nb_programs, duration, size)
+  }
+
 
   implicit val streamDispositionDecoder = new Decoder[StreamDisposition] {
     override def apply(c: HCursor): Result[StreamDisposition] = for {
@@ -181,7 +196,7 @@ trait MediaMetadataEncoder {
       index <- c.downField("index").as[Int]
       width <- c.downField("width").as[Option[Int]]
       pix_fmt <- c.downField("pix_fmt").as[Option[String]]
-      tags <- c.downField("tags").as[Map[String,String]]
+      tags <- c.downField("tags").as[Option[Map[String,String]]]
       r_frame_rate <- c.downField("r_frame_rate").as[Option[String]]
       start_time <- c.downField("start_time").as[Option[String]].map(_.map(_.toDouble))
       time_base <- c.downField("time_base").as[Option[String]]

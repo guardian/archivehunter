@@ -53,7 +53,7 @@ trait MediaMetadataMapConverters {
         entry("index").asInstanceOf[Int],
         safeMap[Int](entry.get("width")),
         safeMap[String](entry.get("pix_fmt")),
-        entry("tags").asInstanceOf[Map[String,String]],
+        safeMap[Map[String,String]](entry.get("tags")),
         safeMap[String](entry.get("r_frame_rate")),
         safeMap[Double](entry.get("start_time")),
         safeMap[String](entry.get("time_base")),
@@ -77,7 +77,7 @@ trait MediaMetadataMapConverters {
     MediaFormat(
       value("tags").asInstanceOf[Map[String,String]],
       value("nb_streams").asInstanceOf[Int],
-      value("start_time").asInstanceOf[Double],
+      safeMap[Double](value.get("start_time")),
       value("format_long_name").asInstanceOf[String],
       value("format_name").asInstanceOf[String],
       value("bit_rate").asInstanceOf[Double],

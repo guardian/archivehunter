@@ -29,6 +29,24 @@ object ProxyFrameworkQueue extends GenericSqsActorMessages {
   case class HandleRunning(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
 }
 
+/**
+  * Actor that handles messages returned via SQS from the Proxy Framework.  Successful processing ends with the message being
+  * deleted from the queue; an error in processing means that the message will NOT be deleted. The hope is that whatever
+  * is preventing the message from processing is a transient failure that will succeed at some point in the future.
+  * Permanent failures are dealt with by a dead-letter queue in SQS.
+  * This is intended to be instansiated via Guice during the app startup in Module,
+  * automatically resolving all parameters
+  *
+  * @param config Configuration object
+  * @param system Actor System
+  * @param sqsClientManager client manager class instance for SQS
+  * @param s3ClientMgr client manager class instance for S3
+  * @param dynamoClientMgr client manager class for DynamoDB
+  * @param jobModelDAO Data Access Object for job models
+  * @param scanTargetDAO Data Access Object for scan targets
+  * @param esClientMgr client manager class instance for Elastic Search
+  * @param proxyLocationDAO Data Access Object for proxy locations
+  */
 class ProxyFrameworkQueue @Inject() (config: Configuration,
                                      system: ActorSystem,
                                      sqsClientManager: SQSClientManager,
@@ -253,19 +271,34 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
         val updatedScanTarget = scanTarget.copy(pendingJobIds = updatedPendingJobIds, transcoderCheck = Some(tcReport))
         scanTargetDAO.put(updatedScanTarget)
 
-        val updatedJobDesc = jobDesc.copy(jobStatus = JobStatus.ST_SUCCESS, completedAt = Some(ZonedDateTime.now()))
-        jobModelDAO.putJob(updatedJobDesc)
+        val updatedJobDesc = jobDesc.copy(jobStatus = actualStatus, completedAt = Some(ZonedDateTime.now()))
+        jobModelDAO.putJob(updatedJobDesc).onComplete({
+          case Success(Some(Left(err)))=>
+            logger.error(s"Could not update job ${jobDesc.jobId}: $err")
+          case Success(Some(Right(rec)))=>
+            logger.info(s"Updated job ${jobDesc.jobId}")
+            sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle(receiptHandle))
+          case Success(None)=>
+            logger.info(s"Updated job ${jobDesc.jobId}")
+            sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle(receiptHandle))
+          case Failure(err)=>
+            logger.error(s"update thread failed: ", err)
+        })
 
-        if(jobDesc.jobStatus==JobStatus.ST_ERROR){
+        if(actualStatus==JobStatus.ST_ERROR){
           ownRef ! HandleFailure(msg, jobDesc, rq, receiptHandle, originalSender)
         } else {
-          sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle(receiptHandle))
           originalSender ! akka.actor.Status.Success()
         }
       }
 
+    /**
+      * Handle the response message from a successful "analyse", i.e. determination of system metadata,
+      * by pushing the captured metadata into the index record
+      */
     case HandleSuccessfulAnalyse(msg, jobDesc, rq, receiptHandle, originalSender)=>
       withArchiveEntry(msg, jobDesc, rq, receiptHandle, originalSender) { entry=>
+        logger.info(s"Received updated metadata ${msg.metadata} for ${entry.id}")
         val updatedEntry = entry.copy(mediaMetadata = msg.metadata)
         indexer.indexSingleItem(updatedEntry).map({
           case Failure(err)=>
@@ -284,17 +317,23 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
         })
       }
 
+    /**
+      * generic stuff for handling success messages - update the job to show completion and logs, then delete the incoming
+      * message from SQS
+      */
     case HandleGenericSuccess(msg, jobDesc, rq, receiptHandle, originalSender)=>
-      logger.info("Job completed successfully, updating job")
+      logger.info(s"HandleGenericSuccess for $jobDesc")
       val updatedJob = jobDesc.copy(jobStatus = JobStatus.ST_SUCCESS, completedAt = Some(ZonedDateTime.now()), log=msg.decodedLog.collect({
-        case Left(err)=>err
+        case Left(err)=>s"$err for ${msg.log}"
         case Right(log)=>log
       }))
       jobModelDAO.putJob(updatedJob).map({
         case None=>
+          logger.info(s"Job ${jobDesc.jobId} updated")
           sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle(receiptHandle))
           originalSender ! akka.actor.Status.Success()
         case Some(Right(mdl))=>
+          logger.info(s"Job ${jobDesc.jobId} updated")
           sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle(receiptHandle))
           originalSender ! akka.actor.Status.Success()
         case Some(Left(err))=>
