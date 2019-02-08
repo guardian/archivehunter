@@ -56,6 +56,8 @@ class BrowseComponent extends CommonSearchView {
         this.addedToLightbox = this.addedToLightbox.bind(this);
 
         /* callback for BrowsePathSummary */
+        this.refreshContents = this.refreshContents.bind(this);
+        this.goToRoot = this.goToRoot.bind(this);
         this.sortUpdated = this.sortUpdated.bind(this);
 
         /* callbacks for Searcher */
@@ -311,6 +313,15 @@ class BrowseComponent extends CommonSearchView {
         this.setState({sortField: newSortField, sortOrder: newSortOrder, searchResults: []}, ()=>this.loadSpecificTreePath());
     }
 
+    refreshContents() {
+        console.debug("refreshContents");
+        this.setState({searchResults:[]}, this.loadSpecificTreePath);
+    }
+
+    goToRoot() {
+        this.setState({cursor: null, searchResults: [], openedPath: []}, ()=>this.loadSpecificTreePath());
+    }
+
     renderMainBody(){
         if(this.state.error){
             return <ErrorViewComponent error={this.state.error}/>
@@ -321,6 +332,9 @@ class BrowseComponent extends CommonSearchView {
                                    onSortChanged={this.sortUpdated}
                                    sortField={this.state.sortField}
                                    sortOrder={this.state.sortOrder}
+                                   parentIsLoading={this.state.isLoading || this.state.searching}
+                                   refreshCb={this.refreshContents}
+                                   goToRootCb={this.goToRoot}
                 />
                 <SearchResultsComponent entries={this.state.searchResults} onItemOpen={this.onItemOpen} onItemClose={this.onItemClose} selectedEntry={this.state.showingPreview} cancelToken={this.entriesCancelTokenSource ? this.entriesCancelTokenSource.token : null}/>
             </div>

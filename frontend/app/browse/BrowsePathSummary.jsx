@@ -5,6 +5,7 @@ import ErrorViewComponent from '../common/ErrorViewComponent.jsx';
 import BytesFormatter from "../common/BytesFormatter.jsx";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import ReactRadioButtonGroup from 'react-radio-button-group';
+import RefreshButton from "../common/RefreshButton.jsx";
 
 /**
  * this component is the "top banner" for the Browse view, showing the collection, path within collection, filters etc.
@@ -15,7 +16,10 @@ class BrowsePathSummary extends React.Component {
         path: PropTypes.string,
         onSortChanged: PropTypes.func.isRequired, //this is called when sort field or sort order is changed. First arg is new sort field, second is new sort order.
         sortField: PropTypes.string.isRequired,
-        sortOrder: PropTypes.string.isRequired
+        sortOrder: PropTypes.string.isRequired,
+        parentIsLoading: PropTypes.bool.isRequired,
+        refreshCb: PropTypes.func.isRequired,
+        goToRootCb: PropTypes.func.isRequired
     };
 
     constructor(props){
@@ -87,9 +91,12 @@ class BrowsePathSummary extends React.Component {
         if(this.state.hasLoaded) return <div className="browse-path-summary">
             <div style={{width: "80%", display: "inline-block"}}>
                 <p className="centered"><FontAwesomeIcon style={{marginRight: "0.5em"}} icon="hdd"/>{this.props.collectionName}</p>
-                <p className="centered" style={{marginTop: "0.1em"}}><FontAwesomeIcon icon="folder" style={{marginRight: "0.5em", display: this.props.path ? "inline":"none"}}/>{this.props.path ? this.props.path : ""}</p>
-            <p>
-                Total of {this.state.totalHits} items occupying <BytesFormatter value={this.state.totalSize}/>
+                <p className="centered" style={{marginTop: "0.1em"}}>
+                    <FontAwesomeIcon icon="home" className="button-icon" style={{display: this.props.path ? "inline":"none"}} onClick={this.props.goToRootCb}/>
+                    <FontAwesomeIcon icon="folder" style={{marginRight: "0.5em", display: this.props.path ? "inline":"none"}}/>
+                    {this.props.path ? this.props.path : ""}
+                </p>
+            <p><RefreshButton isRunning={this.props.parentIsLoading} clickedCb={this.props.refreshCb}/>Total of {this.state.totalHits} items occupying <BytesFormatter value={this.state.totalSize}/>
             </p>
             </div>
 
