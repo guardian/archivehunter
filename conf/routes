@@ -5,6 +5,7 @@
 GET     /is-online                  controllers.Application.healthcheck
 GET     /                           @controllers.Application.rootIndex()
 
+GET     /test/api419                @controllers.Application.test419
 GET     /oauthCallback              @controllers.Auth.oauthCallback
 POST    /api/logout                 @controllers.Auth.logout
 GET     /api/loginStatus            @controllers.UserController.loginStatus

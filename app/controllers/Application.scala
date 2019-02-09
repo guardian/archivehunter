@@ -11,7 +11,7 @@ class Application @Inject() (override val controllerComponents:ControllerCompone
                              override val wsClient: WSClient,
                              override val config: Configuration,
                              override val refresher:InjectableRefresher)
-  extends AbstractController(controllerComponents) with PanDomainAuthActions {
+  extends AbstractController(controllerComponents) with PanDomainAuthActions  {
 
 
   def rootIndex() = index("")
@@ -32,5 +32,9 @@ class Application @Inject() (override val controllerComponents:ControllerCompone
   def healthcheck = Action {
     //basic healthcheck endpoint, will extend later
     Ok("online")
+  }
+
+  def test419 = APIAuthAction {
+    new Status(419)
   }
 }
