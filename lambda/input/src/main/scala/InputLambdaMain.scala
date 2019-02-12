@@ -236,6 +236,8 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
           handleCreated(rec, path)
         case "ObjectCreated:CompleteMultipartUpload"=>
           handleCreated(rec, path)
+        case "ObjectCreated:Copy"=>
+          handleCreated(rec, path)
         case "ObjectRemoved:Delete"=>
           handleRemoved(rec, path)
         case "ObjectRestore:Completed"=>
