@@ -29,6 +29,8 @@ import ProxyFrameworkList from "./ProxyFramework/ProxyFrameworkList.jsx";
 import ProxyFrameworkAdd from './ProxyFramework/ProxyFrameworkAdd.jsx';
 import {handle419, setupInterceptor} from "./common/Handle419.jsx";
 
+import Test419Component from "./testing/test419.jsx";
+
 library.add(faStroopwafel, faCheckCircle, faCheck, faTimes, faTimesCircle, faRoad,faSearch,faThList,faWrench, faLightbulb, faChevronCircleDown, faChevronCircleRight, faTrashAlt, faFolderPlus, faFolderMinus, faFolder);
 library.add(faFilm, faVolumeUp, faImage, faFile, faClock, faRunning, faExclamationTriangle, faHdd, faBalanceScale, faSyncAlt, faBookReader, faBug, faCompressArrowsAlt, faIndustry, faRedoAlt, faHome);
 window.React = require('react');
@@ -79,6 +81,7 @@ class App extends React.Component {
             <TopMenu visible={true} isAdmin={this.state.userLogin ? this.state.userLogin.isAdmin : false}/>
             <LoginStatusComponent userData={this.state.userLogin} userLoggedOutCb={this.userLoggedOut}/>
             <Switch>
+                <Route path="/test/419" component={Test419Component}/>
                 <Route path="/admin/proxyFramework/new" component={ProxyFrameworkAdd}/>
                 <Route path="/admin/proxyFramework" component={ProxyFrameworkList}/>
                 <Route path="/admin/about" component={AboutComponent}/>
