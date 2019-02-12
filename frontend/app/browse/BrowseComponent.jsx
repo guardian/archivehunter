@@ -129,7 +129,7 @@ class BrowseComponent extends CommonSearchView {
                 resolve(parentNode);
                 return;
             }
-            console.log("parentNode", parentNode);
+            //console.log("parentNode", parentNode);
             const childNode = parentNode.children.find(node => node.name === pathParts[index]);
             if (!childNode) {
                 console.error("Could not find relevant child node");
