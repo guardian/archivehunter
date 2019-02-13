@@ -28,6 +28,8 @@ object IngestProxyQueue extends GenericSqsActorMessages {
   case class CheckNonRegisteredThumb(entry: ArchiveEntry) extends IPQMsg
   case class CreateNewThumbnail(entry:ArchiveEntry) extends IPQMsg
 
+  case class StartAnalyse(entry:ArchiveEntry) extends IPQMsg
+
 }
 
 
@@ -64,6 +66,20 @@ class IngestProxyQueue @Inject()(config: Configuration,
     io.circe.parser.parse(body).flatMap(_.as[IngestMessage])
 
   override def receive: Receive = {
+    case StartAnalyse(entry) =>
+      val originalSender = sender()
+      proxyGenerators.requestMetadataAnalyse(entry,defaultRegion).onComplete({
+        case Success(Left(problem))=>
+          logger.error(s"Could not request analyse for $entry: $problem")
+          originalSender ! Status.Failure(new RuntimeException(problem))
+        case Success(Right(status))=>
+          logger.info(s"Started metadata analyse: $status")
+          originalSender ! Status.Success
+        case Failure(err)=>
+          logger.error("Metadata request thread failed: ", err)
+          originalSender ! Status.Failure(err)
+      })
+
     case CheckRegisteredThumb(entry) =>
       val originalSender = sender()
       proxyLocationDAO.getProxy(entry.id, ProxyType.THUMBNAIL).map({
@@ -164,6 +180,7 @@ class IngestProxyQueue @Inject()(config: Configuration,
       logger.info(s"Received notification of new item: ${finalMsg.archiveEntry}")
       ownRef ! CheckRegisteredThumb(finalMsg.archiveEntry)
       ownRef ! CheckRegisteredProxy(finalMsg.archiveEntry)
+      ownRef ! StartAnalyse(finalMsg.archiveEntry)
       sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle(receiptHandle))
 
     case other:GenericSqsActor.SQSMsg => handleGeneric(other)
