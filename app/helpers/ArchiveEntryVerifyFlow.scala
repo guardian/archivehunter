@@ -25,15 +25,18 @@ class ArchiveEntryVerifyFlow @Inject() (s3ClientMgr: S3ClientManager, config:Con
     FlowShape.of(in,out)
   }
 
+  lazy val defaultRegion = config.getOptional[String]("externalData.awsRegion").getOrElse("eu-west-1")
+  lazy val awsProfile = config.getOptional[String]("externalData.awsProfile")
+
   override def createLogic(inheritedAttributes: Attributes): GraphStageLogic =
     new GraphStageLogic(shape) {
-      implicit val s3Client: AmazonS3 = s3ClientMgr.getS3Client(config.getOptional[String]("externalData.awsProfile"))
       private val logger = Logger(getClass)
 
       logger.debug("initialised new instance")
       setHandler(in, new AbstractInHandler {
         override def onPush(): Unit = {
           val elem = grab(in)
+          implicit val s3Client = s3ClientMgr.getS3Client(awsProfile, elem.region)
 
           if(s3Client.doesObjectExist(elem.bucket, elem.path)){
             logger.debug(s"Object s3://${elem.bucket}/${elem.path} still exists, not passing.")

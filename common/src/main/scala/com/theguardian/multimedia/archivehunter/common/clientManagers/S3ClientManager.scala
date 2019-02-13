@@ -18,6 +18,13 @@ class S3ClientManager @Inject() (config:ArchiveHunterConfiguration) extends Clie
 
   override def getClient(profileName:Option[String]=None): AmazonS3 = getS3Client(profileName)
 
+  /**
+    * Obtain an S3 client object for the given region, optionally using profile credentials.  This will re-use previously created
+    * clients and not create a new one on every call.
+    * @param profileName optional, name of AWS credentails profile to use. Used for locally based development.
+    * @param region optional region to get the client for.  If not specified, then uses the default region from the confiuration.
+    * @return the S3 client.
+    */
   def getS3Client(profileName:Option[String]=None, region:Option[String]=None):AmazonS3 = {
     region match {
       case Some(rgn)=>
