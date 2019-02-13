@@ -8,4 +8,4 @@ if [ ! -d "$DIR/esdata" ]; then
     mkdir -p "$DIR/esdata"
 fi
 
-docker run --rm -v "$DIR/esdata":/usr/share/elasticsearch/data -p 9200:9200 docker.elastic.co/elasticsearch/elasticsearch:6.3.2
+docker run -v "$DIR/esdata":/usr/share/elasticsearch/data -p 9200:9200 -e "ES_JAVA_OPTS=-Xms1g -Xmx1g" docker.elastic.co/elasticsearch/elasticsearch:6.3.2
