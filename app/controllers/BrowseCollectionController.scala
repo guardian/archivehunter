@@ -15,6 +15,7 @@ import io.circe.syntax._
 import io.circe.generic.auto._
 import play.api.libs.ws.WSClient
 import play.api.mvc.Result
+import requests.SearchRequest
 
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -124,35 +125,39 @@ extends AbstractController(controllerComponents) with PanDomainAuthActions with 
     result.buckets.map(b=>Tuple2(b.key,b.docCount)).toMap
   }
 
-  def pathSummary(collectionName:String, prefix:Option[String]) = APIAuthAction.async {
-    withScanTargetAsync(collectionName) { target=>
-      val queries = Seq(
-        Some(matchQuery("bucket.keyword", collectionName)),
-        prefix.map(pfx=>termQuery("path", pfx))
-      ).collect({case Some(x)=>x})
+  def pathSummary(collectionName:String, prefix:Option[String]) = APIAuthAction.async(circe.json(2048)) { request=>
+    request.body.as[SearchRequest].fold(
+      err=>
+        Future(BadRequest(GenericErrorResponse("bad_request", err.toString).asJson)),
+      searchRequest=>
+        withScanTargetAsync(collectionName) { target=>
+          val queries = Seq(
+            Some(matchQuery("bucket.keyword", collectionName)),
+            prefix.map(pfx=>termQuery("path", pfx))
+          ).collect({case Some(x)=>x}) ++ searchRequest.toSearchParams
 
-      val aggs = Seq(
-        sumAgg("totalSize","size"),
-        termsAgg("deletedCounts","beenDeleted"),
-        termsAgg("proxiedCounts","beenProxied"),
-        termsAgg("typesCount", "mimeType.major.keyword")
-      )
+          val aggs = Seq(
+            sumAgg("totalSize","size"),
+            termsAgg("deletedCounts","beenDeleted"),
+            termsAgg("proxiedCounts","beenProxied"),
+            termsAgg("typesCount", "mimeType.major.keyword")
+          )
 
-      esClient.execute(search(indexName) query boolQuery().must(queries) aggregations aggs).map({
-        case Left(err)=>
-          InternalServerError(GenericErrorResponse("search_error", err.toString).asJson)
-        case Right(response)=>
-          logger.info(s"Got ${response.result.aggregations}")
+          esClient.execute(search(indexName) query boolQuery().must(queries) aggregations aggs).map({
+            case Left(err)=>
+              InternalServerError(GenericErrorResponse("search_error", err.toString).asJson)
+            case Right(response)=>
+              logger.info(s"Got ${response.result.aggregations}")
 
-          Ok(PathInfoResponse("ok",
-            response.result.hits.total,
-            response.result.aggregations.sum("totalSize").value.toLong,
-            bucketsToCountMap(response.result.aggregations.terms("deletedCounts")),
-            bucketsToCountMap(response.result.aggregations.terms("proxiedCounts")),
-            bucketsToCountMap(response.result.aggregations.terms("typesCount")),
-          ).asJson)
+              Ok(PathInfoResponse("ok",
+                response.result.hits.total,
+                response.result.aggregations.sum("totalSize").value.toLong,
+                bucketsToCountMap(response.result.aggregations.terms("deletedCounts")),
+                bucketsToCountMap(response.result.aggregations.terms("proxiedCounts")),
+                bucketsToCountMap(response.result.aggregations.terms("typesCount")),
+              ).asJson)
+          })
       })
-    }
   }
 
   def getCollections() = APIAuthAction.async { request=>

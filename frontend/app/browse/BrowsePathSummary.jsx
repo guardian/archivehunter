@@ -22,7 +22,8 @@ class BrowsePathSummary extends React.Component {
         refreshCb: PropTypes.func.isRequired,
         goToRootCb: PropTypes.func.isRequired,
         showDotFiles: PropTypes.bool.isRequired,
-        showDotFilesUpdated:PropTypes.func.isRequired
+        showDotFilesUpdated:PropTypes.func.isRequired,
+        queryString: PropTypes.string
     };
 
     constructor(props){
@@ -44,6 +45,13 @@ class BrowsePathSummary extends React.Component {
         this.toggleAdvancedExpanded = this.toggleAdvancedExpanded.bind(this);
     }
 
+    makeSearchJson(){
+        return JSON.stringify({
+            hideDotFiles: ! this.props.showDotFiles,
+            q: this.props.queryString
+        })
+    }
+
     refreshData(){
         if(!this.props.collectionName || this.props.collectionName==="") return;
 
@@ -53,15 +61,16 @@ class BrowsePathSummary extends React.Component {
         const urlsuffix = pathToSearch ? "?prefix=" + encodeURIComponent(pathToSearch) : "";
         const url = "/api/browse/" + this.props.collectionName + "/summary" + urlsuffix;
 
-        this.setState({loading:true, hasLoaded: false, lastError: null}, ()=>axios.get(url).then(response=>{
-            this.setState({
-                loading:false, hasLoaded:true, lastError:null,
-                totalHits: response.data.totalHits,
-                totalSize: response.data.totalSize,
-                deletedCounts: response.data.deletedCounts,
-                proxiedCounts: response.data.proxiedCounts,
-                typesCount: response.data.typesCount
-            })
+        this.setState({loading:true, hasLoaded: false, lastError: null},
+            ()=>axios.put(url, this.makeSearchJson(), {headers: {"Content-Type": "application/json"}}).then(response=>{
+                this.setState({
+                    loading:false, hasLoaded:true, lastError:null,
+                    totalHits: response.data.totalHits,
+                    totalSize: response.data.totalSize,
+                    deletedCounts: response.data.deletedCounts,
+                    proxiedCounts: response.data.proxiedCounts,
+                    typesCount: response.data.typesCount
+                })
         }).catch(err=>{
             console.error("Could not refresh path summary data: ", err);
             this.setState({loading: false, hasLoaded: false, lastError: err})
