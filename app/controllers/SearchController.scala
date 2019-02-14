@@ -66,7 +66,7 @@ with PanDomainAuthActions {
     q match {
       case Some(searchTerms) =>
         val responseFuture = esClient.execute {
-          search(indexName) query searchTerms from actualStart size actualLength sortBy fieldSort("path.keyword")
+          search(indexName) query { boolQuery.must(searchTerms, not(regexQuery(("path.keyword",".*/+\\.[^\\.]+")))) } from actualStart size actualLength sortBy fieldSort("path.keyword")
         }
 
         responseFuture.map({

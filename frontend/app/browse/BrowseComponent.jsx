@@ -29,7 +29,8 @@ class BrowseComponent extends CommonSearchView {
             cancelUnderway: false,
             entriesCancelTokenSource: null,
             sortOrder: "Ascending",
-            sortField: "last_modified"
+            sortField: "last_modified",
+            showDotFiles: false
         };
 
         this.treeStyle = Object.assign({}, defaultTheme);
@@ -204,14 +205,16 @@ class BrowseComponent extends CommonSearchView {
                 path: pathToSearch,
                 collection: this.state.collectionName,
                 sortBy: this.state.sortField,
-                sortOrder: this.state.sortOrder
+                sortOrder: this.state.sortOrder,
+                hideDotFiles: !this.state.showDotFiles
             });
         } else {
             return JSON.stringify({q: null,
                 path: null,
                 collection: this.state.collectionName,
                 sortBy: this.state.sortField,
-                sortOrder: this.state.sortOrder
+                sortOrder: this.state.sortOrder,
+                hideDotFiles: !this.state.showDotFiles
             });
         }
     }
@@ -339,6 +342,8 @@ class BrowseComponent extends CommonSearchView {
                                    parentIsLoading={this.state.isLoading || this.state.searching}
                                    refreshCb={this.refreshContents}
                                    goToRootCb={this.goToRoot}
+                                   showDotFiles={this.state.showDotFiles}
+                                   showDotFilesUpdated={value=>this.setState({showDotFiles: value}, this.refreshContents)}
                 />
                 <SearchResultsComponent entries={this.state.searchResults} onItemOpen={this.onItemOpen} onItemClose={this.onItemClose} selectedEntry={this.state.showingPreview} cancelToken={this.entriesCancelTokenSource ? this.entriesCancelTokenSource.token : null}/>
             </div>

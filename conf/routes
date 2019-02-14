@@ -48,7 +48,7 @@ PUT     /api/job/transcode/:jobId/refresh  @controllers.JobController.refreshTra
 
 GET     /api/browse/collections         @controllers.BrowseCollectionController.getCollections
 GET     /api/browse/:collection         @controllers.BrowseCollectionController.getFolders(collection, prefix:Option[String])
-GET     /api/browse/:collection/summary @controllers.BrowseCollectionController.pathSummary(collection,prefix:Option[String])
+PUT     /api/browse/:collection/summary @controllers.BrowseCollectionController.pathSummary(collection,prefix:Option[String])
 
 GET     /api/user                       @controllers.UserController.allUsers
 PUT     /api/user/update                @controllers.UserController.updateUserProfileField
