@@ -61,7 +61,7 @@ class BasicSearchComponent extends CommonSearchView {
                 } else {
                     this.setState({
                         searchResults: this.state.searchResults.concat(
-                            response.data.entries.filter(ent=>ent.mimeType.minor!=="x-directory")
+                            result.data.entries.filter(ent=>ent.mimeType.minor!=="x-directory")
                         ),
                         totalHits: result.data.entryCount
                     },()=>this.runSearch(startAt+this.defaultPageSize));
