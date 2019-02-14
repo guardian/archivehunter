@@ -119,7 +119,7 @@ class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner
   def manualTrigger(targetName:String) = APIAuthAction { request=>
     adminsOnlySync(request) {
       withLookup(targetName) { tgt =>
-        bucketScanner ! new BucketScanner.PerformDeletionScan(tgt, thenScanForNew = true)
+        bucketScanner ! BucketScanner.PerformDeletionScan(tgt, thenScanForNew = true)
         Ok(GenericErrorResponse("ok", "scan started").asJson)
       }
     }
@@ -128,7 +128,7 @@ class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner
   def manualTriggerAdditionScan(targetName:String) = APIAuthAction { request=>
     adminsOnlySync(request) {
       withLookup(targetName) { tgt =>
-        bucketScanner ! new BucketScanner.PerformTargetScan(tgt)
+        bucketScanner ! BucketScanner.PerformTargetScan(tgt)
         Ok(GenericErrorResponse("ok", "scan started").asJson)
       }
     }
@@ -137,7 +137,7 @@ class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner
   def manualTriggerDeletionScan(targetName:String) = APIAuthAction { request=>
     adminsOnlySync(request) {
       withLookup(targetName) { tgt =>
-        bucketScanner ! new BucketScanner.PerformDeletionScan(tgt)
+        bucketScanner ! BucketScanner.PerformDeletionScan(tgt)
         Ok(GenericErrorResponse("ok", "scan started").asJson)
       }
     }

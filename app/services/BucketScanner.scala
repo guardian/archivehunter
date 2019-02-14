@@ -200,7 +200,7 @@ class BucketScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientMan
     val client = s3ClientMgr.getAlpakkaS3Client(config.getOptional[String]("externalData.awsProfile"), region=Some(target.region))
     val esclient = esClientMgr.getClient()
 
-    val esSource = Source.fromPublisher(esclient.publisher(search(indexName) query s"bucket:${target.bucketName} AND beenDeleted:false" scroll "1m"))
+    val esSource = Source.fromPublisher(esclient.publisher(search(indexName) query s"bucket.keyword:${target.bucketName} AND beenDeleted:false" scroll "1m"))
 
     val verifyFlow = injector.getInstance(classOf[ArchiveEntryVerifyFlow])
     val indexSink = getElasticSearchSink(esclient, completionPromise)

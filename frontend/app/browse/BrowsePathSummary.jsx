@@ -6,6 +6,7 @@ import BytesFormatter from "../common/BytesFormatter.jsx";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import ReactRadioButtonGroup from 'react-radio-button-group';
 import RefreshButton from "../common/RefreshButton.jsx";
+import Expander from "../common/Expander.jsx";
 
 /**
  * this component is the "top banner" for the Browse view, showing the collection, path within collection, filters etc.
@@ -19,7 +20,9 @@ class BrowsePathSummary extends React.Component {
         sortOrder: PropTypes.string.isRequired,
         parentIsLoading: PropTypes.bool.isRequired,
         refreshCb: PropTypes.func.isRequired,
-        goToRootCb: PropTypes.func.isRequired
+        goToRootCb: PropTypes.func.isRequired,
+        showDotFiles: PropTypes.bool.isRequired,
+        showDotFilesUpdated:PropTypes.func.isRequired
     };
 
     constructor(props){
@@ -38,6 +41,7 @@ class BrowsePathSummary extends React.Component {
         };
         this.sortOrderChanged = this.sortOrderChanged.bind(this);
         this.sortFieldChanged = this.sortFieldChanged.bind(this);
+        this.toggleAdvancedExpanded = this.toggleAdvancedExpanded.bind(this);
     }
 
     refreshData(){
@@ -80,6 +84,10 @@ class BrowsePathSummary extends React.Component {
         this.props.onSortChanged(this.props.sortField, newValue);
     }
 
+    toggleAdvancedExpanded(value){
+        this.setState({advancedExpanded: value})
+    }
+
     render(){
         if(this.state.lastError) return <ErrorViewComponent error={this.state.lastError}/>;
 
@@ -96,22 +104,32 @@ class BrowsePathSummary extends React.Component {
                     <FontAwesomeIcon icon="folder" style={{marginRight: "0.5em", display: this.props.path ? "inline":"none"}}/>
                     {this.props.path ? this.props.path : ""}
                 </p>
+            </div>
+            <div style={{width: "18%", display: "inline-block"}}>
+                <label htmlFor="sort-field-selector" style={{marginRight: "0.4em"}}>Sort by</label>
+                <select id="sort-field-selector" value={this.props.sortField} onChange={this.sortFieldChanged}>
+                    <option value="path">Filename</option>
+                    <option value="last_modified">Age</option>
+                    <option value="size">Size</option>
+                </select>
+                <ReactRadioButtonGroup name="sort-order-selector"
+                                       options={["Ascending","Descending"]}
+                                       value={this.props.sortOrder}
+                                       isStateful={false} onChange={this.sortOrderChanged}/>
+            </div>
+
+            <div>
+                <Expander expanded={this.state.advancedExpanded} onChange={this.toggleAdvancedExpanded}/><h4 style={{cursor:"pointer"}} onClick={()=>this.toggleAdvancedExpanded(!this.state.advancedExpanded)}>Advanced</h4>
+                <div style={{display: this.state.advancedExpanded ? "block" : "none", marginTop: "0.5em", marginLeft: "2em" }}>
+                    <input type="checkbox" value={this.props.showDotFiles} onChange={evt=>this.props.showDotFilesUpdated(evt.target.checked)}/>Show dot-files
+                </div>
+            </div>
+
+            <div>
             <p><RefreshButton isRunning={this.props.parentIsLoading} clickedCb={this.props.refreshCb}/>Total of {this.state.totalHits} items occupying <BytesFormatter value={this.state.totalSize}/>
             </p>
             </div>
 
-            <div style={{width: "18%", display: "inline-block"}}>
-                    <label htmlFor="sort-field-selector" style={{marginRight: "0.4em"}}>Sort by</label>
-                    <select id="sort-field-selector" value={this.props.sortField} onChange={this.sortFieldChanged}>
-                        <option value="path">Filename</option>
-                        <option value="last_modified">Age</option>
-                        <option value="size">Size</option>
-                    </select>
-                    <ReactRadioButtonGroup name="sort-order-selector"
-                                           options={["Ascending","Descending"]}
-                                           value={this.props.sortOrder}
-                                           isStateful={false} onChange={this.sortOrderChanged}/>
-            </div>
             <p style={{display: this.state.deletedCounts.hasOwnProperty("1") ? "inherit" : "none"}}>
                 {
                     this.state.deletedCounts.hasOwnProperty("1") ? this.state.deletedCounts["1"] : 0
