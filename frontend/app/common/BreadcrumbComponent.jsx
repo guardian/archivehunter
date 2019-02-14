@@ -23,7 +23,7 @@ class BreadcrumbComponent extends React.Component {
         return <span className="breadcrumb">
             {
                 pathParts.map((part,idx)=>{
-                    return <span><Link className="breadcrumb" to={this.recombineParts(pathParts,idx+1)}>{part}</Link>{ idx<pathPartsLength ? ">" : ""  }</span>
+                    return <span key={idx}><Link className="breadcrumb" to={this.recombineParts(pathParts,idx+1)}>{part}</Link>{ idx<pathPartsLength ? ">" : ""  }</span>
                 })
             }
         </span>

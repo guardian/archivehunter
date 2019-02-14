@@ -6,6 +6,7 @@ import {Link} from "react-router-dom";
 import TimestampFormatter from "../common/TimestampFormatter.jsx";
 import axios from 'axios';
 import CollectionSelector from './CollectionSelector.jsx';
+import SizeInput from "../common/SizeInput.jsx";
 
 class UserList extends React.Component {
     constructor(props){
@@ -21,6 +22,7 @@ class UserList extends React.Component {
 
         this.boolFieldChanged = this.boolFieldChanged.bind(this);
         this.loadUsers = this.loadUsers.bind(this);
+        this.perRestoreQuotaChanged = this.perRestoreQuotaChanged.bind(this);
     }
 
     /**
@@ -51,8 +53,17 @@ class UserList extends React.Component {
         }))
     }
 
+    performUpdate(updateRq){
+        this.setState({saving: true}, ()=>axios.put("/api/user/update", updateRq).then(response=>{
+            this.updateEntry(response.data.entry);
+        }).catch(err=>{
+            console.error(err);
+            this.setState({saving: false, lastError: err});
+        }))
+    }
+
     userCollectionsUpdated(entry, newValue){
-        console.log("userCollectionsUpdated", entry, newValue);
+        //console.log("userCollectionsUpdated", entry, newValue);
         const updateRq = {
             user: entry.userEmail,
             fieldName: "VISIBLE_COLLECTIONS",
@@ -60,12 +71,19 @@ class UserList extends React.Component {
             operation: "OP_OVERWRITE"
         };
 
-        this.setState({saving: true}, ()=>axios.put("/api/user/update", updateRq).then(response=>{
-            this.updateEntry(response.data.entry);
-        }).catch(err=>{
-            console.error(err);
-            this.setState({saving: false, lastError: err});
-        }))
+        this.performUpdate(updateRq);
+    }
+
+    perRestoreQuotaChanged(entry, newValue){
+        const newValueString = (newValue / 1048576).toString();
+        const updateRq = {
+            user: entry.userEmail,
+            fieldName: "PER_RESTORE_QUOTA",
+            stringValue: newValueString,
+            operation: "OP_OVERWRITE"
+        };
+
+        this.performUpdate(updateRq);
     }
 
     mainBody(){
@@ -78,11 +96,12 @@ class UserList extends React.Component {
                 <th className="dashboardheader">Administrator</th>
                 <th className="dashboardheader">Visible collections</th>
                 <th className="dashboardheader">Allow all collections</th>
+                <th className="dashboardheader">Per restore size limit</th>
             </tr>
             </thead>
             <tbody>
             {
-                this.state.usersList.map(entry=><tr>
+                this.state.usersList.map((entry,idx)=><tr key={idx}>
                     <td>{entry.userEmail}</td>
                     <td><input type="checkbox" checked={entry.isAdmin} onChange={()=>this.boolFieldChanged(entry, "IS_ADMIN", entry.isAdmin)}/></td>
                     <td style={{textAlign: "left"}}>
@@ -92,6 +111,10 @@ class UserList extends React.Component {
                                             disabled={entry.allCollectionsVisible}
                         /></td>
                     <td><input type="checkbox" checked={entry.allCollectionsVisible} onChange={()=>this.boolFieldChanged(entry, "ALL_COLLECTIONS", entry.allCollectionsVisible)}/></td>
+                    <td>
+                        { /* the multiply is because the server holds the restore quota value in Mb */}
+                        <SizeInput sizeInBytes={entry.perRestoreQuota ? (entry.perRestoreQuota*1048576) : 0} didUpdate={newValue=>this.perRestoreQuotaChanged(entry, newValue)}/>
+                    </td>
                 </tr>)
             }
             </tbody>
