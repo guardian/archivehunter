@@ -7,6 +7,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import ReactRadioButtonGroup from 'react-radio-button-group';
 import RefreshButton from "../common/RefreshButton.jsx";
 import Expander from "../common/Expander.jsx";
+import BulkLightboxAdd from "./BulkLightboxAdd.jsx";
 
 /**
  * this component is the "top banner" for the Browse view, showing the collection, path within collection, filters etc.
@@ -46,9 +47,14 @@ class BrowsePathSummary extends React.Component {
     }
 
     makeSearchJson(){
+        const pathToSearch = this.props.path ?
+            this.props.path.endsWith("/") ? this.props.path.slice(0, this.props.path.length - 1) : this.props.path : null;
+
         return JSON.stringify({
             hideDotFiles: ! this.props.showDotFiles,
-            q: this.props.queryString
+            q: this.props.queryString,
+            collection: this.props.collectionName,
+            path: pathToSearch
         })
     }
 
@@ -112,6 +118,7 @@ class BrowsePathSummary extends React.Component {
                     <FontAwesomeIcon icon="home" className="button-icon" style={{display: this.props.path ? "inline":"none"}} onClick={this.props.goToRootCb}/>
                     <FontAwesomeIcon icon="folder" style={{marginRight: "0.5em", display: this.props.path ? "inline":"none"}}/>
                     {this.props.path ? this.props.path : ""}
+                    <BulkLightboxAdd path={this.props.path} hideDotFiles={! this.props.showDotFiles} collection={this.props.collectionName}/>
                 </p>
             </div>
             <div style={{width: "18%", display: "inline-block"}}>

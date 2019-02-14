@@ -3,26 +3,29 @@ package controllers
 import java.time.ZonedDateTime
 
 import akka.pattern.ask
-import akka.actor.ActorRef
+import akka.actor.{ActorRef, ActorSystem}
+import akka.stream.{ActorMaterializer, Materializer}
 import com.amazonaws.HttpMethod
 import com.amazonaws.services.s3.model.{GeneratePresignedUrlRequest, ResponseHeaderOverrides}
 import com.theguardian.multimedia.archivehunter.common.{Indexer, LightboxIndex, StorageClass, ZonedDateTimeEncoder}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{ESClientManager, S3ClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{LightboxEntry, LightboxEntryDAO, RestoreStatus, RestoreStatusEncoder}
-import helpers.InjectableRefresher
+import helpers.LightboxHelper.logger
+import helpers.{InjectableRefresher, LightboxHelper}
 import javax.inject.{Inject, Named, Singleton}
 import play.api.{Configuration, Logger}
 import play.api.libs.circe.Circe
 import play.api.mvc.{AbstractController, ControllerComponents}
-import responses.{GenericErrorResponse, ObjectGetResponse, ObjectListResponse, RestoreStatusResponse}
+import responses._
 import io.circe.syntax._
 import io.circe.generic.auto._
 import play.api.libs.ws.WSClient
+import requests.SearchRequest
 import services.GlacierRestoreActor
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
 
 @Singleton
 class LightboxController @Inject() (override val config:Configuration,
@@ -33,6 +36,7 @@ class LightboxController @Inject() (override val config:Configuration,
                                     esClientMgr:ESClientManager,
                                     s3ClientMgr:S3ClientManager,
                                     @Named("glacierRestoreActor") glacierRestoreActor:ActorRef)
+                                   (implicit val system:ActorSystem)
   extends AbstractController(controllerComponents) with PanDomainAuthActions with Circe with ZonedDateTimeEncoder with RestoreStatusEncoder {
   private val logger=Logger(getClass)
   private val indexer = new Indexer(config.get[String]("externalData.indexName"))
@@ -40,6 +44,8 @@ class LightboxController @Inject() (override val config:Configuration,
   private implicit val esClient = esClientMgr.getClient()
   private val s3Client = s3ClientMgr.getClient(awsProfile)
   private implicit val ec:ExecutionContext  = controllerComponents.executionContext
+
+  private implicit val mat:Materializer = ActorMaterializer.create(system)
 
   def removeFromLightbox(fileId:String) = APIAuthAction.async { request=>
     userProfileFromSession(request.session) match {
@@ -71,6 +77,31 @@ class LightboxController @Inject() (override val config:Configuration,
     }
   }
 
+  def addFromSearch = APIAuthAction.async(circe.json(2048)) { request=>
+    request.body.as[SearchRequest].fold(
+      err=> Future(BadRequest(GenericErrorResponse("bad_request", err.toString).asJson)),
+      searchReq=>
+        userProfileFromSession(request.session) match {
+          case None => Future(BadRequest(GenericErrorResponse("session_error", "no session present").asJson))
+          case Some(Left(err)) =>
+            logger.error(s"Session is corrupted: ${err.toString}")
+            Future(InternalServerError(GenericErrorResponse("session_error", "session is corrupted, log out and log in again").asJson))
+          case Some(Right(userProfile)) =>
+            logger.info(s"Checking size of $searchReq")
+            LightboxHelper.getTotalSizeOfSearch(config.get[String]("externalData.indexName"),searchReq)
+              .map(totalSize=>{
+                val totalSizeMb = totalSize/1048576L
+                logger.info(s"Total size is $totalSizeMb Mb, userQuota is ${userProfile.perRestoreQuota.getOrElse(0L)}Mb")
+                if(totalSizeMb > userProfile.perRestoreQuota.getOrElse(0L)) {
+                  new Status(413)(QuotaExceededResponse("quota_exceeded","Your per-request quota has been exceeded",totalSizeMb, userProfile.perRestoreQuota.getOrElse(0)).asJson)
+                } else {
+                  Ok(GenericErrorResponse("ok","restore would proceed").asJson)
+                }
+              })
+        }
+    )
+  }
+
   def addToLightbox(fileId:String) = APIAuthAction.async { request=>
     userProfileFromSession(request.session) match {
       case None=>Future(BadRequest(GenericErrorResponse("session_error","no session present").asJson))
@@ -78,44 +109,26 @@ class LightboxController @Inject() (override val config:Configuration,
         logger.error(s"Session is corrupted: ${err.toString}")
         Future(InternalServerError(GenericErrorResponse("session_error","session is corrupted, log out and log in again").asJson))
       case Some(Right(userProfile)) =>
-        indexer.getById(fileId).flatMap(indexEntry => {
-          val expectedRestoreStatus = indexEntry.storageClass match {
-            case StorageClass.GLACIER => RestoreStatus.RS_PENDING
-            case _ => RestoreStatus.RS_UNNEEDED
-          }
-
-          val lbEntry = LightboxEntry(userProfile.userEmail, fileId, ZonedDateTime.now(), expectedRestoreStatus, None, None, None, None)
-          val lbSaveFuture = lightboxEntryDAO.put(lbEntry).map({
-            case None=>
-              logger.debug(s"lightbox entry saved, no return")
-              Success("saved")
-            case Some(Right(value))=>
-              logger.debug(s"lightbox entry saved, returned $value")
-              Success("saved")
-            case Some(Left(err))=>
-              logger.error(s"Could not save lightbox entry: ${err.toString}")
-              Failure(new RuntimeException(err.toString))
-          })
-
-          val lbIndex = LightboxIndex(request.user.email,request.user.avatarUrl, ZonedDateTime.now())
-          logger.debug(s"lbIndex is $lbIndex")
-          val updatedEntry = indexEntry.copy(lightboxEntries = indexEntry.lightboxEntries ++ Seq(lbIndex))
-          logger.debug(s"updateEntry is $updatedEntry")
-          val indexUpdateFuture = indexer.indexSingleItem(updatedEntry,Some(updatedEntry.id))
-
-          Future.sequence(Seq(lbSaveFuture, indexUpdateFuture)).map(results=>{
+        implicit val lbEntryDAOImplicit = lightboxEntryDAO
+        implicit val indexerImplicit = indexer
+        indexer.getById(fileId).flatMap(indexEntry =>
+          Future.sequence(Seq(
+            LightboxHelper.saveLightboxEntry(userProfile, indexEntry),
+            LightboxHelper.updateIndexLightboxed(userProfile, request.user.avatarUrl, indexEntry)
+          )).map(results=>{
             val errors = results.collect({case Failure(err)=>err})
             if(errors.nonEmpty){
               errors.foreach(err=>logger.error("Could not create lightbox entry", err))
               InternalServerError(ObjectListResponse("error","errors",errors.map(_.toString), errors.length).asJson)
             } else {
+              val lbEntry = results.head.asInstanceOf[Try[LightboxEntry]].get
               if(indexEntry.storageClass==StorageClass.GLACIER){
                 glacierRestoreActor ! GlacierRestoreActor.InitiateRestore(indexEntry, lbEntry, None)  //use default expiration
               }
               Ok(GenericErrorResponse("ok","saved").asJson)
             }
           })
-        })
+        )
     }
   }
 

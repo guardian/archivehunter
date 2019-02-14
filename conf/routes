@@ -54,9 +54,10 @@ GET     /api/user                       @controllers.UserController.allUsers
 PUT     /api/user/update                @controllers.UserController.updateUserProfileField
 GET     /api/user/myProfile             @controllers.UserController.myProfile
 
+PUT     /api/lightbox/my/addFromSearch  @controllers.LightboxController.addFromSearch
+GET     /api/lightbox/my/details        @controllers.LightboxController.lightboxDetails
 PUT     /api/lightbox/my/:fileId        @controllers.LightboxController.addToLightbox(fileId)
 DELETE  /api/lightbox/my/:fileId        @controllers.LightboxController.removeFromLightbox(fileId)
-GET     /api/lightbox/my/details        @controllers.LightboxController.lightboxDetails
 
 GET     /api/download/:fileId           @controllers.LightboxController.getDownloadLink(fileId)
 
