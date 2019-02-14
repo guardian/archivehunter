@@ -343,7 +343,7 @@ class BrowseComponent extends CommonSearchView {
                                    refreshCb={this.refreshContents}
                                    goToRootCb={this.goToRoot}
                                    showDotFiles={this.state.showDotFiles}
-                                   showDotFilesUpdated={value=>this.setState({showDotFiles: value})}
+                                   showDotFilesUpdated={value=>this.setState({showDotFiles: value}, this.refreshContents)}
                 />
                 <SearchResultsComponent entries={this.state.searchResults} onItemOpen={this.onItemOpen} onItemClose={this.onItemClose} selectedEntry={this.state.showingPreview} cancelToken={this.entriesCancelTokenSource ? this.entriesCancelTokenSource.token : null}/>
             </div>
