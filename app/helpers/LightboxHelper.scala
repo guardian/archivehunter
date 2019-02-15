@@ -3,13 +3,14 @@ package helpers
 import java.time.ZonedDateTime
 
 import akka.actor.{ActorRefFactory, ActorSystem}
-import akka.stream.Materializer
-import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
+import akka.stream.{ClosedShape, Materializer}
+import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Keep, RunnableGraph, Sink, Source}
 import com.sksamuel.elastic4s.http.HttpClient
 import com.sksamuel.elastic4s.searches.SearchDefinition
 import com.sksamuel.elastic4s.searches.queries.QueryDefinition
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer, LightboxIndex, StorageClass}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{LightboxBulkEntry, LightboxEntry, LightboxEntryDAO, RestoreStatus}
+import helpers.LightboxStreamComponents.{SaveLightboxEntrySink, UpdateLightboxIndexInfoSink}
 import models.UserProfile
 import play.api.Logger
 import requests.SearchRequest
@@ -130,11 +131,35 @@ object LightboxHelper {
     val archiveEntryConverter = new SearchHitToArchiveEntryFlow
     val bulkAddSink = new BulkAddSink(bulk.id, userProfile)
 
-    logger.info(s"Starting add of $rq to bulk lightbox ${bulk.id}" )
-    val result = getElasticSource(indexName, boolQuery().must(rq.toSearchParams)).via(archiveEntryConverter).toMat(bulkAddSink)(Keep.right).run()
+    val dynamoSaveSink = new SaveLightboxEntrySink(bulk.id, userProfile)
+    val esSaveSink = new UpdateLightboxIndexInfoSink(bulk.id, userProfile, None)
 
-    result.map(addedCount=>{
-      bulk.copy(availCount = bulk.availCount + addedCount)
+    logger.info(s"Starting add of $rq to bulk lightbox ${bulk.id}" )
+    //val result = getElasticSource(indexName, boolQuery().must(rq.toSearchParams)).via(archiveEntryConverter).toMat(bulkAddSink)(Keep.right).run()
+
+    val flow = RunnableGraph.fromGraph(GraphDSL.create(dynamoSaveSink,esSaveSink)((_,_)) { implicit b=> (actualDynamoSink, actualESSink) =>
+      import akka.stream.scaladsl.GraphDSL.Implicits._
+
+      val src = b.add(getElasticSource(indexName, boolQuery().must(rq.toSearchParams)))
+      val entryConverter = b.add(archiveEntryConverter)
+      val bcast = b.add(new Broadcast[ArchiveEntry](2, eagerCancel = true))
+//      val saveLbEntrySink = b.add(new SaveLightboxEntrySink(bulk.id, userProfile))
+//      val updateLbIndexSink = b.add(new UpdateLightboxIndexInfoSink(bulk.id, userProfile, None))
+
+      src ~> entryConverter ~> bcast ~> actualDynamoSink
+      bcast ~> actualESSink
+
+      ClosedShape
+    })
+
+    val resultFutures = flow.run()
+
+    Future.sequence(Seq(resultFutures._1, resultFutures._2)).map(addedCounts=>{
+      if(addedCounts.head != addedCounts(1)){
+        logger.warn(s"Mismatch between dynamodb and elastic outputs - ${addedCounts.head} records saved to dynamo but ${addedCounts(1)} records saved to ES")
+      }
+
+      bulk.copy(availCount = bulk.availCount + addedCounts.head)
     })
   }
 
