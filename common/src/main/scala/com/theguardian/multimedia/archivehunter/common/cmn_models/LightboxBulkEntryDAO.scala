@@ -56,4 +56,7 @@ class LightboxBulkEntryDAO @Inject() (config:ArchiveHunterConfiguration, ddbClie
       Right(resultList.collectFirst({case Right(value)=>value}))
     }
   })
+
+  def delete(entryId:String) =
+    ScanamoAlpakka.exec(client)(table.delete('id->entryId))
 }

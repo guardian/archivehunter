@@ -1,6 +1,7 @@
 package controllers
 
 import java.time.ZonedDateTime
+import java.util.UUID
 
 import akka.pattern.ask
 import akka.actor.{ActorRef, ActorSystem}
@@ -265,6 +266,36 @@ class LightboxController @Inject() (override val config:Configuration,
             Ok(ObjectListResponse("ok","lightboxBulk",successes,successes.length).asJson)
           }
         })
+    }
+  }
+
+  def deleteBulk(entryId:String) = APIAuthAction.async { request=>
+    userProfileFromSession(request.session) match {
+      case None=>Future(BadRequest(GenericErrorResponse("session_error","no session present").asJson))
+      case Some(Left(err))=>
+        logger.error(s"Session is corrupted: ${err.toString}")
+        Future(InternalServerError(GenericErrorResponse("session_error","session is corrupted, log out and log in again").asJson))
+      case Some(Right(profile))=>
+        lightboxBulkEntryDAO.entryForId(UUID.fromString(entryId)).flatMap({
+          case None=>
+            Future(NotFound(GenericErrorResponse("not_found","No bulk with that ID is present").asJson))
+          case Some(Right(entry))=>
+            if(entry.userEmail==profile.userEmail || profile.isAdmin) {
+              logger.info(s"Deleting bulk request $entry")
+              lightboxBulkEntryDAO.delete(entryId).map(deleteResult => {
+                Ok(GenericErrorResponse("ok", "item deleted").asJson)
+              }).recover({
+                case err: Throwable =>
+                  logger.error("Could not delete record from dynamo: ", err)
+                  InternalServerError(GenericErrorResponse("db_error", err.toString).asJson)
+              })
+            } else {
+              Future(Forbidden(GenericErrorResponse("forbidden", "You don't have permission to do this, please contact your administrator").asJson))
+            }
+          case Some(Left(err))=>
+            logger.error(s"Could not look up bulk entry in dynamo: ${err.toString}")
+            Future(InternalServerError(GenericErrorResponse("db_error",err.toString).asJson))
+          })
     }
   }
 }

@@ -235,8 +235,6 @@ Resources:
       KeySchema:
         - AttributeName: id
           KeyType: HASH
-        - AttributeName: userEmail
-          KeyType: RANGE
       ProvisionedThroughput:
         WriteCapacityUnits: 1
         ReadCapacityUnits: 4

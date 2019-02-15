@@ -158,6 +158,15 @@ div.entry-view {
     padding-top: 0.2em;
 }
 
+div.half-height {
+    height: 75px
+}
+
+.black {
+    color: black;
+    background-color: inherit;
+}
+
 .entry-title {
     margin-top: 0;
     margin-bottom: 0.2em;
@@ -541,3 +550,8 @@ pre.inline-log {
 @-moz-keyframes spin { 100% { -moz-transform: rotate(360deg); } }
 @-webkit-keyframes spin { 100% { -webkit-transform: rotate(360deg); } }
 @keyframes spin { 100% { -webkit-transform: rotate(360deg); transform:rotate(360deg); } }
+
+.bulk-selections-scroll {
+    overflow-y: hidden;
+    overflow-x: auto;
+}

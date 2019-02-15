@@ -59,6 +59,7 @@ GET     /api/lightbox/my/details        @controllers.LightboxController.lightbox
 PUT     /api/lightbox/my/:fileId        @controllers.LightboxController.addToLightbox(fileId)
 DELETE  /api/lightbox/my/:fileId        @controllers.LightboxController.removeFromLightbox(fileId)
 GET     /api/lightbox/my/bulks          @controllers.LightboxController.myBulks
+DELETE  /api/lightbox/bulk/:bulkId      @controllers.LightboxController.deleteBulk(bulkId)
 
 GET     /api/download/:fileId           @controllers.LightboxController.getDownloadLink(fileId)
 
