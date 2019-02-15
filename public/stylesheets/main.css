@@ -158,8 +158,9 @@ div.entry-view {
     padding-top: 0.2em;
 }
 
-div.half-height {
-    height: 75px
+div.bulk-selection-view {
+    height: 75px;
+    width: 280px;
 }
 
 .black {

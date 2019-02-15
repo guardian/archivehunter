@@ -27,6 +27,8 @@ class MyLightbox extends CommonSearchView {
         this.checkArchiveStatus = this.checkArchiveStatus.bind(this);
         this.bulkSelectionChanged = this.bulkSelectionChanged.bind(this);
         this.reloadSearch = this.reloadSearch.bind(this);
+        this.bulkSearchDeleteRequested = this.bulkSearchDeleteRequested.bind(this);
+
     }
 
     performLoad(){
@@ -98,7 +100,7 @@ class MyLightbox extends CommonSearchView {
             this.setState({
                 bulkSelections: this.state.bulkSelections.filter(entry=>entry.id !== entryId),
                 bulkSelectionSelected: updatedSelected
-            })
+            }, this.reloadSearch)
         }).catch(err=>{
             console.error(err);
             this.setState({lastError: err});
