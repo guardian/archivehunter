@@ -285,6 +285,7 @@ Resources:
         Value: !Ref Stack
       - Key: Stage
         Value: !Ref Stage
+
   ProxyLocationTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -457,6 +458,13 @@ Resources:
     Type: AWS::SQS::Queue
 
   ProxyFrameworkMsg:
+    Type: AWS::SQS::Queue
+    Properties:
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt ProxyFrameworkDLQ.Arn
+        maxReceiveCount: 10
+
+  ProxyFrameworkDLQ:
     Type: AWS::SQS::Queue
 
   ProxyFrameworkMsgSubs:
