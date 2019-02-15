@@ -9,7 +9,7 @@ import com.amazonaws.HttpMethod
 import com.amazonaws.services.s3.model.{GeneratePresignedUrlRequest, ResponseHeaderOverrides}
 import com.theguardian.multimedia.archivehunter.common.{Indexer, LightboxIndex, StorageClass, ZonedDateTimeEncoder}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{ESClientManager, S3ClientManager}
-import com.theguardian.multimedia.archivehunter.common.cmn_models.{LightboxEntry, LightboxEntryDAO, RestoreStatus, RestoreStatusEncoder}
+import com.theguardian.multimedia.archivehunter.common.cmn_models._
 import helpers.LightboxHelper.logger
 import helpers.{InjectableRefresher, LightboxHelper}
 import javax.inject.{Inject, Named, Singleton}
@@ -35,16 +35,17 @@ class LightboxController @Inject() (override val config:Configuration,
                                     override val refresher:InjectableRefresher,
                                     esClientMgr:ESClientManager,
                                     s3ClientMgr:S3ClientManager,
-                                    @Named("glacierRestoreActor") glacierRestoreActor:ActorRef)
+                                    @Named("glacierRestoreActor") glacierRestoreActor:ActorRef,
+                                    lightboxBulkEntryDAO: LightboxBulkEntryDAO)
                                    (implicit val system:ActorSystem)
   extends AbstractController(controllerComponents) with PanDomainAuthActions with Circe with ZonedDateTimeEncoder with RestoreStatusEncoder {
   private val logger=Logger(getClass)
-  private val indexer = new Indexer(config.get[String]("externalData.indexName"))
+  private implicit val indexer = new Indexer(config.get[String]("externalData.indexName"))
   private val awsProfile = config.getOptional[String]("externalData.awsProfile")
   private implicit val esClient = esClientMgr.getClient()
   private val s3Client = s3ClientMgr.getClient(awsProfile)
   private implicit val ec:ExecutionContext  = controllerComponents.executionContext
-
+  private val indexName = config.get[String]("externalData.indexName")
   private implicit val mat:Materializer = ActorMaterializer.create(system)
 
   def removeFromLightbox(fileId:String) = APIAuthAction.async { request=>
@@ -87,17 +88,59 @@ class LightboxController @Inject() (override val config:Configuration,
             logger.error(s"Session is corrupted: ${err.toString}")
             Future(InternalServerError(GenericErrorResponse("session_error", "session is corrupted, log out and log in again").asJson))
           case Some(Right(userProfile)) =>
-            logger.info(s"Checking size of $searchReq")
-            LightboxHelper.getTotalSizeOfSearch(config.get[String]("externalData.indexName"),searchReq)
-              .map(totalSize=>{
-                val totalSizeMb = totalSize/1048576L
-                logger.info(s"Total size is $totalSizeMb Mb, userQuota is ${userProfile.perRestoreQuota.getOrElse(0L)}Mb")
-                if(totalSizeMb > userProfile.perRestoreQuota.getOrElse(0L)) {
-                  new Status(413)(QuotaExceededResponse("quota_exceeded","Your per-request quota has been exceeded",totalSizeMb, userProfile.perRestoreQuota.getOrElse(0)).asJson)
-                } else {
-                  Ok(GenericErrorResponse("ok","restore would proceed").asJson)
-                }
-              })
+            implicit val implLBEntryDAO = lightboxEntryDAO
+            LightboxHelper.testBulkAddSize(indexName ,userProfile, searchReq).flatMap({
+              case Left(resp:QuotaExceededResponse)=>
+                Future(new Status(413)(resp.asJson))
+              case Right(restoreSize)=>
+                logger.info("Proceeding with bulk restore")
+
+                //either pick up an existing bulk entry or create a new one
+                val bulkDesc = s"${searchReq.collection.get}:${searchReq.path.getOrElse("none")}"
+                val maybeBulkEntryFuture = lightboxBulkEntryDAO.entryForDescAndUser(userProfile.userEmail, bulkDesc)
+                    .map(_.map({
+                      case Some(entry)=>entry
+                      case None=>LightboxBulkEntry.create(userProfile.userEmail, bulkDesc)
+                    }))
+
+                maybeBulkEntryFuture.flatMap({
+                  case Left(err)=>
+                    logger.error(s"Could not get bulk restore entires: ${err.toString}")
+                    Future(InternalServerError(GenericErrorResponse("error", err.toString).asJson))
+                  case Right(entry)=>
+                    logger.info(s"Got bulk restore entry: $entry")
+                    val saveFuture = lightboxBulkEntryDAO.put(entry).map({
+                      case None=>Right(entry)
+                      case Some(Right(x))=>Right(x)
+                      case Some(Left(err))=>Left(err)
+                    })
+
+                    saveFuture.flatMap({
+                      case Right(savedEntry)=>
+                        LightboxHelper.addToBulkFromSearch(indexName,userProfile,searchReq,savedEntry).flatMap(updatedBulkEntry=>{
+                          lightboxBulkEntryDAO.put(updatedBulkEntry).map({
+                            case None=>
+                              Ok(ObjectCreatedResponse("ok","bulkLightboxEntry", updatedBulkEntry.id).asJson)
+                            case Some(Right(oldValue))=>
+                              Ok(ObjectCreatedResponse("ok","bulkLightboxEntry", updatedBulkEntry.id).asJson)
+                            case Some(Left(err))=>
+                              InternalServerError(GenericErrorResponse("db_error",err.toString).asJson)
+                          })
+
+                        })
+
+                      case Left(err)=>
+                        logger.error(s"Could not save bulk restore entry: $err")
+                        Future(InternalServerError(GenericErrorResponse("db_error",err.toString).asJson))
+                    })
+
+                })
+
+            }).recover({
+              case err:Throwable=>
+                logger.error("Could not test bulk add size: ", err)
+                InternalServerError(GenericErrorResponse("error",err.toString).asJson)
+            })
         }
     )
   }
@@ -110,11 +153,10 @@ class LightboxController @Inject() (override val config:Configuration,
         Future(InternalServerError(GenericErrorResponse("session_error","session is corrupted, log out and log in again").asJson))
       case Some(Right(userProfile)) =>
         implicit val lbEntryDAOImplicit = lightboxEntryDAO
-        implicit val indexerImplicit = indexer
         indexer.getById(fileId).flatMap(indexEntry =>
           Future.sequence(Seq(
-            LightboxHelper.saveLightboxEntry(userProfile, indexEntry),
-            LightboxHelper.updateIndexLightboxed(userProfile, request.user.avatarUrl, indexEntry)
+            LightboxHelper.saveLightboxEntry(userProfile, indexEntry, None),
+            LightboxHelper.updateIndexLightboxed(userProfile, request.user.avatarUrl, indexEntry, None)
           )).map(results=>{
             val errors = results.collect({case Failure(err)=>err})
             if(errors.nonEmpty){
@@ -199,6 +241,29 @@ class LightboxController @Inject() (override val config:Configuration,
                 Ok(RestoreStatusResponse("not_requested", entry.id, RestoreStatus.RS_ERROR, None).asJson)
             })
 
+        })
+    }
+  }
+
+  /**
+    * returns bulk entries for the current user
+    * @return
+    */
+  def myBulks = APIAuthAction.async { request=>
+    userProfileFromSession(request.session) match {
+      case None=>Future(BadRequest(GenericErrorResponse("session_error","no session present").asJson))
+      case Some(Left(err))=>
+        logger.error(s"Session is corrupted: ${err.toString}")
+        Future(InternalServerError(GenericErrorResponse("session_error","session is corrupted, log out and log in again").asJson))
+      case Some(Right(profile))=>
+        lightboxBulkEntryDAO.entriesForUser(profile.userEmail).map(results=>{
+          val failures = results.collect({ case Left(err)=>err })
+          if(failures.nonEmpty){
+            InternalServerError(GenericErrorResponse("error",failures.map(_.toString).mkString(",")).asJson)
+          } else {
+            val successes = results.collect({ case Right(value)=>value })
+            Ok(ObjectListResponse("ok","lightboxBulk",successes,successes.length).asJson)
+          }
         })
     }
   }

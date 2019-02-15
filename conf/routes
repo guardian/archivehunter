@@ -28,7 +28,7 @@ GET     /api/search/basic      @controllers.SearchController.simpleStringSearch(
 GET     /api/entry/:id                  @controllers.SearchController.getEntry(id)
 PUT     /api/search/suggestions         @controllers.SearchController.suggestions
 POST    /api/search/browser             @controllers.SearchController.browserSearch(start:Int ?= 0, size:Int ?=100)
-GET     /api/search/myLightBox          @controllers.SearchController.lightboxSearch(start:Int ?= 0, size:Int ?=100)
+GET     /api/search/myLightBox          @controllers.SearchController.lightboxSearch(start:Int ?= 0, size:Int ?=100, bulkId:Option[String])
 
 GET     /api/proxy/searchForFile        @controllers.ProxiesController.searchFor(id:String)
 GET     /api/proxy/:id/associate        @controllers.ProxiesController.associate(fileId:Option[String],id)
@@ -58,6 +58,7 @@ PUT     /api/lightbox/my/addFromSearch  @controllers.LightboxController.addFromS
 GET     /api/lightbox/my/details        @controllers.LightboxController.lightboxDetails
 PUT     /api/lightbox/my/:fileId        @controllers.LightboxController.addToLightbox(fileId)
 DELETE  /api/lightbox/my/:fileId        @controllers.LightboxController.removeFromLightbox(fileId)
+GET     /api/lightbox/my/bulks          @controllers.LightboxController.myBulks
 
 GET     /api/download/:fileId           @controllers.LightboxController.getDownloadLink(fileId)
 

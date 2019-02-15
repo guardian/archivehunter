@@ -34,7 +34,7 @@ class BulkLightboxAdd extends React.Component {
         return JSON.stringify({
             hideDotFiles: ! this.props.showDotFiles,
             q: this.props.queryString,
-            collection: this.props.collectionName,
+            collection: this.props.collection,
             path: pathToSearch
         })
     }

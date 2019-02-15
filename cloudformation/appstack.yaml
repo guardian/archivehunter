@@ -222,6 +222,37 @@ Resources:
             WriteCapacityUnits: 1
             ReadCapacityUnits: 4
 
+  LightboxBulkEntryTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: userEmail
+          AttributeType: S
+        - AttributeName: description
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+        - AttributeName: userEmail
+          KeyType: RANGE
+      ProvisionedThroughput:
+        WriteCapacityUnits: 1
+        ReadCapacityUnits: 4
+      GlobalSecondaryIndexes:
+        - IndexName: DescIndex
+          KeySchema:
+            - AttributeName: description
+              KeyType: HASH
+            - AttributeName: userEmail
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+          ProvisionedThroughput:
+            WriteCapacityUnits: 1
+            ReadCapacityUnits: 2
+
   JobHistoryTable:
     Type: AWS::DynamoDB::Table
     Properties:

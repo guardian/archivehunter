@@ -2,21 +2,21 @@ package helpers
 
 import java.time.ZonedDateTime
 
-import akka.actor.ActorRefFactory
+import akka.actor.{ActorRefFactory, ActorSystem}
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import com.sksamuel.elastic4s.http.HttpClient
 import com.sksamuel.elastic4s.searches.SearchDefinition
 import com.sksamuel.elastic4s.searches.queries.QueryDefinition
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer, LightboxIndex, StorageClass}
-import com.theguardian.multimedia.archivehunter.common.cmn_models.{LightboxEntry, LightboxEntryDAO, RestoreStatus}
+import com.theguardian.multimedia.archivehunter.common.cmn_models.{LightboxBulkEntry, LightboxEntry, LightboxEntryDAO, RestoreStatus}
 import models.UserProfile
 import play.api.Logger
 import requests.SearchRequest
-import responses.{GenericErrorResponse, ObjectListResponse}
+import responses.{GenericErrorResponse, ObjectListResponse, QuotaExceededResponse}
 import services.GlacierRestoreActor
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success}
 
 object LightboxHelper {
@@ -33,13 +33,13 @@ object LightboxHelper {
     * @param ec implicitly provided execution context
     * @return a Future, containing a Try which either has the created LightboxEntry or a Failure
     */
-  def saveLightboxEntry(userProfile:UserProfile, indexEntry:ArchiveEntry)(implicit lightboxEntryDAO: LightboxEntryDAO, ec:ExecutionContext) = {
+  def saveLightboxEntry(userProfile:UserProfile, indexEntry:ArchiveEntry, bulkId:Option[String])(implicit lightboxEntryDAO: LightboxEntryDAO, ec:ExecutionContext) = {
     val expectedRestoreStatus = indexEntry.storageClass match {
       case StorageClass.GLACIER => RestoreStatus.RS_PENDING
       case _ => RestoreStatus.RS_UNNEEDED
     }
 
-    val lbEntry = LightboxEntry(userProfile.userEmail, indexEntry.id, ZonedDateTime.now(), expectedRestoreStatus, None, None, None, None)
+    val lbEntry = LightboxEntry(userProfile.userEmail, indexEntry.id, ZonedDateTime.now(), expectedRestoreStatus, None, None, None, None, bulkId)
     lightboxEntryDAO.put(lbEntry).map({
       case None=>
         logger.debug(s"lightbox entry saved, no return")
@@ -64,8 +64,8 @@ object LightboxHelper {
     * @param ec
     * @return
     */
-  def updateIndexLightboxed(userProfile:UserProfile, userAvatarUrl:Option[String], indexEntry:ArchiveEntry)(implicit esClient:HttpClient, indexer:Indexer, ec:ExecutionContext) = {
-    val lbIndex = LightboxIndex(userProfile.userEmail,userAvatarUrl, ZonedDateTime.now())
+  def updateIndexLightboxed(userProfile:UserProfile, userAvatarUrl:Option[String], indexEntry:ArchiveEntry, bulkId:Option[String])(implicit esClient:HttpClient, indexer:Indexer, ec:ExecutionContext) = {
+    val lbIndex = LightboxIndex(userProfile.userEmail,userAvatarUrl, ZonedDateTime.now(), bulkId)
     logger.debug(s"lbIndex is $lbIndex")
     val updatedEntry = indexEntry.copy(lightboxEntries = indexEntry.lightboxEntries ++ Seq(lbIndex))
     logger.debug(s"updateEntry is $updatedEntry")
@@ -97,4 +97,45 @@ object LightboxHelper {
       entry.size
     }).async.toMat(Sink.reduce[Long]((acc, entry)=>acc+entry))(Keep.right).run()
   }
+
+  def testBulkAddSize(indexName:String, userProfile: UserProfile, searchReq:SearchRequest)(implicit esClient:HttpClient, actorRefFactory:ActorRefFactory, materializer:Materializer, ec:ExecutionContext) = {
+    logger.info(s"Checking size of $searchReq")
+    LightboxHelper.getTotalSizeOfSearch(indexName,searchReq)
+      .map(totalSize=>{
+        val totalSizeMb = totalSize/1048576L
+        logger.info(s"Total size is $totalSizeMb Mb, userQuota is ${userProfile.perRestoreQuota.getOrElse(0L)}Mb")
+        if(totalSizeMb > userProfile.perRestoreQuota.getOrElse(0L)) {
+          Left(QuotaExceededResponse("quota_exceeded","Your per-request quota has been exceeded",totalSizeMb, userProfile.perRestoreQuota.getOrElse(0)))
+        } else {
+          Right(totalSizeMb)
+        }
+      })
+  }
+
+  /**
+    * run the provided SearchRequest and add the result to the given LightboxBulkEntry
+    * @param indexName
+    * @param userProfile
+    * @param rq
+    * @param bulk
+    * @param lightboxEntryDAO
+    * @param system
+    * @param esClient
+    * @param indexer
+    * @param mat
+    * @return
+    */
+  def addToBulkFromSearch(indexName:String, userProfile:UserProfile, rq:SearchRequest, bulk:LightboxBulkEntry)
+                         (implicit lightboxEntryDAO: LightboxEntryDAO, system:ActorSystem, esClient:HttpClient, indexer:Indexer, mat:Materializer, ec:ExecutionContext) = {
+    val archiveEntryConverter = new SearchHitToArchiveEntryFlow
+    val bulkAddSink = new BulkAddSink(bulk.id, userProfile)
+
+    logger.info(s"Starting add of $rq to bulk lightbox ${bulk.id}" )
+    val result = getElasticSource(indexName, boolQuery().must(rq.toSearchParams)).via(archiveEntryConverter).toMat(bulkAddSink)(Keep.right).run()
+
+    result.map(addedCount=>{
+      bulk.copy(availCount = bulk.availCount + addedCount)
+    })
+  }
+
 }

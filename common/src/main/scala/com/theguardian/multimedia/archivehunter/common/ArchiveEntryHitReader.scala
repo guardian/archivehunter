@@ -15,7 +15,14 @@ trait ArchiveEntryHitReader extends MediaMetadataMapConverters {
 
   private def mappingToLightboxes(value:Seq[Map[String,String]]) =
     value.map(entry=>
-      LightboxIndex(entry("owner"),entry.get("avatarUrl"),ZonedDateTime.parse(entry("addedAt"), DateTimeFormatter.ISO_DATE_TIME))
+      LightboxIndex(entry("owner"),
+        //if you don't do this, an original value of None becomes Some(null), which is not pleasant...
+        entry.get("avatarUrl").flatMap({
+          case null=>None
+          case other=>Some(other)
+        }),
+        ZonedDateTime.parse(entry("addedAt"), DateTimeFormatter.ISO_DATE_TIME),
+        entry.get("memberOfBulk"))
     )
 
   implicit object ArchiveEntryHR extends HitReader[ArchiveEntry] {
