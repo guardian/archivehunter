@@ -2,11 +2,11 @@ package helpers.LightboxStreamComponents
 
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.Sink
-import akka.stream.{Attributes, Inlet, SinkShape}
-import akka.stream.stage.{AbstractInHandler, GraphStage, GraphStageLogic, GraphStageWithMaterializedValue}
+import akka.stream._
+import akka.stream.stage._
 import com.sksamuel.elastic4s.http.HttpClient
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer}
-import com.theguardian.multimedia.archivehunter.common.cmn_models.LightboxEntryDAO
+import com.theguardian.multimedia.archivehunter.common.cmn_models.{LightboxEntry, LightboxEntryDAO}
 import helpers.LightboxHelper
 import models.UserProfile
 import play.api.Logger
@@ -16,7 +16,7 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
 /**
-  * an akka Sink that adds incoming ArchiveEntry records to a bulk entry
+  * an akka Flow that creates LightboxEntry records for each ArchiveEntry that it receives, and outputs the saved LightboxEntry and incoming ARchiveEntry as a tuple
   * @param bulkId ID of the bulk entry to add to
   * @param userProfile UserProfile object for the user doing the adding
   * @param lightboxEntryDAO implicitly provided Data Access Object for lightboxEntry
@@ -24,13 +24,13 @@ import scala.util.{Failure, Success}
   * @param esClient implicitly provided HttpClient for Elastic Search
   * @param indexer implicitly provided Indexer instance
   */
-class SaveLightboxEntrySink (bulkId:String,userProfile: UserProfile)
+class SaveLightboxEntryFlow (bulkId:String,userProfile: UserProfile)
                   (implicit val lightboxEntryDAO:LightboxEntryDAO, system:ActorSystem, esClient:HttpClient, indexer:Indexer)
-  extends GraphStageWithMaterializedValue[SinkShape[ArchiveEntry], Future[Int]]{
+  extends GraphStageWithMaterializedValue[FlowShape[ArchiveEntry,(ArchiveEntry, LightboxEntry)], Future[Int]]{
 
   private val in = Inlet.create[ArchiveEntry]("BulkAddSink.in")
-
-  override def shape: SinkShape[ArchiveEntry] = SinkShape.of(in)
+  private val out = Outlet.create[(ArchiveEntry, LightboxEntry)]("BulkAddSink.out")
+  override def shape: FlowShape[ArchiveEntry,(ArchiveEntry, LightboxEntry)] = FlowShape.of(in, out)
 
   private implicit val ec:ExecutionContext =  system.dispatcher
 
@@ -49,16 +49,16 @@ class SaveLightboxEntrySink (bulkId:String,userProfile: UserProfile)
             case Success(entry)=>
               logger.info("Saved lightbox entry")
               ctr+=1
-              pull(in)
+              push(out, (elem, entry))
             case Failure(err)=>
               throw err
           }
         }
       })
 
-      override def preStart(): Unit = {
-        pull(in)
-      }
+      setHandler(out, new AbstractOutHandler {
+        override def onPull(): Unit = pull(in)
+      })
 
       override def postStop(): Unit = {
         promise.success(ctr)

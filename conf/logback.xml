@@ -38,6 +38,7 @@
     <logger name="services.AppStartup" level="INFO"/>
     <logger name="services.BucketScanner" level="INFO"/>
     <logger name="akka.cluster" level="ERROR"/>
+    <logger name="helpers.LightboxStreamComponents" level="DEBUG"/>
     <logger name="helpers.S3ToArchiveEntryFlow" level="WARN"/>
     <logger name="helpers.SearchHitToArchiveEntryFlow" level="WARN"/>
     <logger name="helpers.ArchiveEntryVerifyFlow" level="WARN"/>

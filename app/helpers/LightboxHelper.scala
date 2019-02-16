@@ -4,13 +4,14 @@ import java.time.ZonedDateTime
 
 import akka.actor.{ActorRefFactory, ActorSystem}
 import akka.stream.{ClosedShape, Materializer}
-import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Keep, RunnableGraph, Sink, Source}
+import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Keep, Merge, RunnableGraph, Sink, Source}
+import com.google.inject.Injector
 import com.sksamuel.elastic4s.http.HttpClient
 import com.sksamuel.elastic4s.searches.SearchDefinition
 import com.sksamuel.elastic4s.searches.queries.QueryDefinition
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer, LightboxIndex, StorageClass}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{LightboxBulkEntry, LightboxEntry, LightboxEntryDAO, RestoreStatus}
-import helpers.LightboxStreamComponents.{RemoveLightboxEntrySink, RemoveLightboxIndexInfoSink, SaveLightboxEntrySink, UpdateLightboxIndexInfoSink}
+import helpers.LightboxStreamComponents._
 import models.UserProfile
 import play.api.Logger
 import requests.SearchRequest
@@ -114,35 +115,37 @@ object LightboxHelper {
   }
 
   /**
-    * run the provided SearchRequest and add the result to the given LightboxBulkEntry
-    * @param indexName
-    * @param userProfile
-    * @param rq
-    * @param bulk
-    * @param lightboxEntryDAO
-    * @param system
-    * @param esClient
-    * @param indexer
-    * @param mat
-    * @return
+    * run the provided SearchRequest and add the result to the given LightboxBulkEntry.
+    * if any elements require restore from Glacier, this will be initated
+    * @param indexName index name to query
+    * @param userProfile profile of the user requesting the restore
+    * @param rq SearchRequest with the search terms to restore
+    * @param bulk initialised LightboxBulkEntry to associate the items with
+    * @param lightboxEntryDAO implicitly provided Data Access Object for lightbox entries
+    * @param system implicitly provided ActorSystem
+    * @param esClient implicitly provided Elastic4s HttpClient
+    * @param indexer implicitly provided Indexer object
+    * @param mat implicitly provided ActorMaterializer
+    * @return a Future, with the LightboxBulkEntry updated to show the number of items it now has associated
     */
   def addToBulkFromSearch(indexName:String, userProfile:UserProfile, rq:SearchRequest, bulk:LightboxBulkEntry)
-                         (implicit lightboxEntryDAO: LightboxEntryDAO, system:ActorSystem, esClient:HttpClient, indexer:Indexer, mat:Materializer, ec:ExecutionContext) = {
+                         (implicit lightboxEntryDAO: LightboxEntryDAO, system:ActorSystem, esClient:HttpClient, indexer:Indexer, mat:Materializer, ec:ExecutionContext, injector:Injector) = {
     val archiveEntryConverter = new SearchHitToArchiveEntryFlow
 
-    val dynamoSaveSink = new SaveLightboxEntrySink(bulk.id, userProfile)
+    val dynamoSaveFlow = new SaveLightboxEntryFlow(bulk.id, userProfile)
+    val maybeRestoreSink = injector.getInstance(classOf[InitiateRestoreSink])
+
     val esSaveSink = new UpdateLightboxIndexInfoSink(bulk.id, userProfile, None)
 
     logger.info(s"Starting add of $rq to bulk lightbox ${bulk.id}" )
 
-    val flow = RunnableGraph.fromGraph(GraphDSL.create(dynamoSaveSink,esSaveSink)((_,_)) { implicit b=> (actualDynamoSink, actualESSink) =>
+    val flow = RunnableGraph.fromGraph(GraphDSL.create(dynamoSaveFlow,esSaveSink, maybeRestoreSink)((_,_,_)) { implicit b=> (actualDynamoFlow, actualESSink, actualRestoreSink) =>
       import akka.stream.scaladsl.GraphDSL.Implicits._
 
       val src = b.add(getElasticSource(indexName, boolQuery().must(rq.toSearchParams)))
       val entryConverter = b.add(archiveEntryConverter)
       val bcast = b.add(new Broadcast[ArchiveEntry](2, eagerCancel = true))
-
-      src ~> entryConverter ~> bcast ~> actualDynamoSink
+      src ~> entryConverter ~> bcast ~> actualDynamoFlow ~> actualRestoreSink
       bcast ~> actualESSink
 
       ClosedShape

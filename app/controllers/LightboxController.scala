@@ -8,6 +8,7 @@ import akka.actor.{ActorRef, ActorSystem}
 import akka.stream.{ActorMaterializer, Materializer}
 import com.amazonaws.HttpMethod
 import com.amazonaws.services.s3.model.{GeneratePresignedUrlRequest, ResponseHeaderOverrides}
+import com.google.inject.Injector
 import com.theguardian.multimedia.archivehunter.common.{Indexer, LightboxIndex, StorageClass, ZonedDateTimeEncoder}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{ESClientManager, S3ClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models._
@@ -38,7 +39,7 @@ class LightboxController @Inject() (override val config:Configuration,
                                     s3ClientMgr:S3ClientManager,
                                     @Named("glacierRestoreActor") glacierRestoreActor:ActorRef,
                                     lightboxBulkEntryDAO: LightboxBulkEntryDAO)
-                                   (implicit val system:ActorSystem)
+                                   (implicit val system:ActorSystem, injector:Injector)
   extends AbstractController(controllerComponents) with PanDomainAuthActions with Circe with ZonedDateTimeEncoder with RestoreStatusEncoder {
   private val logger=Logger(getClass)
   private implicit val indexer = new Indexer(config.get[String]("externalData.indexName"))
