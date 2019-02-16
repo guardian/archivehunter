@@ -128,14 +128,14 @@ object LightboxHelper {
     * @param mat implicitly provided ActorMaterializer
     * @return a Future, with the LightboxBulkEntry updated to show the number of items it now has associated
     */
-  def addToBulkFromSearch(indexName:String, userProfile:UserProfile, rq:SearchRequest, bulk:LightboxBulkEntry)
+  def addToBulkFromSearch(indexName:String, userProfile:UserProfile, userAvatarUrl:Option[String], rq:SearchRequest, bulk:LightboxBulkEntry)
                          (implicit lightboxEntryDAO: LightboxEntryDAO, system:ActorSystem, esClient:HttpClient, indexer:Indexer, mat:Materializer, ec:ExecutionContext, injector:Injector) = {
     val archiveEntryConverter = new SearchHitToArchiveEntryFlow
 
     val dynamoSaveFlow = new SaveLightboxEntryFlow(bulk.id, userProfile)
     val maybeRestoreSink = injector.getInstance(classOf[InitiateRestoreSink])
 
-    val esSaveSink = new UpdateLightboxIndexInfoSink(bulk.id, userProfile, None)
+    val esSaveSink = new UpdateLightboxIndexInfoSink(bulk.id, userProfile, userAvatarUrl)
 
     logger.info(s"Starting add of $rq to bulk lightbox ${bulk.id}" )
 

@@ -119,7 +119,7 @@ class LightboxController @Inject() (override val config:Configuration,
 
                     saveFuture.flatMap({
                       case Right(savedEntry)=>
-                        LightboxHelper.addToBulkFromSearch(indexName,userProfile,searchReq,savedEntry).flatMap(updatedBulkEntry=>{
+                        LightboxHelper.addToBulkFromSearch(indexName,userProfile,request.user.avatarUrl,searchReq,savedEntry).flatMap(updatedBulkEntry=>{
                           lightboxBulkEntryDAO.put(updatedBulkEntry).map({
                             case None=>
                               Ok(ObjectCreatedResponse("ok","bulkLightboxEntry", updatedBulkEntry.id).asJson)
