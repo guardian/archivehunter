@@ -60,6 +60,7 @@ PUT     /api/lightbox/my/:fileId        @controllers.LightboxController.addToLig
 DELETE  /api/lightbox/my/:fileId        @controllers.LightboxController.removeFromLightbox(fileId)
 GET     /api/lightbox/my/bulks          @controllers.LightboxController.myBulks
 DELETE  /api/lightbox/bulk/:bulkId      @controllers.LightboxController.deleteBulk(bulkId)
+PUT     /api/lightbox/bulk/query        @controllers.LightboxController.haveBulkEntryFor
 
 GET     /api/download/:fileId           @controllers.LightboxController.getDownloadLink(fileId)
 

@@ -148,6 +148,7 @@ with PanDomainAuthActions {
         logger.error(s"Could not perform lightbox query: $err")
         InternalServerError(GenericErrorResponse("search_error", err.toString).asJson)
       case Right(results)=>
+        results.result.to[ArchiveEntry].foreach(x=>println(x.toString))
         Ok(ObjectListResponse("ok","entry", results.result.to[ArchiveEntry], results.result.totalHits.toInt).asJson)
     }).recover({
       case err:Throwable=>

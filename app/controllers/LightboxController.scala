@@ -308,4 +308,27 @@ class LightboxController @Inject() (override val config:Configuration,
           })
     }
   }
+
+  /**
+    * check whether there is a bulk entry for the given collection and path, for the requesting user.
+    * if nothing is found, a 200 response is still returned, but with a null in the entry field.
+    * @return
+    */
+  def haveBulkEntryFor = APIAuthAction.async(circe.json(2048)) { request=>
+    request.body.as[SearchRequest].fold(
+      err=>Future(BadRequest(GenericErrorResponse("bad_request", err.toString).asJson)),
+      rq=>{
+        if(rq.path.isDefined && rq.collection.isDefined) {
+          val desc = s"${rq.collection.get}:${rq.path.get}"
+          lightboxBulkEntryDAO.entryForDescAndUser(request.user.email,desc).map({
+            case Left(err)=>InternalServerError(GenericErrorResponse("db_error", err.toString).asJson)
+            case Right(Some(entry))=>Ok(ObjectGetResponse("ok","lightboxbulk",entry.id).asJson)
+            case Right(None)=>Ok(ObjectGetResponseEmpty("notfound","lightboxbulk").asJson)
+          })
+        } else {
+          Future(BadRequest(GenericErrorResponse("bad_request","You must set path and collection").asJson))
+        }
+      }
+    )
+  }
 }

@@ -13,16 +13,19 @@ trait ArchiveEntryHitReader extends MediaMetadataMapConverters {
   private def mappingToMimeType(value:Map[String,String]) =
     MimeType(value("major"),value("minor"))
 
+  private def safeGetOptional(entry:Map[String,String], key:String) = entry.get(key).flatMap({
+    case null=>None
+    case other=>Some(other)
+  })
+
   private def mappingToLightboxes(value:Seq[Map[String,String]]) =
     value.map(entry=>
       LightboxIndex(entry("owner"),
         //if you don't do this, an original value of None becomes Some(null), which is not pleasant...
-        entry.get("avatarUrl").flatMap({
-          case null=>None
-          case other=>Some(other)
-        }),
+        safeGetOptional(entry, "avatarUrl"),
         ZonedDateTime.parse(entry("addedAt"), DateTimeFormatter.ISO_DATE_TIME),
-        entry.get("memberOfBulk"))
+        safeGetOptional(entry, "memberOfBulk")
+      )
     )
 
   implicit object ArchiveEntryHR extends HitReader[ArchiveEntry] {
