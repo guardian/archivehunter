@@ -27,7 +27,6 @@ class BulkSelectionsScroll extends React.Component {
 
     extractNameAndPathArray(str) {
         const result = BulkSelectionsScroll.nameExtractor.exec(str);
-        console.log(str, result);
         if(result){
             return ({name: result[1], pathArray: result[2].split("/")})
         } else {
@@ -40,7 +39,6 @@ class BulkSelectionsScroll extends React.Component {
             {
                 this.props.entries.map((entry,idx)=>{
                     const bulkInfo = this.extractNameAndPathArray(entry.description);
-                    //console.log(bulkInfo);
                     const baseClasses = "entry-view bulk-selection-view clickable";
                     const classList = this.props.currentSelection === entry.id ? baseClasses + " entry-thumbnail-shadow" : baseClasses;
 

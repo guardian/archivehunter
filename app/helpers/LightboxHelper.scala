@@ -57,14 +57,14 @@ object LightboxHelper {
 
   /**
     * update the index entry for the given item to show that it has been lightboxed.
-    * @param userProfile
-    * @param userAvatarUrl
-    * @param indexEntry
-    * @param lightboxEntryDAO
-    * @param esClient
-    * @param indexer
-    * @param ec
-    * @return
+    * @param userProfile profile for the user that is doing the lightboxing.
+    * @param userAvatarUrl URL for the user's avatar. this is added into the index to improve performance in the UI by preventing the need for extra lookups
+    * @param indexEntry ArchiveEntry representing the item being lightboxed
+    * @param bulkId If the item is being added as part of a bulk set, this should contain the ID of the bulk set, otherwise it's None
+    * @param esClient implicitly provided ElasticSearch HttpClient
+    * @param indexer implicitly provided Indexer instance
+    * @param ec implicitly provided Execution Context
+    * @return a Future, containing Success with the updated index item's ID or a Failure if something broke.
     */
   def updateIndexLightboxed(userProfile:UserProfile, userAvatarUrl:Option[String], indexEntry:ArchiveEntry, bulkId:Option[String])(implicit esClient:HttpClient, indexer:Indexer, ec:ExecutionContext) = {
     val lbIndex = LightboxIndex(userProfile.userEmail,userAvatarUrl, ZonedDateTime.now(), bulkId)
@@ -74,6 +74,14 @@ object LightboxHelper {
     indexer.indexSingleItem(updatedEntry,Some(updatedEntry.id))
   }
 
+  /**
+    * internal method, return an Akka Streams Source for the given ES query
+    * @param indexName ElasticSearch index to query
+    * @param queryParams Elastic4s QueryDefinition describing the query to perform
+    * @param esClient implicitly provided Elastic4s HttpClient
+    * @param actorRefFactory implicitly provided ActorRefFactory, get this from an ActorSystem
+    * @return a Source that yields SearchHit entries.  Connect this to SearchHitToArchiveEntryFlow to convert to domain objects.
+    */
   protected def getElasticSource(indexName:String, queryParams:QueryDefinition)(implicit esClient:HttpClient, actorRefFactory:ActorRefFactory) = {
     val publisher = esClient.publisher(search(indexName) query queryParams scroll "1m")
     Source.fromPublisher(publisher)
@@ -100,6 +108,17 @@ object LightboxHelper {
     }).async.toMat(Sink.reduce[Long]((acc, entry)=>acc+entry))(Keep.right).run()
   }
 
+  /**
+    * check the total size of a bulk restore before carrying it out.
+    * @param indexName index name to search
+    * @param userProfile user doing the restore
+    * @param searchReq SearchRequest object with the parameters describing the bulk search
+    * @param esClient implicitly provided ElasticSearch HttpClient
+    * @param actorRefFactory implicitly provided ActorRefFactory, from ActorSystem
+    * @param materializer implicitly provided ActorMaterializer
+    * @param ec implicitly provided ExecutionContext
+    * @return a Future, with either a QuotaExceededResponse indicating that the restore should not be allowed or a Long indicating that it should, and giving the total size in Mb of the restore.
+    */
   def testBulkAddSize(indexName:String, userProfile: UserProfile, searchReq:SearchRequest)(implicit esClient:HttpClient, actorRefFactory:ActorRefFactory, materializer:Materializer, ec:ExecutionContext) = {
     logger.info(s"Checking size of $searchReq")
     LightboxHelper.getTotalSizeOfSearch(indexName,searchReq)
@@ -162,6 +181,19 @@ object LightboxHelper {
     })
   }
 
+  /**
+    * removes the contents of the provided LightboxBulkEntry from the lightbox of the provided user
+    * @param indexName index name to search
+    * @param userProfile user that is being updated
+    * @param bulk LightboxBulkEntry that is being removed
+    * @param lightboxEntryDAO
+    * @param system
+    * @param esClient
+    * @param indexer
+    * @param mat
+    * @param ec
+    * @return a Future, containing an Int of the number of items removed
+    */
   def removeBulkContents(indexName:String, userProfile:UserProfile, bulk:LightboxBulkEntry)
                         (implicit lightboxEntryDAO: LightboxEntryDAO, system:ActorSystem, esClient:HttpClient, indexer:Indexer, mat:Materializer, ec:ExecutionContext) = {
     val dynamoSaveSink = new RemoveLightboxEntrySink(userProfile.userEmail)

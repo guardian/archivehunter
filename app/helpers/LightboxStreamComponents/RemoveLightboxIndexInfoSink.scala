@@ -27,7 +27,6 @@ class RemoveLightboxIndexInfoSink (userEmail:String)(implicit esClient:HttpClien
         override def onPush(): Unit = {
           val elem = grab(in)
 
-          println(elem.toString)
           val updatedElem = elem.copy(lightboxEntries = elem.lightboxEntries.filter(_.owner!=userEmail))
           //TODO: this could be improved by converting this to a Flow and then using an existing Elastic4s bulk consumer to write the index in bulk.
           Await.ready(indexer.indexSingleItem(updatedElem).map({

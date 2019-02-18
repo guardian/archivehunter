@@ -46,9 +46,6 @@ class MyLightbox extends CommonSearchView {
             const loginDetailsResult = results[2];  //this is a map of key->value
             const bulkSelectionsResult = results[3];    //this is an object with "entries" and "entryCount" fields
 
-            // console.log("detailsResult: ", detailsResult);
-            // console.log("summaryResult: ", summaryResult);
-
             this.setState({loading: false,
                 lastError: null,
                 searchResults: summaryResult.data.entries.map(currentEntry=>

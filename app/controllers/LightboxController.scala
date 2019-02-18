@@ -285,15 +285,10 @@ class LightboxController @Inject() (override val config:Configuration,
             if(entry.userEmail==profile.userEmail || profile.isAdmin) {
               logger.info(s"Removing bulk entries for request $entry")
               LightboxHelper.removeBulkContents(indexName, profile, entry).flatMap(count=> {
-                //if(count>0) {
                   logger.info(s"Deleting bulk request $entry")
                   lightboxBulkEntryDAO.delete(entryId).map(_ => {
                     Ok(GenericErrorResponse("ok", "item deleted").asJson)
                   })
-//                } else {
-//                  logger.warn(s"DEBUG - no entries deleted, so not removing LB entry either.")
-//                  Future(Ok(GenericErrorResponse("ok","operation completed without error but nothing removed").asJson))
-//                }
               }).recover({
                 case err: Throwable =>
                   logger.error("Could not delete record from dynamo: ", err)

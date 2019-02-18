@@ -63,7 +63,6 @@ class UserList extends React.Component {
     }
 
     userCollectionsUpdated(entry, newValue){
-        //console.log("userCollectionsUpdated", entry, newValue);
         const updateRq = {
             user: entry.userEmail,
             fieldName: "VISIBLE_COLLECTIONS",
