@@ -22,7 +22,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito{
   "ProxyFrameworkQueue!HandleSuccessfulProxy" should {
     "call updateProxyRef, then update the database and return success" in new AkkaTestkitSpecs2Support {
       implicit val ec: ExecutionContext = system.dispatcher
-      val mockedJd = new JobModel("fake-job-id","PROXY",None,None,JobStatus.ST_PENDING,None,"fake-source",None,SourceType.SRC_MEDIA)
+      val mockedJd = new JobModel("fake-job-id","PROXY",None,None,JobStatus.ST_PENDING,None,"fake-source",None,SourceType.SRC_MEDIA,None)
 
       val mockedJobModelDAO = mock[JobModelDAO]
       mockedJobModelDAO.putJob(any) returns Future(None)
@@ -58,7 +58,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito{
 
       toTest ! fakeMessage
 
-      testProbe.expectMsg(10 seconds, akka.actor.Status.Success())
+      testProbe.expectMsg(10 seconds, akka.actor.Status.Success)
       there was one(mockedUpdateProxyRef).apply("output-uri",mockedArchiveEntry, ProxyType.VIDEO)
       there was one(mockedJobModelDAO).putJob(any)
       there was one(mockedSqsClient).deleteMessage(any)
@@ -66,7 +66,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito{
 
     "return failure and not delete message if media lookup fails" in new AkkaTestkitSpecs2Support {
       implicit val ec: ExecutionContext = system.dispatcher
-      val mockedJd = new JobModel("fake-job-id","PROXY",None,None,JobStatus.ST_PENDING,None,"fake-source",None,SourceType.SRC_MEDIA)
+      val mockedJd = new JobModel("fake-job-id","PROXY",None,None,JobStatus.ST_PENDING,None,"fake-source",None,SourceType.SRC_MEDIA,None)
 
       val mockedJobModelDAO = mock[JobModelDAO]
       mockedJobModelDAO.putJob(any) returns Future(None)
@@ -113,7 +113,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito{
   "ProxyFrameworkQueue!HandleRunning" should {
     "update the database record and delete the SQS message" in new AkkaTestkitSpecs2Support {
       implicit val ec: ExecutionContext = system.dispatcher
-      val mockedJd = new JobModel("fake-job-id","PROXY",None,None,JobStatus.ST_PENDING,None,"fake-source",None,SourceType.SRC_MEDIA)
+      val mockedJd = new JobModel("fake-job-id","PROXY",None,None,JobStatus.ST_PENDING,None,"fake-source",None,SourceType.SRC_MEDIA,None)
 
       val mockedJobModelDAO = mock[JobModelDAO]
       mockedJobModelDAO.putJob(any) returns Future(None)
@@ -147,14 +147,14 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito{
 
       toTest ! fakeMessage
 
-      testProbe.expectMsg(10 seconds, akka.actor.Status.Success())
+      testProbe.expectMsg(10 seconds, akka.actor.Status.Success)
       there was one(mockedJobModelDAO).putJob(any)
       there was one(mockedSqsClient).deleteMessage(any)
     }
 
     "not delete the SQS message if database write fails" in new AkkaTestkitSpecs2Support {
       implicit val ec: ExecutionContext = system.dispatcher
-      val mockedJd = new JobModel("fake-job-id","PROXY",None,None,JobStatus.ST_PENDING,None,"fake-source",None,SourceType.SRC_MEDIA)
+      val mockedJd = new JobModel("fake-job-id","PROXY",None,None,JobStatus.ST_PENDING,None,"fake-source",None,SourceType.SRC_MEDIA,None)
 
       val mockedJobModelDAO = mock[JobModelDAO]
       mockedJobModelDAO.putJob(any) returns Future(Some(Left(NoPropertyOfType("something",new AttributeValue()))))
