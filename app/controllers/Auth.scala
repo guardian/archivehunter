@@ -33,7 +33,7 @@ class Auth @Inject() (
     * @return
     */
   def registerUser(u:AuthenticatedUser):Future[Either[String,UserProfile]] = {
-    val newRecord = UserProfile(u.user.email,isAdmin = false, visibleCollections = Seq(), allCollectionsVisible = true)
+    val newRecord = UserProfile(u.user.email,isAdmin = false, visibleCollections = Seq(), allCollectionsVisible = true, perRestoreQuota = None)
     userProfileDAO.put(newRecord).map({
       case None=>
         Right(newRecord)

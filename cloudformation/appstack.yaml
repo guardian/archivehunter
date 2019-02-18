@@ -222,6 +222,35 @@ Resources:
             WriteCapacityUnits: 1
             ReadCapacityUnits: 4
 
+  LightboxBulkEntryTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: userEmail
+          AttributeType: S
+        - AttributeName: description
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      ProvisionedThroughput:
+        WriteCapacityUnits: 1
+        ReadCapacityUnits: 4
+      GlobalSecondaryIndexes:
+        - IndexName: DescIndex
+          KeySchema:
+            - AttributeName: description
+              KeyType: HASH
+            - AttributeName: userEmail
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+          ProvisionedThroughput:
+            WriteCapacityUnits: 1
+            ReadCapacityUnits: 2
+
   JobHistoryTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -651,6 +680,8 @@ Resources:
             - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${LightboxTable}/index/*
             - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ProxyFrameworkTable}
             - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ProxyFrameworkTable}/index/*
+            - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${LightboxBulkEntryTable}
+            - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${LightboxBulkEntryTable}/index/*
       - PolicyName: TranscoderAccess
         PolicyDocument:
           Version: 2012-10-17
@@ -884,6 +915,7 @@ Resources:
 
           lightbox {
             tableName = "${LightboxTable}"
+            bulkTableName = "${LightboxBulkEntryTable}"
           }
 
           elasticsearch {

@@ -66,6 +66,17 @@ class UserController @Inject()(override val controllerComponents:ControllerCompo
       case Some(otherStr)=>Left(s"$otherStr is not a recognised value. Try 'true' or 'false'.")
     }
 
+  protected def getSingleLongValue(rq:UserProfileFieldUpdate):Either[String,Long] = {
+    try {
+      rq.stringValue.map(_.toInt) match {
+        case Some(value) => Right(value)
+        case None => Left("No value was provided")
+      }
+    } catch {
+      case ex:Throwable=>
+        Left(s"Could not convert ${rq.stringValue} to integer: ${ex.toString}")
+    }
+  }
 
   /**
     * updates an existing list with the listValue field in the request, based on the `operation` field of the request
@@ -105,6 +116,8 @@ class UserController @Inject()(override val controllerComponents:ControllerCompo
         getSingleBoolValue(rq).map(newValue=>originalProfile.copy(allCollectionsVisible = newValue))
       case UserProfileField.VISIBLE_COLLECTIONS=>
         updateStringList(rq, originalProfile.visibleCollections).map(newValue=>originalProfile.copy(visibleCollections = newValue))
+      case UserProfileField.PER_RESTORE_QUOTA=>
+        getSingleLongValue(rq).map(newValue=>originalProfile.copy(perRestoreQuota = Some(newValue)))
     }
   }
 

@@ -425,7 +425,7 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
           }
       }).recover({
         case err:Throwable=>
-          logger.error(s"Could not look up job for $msg in database", err)
+          logger.error(s"Could not look up job for $msg in database: ${err.toString}", err)
       })
     case other:GenericSqsActor.SQSMsg => handleGeneric(other)
   }

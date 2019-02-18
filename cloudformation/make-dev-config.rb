@@ -34,7 +34,8 @@ $settings_mapping = {
     "proxyFramework.trackingTable" => "ProxyFrameworkTable",
     "proxies.tableName"=> "ProxyLocationTable",
     "ingest.notificationsQueue" => "IngestTranscodeMsg",
-    "lightbox.tableName" => "LightboxTable"
+    "lightbox.tableName" => "LightboxTable",
+    "lightbox.bulkTableName" => "LightboxBulkEntryTable"
 }
 
 

@@ -1,7 +1,7 @@
 package models
 
 object UserProfileField extends Enumeration {
-  val IS_ADMIN,VISIBLE_COLLECTIONS,ALL_COLLECTIONS = Value
+  val IS_ADMIN,VISIBLE_COLLECTIONS,ALL_COLLECTIONS,PER_RESTORE_QUOTA = Value
 }
 
 /**
@@ -10,5 +10,6 @@ object UserProfileField extends Enumeration {
   * @param isAdmin boolean indicating whether this user has admin rights. If false, some operations are denied
   * @param visibleCollections list of collections that the user is allowed to see
   * @param allCollectionsVisible boolean indicating whether to ignore the `visibleCollections` list and show everything.
+  * @param perRestoreQuota maximum size of restore that this user is able to perform, in Mb. If not present then the user is not allowed to restore.
   */
-case class UserProfile (userEmail:String, isAdmin:Boolean, visibleCollections:Seq[String], allCollectionsVisible: Boolean)
+case class UserProfile (userEmail:String, isAdmin:Boolean, visibleCollections:Seq[String], allCollectionsVisible: Boolean, perRestoreQuota:Option[Long])

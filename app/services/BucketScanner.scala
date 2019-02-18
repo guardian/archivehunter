@@ -119,7 +119,7 @@ class BucketScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientMan
       }
     },batchSize=100,concurrentRequests=5,completionFn = ()=>{
       //the promise may have already been completed by the errorFn below
-      if(!completionPromise.isCompleted) completionPromise.complete(Success())
+      if(!completionPromise.isCompleted) completionPromise.complete(Success(()))
       ()
     },errorFn = (err:Throwable)=>{
       logger.error("Could not send to elasticsearch", err)

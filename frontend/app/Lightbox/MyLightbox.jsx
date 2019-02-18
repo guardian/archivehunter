@@ -6,6 +6,7 @@ import SearchResultsComponent from "../search/SearchResultsComponent.jsx";
 import CommonSearchView from "../common/CommonSearchView.jsx";
 import LightboxInfoInsert from "./LightboxInfoInsert.jsx";
 import AvailabilityInsert from "./AvailabilityInsert.jsx";
+import BulkSelectionsScroll from "./BulkSelectionsScroll.jsx";
 
 class MyLightbox extends CommonSearchView {
     constructor(props){
@@ -17,17 +18,25 @@ class MyLightbox extends CommonSearchView {
             searchResults: [],
             userDetails: null,
             showingPreview: null,
-            extraInfo: ""
+            extraInfo: "",
+            bulkSelections: [],
+            bulkSelectionsCount: 0,
+            bulkSelectionSelected: null
         };
 
         this.checkArchiveStatus = this.checkArchiveStatus.bind(this);
+        this.bulkSelectionChanged = this.bulkSelectionChanged.bind(this);
+        this.reloadSearch = this.reloadSearch.bind(this);
+        this.bulkSearchDeleteRequested = this.bulkSearchDeleteRequested.bind(this);
+
     }
 
     performLoad(){
         const detailsRequest = axios.get("/api/lightbox/my/details");
         const summaryRequest = axios.get("/api/search/myLightBox");
         const loginDetailsRequest = axios.get("/api/loginStatus");
-        return Promise.all([detailsRequest, summaryRequest, loginDetailsRequest]);
+        const bulkSelectionsRequest = axios.get("/api/lightbox/my/bulks");
+        return Promise.all([detailsRequest, summaryRequest, loginDetailsRequest, bulkSelectionsRequest]);
     }
 
     refreshData(){
@@ -35,9 +44,7 @@ class MyLightbox extends CommonSearchView {
             const detailsResult = results[0];   //this is a map of fileId->record
             const summaryResult = results[1];   //this is an array
             const loginDetailsResult = results[2];  //this is a map of key->value
-
-            // console.log("detailsResult: ", detailsResult);
-            // console.log("summaryResult: ", summaryResult);
+            const bulkSelectionsResult = results[3];    //this is an object with "entries" and "entryCount" fields
 
             this.setState({loading: false,
                 lastError: null,
@@ -46,7 +53,9 @@ class MyLightbox extends CommonSearchView {
                         {details: detailsResult.data.entries.hasOwnProperty(currentEntry.id) ? detailsResult.data.entries[currentEntry.id] : null}
                         )
                 ),
-                userDetails: loginDetailsResult.data
+                userDetails: loginDetailsResult.data,
+                bulkSelections: bulkSelectionsResult.data.entries,
+                bulkSelectionsCount: bulkSelectionsResult.data.entryCount
             })
         }).catch(err=>{
             console.error(err);
@@ -54,8 +63,53 @@ class MyLightbox extends CommonSearchView {
         }))
     }
 
+    reloadSearch(){
+        const detailsRequest = axios.get("/api/lightbox/my/details");
+        const searchUrl = this.state.bulkSelectionSelected ? "/api/search/myLightBox?bulkId=" + this.state.bulkSelectionSelected : "/api/search/myLightbox";
+        const searchRequest = axios.get(searchUrl);
+
+        const loadingPromise = Promise.all([detailsRequest, searchRequest]);
+
+        this.setState({searchResults:[], loading: true, lastError:null}, ()=>loadingPromise.then(results=>{
+            const detailsResult = results[0];
+            const searchResult = results[1];
+
+            this.setState({
+                loading: false,
+                lastError: null,
+                searchResults: searchResult.data.entries.map(currentEntry=>
+                    Object.assign({}, currentEntry,
+                        {details: detailsResult.data.entries.hasOwnProperty(currentEntry.id) ? detailsResult.data.entries[currentEntry.id] : null}
+                    )
+                )
+            })
+        }).catch(err=>{
+            console.error(err);
+            this.setState({lastError: err})
+        }))
+    }
+
+    bulkSearchDeleteRequested(entryId){
+        axios.delete("/api/lightbox/bulk/" + entryId).then(response=>{
+            console.log("lightbox entry " + entryId + " deleted.");
+            const updatedSelected = this.state.bulkSelectionSelected===entryId ? null : this.state.bulkSelectionSelected;
+
+            this.setState({
+                bulkSelections: this.state.bulkSelections.filter(entry=>entry.id !== entryId),
+                bulkSelectionSelected: updatedSelected
+            }, this.reloadSearch)
+        }).catch(err=>{
+            console.error(err);
+            this.setState({lastError: err});
+        })
+    }
+
     componentWillMount(){
         this.refreshData();
+    }
+
+    bulkSelectionChanged(newValue){
+        this.setState({bulkSelectionSelected: newValue}, this.reloadSearch);
     }
 
     shouldHideAvailability(entry){
@@ -132,6 +186,10 @@ class MyLightbox extends CommonSearchView {
                     } Lightbox
                 </h1>
             </div>
+            <BulkSelectionsScroll entries={this.state.bulkSelections}
+                                  onSelected={this.bulkSelectionChanged}
+                                  onDeleteClicked={this.bulkSearchDeleteRequested}
+                                  currentSelection={this.state.bulkSelectionSelected}/>
             <EntryDetails entry={this.state.showingPreview}
                           autoPlay={this.state.autoPlay}
                           showJobs={true}

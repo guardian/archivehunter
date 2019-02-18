@@ -38,6 +38,7 @@
     <logger name="services.AppStartup" level="INFO"/>
     <logger name="services.BucketScanner" level="INFO"/>
     <logger name="akka.cluster" level="ERROR"/>
+    <logger name="helpers.LightboxStreamComponents" level="INFO"/>
     <logger name="helpers.S3ToArchiveEntryFlow" level="WARN"/>
     <logger name="helpers.SearchHitToArchiveEntryFlow" level="WARN"/>
     <logger name="helpers.ArchiveEntryVerifyFlow" level="WARN"/>
@@ -81,6 +82,8 @@
     <logger name="com.theguardian.multimedia.archivehunter.cmn_services.ProxyGenerators" level="INFO"/>
     <logger name="com.theguardian.multimedia.archivehunter.common.ProxyLocation$" level="INFO"/>
 
+    <logger name="helpers.LightboxHelper$" level="INFO"/>
+    <logger name="helpers.LightboxHelper" level="INFO"/>
     <root level="WARN">
         <appender-ref ref="STDOUT" />
         <appender-ref ref="ASYNCFILE"/>

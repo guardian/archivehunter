@@ -131,11 +131,16 @@ with PanDomainAuthActions {
     })
   }
 
-  def lightboxSearch(startAt:Int, pageSize:Int) = APIAuthAction.async {request=>
+  def lightboxSearch(startAt:Int, pageSize:Int, bulkId:Option[String]) = APIAuthAction.async {request=>
+    val queryTerms = Seq(
+      Some(matchQuery("lightboxEntries.owner", request.user.email)),
+      bulkId.map(actualBulkId=>matchQuery("lightboxEntries.memberOfBulk", actualBulkId))
+    ).collect({case Some(term)=>term})
+
     esClient.execute {
       search(indexName) query {
         nestedQuery(path="lightboxEntries", query = {
-          matchQuery("lightboxEntries.owner", request.user.email)
+          boolQuery().must(queryTerms)
         })
       } from startAt size pageSize sortBy fieldSort("path.keyword")
     }.map({
@@ -143,6 +148,7 @@ with PanDomainAuthActions {
         logger.error(s"Could not perform lightbox query: $err")
         InternalServerError(GenericErrorResponse("search_error", err.toString).asJson)
       case Right(results)=>
+        results.result.to[ArchiveEntry].foreach(x=>println(x.toString))
         Ok(ObjectListResponse("ok","entry", results.result.to[ArchiveEntry], results.result.totalHits.toInt).asJson)
     }).recover({
       case err:Throwable=>
