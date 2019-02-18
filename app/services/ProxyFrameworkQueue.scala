@@ -438,7 +438,7 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
           logger.debug(s"jobType: ${jobDesc.jobType} jobReportStatus: ${msg.status}")
 
           if(isMessageOutOfDate(jobDesc.lastUpdatedTS, msg.timestamp)){
-            logger.info(s"Received outdated message update: job had ${jobDesc.lastUpdatedTS}, message had $maybeTimestamp")
+            logger.info(s"Received outdated message update: job had ${jobDesc.lastUpdatedTS}, message had ${msg.timestamp}")
             sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle(receiptHandle))
           } else {
             val updatedJobDesc = if(msg.timestamp.isDefined) jobDesc.copy(lastUpdatedTS = msg.timestamp) else jobDesc
