@@ -149,9 +149,9 @@ class InputLambdaMainSpec extends Specification with Mockito with ZonedDateTimeE
       val mockRecord = mock[S3EventNotification.S3EventNotificationRecord]
       mockRecord.getS3 returns mockEntity
 
-      val job1 = JobModel("test-job-1","RESTORE",Some(ZonedDateTime.now()),None,JobStatus.ST_PENDING,None,"test-source-id",None,SourceType.SRC_MEDIA)
-      val job2 = JobModel("test-job-2","TRANSCODE",Some(ZonedDateTime.now()),None,JobStatus.ST_RUNNING,None,"test-source-id",None,SourceType.SRC_MEDIA)
-      val job3 = JobModel("test-job-3","RESTORE",Some(ZonedDateTime.now()),None,JobStatus.ST_PENDING,None,"test-source-id",None,SourceType.SRC_MEDIA)
+      val job1 = JobModel("test-job-1","RESTORE",Some(ZonedDateTime.now()),None,JobStatus.ST_PENDING,None,"test-source-id",None,SourceType.SRC_MEDIA, None)
+      val job2 = JobModel("test-job-2","TRANSCODE",Some(ZonedDateTime.now()),None,JobStatus.ST_RUNNING,None,"test-source-id",None,SourceType.SRC_MEDIA, None)
+      val job3 = JobModel("test-job-3","RESTORE",Some(ZonedDateTime.now()),None,JobStatus.ST_PENDING,None,"test-source-id",None,SourceType.SRC_MEDIA, None)
 
       mockDao.jobsForSource("test-source-id") returns Future(List(Right(job1),Right(job2),Right(job3)))
       mockDao.putJob(any[JobModel]) returns Future(None)
