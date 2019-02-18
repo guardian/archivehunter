@@ -64,7 +64,7 @@ def filter_unparseable(msg_list)
 end
 
 # push the list of messages to the source queue_url, and delete each one as it is successfully pushed
-def push_to_source(client, queue_url, source_queue_url, msgList)
+def push_to_source(client, queue_url, source_queue_url, msgList, keep=false)
   # SQS supports only bulks of up to 10 messages
 
   msgList.each_slice(10) do |msgSubList|
@@ -81,7 +81,7 @@ def push_to_source(client, queue_url, source_queue_url, msgList)
     successful_messages.each { |entry|
       puts("debug: deleting message #{entry.message_id}; #{entry.receipt_handle} from #{source_queue_url}")
       client.delete_message({queue_url: source_queue_url, receipt_handle: entry.receipt_handle})
-    }
+    } if(!keep)
   end
 end
 
@@ -92,6 +92,7 @@ opts = Optimist::options do
   opt :limit, "limit to this number of messages", :type=>:integer, :default=>999999
   opt :pagesize,"shift this many messages at a time", :type=>:integer, :default=>30
   opt :region, "work in this region", :type=>:string, :default=>"eu-west-1"
+  opt :keep, "don't delete messages from the DLQ after copying. Intended for use in testing.", :type=>:boolean, :default=>false
 end
 
 client = Aws::SQS::Client.new({:region=>opts.region})
@@ -107,7 +108,7 @@ while ctr<=opts.limit
   puts("Received #{msgList.length} messages")
   ctr+=msgList.length
   break if msgList.length==0
-  push_to_source(client,target_url, dlq_url, msgList)
+  push_to_source(client,target_url, dlq_url, msgList, keep: opts.keep)
 end
 
 puts("Relayed #{ctr} messages with a limit of #{opts.limit}")

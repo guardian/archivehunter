@@ -18,9 +18,9 @@ object SourceType extends Enumeration {
 case class JobModel (jobId:String, jobType:String, startedAt: Option[ZonedDateTime],
                      completedAt: Option[ZonedDateTime], jobStatus: JobStatus.Value,
                      log:Option[String], sourceId:String, transcodeInfo: Option[TranscodeInfo],
-                     sourceType: SourceType.Value, lastUpdatedTS: Option[Long])
+                     sourceType: SourceType.Value, lastUpdatedTS: Option[ZonedDateTime])
 
-object JobModel extends ((String, String, Option[ZonedDateTime], Option[ZonedDateTime], JobStatus.Value, Option[String], String, Option[TranscodeInfo], SourceType.Value, Option[Long])=>JobModel) {
+object JobModel extends ((String, String, Option[ZonedDateTime], Option[ZonedDateTime], JobStatus.Value, Option[String], String, Option[TranscodeInfo], SourceType.Value, Option[ZonedDateTime])=>JobModel) {
   /**
     * shortcut constructor that sets defaults for most options
     * @param jobType
