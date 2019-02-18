@@ -680,6 +680,8 @@ Resources:
             - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${LightboxTable}/index/*
             - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ProxyFrameworkTable}
             - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ProxyFrameworkTable}/index/*
+            - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${LightboxBulkEntryTable}
+            - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${LightboxBulkEntryTable}/index/*
       - PolicyName: TranscoderAccess
         PolicyDocument:
           Version: 2012-10-17
@@ -913,6 +915,7 @@ Resources:
 
           lightbox {
             tableName = "${LightboxTable}"
+            bulkTableName = "${LightboxBulkEntryTable}"
           }
 
           elasticsearch {

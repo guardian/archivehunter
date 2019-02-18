@@ -113,18 +113,23 @@ class ProxiesController @Inject()(override val config:Configuration,
           val expiration = new java.util.Date()
           expiration.setTime(expiration.getTime + (1000 * 60 * 60)) //expires in 1 hour
 
-          val meta = s3client.getObjectMetadata(proxyLocation.bucketName, proxyLocation.bucketPath)
-          val mimeType = MimeType.fromString(meta.getContentType) match {
-            case Left(str)=>
-              logger.warn(s"Could not get MIME type for s3://${proxyLocation.bucketName}/${proxyLocation.bucketPath}: $str")
-              MimeType("application","octet-stream")
-            case Right(t)=>t
+          if(s3client.doesObjectExist(proxyLocation.bucketName, proxyLocation.bucketPath)) {
+            val meta = s3client.getObjectMetadata(proxyLocation.bucketName, proxyLocation.bucketPath)
+            val mimeType = MimeType.fromString(meta.getContentType) match {
+              case Left(str) =>
+                logger.warn(s"Could not get MIME type for s3://${proxyLocation.bucketName}/${proxyLocation.bucketPath}: $str")
+                MimeType("application", "octet-stream")
+              case Right(t) => t
+            }
+            val rq = new GeneratePresignedUrlRequest(proxyLocation.bucketName, proxyLocation.bucketPath)
+              .withMethod(HttpMethod.GET)
+              .withExpiration(expiration)
+            val result = s3client.generatePresignedUrl(rq)
+            Ok(PlayableProxyResponse("ok", result.toString, mimeType).asJson)
+          } else {
+            logger.warn(s"Invalid proxy location: $proxyLocation does not point to an existing file")
+            NotFound(GenericErrorResponse("invalid_location",s"No proxy found for $proxyType on $fileId").asJson)
           }
-          val rq = new GeneratePresignedUrlRequest(proxyLocation.bucketName, proxyLocation.bucketPath)
-            .withMethod(HttpMethod.GET)
-            .withExpiration(expiration)
-          val result = s3client.generatePresignedUrl(rq)
-          Ok(PlayableProxyResponse("ok",result.toString,mimeType).asJson)
         case Some(Left(err))=>
           InternalServerError(GenericErrorResponse("db_error", err.toString).asJson)
       })
