@@ -25,7 +25,9 @@ object ProxyFrameworkQueue extends GenericSqsActorMessages {
   case class HandleTranscodingSetup(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
   case class HandleSuccessfulProxy(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
   case class HandleSuccessfulAnalyse(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
+
   case class HandleFailure(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
+  case class HandleWarning(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
   case class HandleRunning(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
 }
 
@@ -373,6 +375,24 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
           originalSender ! akka.actor.Status.Failure(err)
       })
 
+    case HandleWarning(msg, jobDesc, rq, receiptHandle, originalSender)=>
+      val updatedJd = jobDesc.copy(jobStatus = JobStatus.ST_WARNING, log = msg.decodedLog.map(_.fold(
+        err=>s"Could not decode job log ${msg.log}: $err",
+        logContent=>logContent
+      )))
+
+      jobModelDAO.putJob(updatedJd).onComplete({
+        case Success(Some(Left(err)))=>
+          logger.error(s"Could not update job model in database: ${err.toString}")
+          originalSender ! akka.actor.Status.Failure(new RuntimeException(s"Could not update job model in database: ${err.toString}"))
+        case Success(_)=>
+          sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle(receiptHandle))
+          originalSender ! akka.actor.Status.Success()
+        case Failure(err)=>
+          logger.error("Could not update job model in database", err)
+          originalSender ! akka.actor.Status.Failure(err)
+      })
+
     /**
       * if a proxy job failed, then record this in the database along with any decoded log
       */
@@ -421,6 +441,7 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
               case JobReportStatus.SUCCESS => ownRef ! HandleSuccess(msg, jobDesc, rq, receiptHandle, originalSender)
               case JobReportStatus.FAILURE => ownRef ! HandleFailure(msg, jobDesc, rq, receiptHandle, originalSender)
               case JobReportStatus.RUNNING => ownRef ! HandleRunning(msg, jobDesc, rq, receiptHandle, originalSender)
+              case JobReportStatus.WARNING => ownRef ! HandleWarning(msg, jobDesc, rq, receiptHandle, originalSender)
             }
           }
       }).recover({
