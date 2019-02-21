@@ -220,9 +220,14 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
         logger.error(s"Message $msg logged as success but had no 'output' field!")
         originalSender ! akka.actor.Status.Failure(new RuntimeException(s"Message logged as success but had no 'output' field!"))
       } else {
-        val proxyType = jobDesc.jobType.toLowerCase match {
-          case "thumbnail"=>ProxyType.THUMBNAIL
-          case "proxy"=>ProxyType.VIDEO //FIXME: need to get data from transcode framework to determine what this actually is
+        val proxyType = msg.proxyType match {
+          case Some(pt)=>pt
+          case None =>
+            logger.warn("No proxy type information from transcode framework, guessing based on job type")
+            jobDesc.jobType.toLowerCase match {
+              case "thumbnail" => ProxyType.THUMBNAIL
+              case "proxy" => ProxyType.VIDEO
+            }
         }
         val proxyUpdateFuture = thumbnailJobOriginalMedia(jobDesc).flatMap({
           case Left(err) => Future(Left(err))
@@ -239,15 +244,7 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
                 originalSender ! akka.actor.Status.Failure(dbErr)
             })
           case Right(_) =>
-            val updatedJd = jobDesc.copy(completedAt = Some(ZonedDateTime.now), jobStatus = JobStatus.ST_SUCCESS)
-            jobModelDAO.putJob(updatedJd).onComplete({
-              case Success(_) =>
-                //only delete the message here.  This will ensure that it's retried elsewhere if we fail.
-                sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle(receiptHandle))
-                originalSender ! akka.actor.Status.Success
-              case Failure(dbErr) =>
-                originalSender ! akka.actor.Status.Failure(dbErr)
-            })
+            ownRef ! HandleGenericSuccess(msg, jobDesc, rq, receiptHandle, originalSender)
         }).recover({
           case err:Throwable=>
             logger.error("Could not update proxy: ", err)
@@ -383,17 +380,55 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
         logContent=>logContent
       )))
 
-      jobModelDAO.putJob(updatedJd).onComplete({
-        case Success(Some(Left(err)))=>
-          logger.error(s"Could not update job model in database: ${err.toString}")
-          originalSender ! akka.actor.Status.Failure(new RuntimeException(s"Could not update job model in database: ${err.toString}"))
-        case Success(_)=>
-          sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle(receiptHandle))
-          originalSender ! akka.actor.Status.Success
-        case Failure(err)=>
-          logger.error("Could not update job model in database", err)
+      val proxyType = msg.proxyType match {
+        case Some(pt)=>pt
+        case None =>
+          logger.warn("No proxy type information from transcode framework, guessing based on job type")
+          jobDesc.jobType.toLowerCase match {
+            case "thumbnail" => ProxyType.THUMBNAIL
+            case "proxy" => ProxyType.VIDEO
+          }
+      }
+
+      val proxyUpdateFuture = msg.output match {
+        case Some(output) =>  //if msg.output is set, then we can still set the proxy even though the state is warning.
+          thumbnailJobOriginalMedia(jobDesc).flatMap({
+            case Left(err) => Future(Left(err))
+            case Right(archiveEntry) => updateProxyRef(msg.output.get, archiveEntry, proxyType)
+          })
+        case None => Future(Right(None))  //if there is no output there's nothing to update, but no failure either.
+      }
+
+      proxyUpdateFuture.map({
+        case Left(err) =>
+          logger.error(s"Could not update proxy: $err")
+          val updatedJd = jobDesc.copy(completedAt = Some(ZonedDateTime.now), log = Some(s"Could not update proxy: $err"), jobStatus = JobStatus.ST_ERROR)
+          jobModelDAO.putJob(updatedJd).onComplete({
+            case Success(_) =>
+              logger.error(s"could not update proxy: $err")
+              originalSender ! akka.actor.Status.Failure(new RuntimeException(s"Could not update proxy: $err"))
+            case Failure(dbErr) =>
+              logger.error(s"job table update failed: ", dbErr)
+              originalSender ! akka.actor.Status.Failure(dbErr)
+          })
+        case Right(_) =>
+          jobModelDAO.putJob(updatedJd).onComplete({
+            case Success(Some(Left(err)))=>
+              logger.error(s"Could not update job model in database: ${err.toString}")
+              originalSender ! akka.actor.Status.Failure(new RuntimeException(s"Could not update job model in database: ${err.toString}"))
+            case Success(_)=>
+              sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle(receiptHandle))
+              originalSender ! akka.actor.Status.Success()
+            case Failure(err)=>
+              logger.error("Could not update job model in database", err)
+              originalSender ! akka.actor.Status.Failure(err)
+          })
+      }).recover({
+        case err:Throwable=>
+          logger.error("Could not update proxy: ", err)
           originalSender ! akka.actor.Status.Failure(err)
       })
+
 
     /**
       * if a proxy job failed, then record this in the database along with any decoded log
