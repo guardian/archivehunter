@@ -9,6 +9,8 @@ class JobStatusIcon extends React.Component {
 
     render(){
         switch(this.props.status){
+            case "ST_WARNING":
+                return <span data-tip="Warning" data-for="jobslist-tooltip"><FontAwesomeIcon size="1.5x" icon="exclamation-triangle" style={{color:"yellow"}}/></span>;
             case "ST_PENDING":
                 return <span data-tip="Pending" data-for="jobslist-tooltip"><FontAwesomeIcon size="1.5x" icon="clock"/></span>;
             case "ST_RUNNING":

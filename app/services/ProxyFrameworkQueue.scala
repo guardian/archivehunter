@@ -375,7 +375,7 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
       })
 
     case HandleWarning(msg, jobDesc, rq, receiptHandle, originalSender)=>
-      val updatedJd = jobDesc.copy(jobStatus = JobStatus.ST_WARNING, log = msg.decodedLog.map(_.fold(
+      val updatedJd = jobDesc.copy(completedAt = Some(ZonedDateTime.now), jobStatus = JobStatus.ST_WARNING, log = msg.decodedLog.map(_.fold(
         err=>s"Could not decode job log ${msg.log}: $err",
         logContent=>logContent
       )))
