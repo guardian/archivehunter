@@ -135,7 +135,7 @@ class UserList extends React.Component {
     }
 
     static sortFunc(a,b){
-        return a.toString().localeCompare(b);
+        return a.userEmail.localeCompare(b.userEmail);
     }
 
     loadUsers(){

@@ -5,7 +5,7 @@ class FrontPage extends React.Component {
     render(){
         return <div className="centered">
             <h1 style={{textAlign: "center"}}>ArchiveHunter</h1>
-            <span className="login-icon"> <FontAwesomeIcon className="login-icon" size={70} icon="road"/></span>
+            <span className="login-icon"> <FontAwesomeIcon className="login-icon" size="10x" icon="road"/></span>
             <p style={{textAlign: "center"}}>Work In Progress</p>
         </div>
     }
