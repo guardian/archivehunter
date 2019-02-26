@@ -170,7 +170,7 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration,
       case RequestType.ANALYSE=>"analyse"
     }
 
-    val jobDesc = JobModel(jobUuid.toString,jobTypeString,Some(ZonedDateTime.now()),None,JobStatus.ST_PENDING,None,entry.id,None,SourceType.SRC_MEDIA)
+    val jobDesc = JobModel(jobUuid.toString,jobTypeString,Some(ZonedDateTime.now()),None,JobStatus.ST_PENDING,None,entry.id,None,SourceType.SRC_MEDIA,None)
     val uriToProxyFuture = getUriToProxy(entry)
 
     Future.sequence(Seq(targetFuture, uriToProxyFuture)).map(results=> {
@@ -258,7 +258,7 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration,
 
   def requestCheckJob(sourceBucket:String, destBucket:String, region:String) = {
     val jobUuid = UUID.randomUUID()
-    val jobDesc = JobModel(jobUuid.toString,"CheckSetup",Some(ZonedDateTime.now()),None,JobStatus.ST_PENDING,None,"none",None,SourceType.SRC_GLOBAL)
+    val jobDesc = JobModel(jobUuid.toString,"CheckSetup",Some(ZonedDateTime.now()),None,JobStatus.ST_PENDING,None,"none",None,SourceType.SRC_GLOBAL,None)
 
     val rq = RequestModel(RequestType.CHECK_SETUP,s"s3://$sourceBucket",destBucket,jobUuid.toString,None,None,None)
 
@@ -267,7 +267,7 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration,
 
   def requestPipelineCreate(inputBucket:String,outputBucket:String,region:String,force:Boolean) = {
     val jobUuid = UUID.randomUUID()
-    val jobDesc = JobModel(jobUuid.toString,"SetupTranscoding",Some(ZonedDateTime.now()),None,JobStatus.ST_PENDING,None,"none",None,SourceType.SRC_GLOBAL)
+    val jobDesc = JobModel(jobUuid.toString,"SetupTranscoding",Some(ZonedDateTime.now()),None,JobStatus.ST_PENDING,None,"none",None,SourceType.SRC_GLOBAL,None)
 
     val pipelineRequest = CreatePipeline(inputBucket,outputBucket)
     val rq = RequestModel(RequestType.SETUP_PIPELINE,"","",jobUuid.toString,Some(force),Some(pipelineRequest),None)
@@ -278,7 +278,7 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration,
   def requestMetadataAnalyse(entry:ArchiveEntry, defaultRegion:String) = {
     val jobUuid = UUID.randomUUID()
 
-    val jobDesc = JobModel(jobUuid.toString,"Analyse",Some(ZonedDateTime.now()), None, JobStatus.ST_PENDING, None, entry.id, None, SourceType.SRC_MEDIA)
+    val jobDesc = JobModel(jobUuid.toString,"Analyse",Some(ZonedDateTime.now()), None, JobStatus.ST_PENDING, None, entry.id, None, SourceType.SRC_MEDIA,None)
     val rq = RequestModel(RequestType.ANALYSE,s"s3://${entry.bucket}/${entry.path}","none",jobUuid.toString,None,None,None)
 
     saveNSend(jobDesc,rq, entry.region.getOrElse(defaultRegion), jobUuid.toString)

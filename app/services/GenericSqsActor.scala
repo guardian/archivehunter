@@ -1,9 +1,11 @@
 package services
 
+import java.time.{Instant, ZoneId, ZonedDateTime}
+
 import akka.actor.{Actor, ActorRef, ActorSystem, Status}
 import akka.stream.{ActorMaterializer, Materializer}
 import com.amazonaws.services.sqs.AmazonSQS
-import com.amazonaws.services.sqs.model.{DeleteMessageRequest, ReceiveMessageRequest}
+import com.amazonaws.services.sqs.model.{DeleteMessageRequest, Message, ReceiveMessageRequest}
 import com.theguardian.multimedia.archivehunter.common.ArchiveHunterConfiguration
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, SQSClientManager}
 import javax.inject.Inject
@@ -45,6 +47,13 @@ trait GenericSqsActor[MsgType] extends Actor {
 
   //override this when implementing, like this: io.circe.parser.parse(body).flatMap(_.as[MessageType])
   def convertMessageBody(body:String):Either[io.circe.Error,MsgType]
+
+  def timestampOfMessage(msg:Message):Option[Long] = {
+    msg.getAttributes.asScala.get("SentTimestamp").map(tsString=>{
+      logger.debug(s"Timestamp is $tsString")
+      tsString.toLong
+    })
+  }
 
   def handleGeneric(msg: SQSMsg) = msg match {
     //dispatched to pull all messages off the queue. This "recurses" by dispatching itself if there are messages left on the queue.

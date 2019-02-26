@@ -59,7 +59,8 @@ class JobPurgerActor @Inject() (config:Configuration, ddbClientMgr:DynamoClientM
         entry.get("log").flatMap(x=>Option(x.getS)),
         entry("sourceId").getS,
         None, //we don't need transcodeInfo here
-        SourceType.withName(entry("sourceType").getS)
+        SourceType.withName(entry("sourceType").getS),
+        entry.get("lastUpdatedTS").flatMap(x=>Option(x.getS)).map(timeString=>ZonedDateTime.parse(timeString, DateTimeFormatter.ISO_DATE_TIME))
       )
 
       val purgeTime = maybePurgeTime match {

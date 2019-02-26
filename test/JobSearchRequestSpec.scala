@@ -8,12 +8,12 @@ class JobSearchRequestSpec extends Specification with Mockito{
   "JobSearchRequest.makeIntersection" should {
     "return a list of the jobmodel instances that exist in all sets" in {
       val sampleList = List(
-        JobModel("job1","Restore",None,None,JobStatus.ST_ERROR,None,"source1",None,SourceType.SRC_MEDIA),
-        JobModel("job2","Proxy",None,None,JobStatus.ST_ERROR,None,"source2",None,SourceType.SRC_MEDIA),
-        JobModel("job3","Restore",None,None,JobStatus.ST_ERROR,None,"source3",None,SourceType.SRC_MEDIA),
-        JobModel("job4","Thumbnail",None,None,JobStatus.ST_ERROR,None,"source4",None,SourceType.SRC_MEDIA),
-        JobModel("job5","Thumbnail",None,None,JobStatus.ST_ERROR,None,"source5",None,SourceType.SRC_MEDIA),
-        JobModel("job6","Proxy",None,None,JobStatus.ST_ERROR,None,"source6",None,SourceType.SRC_MEDIA),
+        JobModel("job1","Restore",None,None,JobStatus.ST_ERROR,None,"source1",None,SourceType.SRC_MEDIA,None),
+        JobModel("job2","Proxy",None,None,JobStatus.ST_ERROR,None,"source2",None,SourceType.SRC_MEDIA,None),
+        JobModel("job3","Restore",None,None,JobStatus.ST_ERROR,None,"source3",None,SourceType.SRC_MEDIA,None),
+        JobModel("job4","Thumbnail",None,None,JobStatus.ST_ERROR,None,"source4",None,SourceType.SRC_MEDIA,None),
+        JobModel("job5","Thumbnail",None,None,JobStatus.ST_ERROR,None,"source5",None,SourceType.SRC_MEDIA,None),
+        JobModel("job6","Proxy",None,None,JobStatus.ST_ERROR,None,"source6",None,SourceType.SRC_MEDIA,None),
       )
 
       val resultsSeq = Seq(
@@ -31,12 +31,12 @@ class JobSearchRequestSpec extends Specification with Mockito{
 
     "not fail if there is no list tail to check" in {
       val sampleList = List(
-        JobModel("job1","Restore",None,None,JobStatus.ST_ERROR,None,"source1",None,SourceType.SRC_MEDIA),
-        JobModel("job2","Proxy",None,None,JobStatus.ST_ERROR,None,"source2",None,SourceType.SRC_MEDIA),
-        JobModel("job3","Restore",None,None,JobStatus.ST_ERROR,None,"source3",None,SourceType.SRC_MEDIA),
-        JobModel("job4","Thumbnail",None,None,JobStatus.ST_ERROR,None,"source4",None,SourceType.SRC_MEDIA),
-        JobModel("job5","Thumbnail",None,None,JobStatus.ST_ERROR,None,"source5",None,SourceType.SRC_MEDIA),
-        JobModel("job6","Proxy",None,None,JobStatus.ST_ERROR,None,"source6",None,SourceType.SRC_MEDIA),
+        JobModel("job1","Restore",None,None,JobStatus.ST_ERROR,None,"source1",None,SourceType.SRC_MEDIA,None),
+        JobModel("job2","Proxy",None,None,JobStatus.ST_ERROR,None,"source2",None,SourceType.SRC_MEDIA,None),
+        JobModel("job3","Restore",None,None,JobStatus.ST_ERROR,None,"source3",None,SourceType.SRC_MEDIA,None),
+        JobModel("job4","Thumbnail",None,None,JobStatus.ST_ERROR,None,"source4",None,SourceType.SRC_MEDIA,None),
+        JobModel("job5","Thumbnail",None,None,JobStatus.ST_ERROR,None,"source5",None,SourceType.SRC_MEDIA,None),
+        JobModel("job6","Proxy",None,None,JobStatus.ST_ERROR,None,"source6",None,SourceType.SRC_MEDIA,None),
       )
 
       val resultsSeq = Seq(
@@ -55,12 +55,12 @@ class JobSearchRequestSpec extends Specification with Mockito{
   "JobSearchRequest.gatherFailures" should {
     "collect any failures spread across multiple sets into a single list" in {
       val sampleList = List(
-        JobModel("job1","Restore",None,None,JobStatus.ST_ERROR,None,"source1",None,SourceType.SRC_MEDIA),
-        JobModel("job2","Proxy",None,None,JobStatus.ST_ERROR,None,"source2",None,SourceType.SRC_MEDIA),
-        JobModel("job3","Restore",None,None,JobStatus.ST_ERROR,None,"source3",None,SourceType.SRC_MEDIA),
-        JobModel("job4","Thumbnail",None,None,JobStatus.ST_ERROR,None,"source4",None,SourceType.SRC_MEDIA),
-        JobModel("job5","Thumbnail",None,None,JobStatus.ST_ERROR,None,"source5",None,SourceType.SRC_MEDIA),
-        JobModel("job6","Proxy",None,None,JobStatus.ST_ERROR,None,"source6",None,SourceType.SRC_MEDIA),
+        JobModel("job1","Restore",None,None,JobStatus.ST_ERROR,None,"source1",None,SourceType.SRC_MEDIA,None),
+        JobModel("job2","Proxy",None,None,JobStatus.ST_ERROR,None,"source2",None,SourceType.SRC_MEDIA,None),
+        JobModel("job3","Restore",None,None,JobStatus.ST_ERROR,None,"source3",None,SourceType.SRC_MEDIA,None),
+        JobModel("job4","Thumbnail",None,None,JobStatus.ST_ERROR,None,"source4",None,SourceType.SRC_MEDIA,None),
+        JobModel("job5","Thumbnail",None,None,JobStatus.ST_ERROR,None,"source5",None,SourceType.SRC_MEDIA,None),
+        JobModel("job6","Proxy",None,None,JobStatus.ST_ERROR,None,"source6",None,SourceType.SRC_MEDIA,None),
       )
 
       val mixedList:Seq[List[Either[DynamoReadError, JobModel]]] = Seq(
@@ -80,12 +80,12 @@ class JobSearchRequestSpec extends Specification with Mockito{
   "JobSearchRequest.gatherSuccess" should {
     "collect any job models spread across multiple sets into a set of lists" in {
       val sampleList = List(
-        JobModel("job1","Restore",None,None,JobStatus.ST_ERROR,None,"source1",None,SourceType.SRC_MEDIA),
-        JobModel("job2","Proxy",None,None,JobStatus.ST_ERROR,None,"source2",None,SourceType.SRC_MEDIA),
-        JobModel("job3","Restore",None,None,JobStatus.ST_ERROR,None,"source3",None,SourceType.SRC_MEDIA),
-        JobModel("job4","Thumbnail",None,None,JobStatus.ST_ERROR,None,"source4",None,SourceType.SRC_MEDIA),
-        JobModel("job5","Thumbnail",None,None,JobStatus.ST_ERROR,None,"source5",None,SourceType.SRC_MEDIA),
-        JobModel("job6","Proxy",None,None,JobStatus.ST_ERROR,None,"source6",None,SourceType.SRC_MEDIA),
+        JobModel("job1","Restore",None,None,JobStatus.ST_ERROR,None,"source1",None,SourceType.SRC_MEDIA,None),
+        JobModel("job2","Proxy",None,None,JobStatus.ST_ERROR,None,"source2",None,SourceType.SRC_MEDIA,None),
+        JobModel("job3","Restore",None,None,JobStatus.ST_ERROR,None,"source3",None,SourceType.SRC_MEDIA,None),
+        JobModel("job4","Thumbnail",None,None,JobStatus.ST_ERROR,None,"source4",None,SourceType.SRC_MEDIA,None),
+        JobModel("job5","Thumbnail",None,None,JobStatus.ST_ERROR,None,"source5",None,SourceType.SRC_MEDIA,None),
+        JobModel("job6","Proxy",None,None,JobStatus.ST_ERROR,None,"source6",None,SourceType.SRC_MEDIA,None),
       )
 
       val mixedList:Seq[List[Either[DynamoReadError, JobModel]]] = Seq(

@@ -31,6 +31,12 @@ object ProxyFrameworkQueue extends GenericSqsActorMessages {
   case class HandleRunning(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
 }
 
+trait ProxyFrameworkQueueFunctions extends ProxyTypeEncoder with JobReportStatusEncoder with MediaMetadataEncoder {
+  def convertMessageBody(body: String) =
+    AwsSqsMsg.fromJsonString(body).flatMap(snsMsg=>{
+      io.circe.parser.parse(snsMsg.Message).flatMap(_.as[JobReportNew]).map(_.copy(timestamp = Some(ZonedDateTime.parse(snsMsg.Timestamp))))
+    })
+}
 /**
   * Actor that handles messages returned via SQS from the Proxy Framework.  Successful processing ends with the message being
   * deleted from the queue; an error in processing means that the message will NOT be deleted. The hope is that whatever
@@ -58,7 +64,7 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
                                      scanTargetDAO: ScanTargetDAO,
                                      esClientMgr:ESClientManager
                                     )(implicit proxyLocationDAO: ProxyLocationDAO)
-  extends GenericSqsActor[JobReportNew] with ProxyTypeEncoder with JobReportStatusEncoder with MediaMetadataEncoder {
+  extends GenericSqsActor[JobReportNew] with ProxyFrameworkQueueFunctions {
   import ProxyFrameworkQueue._
   import GenericSqsActor._
 
@@ -83,10 +89,6 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
 
   lazy val defaultRegion = config.getOptional[String]("externalData.awsRegion").getOrElse("eu-west-1")
 
-  override def convertMessageBody(body: String) =
-    AwsSqsMsg.fromJsonString(body).flatMap(snsMsg=>{
-      io.circe.parser.parse(snsMsg.Message).flatMap(_.as[JobReportNew])
-    })
 
   /**
     * looks up the ArchiveEntry for the original media associated with the given JobModel
@@ -242,7 +244,7 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
               case Success(_) =>
                 //only delete the message here.  This will ensure that it's retried elsewhere if we fail.
                 sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle(receiptHandle))
-                originalSender ! akka.actor.Status.Success()
+                originalSender ! akka.actor.Status.Success
               case Failure(dbErr) =>
                 originalSender ! akka.actor.Status.Failure(dbErr)
             })
@@ -290,7 +292,7 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
         if(actualStatus==JobStatus.ST_ERROR){
           ownRef ! HandleFailure(msg, jobDesc, rq, receiptHandle, originalSender)
         } else {
-          originalSender ! akka.actor.Status.Success()
+          originalSender ! akka.actor.Status.Success
         }
       }
 
@@ -333,11 +335,11 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
         case None=>
           logger.info(s"Job ${jobDesc.jobId} updated")
           sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle(receiptHandle))
-          originalSender ! akka.actor.Status.Success()
+          originalSender ! akka.actor.Status.Success
         case Some(Right(mdl))=>
           logger.info(s"Job ${jobDesc.jobId} updated")
           sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle(receiptHandle))
-          originalSender ! akka.actor.Status.Success()
+          originalSender ! akka.actor.Status.Success
         case Some(Left(err))=>
           logger.error(s"Could not update job description: $err")
           originalSender ! akka.actor.Status.Failure(new RuntimeException(err.toString))
@@ -369,7 +371,7 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
           originalSender ! akka.actor.Status.Failure(new RuntimeException(s"Could not update job model in database: ${err.toString}"))
         case Success(_)=>
           sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle(receiptHandle))
-          originalSender ! akka.actor.Status.Success()
+          originalSender ! akka.actor.Status.Success
         case Failure(err)=>
           logger.error("Could not update job model in database", err)
           originalSender ! akka.actor.Status.Failure(err)
@@ -387,7 +389,7 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
           originalSender ! akka.actor.Status.Failure(new RuntimeException(s"Could not update job model in database: ${err.toString}"))
         case Success(_)=>
           sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle(receiptHandle))
-          originalSender ! akka.actor.Status.Success()
+          originalSender ! akka.actor.Status.Success
         case Failure(err)=>
           logger.error("Could not update job model in database", err)
           originalSender ! akka.actor.Status.Failure(err)
@@ -411,7 +413,7 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
           originalSender ! akka.actor.Status.Failure(new RuntimeException(s"Could not update job model in database: ${err.toString}"))
         case Success(_)=>
           sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle(receiptHandle))
-          originalSender ! akka.actor.Status.Success()
+          originalSender ! akka.actor.Status.Success
         case Failure(err)=>
           logger.error("Could not update job model in database", err)
           originalSender ! akka.actor.Status.Failure(err)
@@ -434,14 +436,22 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
         case Some(Right(jobDesc)) =>
           logger.debug(s"Got jobDesc $jobDesc")
           logger.debug(s"jobType: ${jobDesc.jobType} jobReportStatus: ${msg.status}")
-          if(jobDesc.jobType=="CheckSetup" || jobDesc.jobType=="SetupTranscoding"){
-            ownRef ! HandleCheckSetup(msg,jobDesc, rq, receiptHandle, originalSender)
+
+          if(isMessageOutOfDate(jobDesc.lastUpdatedTS, msg.timestamp)){
+            logger.info(s"Received outdated message update: job  ${jobDesc.jobId} had ${jobDesc.lastUpdatedTS}, message had ${msg.timestamp}")
+            sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle(receiptHandle))
           } else {
-            msg.status match {
-              case JobReportStatus.SUCCESS => ownRef ! HandleSuccess(msg, jobDesc, rq, receiptHandle, originalSender)
-              case JobReportStatus.FAILURE => ownRef ! HandleFailure(msg, jobDesc, rq, receiptHandle, originalSender)
-              case JobReportStatus.RUNNING => ownRef ! HandleRunning(msg, jobDesc, rq, receiptHandle, originalSender)
-              case JobReportStatus.WARNING => ownRef ! HandleWarning(msg, jobDesc, rq, receiptHandle, originalSender)
+            val updatedJobDesc = if(msg.timestamp.isDefined) jobDesc.copy(lastUpdatedTS = msg.timestamp) else jobDesc
+
+            if (updatedJobDesc.jobType == "CheckSetup" || updatedJobDesc.jobType == "SetupTranscoding") {
+              ownRef ! HandleCheckSetup(msg, updatedJobDesc, rq, receiptHandle, originalSender)
+            } else {
+              msg.status match {
+                case JobReportStatus.SUCCESS => ownRef ! HandleSuccess(msg, updatedJobDesc, rq, receiptHandle, originalSender)
+                case JobReportStatus.FAILURE => ownRef ! HandleFailure(msg, updatedJobDesc, rq, receiptHandle, originalSender)
+                case JobReportStatus.RUNNING => ownRef ! HandleRunning(msg, updatedJobDesc, rq, receiptHandle, originalSender)
+                case JobReportStatus.WARNING => ownRef ! HandleWarning(msg, updatedJobDesc, rq, receiptHandle, originalSender)
+              }
             }
           }
       }).recover({
@@ -449,5 +459,27 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
           logger.error(s"Could not look up job for $msg in database: ${err.toString}", err)
       })
     case other:GenericSqsActor.SQSMsg => handleGeneric(other)
+  }
+
+  /**
+    * check whether the given message is out of date, i.e. the db record has been updated by a message sent after this one.
+    * @param maybeJobLast timestamp of the last update message to the job
+    * @param maybeMsgTimestamp timestamp of this update message
+    * @return Boolean indicating whether the message is out of date. true if it is, and should be discarded; false if it should be procesed.
+    */
+  private def isMessageOutOfDate(maybeJobLast:Option[ZonedDateTime], maybeMsgTimestamp:Option[ZonedDateTime]) = {
+    maybeMsgTimestamp match {
+      case None=>
+        logger.warn("Got message with no timestamp? can't determine if message is outdated.")
+        false
+      case Some(msgTimestamp)=>
+        maybeJobLast match {
+          case None=>
+            logger.debug("Job has no timestamp, so we must be first")
+            false
+          case Some(jobLast)=>
+            msgTimestamp.isBefore(jobLast)
+        }
+    }
   }
 }
