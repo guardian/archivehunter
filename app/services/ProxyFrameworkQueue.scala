@@ -419,7 +419,7 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
           originalSender ! akka.actor.Status.Failure(err)
       })
 
-    case HandleDomainMessage(msg: JobReportNew, rq, receiptHandle, maybeTimestamp)=>
+    case HandleDomainMessage(msg: JobReportNew, rq, receiptHandle)=>
       logger.debug(s"HandleDomainMessage: $msg")
       val originalSender=sender()
       jobModelDAO.jobForId(msg.jobId).map({

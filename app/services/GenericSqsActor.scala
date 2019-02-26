@@ -27,7 +27,7 @@ object GenericSqsActor extends GenericSqsActorMessages {
   case class HandleNextSqsMessage(rq:ReceiveMessageRequest) extends SQSMsg
 
   /* implement this in an extending actor to be provided with decoded message */
-  case class HandleDomainMessage[T](msg:T, rq:ReceiveMessageRequest, receiptHandle:String, maybeTimestamp:Option[Long]) extends SQSMsg
+  case class HandleDomainMessage[T](msg:T, rq:ReceiveMessageRequest, receiptHandle:String) extends SQSMsg
 }
 
 trait GenericSqsActor[MsgType] extends Actor {
@@ -73,7 +73,7 @@ trait GenericSqsActor[MsgType] extends Actor {
               logger.error(s"Message was ${msg.getBody}")
               sender ! Status.Failure
             case Right(finalMsg)=>
-              ownRef ! HandleDomainMessage(finalMsg, rq, msg.getReceiptHandle, timestampOfMessage(msg))
+              ownRef ! HandleDomainMessage(finalMsg, rq, msg.getReceiptHandle)
           }
         })
         ownRef ! HandleNextSqsMessage(rq)

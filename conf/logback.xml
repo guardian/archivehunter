@@ -68,7 +68,7 @@
     <logger name="helpers.CreateProxySink" level="INFO"/>
     <logger name="services.BulkThumbnailer" level="INFO"/>
     <logger name="services.DynamoCapacityActor" level="INFO"/>
-    <logger name="services.ClockSingleton" level="DEBUG"/>
+    <logger name="services.ClockSingleton" level="INFO"/>
     <logger name="services.ETSProxyActor" level="INFO"/>
     <logger name="services.ProxiesRelinker" level="INFO"/>
     <logger name="helpers.ProxyVerifyFlow" level="INFO"/>
@@ -77,7 +77,7 @@
     <logger name="requests.JobSearchRequest" level="INFO"/>
 
     <logger name="helpers.ProxyFramework" level="INFO"/>
-    <logger name="services.ProxyFrameworkQueue" level="DEBUG"/>
+    <logger name="services.ProxyFrameworkQueue" level="INFO"/>
 
     <logger name="com.theguardian.multimedia.archivehunter.cmn_services.ProxyGenerators" level="INFO"/>
     <logger name="com.theguardian.multimedia.archivehunter.common.ProxyLocation$" level="INFO"/>

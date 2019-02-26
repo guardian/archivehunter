@@ -78,10 +78,12 @@ def push_to_source(client, queue_url, source_queue_url, msgList, keep=false)
     successful_messages = msgList.select { |entry| successful_ids.include?(entry.message_id)}
     #puts("debug: successful_messages: #{successful_messages}")
 
-    successful_messages.each { |entry|
-      puts("debug: deleting message #{entry.message_id}; #{entry.receipt_handle} from #{source_queue_url}")
-      client.delete_message({queue_url: source_queue_url, receipt_handle: entry.receipt_handle})
-    }
+    unless keep
+      successful_messages.each { |entry|
+        puts("debug: deleting message #{entry.message_id}; #{entry.receipt_handle} from #{source_queue_url}")
+        client.delete_message({queue_url: source_queue_url, receipt_handle: entry.receipt_handle})
+      }
+    end
   end
 end
 
