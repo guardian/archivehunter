@@ -7,6 +7,10 @@ import {Redirect} from 'react-router-dom';
 import ErrorViewComponent from "../common/ErrorViewComponent.jsx";
 import BreadcrumbComponent from "../common/BreadcrumbComponent.jsx";
 import RegionSelector from "../common/RegionSelector.jsx";
+import {FontAwesomeIcon} from "@fortawesome/react-fontawesome";
+import TranscoderCheckComponent from "./TranscoderCheckComponent.jsx";
+import ReactTooltip from 'react-tooltip';
+import JobEntry from "../common/JobEntry.jsx";
 
 class ScanTargetEdit extends React.Component {
     constructor(props){
@@ -21,11 +25,13 @@ class ScanTargetEdit extends React.Component {
             scanInterval: 7200,
             scanInProgress: false,
             lastError: "",
+            pendingJobIds: [],
             paranoid: false
         };
 
         this.state = {
             entry: defaultValues,
+            idToLoad: null,
             loading: false,
             error: null,
             formValidationErrors: [],
@@ -40,13 +46,33 @@ class ScanTargetEdit extends React.Component {
         this.toggleParanoid = this.toggleParanoid.bind(this);
 
         this.formSubmit = this.formSubmit.bind(this);
+
+        this.updatePendingJobs = this.updatePendingJobs.bind(this);
     }
 
     loadData(idToLoad){
-        this.setState({error:null, loading:true},
+        return new Promise((resolve, reject)=>
+        this.setState({error:null, loading:true, idToLoad: idToLoad},
             ()=>axios.get("/api/scanTarget/" + encodeURIComponent(idToLoad))
                 .then(response=> {
-                    this.setState({loading: false, error: null, entry: response.data.entry})
+                    this.setState({loading: false, error: null,
+                        entry: response.data.entry,
+                        pendingJobIds: response.data.entry.pendingJobIds ? response.data.entry.pendingJobIds : []}, ()=>resolve())
+                })
+                .catch(err=>{
+                    console.error(err);
+                    this.setState({loading: false, error: err, entry: null}, ()=>reject())
+                })
+        ))
+    }
+
+    updatePendingJobs(){
+        if(this.state.loading) return;
+
+        this.setState({error:null, loading:true},
+            ()=>axios.get("/api/scanTarget/" + encodeURIComponent(this.state.idToLoad))
+                .then(response=>{
+                    this.setState({loading: false, error: null, pendingJobIds: response.data.entry.pendingJobIds ? response.data.entry.pending : []})
                 })
                 .catch(err=>{
                     console.error(err);
@@ -60,7 +86,7 @@ class ScanTargetEdit extends React.Component {
         console.log("going to load from id", idToLoad);
 
         if(idToLoad!=="new"){
-            this.loadData(idToLoad)
+            this.loadData(idToLoad).then(()=>window.setInterval(this.updatePendingJobs,3000));
         } else {
 
         }
@@ -134,11 +160,93 @@ class ScanTargetEdit extends React.Component {
         );
     }
 
+    triggerAddedScan(){
+        return this.generalScanTrigger("additionScan")
+    }
+    triggerRemovedScan(){
+        return this.generalScanTrigger("deletionScan")
+    }
+    triggerFullScan(){
+        return this.generalScanTrigger("scan")
+    }
+
+    triggerValidateConfig(){
+        const targetId = this.state.idToLoad;
+        this.setState({loading: true, currentActionCaption: "Validating config..."}, ()=>axios.post("/api/scanTarget/" + encodeURIComponent(targetId) + "/" + "checkTranscoder")
+            .then(result=>{
+                console.log("Config validation has been started with job ID " + result.data.entity);
+                this.setState({loading: false, lastError: null, currentActionCaption: null}, ()=>window.setTimeout(this.updatePendingJobs, 500));
+            }).catch(err=>{
+                console.error(err);
+                this.setState({loading: false, lastError: err, currentActionCaption: null});
+            }))
+    }
+
+    triggerTranscodeSetup(){
+        const targetId = this.state.idToLoad;
+        this.setState({loading:true, currentActionCaption: "Starting setup..."}, ()=>axios.post("/api/scanTarget/" + encodeURIComponent(targetId) + "/" + "createPipelines?force=true")
+            .then(result=>{
+                console.log("Transcode setup has been started with job ID " + result.data.entity);
+                this.setState({loading: false, lastError: null, currentActionCaption: null}, ()=>window.setTimeout(this.updatePendingJobs, 500));
+            }).catch(err=>{
+                console.error(err);
+                this.setState({loading: false, lastError: err, currentActionCaption: null});
+            }))
+    }
+
+    triggerProxyGen(){
+        const targetId = this.state.idToLoad;
+        this.setState({loading: true, currentActionCaption: "Starting proxy generation..."},()=>axios.post("/api/scanTarget/" + encodeURIComponent(targetId) + "/" + "genProxies")
+            .then(result=>{
+                console.log("Proxy generation has been triggered");
+                this.setState({loading:false, lastError:null, scanTargets:[],currentActionCaption: null}, ()=>window.setTimeout(this.updatePendingJobs, 500));
+            })
+            .catch(err=>{
+                console.error(err);
+                this.setState({loading: false, lastError: err,currentActionCaption: null});
+            }))
+    }
+
+    /**
+     * FIXME: this does not belong in this UI location.
+     * @param targetId
+     */
+    triggerProxyRelink(){
+        const targetId = this.state.idToLoad;
+        this.setState({loading:true}, ()=>axios.post("/api/proxy/relink/global")
+            .then(result=>{
+                console.log("Global proxy relink has been triggered");
+                this.setState({loading: false, lastError:null}, ()=>window.setTimeout(this.updatePendingJobs, 500));
+            }).catch(err=>{
+                console.error(err);
+                this.setState({loading: false, lastError:err});
+            }))
+    }
+
+    generalScanTrigger(type){
+        const targetId = this.state.idToLoad;
+        console.log(this.state);
+        console.log(targetId);
+        this.setState({loading: true,currentActionCaption: "Starting scan..."},()=>axios.post("/api/scanTarget/" + encodeURIComponent(targetId) + "/" + type)
+            .then(result=>{
+                console.log("Manual rescan has been triggered");
+                window.setTimeout(this.updatePendingJobs, 500);
+            })
+            .catch(err=>{
+                console.error(err);
+                this.setState({loading: false, lastError: err, currentActionCaption: null});
+            }))
+    }
+
     render(){
         if(this.state.completed) return <Redirect to="/admin/scanTargets"/>;
         return <form onSubmit={this.formSubmit}>
+            <ReactTooltip/>
             <BreadcrumbComponent path={this.props.location.pathname}/>
-            <h2>Edit scan target <img src="/assets/images/Spinner-1s-44px.svg" style={{display: this.state.loading ? "inline" : "none"}}/></h2>
+            <h2>Edit scan target <img src="/assets/images/Spinner-1s-44px.svg"
+                                      alt="loading" style={{display: this.state.loading ? "inline" : "none"}}
+                                      className="inline-throbber"
+            /></h2>
             <div className="centered" style={{display: this.state.formValidationErrors.length>0 ? "block" : "none"}}>
                 <ul className="form-errors">
                     {
@@ -181,8 +289,45 @@ class ScanTargetEdit extends React.Component {
                     <td>Paranoid Mode</td>
                     <td><input type="checkbox" checked={this.state.entry.paranoid} onChange={this.toggleParanoid}/></td>
                 </tr>
+                <tr>
+                    <td>Transcode Setup</td>
+                    <td>
+                        <span data-tip="Validate transcode config"><FontAwesomeIcon icon="bug" className="clickable button-row" onClick={()=>this.triggerValidateConfig()}/></span>
+                        <FontAwesomeIcon icon="industry" className="clickable button-row" data-tip="(Redo) Transcode Setup" onClick={()=>this.triggerTranscodeSetup()}/>
+                        {
+                        this.state.entry.transcoderCheck ?
+                            <TranscoderCheckComponent status={this.state.entry.transcoderCheck.status} checkedAt={this.state.entry.transcoderCheck.checkedAt} log={this.state.entry.transcoderCheck.log}/> :
+                            <p className="information">Not checked</p>
+                        }
+                    </td>
+                </tr>
                 </tbody>
             </table>
+            <h3>Actions</h3>
+            <ul className="no-bullets">
+                <li className="list-grid">
+                    <span data-tip="Addition scan"><FontAwesomeIcon icon="folder-plus" className="clickable button-row" onClick={()=>this.triggerAddedScan()}/>Scan for added files only</span>
+                </li>
+                <li className="list-grid">
+                    <span data-tip="Removal scan"><FontAwesomeIcon icon="folder-minus" className="clickable button-row" onClick={()=>this.triggerRemovedScan()}/>Scan for removed files</span>
+                </li>
+                <li className="list-grid">
+                    <span data-tip="Full scan"><FontAwesomeIcon icon="folder" className="clickable button-row " onClick={()=>this.triggerFullScan()}/>Scan for added and removed files</span>
+                </li>
+                <li className="list-grid">
+                    <span data-tip="Proxy generation"><FontAwesomeIcon icon="compress-arrows-alt" className="clickable button-row" onClick={()=>this.triggerProxyGen()}/>Generate proxies</span>
+                </li>
+                <li className="list-grid">
+                    <span data-tip="Relink proxies"><FontAwesomeIcon icon="book-reader" className="clickable button-row" onClick={()=>this.triggerProxyRelink()}/>Relink existing proxies</span>
+                </li>
+            </ul>
+            <h3>Pending jobs</h3>
+            <ul className="no-bullets">
+                {
+                    this.state.pendingJobIds ?
+                        this.state.pendingJobIds.map(jobId=><li key={jobId}><JobEntry jobId={jobId}/></li>) : <li><i>no pending job ids</i></li>
+                }
+            </ul>
             <input type="submit" value="Save"/>
             <button type="button" onClick={()=>window.location="/admin/scanTargets"}>Back</button>
             {this.state.error ? <ErrorViewComponent error={this.state.error}/> : <span/>}

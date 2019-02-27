@@ -240,7 +240,8 @@ class ScanTargetsList extends React.Component {
 
     render(){
         return <div>
-            <BreadcrumbComponent path={this.props.location.pathname}/>
+            <ReactTooltip/>
+            <BreadcrumbComponent path={this.props.location ? this.props.location.pathname : "/unknown"}/>
             <div id="right-button-holder" style={{float: "right"}}>
                 <button type="button" onClick={this.newButtonClicked}>New</button>
             </div>
@@ -277,7 +278,6 @@ class ScanTargetsList extends React.Component {
                     <p style={{height:"200px"}} className="centered">Are you sure you want to delete the scan target for {this.state.deletionTarget}?</p>
                 </Dialog>
             }
-            <ReactTooltip/>
         </div>
     }
 }
