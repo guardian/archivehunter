@@ -76,7 +76,7 @@ class BulkThumbnailer @Inject() (@Named("dynamoCapacityActor") dynamoCapacityAct
       val streamCompletionPromise = Promise[Unit]()
       val eosDetect = new EOSDetect[Unit, ArchiveEntry](streamCompletionPromise, ())
 
-      logger.info("Bulk thumbnail of ${tgt.bucketName} completed")
+      logger.info("Bulk thumbnail of ${tgt.bucketName} starting")
       searchHitSource.via(archiveEntryConverter)
         .via(hasThumbnailFilter.async)
         .log("bulk-thumbnailer")

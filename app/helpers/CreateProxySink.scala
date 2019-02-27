@@ -9,6 +9,7 @@ import javax.inject.{Inject, Named}
 import play.api.Logger
 
 import scala.concurrent.{Await, Future}
+import scala.util.matching.Regex
 import scala.util.{Failure, Success}
 
 /**
@@ -23,6 +24,21 @@ class CreateProxySink @Inject() (proxyGenerators: ProxyGenerators)(implicit prox
 
   override def shape: SinkShape[ArchiveEntry] = SinkShape.of(in)
 
+  val dotFileRegex:Regex = ".*/\\.[^/]*".r
+  val dotFileRoot:Regex = "^\\.[^/]*".r
+
+  /**
+    * return TRUE if the filepath is a dot-file, false otherwise
+    * @param filePath
+    */
+  def isDotFile(filePath:String) = {
+    filePath match {
+      case dotFileRegex(_*)=>true
+      case dotFileRoot(_*)=>true
+      case _=>false
+    }
+  }
+
   override def createLogic(inheritedAttributes: Attributes): GraphStageLogic = new GraphStageLogic(shape) {
     setHandler(in, new AbstractInHandler {
       override def onPush(): Unit = {
@@ -30,26 +46,30 @@ class CreateProxySink @Inject() (proxyGenerators: ProxyGenerators)(implicit prox
 
         val proxyType = proxyGenerators.defaultProxyType(elem)
 
-        val operationFutures = Future.sequence(Seq(
-          Some(proxyGenerators.requestProxyJob(RequestType.THUMBNAIL, elem,None)),
-          Some(proxyGenerators.requestProxyJob(RequestType.ANALYSE, elem,None)),
-          proxyType.map(pt=>proxyGenerators.requestProxyJob(RequestType.PROXY, elem, Some(pt)))
-        ).collect({case Some(fut)=>fut})).map(resultSeq=>{
-          val failures = resultSeq.collect({case Failure(err)=>err})
-          if(failures.nonEmpty){
-            logger.error("Could not thumb and analyse: ")
-            failures.foreach(err=>logger.error("Error: ", err))
-            Failure(failures.head)
-          } else {
-            Success(resultSeq.collect({ case Success(result) => result }))
-          }
-        })
+        if(!isDotFile(elem.path)) {
+          val operationFutures = Future.sequence(Seq(
+            Some(proxyGenerators.requestProxyJob(RequestType.THUMBNAIL, elem, None)),
+            Some(proxyGenerators.requestProxyJob(RequestType.ANALYSE, elem, None)),
+            proxyType.map(pt => proxyGenerators.requestProxyJob(RequestType.PROXY, elem, Some(pt)))
+          ).collect({ case Some(fut) => fut })).map(resultSeq => {
+            val failures = resultSeq.collect({ case Failure(err) => err })
+            if (failures.nonEmpty) {
+              logger.error("Could not thumb and analyse: ")
+              failures.foreach(err => logger.error("Error: ", err))
+              Failure(failures.head)
+            } else {
+              Success(resultSeq.collect({ case Success(result) => result }))
+            }
+          })
 
-        Await.result(operationFutures, 30 seconds) match {
-          case Success(msg)=>
-            logger.info(s"Bulk proxy trigger success: $msg")
-          case Failure(err)=>
-            logger.info(s"Bulk proxy trigger failed: $err")
+          Await.result(operationFutures, 30 seconds) match {
+            case Success(msg) =>
+              logger.info(s"Bulk proxy trigger success: $msg")
+            case Failure(err) =>
+              logger.info(s"Bulk proxy trigger failed: $err")
+          }
+        } else {
+          logger.info(s"Not proxying dot-file ${elem.path}")
         }
         pull(in)
       }
