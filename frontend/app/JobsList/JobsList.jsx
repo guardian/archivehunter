@@ -27,19 +27,21 @@ class JobsList extends  React.Component {
             activeFilters: {},
             showingLog: false,
             logContent: "",
-            specificJob: null
+            specificJob: null,
+            notesBanner: ""
         };
 
         this.filterUpdated = this.filterUpdated.bind(this);
         this.filterbarUpdated = this.filterbarUpdated.bind(this);
         this.handleModalClose = this.handleModalClose.bind(this);
+        this.resubmit = this.resubmit.bind(this);
 
         this.columns = [
             {
                 header: "ID",
                 key: "jobId",
                 headerProps: {className: "dashboardheader"},
-                render: value=><span><p className="small">{value}</p><FontAwesomeIcon icon="sync-alt" onClick={()=>this.refreshJob(value)}/></span>
+                render: value=><span><p className="small">{value}</p><FontAwesomeIcon className="button-icon" icon="sync-alt" onClick={()=>this.refreshJob(value)}/></span>
             },
             {
                 header: "Type",
@@ -72,7 +74,6 @@ class JobsList extends  React.Component {
                         <FilterButton fieldName="jobStatus" values={value} type="plus" onActivate={this.filterUpdated}/>
                         <FilterButton fieldName="jobStatus" values={value} type="minus" onActivate={this.filterUpdated}/>
                         <JobStatusIcon status={value}/>
-
                 </span>
             },
             {
@@ -80,6 +81,12 @@ class JobsList extends  React.Component {
                 key: "log",
                 headerProps: {className: "dashboardheader"},
                 render: value=> (!value || value==="") ? <p>None</p> : <a style={{cursor: "pointer"}} onClick={()=>this.setState({logContent: value, showingLog: true})}>View</a>
+            },
+            {
+                header: "Resubmit",
+                key: "jobId",
+                headerProps: {className: "dashboardheader"},
+                render: value=><FontAwesomeIcon className="button-icon" icon="sync-alt" onClick={()=>this.resubmit(value)}/>
             },
             {
                 header: "Source file",
@@ -216,11 +223,23 @@ class JobsList extends  React.Component {
             this.refreshData());
         }
     }
+
     componentWillMount(){
         this.setState(
             {jobsList:[], specificJob: this.props.match.params.hasOwnProperty("jobid") ? this.props.match.params.jobid : null},
             ()=>this.refreshData()
         );
+    }
+
+    resubmit(jobId){
+        axios.put("/api/job/rerunproxy/" + jobId)
+            .then(response=>{
+                this.setState({notesBanner: "Job " + jobId + " resubmitted"});
+            })
+            .catch(err=>{
+                console.error(err);
+                this.setState({notesBanner: "Could not resubmit " + jobId + ", see console for details"});
+            })
     }
 
     handleModalClose(){

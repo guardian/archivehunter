@@ -173,6 +173,10 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration,
     val jobDesc = JobModel(jobUuid.toString,jobTypeString,Some(ZonedDateTime.now()),None,JobStatus.ST_PENDING,None,entry.id,None,SourceType.SRC_MEDIA,None)
     val uriToProxyFuture = getUriToProxy(entry)
 
+    internalDoProxy(jobDesc, requestType, proxyType, targetFuture, uriToProxyFuture)
+  }
+
+  private def internalDoProxy(jobDesc:JobModel, requestType:RequestType.Value, proxyType: Option[ProxyType.Value], targetFuture:Future[ScanTarget],uriToProxyFuture:Future[Option[String]]) =
     Future.sequence(Seq(targetFuture, uriToProxyFuture)).map(results=> {
       logger.debug("Saving job description...")
       results ++ Seq(jobModelDAO.putJob(jobDesc))
@@ -187,13 +191,62 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration,
           jobModelDAO.deleteJob(jobDesc.jobId)  //ignore the result, this is non-essential but there to prevent the jobs list getting clogged up
           Future(Failure(NothingFoundError("media", "Nothing found to proxy")))
         case Some(uriString) =>
-          val rq = RequestModel(requestType,uriString,targetProxyBucket,jobUuid.toString,None,None,proxyType)
+          val rq = RequestModel(requestType,uriString,targetProxyBucket,jobDesc.jobId,None,None,proxyType)
           sendRequest(rq, target.region)
       }
     }).recoverWith({
       case err:Throwable=>
         logger.error("Could not start proxy job: ", err)
         Future(Failure(ExternalSystemError("archivehunter", err.toString)))
+    })
+
+  /**
+    * tries to kick off a "stuck in pending" job again by resubmitting
+    * @param jobUuid UUId of the job to redo
+    * @param proxyType the ProxyType is not stored, so we have to request it again here. if None, the default for the type of media
+    *                  referenced by the job will be used
+    * @return a Future with either an error string or the job ID as a string.
+    */
+  def rerunProxyJob(jobUuid:UUID, proxyType: Option[ProxyType.Value]) = {
+    val entryFuture = jobModelDAO.jobForId(jobUuid.toString).flatMap({
+      case None=>Future(Left(s"No job found for ${jobUuid.toString}"))
+      case Some(Left(err))=>Future(Left(err.toString))
+      case Some(Right(jobModel))=>
+        indexer.getById(jobModel.sourceId).map(result=>Right((jobModel,result)))
+    })
+
+    entryFuture.flatMap({
+      case Left(err)=>Future(Left(err))
+      case Right(params)=>
+        val jobModel = params._1
+        val entry = params._2
+
+        val requestType = jobModel.jobType match {
+          case "thumbnail"=>Right(RequestType.THUMBNAIL)
+          case "proxy"=>Right(RequestType.PROXY)
+          case "analyse"=>Right(RequestType.ANALYSE)
+          case other=>Left(s"$other is not a proxying job")
+        }
+
+        requestType match {
+          case Right(actualRequestType)=>
+            val targetFuture = scanTargetDAO.targetForBucket(entry.bucket).map({
+              case None => throw new RuntimeException(s"Entry's source bucket ${entry.bucket} is not registered")
+              case Some(Left(err)) => throw new RuntimeException(err.toString)
+              case Some(Right(target)) => target
+            })
+
+            val uriToProxyFuture = getUriToProxy(entry)
+
+            internalDoProxy(jobModel, requestType.right.get, proxyType, targetFuture, uriToProxyFuture).map({
+              case Success(result)=>Right(result)
+              case Failure(err)=>
+                logger.error("Could not run proxying: ", err)
+                Left(err.toString)
+            })
+          case Left(err)=>
+            Future(Left(err))
+        }
     })
   }
 
