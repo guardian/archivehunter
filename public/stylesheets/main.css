@@ -20,7 +20,7 @@ html, body, p, th, td, li, dd, dt, pre .ui-dialog-buttonset{
 a {
     color: #AAAAAA;
 }
-tr.dashboardheader, th.dashboardheader {
+.dashboardheader {
     text-transform: inherit;
     font-weight: inherit;
     background-color: lavender;

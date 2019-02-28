@@ -1,6 +1,9 @@
 import React from 'react';
 import axios from 'axios';
-import SortableTable from 'react-sortable-table';
+import ReactTable from 'react-table';
+import { ReactTableDefaults } from 'react-table';
+import 'react-table/react-table.css'
+
 import TimestampFormatter from '../common/TimestampFormatter.jsx';
 import ErrorViewComponent from '../common/ErrorViewComponent.jsx';
 import BreadcrumbComponent from "../common/BreadcrumbComponent.jsx";
@@ -38,69 +41,69 @@ class JobsList extends  React.Component {
 
         this.columns = [
             {
-                header: "ID",
-                key: "jobId",
+                Header: "ID",
+                accessor: "jobId",
                 headerProps: {className: "dashboardheader"},
-                render: value=><span><p className="small">{value}</p><FontAwesomeIcon className="button-icon" icon="sync-alt" onClick={()=>this.refreshJob(value)}/></span>
+                Cell: props=><p className="small">{props.value}</p>
             },
             {
-                header: "Type",
-                key: "jobType",
+                Header: "Type",
+                accessor: "jobType",
                 headerProps: {className: "dashboardheader"},
-                render: (value)=><span>
-                        <FilterButton fieldName="jobType" values={value} type="plus" onActivate={this.filterUpdated}/>
-                        <FilterButton fieldName="jobType" values={value} type="minus" onActivate={this.filterUpdated}/>
-                        <JobTypeIcon jobType={value}/>
+                Cell: props=><span>
+                        <FilterButton fieldName="jobType" values={props.value} type="plus" onActivate={this.filterUpdated}/>
+                        <FilterButton fieldName="jobType" values={props.value} type="minus" onActivate={this.filterUpdated}/>
+                        <JobTypeIcon jobType={props.value}/>
                     </span>
             },
             {
-                header: "Start time",
-                key: "startedAt",
+                Header: "Start time",
+                accessor: "startedAt",
                 defaultSorting: "desc",
                 headerProps: {className: "dashboardheader"},
-                render: value=><TimestampFormatter relative={this.state.showRelativeTimes} value={value}/>
+                Cell: props=><TimestampFormatter relative={this.state.showRelativeTimes} value={props.value}/>
             },
             {
-                header: "Completion time",
-                key: "completedAt",
+                Header: "Completion time",
+                accessor: "completedAt",
                 headerProps: {className: "dashboardheader"},
-                render: value=><TimestampFormatter relative={this.state.showRelativeTimes} value={value}/>
+                Cell: props=><TimestampFormatter relative={this.state.showRelativeTimes} value={props.value}/>
             },
             {
-                header: "Status",
-                key: "jobStatus",
+                Header: "Status",
+                accessor: "jobStatus",
                 headerProps: {className: "dashboardheader"},
-                render: value=><span>
-                        <FilterButton fieldName="jobStatus" values={value} type="plus" onActivate={this.filterUpdated}/>
-                        <FilterButton fieldName="jobStatus" values={value} type="minus" onActivate={this.filterUpdated}/>
-                        <JobStatusIcon status={value}/>
+                Cell: props=><span>
+                        <FilterButton fieldName="jobStatus" values={props.value} type="plus" onActivate={this.filterUpdated}/>
+                        <FilterButton fieldName="jobStatus" values={props.value} type="minus" onActivate={this.filterUpdated}/>
+                        <JobStatusIcon status={props.value}/>
                 </span>
             },
             {
-                header: "Log",
-                key: "log",
+                Header: "Log",
+                accessor: "log",
                 headerProps: {className: "dashboardheader"},
-                render: value=> (!value || value==="") ? <p>None</p> : <a style={{cursor: "pointer"}} onClick={()=>this.setState({logContent: value, showingLog: true})}>View</a>
+                Cell: props=> (!props.value || props.value==="") ? <p>None</p> : <a style={{cursor: "pointer"}} onClick={()=>this.setState({logContent: props.value, showingLog: true})}>View</a>
             },
             {
-                header: "Resubmit",
-                key: "jobId",
+                Header: "Resubmit",
+                accessor: "jobId",
                 headerProps: {className: "dashboardheader"},
-                render: value=><ResubmitComponent jobId={value}/>
+                Cell: props=><ResubmitComponent jobId={props.value}/>
             },
             {
-                header: "Source file",
-                key: "sourceId",
+                Header: "Source file",
+                accessor: "sourceId",
                 headerProps: {className: "dashboardheader"},
-                render: value=><span>
-                        <FilterButton fieldName="sourceId" values={value} type="plus" onActivate={this.filterUpdated}/>
-                        <FilterButton fieldName="sourceId" values={value} type="minus" onActivate={this.filterUpdated}/>
-                        <Link to={"/browse?open="+value}>View</Link>
+                Cell: props=><span>
+                        <FilterButton fieldName="sourceId" values={props.value} type="plus" onActivate={this.filterUpdated}/>
+                        <FilterButton fieldName="sourceId" values={props.value} type="minus" onActivate={this.filterUpdated}/>
+                        <Link to={"/browse?open="+props.value}>View</Link>
                 </span>
             },
             {
-                header: "Source type",
-                key: "sourceType",
+                Header: "Source type",
+                accessor: "sourceType",
                 headerProps: {className: "dashboardheader"}
             }
         ];
@@ -259,12 +262,13 @@ class JobsList extends  React.Component {
                     <div style={{height:"200px", overflowY: "auto"}}>{this.state.logContent.split("\n").map(para=><p className="centered longlines">{para}</p>)}</div>
                 </Dialog>
             }
-            <SortableTable
+            <ReactTable
             data={this.state.jobsList}
             columns={this.columns}
-            style={this.style}
-            iconStyle={this.iconStyle}
-            tableProps={ {className: "dashboardpanel"} }
+            column={Object.assign({}, ReactTableDefaults.column, {headerClassName: 'dashboardheader'})}
+            // style={this.style}
+            // iconStyle={this.iconStyle}
+            // tableProps={ {className: "dashboardpanel"} }
         />
             <ReactTooltip id="jobslist-tooltip"/>
         </div>
