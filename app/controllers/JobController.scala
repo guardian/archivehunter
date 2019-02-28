@@ -110,8 +110,7 @@ class JobController @Inject() (override val config:Configuration, override val c
   def rerunProxy(jobId:String) = APIAuthAction.async { request=>
     Try { UUID.fromString(jobId) } match {
       case Success(jobUuid) =>
-        proxyGenerators.rerunProxyJob(jobUuid, Some(ProxyType.VIDEO)).map({ //FIXME: don't leave in the hard-set for PROD,
-                          // this is just to clean up ones that don't have it on the record. Need to add the ProxyType to the job record
+        proxyGenerators.rerunProxyJob(jobUuid).map({
           case Right(jobId) =>
             Ok(ObjectCreatedResponse("ok","jobId",jobId).asJson)
           case Left(err) =>

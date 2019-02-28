@@ -179,7 +179,9 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration,
   private def internalDoProxy(jobDesc:JobModel, requestType:RequestType.Value, proxyType: Option[ProxyType.Value], targetFuture:Future[ScanTarget],uriToProxyFuture:Future[Option[String]]) =
     Future.sequence(Seq(targetFuture, uriToProxyFuture)).map(results=> {
       logger.debug("Saving job description...")
-      results ++ Seq(jobModelDAO.putJob(jobDesc))
+      val target = results.head.asInstanceOf[ScanTarget]
+      val updatedJobDesc = jobDesc.copy(transcodeInfo = Some(TranscodeInfo(target.proxyBucket, target.region, proxyType)))
+      results ++ Seq(jobModelDAO.putJob(updatedJobDesc))
     }).flatMap(results=>{
       val target = results.head.asInstanceOf[ScanTarget]
       val targetProxyBucket = target.proxyBucket
@@ -207,7 +209,7 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration,
     *                  referenced by the job will be used
     * @return a Future with either an error string or the job ID as a string.
     */
-  def rerunProxyJob(jobUuid:UUID, proxyType: Option[ProxyType.Value]) = {
+  def rerunProxyJob(jobUuid:UUID) = {
     val entryFuture = jobModelDAO.jobForId(jobUuid.toString).flatMap({
       case None=>Future(Left(s"No job found for ${jobUuid.toString}"))
       case Some(Left(err))=>Future(Left(err.toString))
@@ -238,12 +240,18 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration,
 
             val uriToProxyFuture = getUriToProxy(entry)
 
-            internalDoProxy(jobModel, requestType.right.get, proxyType, targetFuture, uriToProxyFuture).map({
-              case Success(result)=>Right(result)
-              case Failure(err)=>
-                logger.error("Could not run proxying: ", err)
-                Left(err.toString)
-            })
+            jobModel.transcodeInfo match {
+              case Some(transcodeInfo)=>
+                internalDoProxy(jobModel, requestType.right.get, transcodeInfo.proxyType, targetFuture, uriToProxyFuture).map({
+                  case Success(result)=>Right(result)
+                  case Failure(err)=>
+                    logger.error("Could not run proxying: ", err)
+                    Left(err.toString)
+                })
+              case None=>
+                Future(Left("No transcode info on this job"))
+            }
+
           case Left(err)=>
             Future(Left(err))
         }
