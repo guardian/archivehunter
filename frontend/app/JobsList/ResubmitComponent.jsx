@@ -7,6 +7,7 @@ import ErrorViewComponent from "../common/ErrorViewComponent.jsx";
 class ResubmitComponent extends React.Component {
     static propTypes = {
         jobId: PropTypes.string.isRequired,
+        visible: PropTypes.bool.isRequired,
         onSuccess: PropTypes.func,
         onFailed: PropTypes.func
     };
@@ -40,7 +41,7 @@ class ResubmitComponent extends React.Component {
     }
 
     render(){
-        return <span>
+        return <span style={{display: this.props.visible ? "inherit": "none"}}>
             <FontAwesomeIcon icon="sync-alt" style={{display: this.state.success ? "none":"inherit"}}
                              className={this.state.loading ? "spin" : "button-icon"}
                              onClick={this.resubmit}/>

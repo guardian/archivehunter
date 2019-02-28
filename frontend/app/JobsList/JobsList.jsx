@@ -13,10 +13,8 @@ import JobTypeIcon from "./JobTypeIcon.jsx";
 import JobStatusIcon from "./JobStatusIcon.jsx";
 import FilterButton from "../common/FilterButton.jsx";
 import omit from "lodash.omit";
-import LoadingThrobber from "../common/LoadingThrobber.jsx";
 import Dialog from 'react-dialog';
 import JobsFilterComponent from "./JobsFilterComponent.jsx";
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import ResubmitComponent from "./ResubmitComponent.jsx";
 
 class JobsList extends  React.Component {
@@ -38,18 +36,17 @@ class JobsList extends  React.Component {
         this.filterUpdated = this.filterUpdated.bind(this);
         this.filterbarUpdated = this.filterbarUpdated.bind(this);
         this.handleModalClose = this.handleModalClose.bind(this);
+        this.refreshData = this.refreshData.bind(this);
 
         this.columns = [
             {
                 Header: "ID",
                 accessor: "jobId",
-                headerProps: {className: "dashboardheader"},
                 Cell: props=><p className="small">{props.value}</p>
             },
             {
                 Header: "Type",
                 accessor: "jobType",
-                headerProps: {className: "dashboardheader"},
                 Cell: props=><span>
                         <FilterButton fieldName="jobType" values={props.value} type="plus" onActivate={this.filterUpdated}/>
                         <FilterButton fieldName="jobType" values={props.value} type="minus" onActivate={this.filterUpdated}/>
@@ -59,20 +56,16 @@ class JobsList extends  React.Component {
             {
                 Header: "Start time",
                 accessor: "startedAt",
-                defaultSorting: "desc",
-                headerProps: {className: "dashboardheader"},
                 Cell: props=><TimestampFormatter relative={this.state.showRelativeTimes} value={props.value}/>
             },
             {
                 Header: "Completion time",
                 accessor: "completedAt",
-                headerProps: {className: "dashboardheader"},
                 Cell: props=><TimestampFormatter relative={this.state.showRelativeTimes} value={props.value}/>
             },
             {
                 Header: "Status",
                 accessor: "jobStatus",
-                headerProps: {className: "dashboardheader"},
                 Cell: props=><span>
                         <FilterButton fieldName="jobStatus" values={props.value} type="plus" onActivate={this.filterUpdated}/>
                         <FilterButton fieldName="jobStatus" values={props.value} type="minus" onActivate={this.filterUpdated}/>
@@ -82,19 +75,16 @@ class JobsList extends  React.Component {
             {
                 Header: "Log",
                 accessor: "log",
-                headerProps: {className: "dashboardheader"},
                 Cell: props=> (!props.value || props.value==="") ? <p>None</p> : <a style={{cursor: "pointer"}} onClick={()=>this.setState({logContent: props.value, showingLog: true})}>View</a>
             },
             {
                 Header: "Resubmit",
                 accessor: "jobId",
-                headerProps: {className: "dashboardheader"},
-                Cell: props=><ResubmitComponent jobId={props.value}/>
+                Cell: props=><ResubmitComponent jobId={props.value} visible={props.original.jobType==="proxy"}/>
             },
             {
                 Header: "Source file",
                 accessor: "sourceId",
-                headerProps: {className: "dashboardheader"},
                 Cell: props=><span>
                         <FilterButton fieldName="sourceId" values={props.value} type="plus" onActivate={this.filterUpdated}/>
                         <FilterButton fieldName="sourceId" values={props.value} type="minus" onActivate={this.filterUpdated}/>
@@ -104,7 +94,6 @@ class JobsList extends  React.Component {
             {
                 Header: "Source type",
                 accessor: "sourceType",
-                headerProps: {className: "dashboardheader"}
             }
         ];
         this.style = {
@@ -242,8 +231,12 @@ class JobsList extends  React.Component {
         if(this.state.lastError) return <ErrorViewComponent error={this.state.lastError}/>;
         return <div>
             <BreadcrumbComponent path={this.props.location.pathname}/>
-            <JobsFilterComponent activeFilters={this.state.activeFilters} filterChanged={this.filterbarUpdated}/>
-            <LoadingThrobber show={this.state.loading} caption="Loading data..." small={true}/>
+            <JobsFilterComponent activeFilters={this.state.activeFilters}
+                                 filterChanged={this.filterbarUpdated}
+                                 refreshClicked={this.refreshData}
+                                 isLoading={this.state.loading}
+            />
+
             {
                 this.state.showingLog && <Dialog modal={true}
                                                  title="Job log"
