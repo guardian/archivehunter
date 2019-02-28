@@ -252,7 +252,7 @@ class JobsList extends  React.Component {
                                                      }]
                                                  }
                 >
-                    <div style={{height:"200px", overflowY: "auto"}}>{this.state.logContent.split("\n").map(para=><p className="centered longlines">{para}</p>)}</div>
+                    <div className="dialog-content">{this.state.logContent.split("\n").map(para=><p className="centered longlines">{para}</p>)}</div>
                 </Dialog>
             }
             <ReactTable
