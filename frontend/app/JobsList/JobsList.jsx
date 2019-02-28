@@ -14,6 +14,7 @@ import LoadingThrobber from "../common/LoadingThrobber.jsx";
 import Dialog from 'react-dialog';
 import JobsFilterComponent from "./JobsFilterComponent.jsx";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import ResubmitComponent from "./ResubmitComponent.jsx";
 
 class JobsList extends  React.Component {
     constructor(props){
@@ -34,7 +35,6 @@ class JobsList extends  React.Component {
         this.filterUpdated = this.filterUpdated.bind(this);
         this.filterbarUpdated = this.filterbarUpdated.bind(this);
         this.handleModalClose = this.handleModalClose.bind(this);
-        this.resubmit = this.resubmit.bind(this);
 
         this.columns = [
             {
@@ -86,7 +86,7 @@ class JobsList extends  React.Component {
                 header: "Resubmit",
                 key: "jobId",
                 headerProps: {className: "dashboardheader"},
-                render: value=><FontAwesomeIcon className="button-icon" icon="sync-alt" onClick={()=>this.resubmit(value)}/>
+                render: value=><ResubmitComponent jobId={value}/>
             },
             {
                 header: "Source file",
@@ -229,17 +229,6 @@ class JobsList extends  React.Component {
             {jobsList:[], specificJob: this.props.match.params.hasOwnProperty("jobid") ? this.props.match.params.jobid : null},
             ()=>this.refreshData()
         );
-    }
-
-    resubmit(jobId){
-        axios.put("/api/job/rerunproxy/" + jobId)
-            .then(response=>{
-                this.setState({notesBanner: "Job " + jobId + " resubmitted"});
-            })
-            .catch(err=>{
-                console.error(err);
-                this.setState({notesBanner: "Could not resubmit " + jobId + ", see console for details"});
-            })
     }
 
     handleModalClose(){
