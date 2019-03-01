@@ -3,12 +3,15 @@ import PropTypes from 'prop-types';
 import omit from 'lodash.omit';
 import ItemEntryName from "../common/ItemEntryName.jsx";
 import ClickableIcon from "../common/ClickableIcon.jsx";
+import RefreshButton from "../common/RefreshButton.jsx";
 
 
 class JobsFilterComponent extends React.Component {
     static propTypes = {
         activeFilters: PropTypes.object.isRequired,
-        filterChanged: PropTypes.func.isRequired
+        filterChanged: PropTypes.func.isRequired,
+        refreshClicked: PropTypes.func.isRequired,
+        isLoading: PropTypes.bool.isRequired
     };
 
     constructor(props){
@@ -62,7 +65,6 @@ class JobsFilterComponent extends React.Component {
             <span className="filter-entry">
                 <label htmlFor="jobtype-selector" className="filter-control-label">Job type</label>
                 <select id="jobtype-selector" onChange={this.selectorChanged} value={this.jobTypeFilter()}>
-                    <option value="">(any)</option>
                     <option value="proxy">Proxy</option>
                     <option value="thumbnail">Thumbnail</option>
                     <option value="RESTORE">Restore</option>
@@ -86,6 +88,7 @@ class JobsFilterComponent extends React.Component {
                 <label htmlFor="entry-filter" className="filter-control-label">Specific item:</label>
                 <ItemEntryName id="entry-filter" entryId={this.props.activeFilters.hasOwnProperty("sourceId") ? this.props.activeFilters.sourceId : null}/>
             </span>
+            <RefreshButton isRunning={this.props.isLoading} clickedCb={this.props.refreshClicked} showText={true} caption={this.props.isLoading ? "Loading..." : "Refresh"}/>
         </div>
     }
 }

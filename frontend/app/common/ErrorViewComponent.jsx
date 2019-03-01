@@ -3,7 +3,8 @@ import PropTypes from 'prop-types';
 
 class ErrorViewComponent extends React.Component {
     static propTypes = {
-        error: PropTypes.object.isRequired
+        error: PropTypes.object.isRequired,
+        brief: PropTypes.bool
     };
 
     /* expects axios error response in props.error */
@@ -30,6 +31,7 @@ class ErrorViewComponent extends React.Component {
     }
 
     bestErrorString(errorObj){
+        if(this.props.brief) return "See console";
         if(errorObj.hasOwnProperty("detail")) return JSON.stringify(errorObj.detail);
         return errorObj.toString();
     }
@@ -48,11 +50,11 @@ class ErrorViewComponent extends React.Component {
             // `error.request` is an instance of XMLHttpRequest in the browser and an instance of
             // http.ClientRequest in node.js
             console.error("Failed request: ", this.props.error.request);
-            return <p className="error-text">No response from server. See console log for more details.</p>
+            return <p className="error-text">{this.props.brief ? "No response" : "No response from server. See console log for more details."}</p>
         } else {
             // Something happened in setting up the request that triggered an Error
             console.error('Axios error setting up request: ', this.props.error.message);
-            return <p className="error-text">Unable to set up request. See console log for more details.</p>
+            return <p className="error-text">{this.props.brief ? "Couldn't send" : "Unable to set up request. See console log for more details."}</p>
         }
 
     }

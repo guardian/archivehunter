@@ -1,6 +1,7 @@
 package controllers
 
 import java.time.ZonedDateTime
+import java.util.UUID
 
 import akka.actor.{ActorRef, ActorSystem}
 import akka.stream.alpakka.dynamodb.scaladsl.DynamoClient
@@ -21,13 +22,14 @@ import com.theguardian.multimedia.archivehunter.common.cmn_models._
 import helpers.InjectableRefresher
 import play.api.libs.ws.WSClient
 import requests.JobSearchRequest
-import responses.{GenericErrorResponse, ObjectGetResponse, ObjectListResponse}
+import responses.{GenericErrorResponse, ObjectCreatedResponse, ObjectGetResponse, ObjectListResponse}
 
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.Future
 import akka.pattern.ask
+import com.theguardian.multimedia.archivehunter.common.ProxyTranscodeFramework.ProxyGenerators
 
 @Singleton
 class JobController @Inject() (override val config:Configuration, override val controllerComponents:ControllerComponents, jobModelDAO: JobModelDAO,
@@ -35,7 +37,8 @@ class JobController @Inject() (override val config:Configuration, override val c
                                ddbClientManager:DynamoClientManager,
                                override val refresher:InjectableRefresher,
                                override val wsClient:WSClient,
-                               proxyLocationDAO:ProxyLocationDAO)
+                               proxyLocationDAO:ProxyLocationDAO,
+                               proxyGenerators:ProxyGenerators)
                               (implicit actorSystem:ActorSystem)
   extends AbstractController(controllerComponents) with Circe with JobModelEncoder with ZonedDateTimeEncoder with PanDomainAuthActions with QueryRemaps {
 
@@ -101,6 +104,20 @@ class JobController @Inject() (override val config:Configuration, override val c
             logger.error("Could not scan jobs: ", err)
             Future(InternalServerError(GenericErrorResponse("db_error", err.toString).asJson))
         })
+    }
+  }
+
+  def rerunProxy(jobId:String) = APIAuthAction.async { request=>
+    Try { UUID.fromString(jobId) } match {
+      case Success(jobUuid) =>
+        proxyGenerators.rerunProxyJob(jobUuid).map({
+          case Right(jobId) =>
+            Ok(ObjectCreatedResponse("ok","jobId",jobId).asJson)
+          case Left(err) =>
+            InternalServerError(GenericErrorResponse("error", err).asJson)
+        })
+      case Failure(err) =>
+        Future(BadRequest(GenericErrorResponse("error", "You did not input a valid UUID").asJson))
     }
   }
 

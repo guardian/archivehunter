@@ -4,6 +4,7 @@ import java.time.ZonedDateTime
 import java.util.UUID
 
 import com.gu.scanamo.DynamoFormat
+import com.theguardian.multimedia.archivehunter.common.ProxyTranscodeFramework.RequestType
 import com.theguardian.multimedia.archivehunter.common.{ProxyType, StorageClassEncoder}
 import io.circe.{Decoder, Encoder}
 
@@ -70,4 +71,9 @@ trait JobModelEncoder {
   )(
     pt=>pt.toString
   )
+
+  implicit val requestTypeEncoder = Encoder.enumEncoder(RequestType)
+  implicit val requestTypeDecoder = Decoder.enumDecoder(RequestType)
+  implicit val requestTypeFormat =
+    DynamoFormat.coercedXmap[RequestType.Value,String,IllegalArgumentException](input=>RequestType.withName(input))(_.toString)
 }

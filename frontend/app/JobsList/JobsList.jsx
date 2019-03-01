@@ -1,6 +1,9 @@
 import React from 'react';
 import axios from 'axios';
-import SortableTable from 'react-sortable-table';
+import ReactTable from 'react-table';
+import { ReactTableDefaults } from 'react-table';
+import 'react-table/react-table.css'
+
 import TimestampFormatter from '../common/TimestampFormatter.jsx';
 import ErrorViewComponent from '../common/ErrorViewComponent.jsx';
 import BreadcrumbComponent from "../common/BreadcrumbComponent.jsx";
@@ -10,12 +13,17 @@ import JobTypeIcon from "./JobTypeIcon.jsx";
 import JobStatusIcon from "./JobStatusIcon.jsx";
 import FilterButton from "../common/FilterButton.jsx";
 import omit from "lodash.omit";
-import LoadingThrobber from "../common/LoadingThrobber.jsx";
 import Dialog from 'react-dialog';
 import JobsFilterComponent from "./JobsFilterComponent.jsx";
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import ResubmitComponent from "./ResubmitComponent.jsx";
 
 class JobsList extends  React.Component {
+    static knownKeys = [
+        "jobType",
+        "jobStatus",
+        "sourceId"
+    ];  //we will respond to these parameters on the query string as filters
+
     constructor(props){
         super(props);
 
@@ -24,7 +32,9 @@ class JobsList extends  React.Component {
             loading: false,
             showRelativeTimes: true,
             lastError: null,
-            activeFilters: {},
+            activeFilters: {
+                jobType: "proxy"
+            },
             showingLog: false,
             logContent: "",
             specificJob: null
@@ -33,68 +43,64 @@ class JobsList extends  React.Component {
         this.filterUpdated = this.filterUpdated.bind(this);
         this.filterbarUpdated = this.filterbarUpdated.bind(this);
         this.handleModalClose = this.handleModalClose.bind(this);
+        this.refreshData = this.refreshData.bind(this);
 
         this.columns = [
             {
-                header: "ID",
-                key: "jobId",
-                headerProps: {className: "dashboardheader"},
-                render: value=><span><p className="small">{value}</p><FontAwesomeIcon icon="sync-alt" onClick={()=>this.refreshJob(value)}/></span>
+                Header: "ID",
+                accessor: "jobId",
+                Cell: props=><p className="small">{props.value}</p>
             },
             {
-                header: "Type",
-                key: "jobType",
-                headerProps: {className: "dashboardheader"},
-                render: (value)=><span>
-                        <FilterButton fieldName="jobType" values={value} type="plus" onActivate={this.filterUpdated}/>
-                        <FilterButton fieldName="jobType" values={value} type="minus" onActivate={this.filterUpdated}/>
-                        <JobTypeIcon jobType={value}/>
+                Header: "Type",
+                accessor: "jobType",
+                Cell: props=><span>
+                        <FilterButton fieldName="jobType" values={props.value} type="plus" onActivate={this.filterUpdated}/>
+                        <FilterButton fieldName="jobType" values={props.value} type="minus" onActivate={this.filterUpdated}/>
+                        <JobTypeIcon jobType={props.value}/>
                     </span>
             },
             {
-                header: "Start time",
-                key: "startedAt",
-                defaultSorting: "desc",
-                headerProps: {className: "dashboardheader"},
-                render: value=><TimestampFormatter relative={this.state.showRelativeTimes} value={value}/>
+                Header: "Start time",
+                accessor: "startedAt",
+                Cell: props=><TimestampFormatter relative={this.state.showRelativeTimes} value={props.value}/>
             },
             {
-                header: "Completion time",
-                key: "completedAt",
-                headerProps: {className: "dashboardheader"},
-                render: value=><TimestampFormatter relative={this.state.showRelativeTimes} value={value}/>
+                Header: "Completion time",
+                accessor: "completedAt",
+                Cell: props=><TimestampFormatter relative={this.state.showRelativeTimes} value={props.value}/>
             },
             {
-                header: "Status",
-                key: "jobStatus",
-                headerProps: {className: "dashboardheader"},
-                render: value=><span>
-                        <FilterButton fieldName="jobStatus" values={value} type="plus" onActivate={this.filterUpdated}/>
-                        <FilterButton fieldName="jobStatus" values={value} type="minus" onActivate={this.filterUpdated}/>
-                        <JobStatusIcon status={value}/>
-
+                Header: "Status",
+                accessor: "jobStatus",
+                Cell: props=><span>
+                        <FilterButton fieldName="jobStatus" values={props.value} type="plus" onActivate={this.filterUpdated}/>
+                        <FilterButton fieldName="jobStatus" values={props.value} type="minus" onActivate={this.filterUpdated}/>
+                        <JobStatusIcon status={props.value}/>
                 </span>
             },
             {
-                header: "Log",
-                key: "log",
-                headerProps: {className: "dashboardheader"},
-                render: value=> (!value || value==="") ? <p>None</p> : <a style={{cursor: "pointer"}} onClick={()=>this.setState({logContent: value, showingLog: true})}>View</a>
+                Header: "Log",
+                accessor: "log",
+                Cell: props=> (!props.value || props.value==="") ? <p>None</p> : <a style={{cursor: "pointer"}} onClick={()=>this.setState({logContent: props.value, showingLog: true})}>View</a>
             },
             {
-                header: "Source file",
-                key: "sourceId",
-                headerProps: {className: "dashboardheader"},
-                render: value=><span>
-                        <FilterButton fieldName="sourceId" values={value} type="plus" onActivate={this.filterUpdated}/>
-                        <FilterButton fieldName="sourceId" values={value} type="minus" onActivate={this.filterUpdated}/>
-                        <Link to={"/browse?open="+value}>View</Link>
+                Header: "Resubmit",
+                accessor: "jobId",
+                Cell: props=><ResubmitComponent jobId={props.value} visible={props.original.jobType==="proxy"}/>
+            },
+            {
+                Header: "Source file",
+                accessor: "sourceId",
+                Cell: props=><span>
+                        <FilterButton fieldName="sourceId" values={props.value} type="plus" onActivate={this.filterUpdated}/>
+                        <FilterButton fieldName="sourceId" values={props.value} type="minus" onActivate={this.filterUpdated}/>
+                        <Link to={"/browse?open="+props.value}>View</Link>
                 </span>
             },
             {
-                header: "Source type",
-                key: "sourceType",
-                headerProps: {className: "dashboardheader"}
+                Header: "Source type",
+                accessor: "sourceType",
             }
         ];
         this.style = {
@@ -169,12 +175,18 @@ class JobsList extends  React.Component {
                 toUpdate[fieldName] = values;
                 this.setState({
                     activeFilters: Object.assign({}, this.state.activeFilters, toUpdate)
-                }, ()=>this.refreshData());
+                }, ()=>{
+                    this.props.history.push(this.queryParamsFromFilters());
+                    this.refreshData()
+                });
                 break;
             case "minus":
                 this.setState({
                     activeFilters: omit(this.state.activeFilters, fieldName)
-                }, ()=>this.refreshData());
+                }, ()=>{
+                    this.props.history.push(this.queryParamsFromFilters());
+                    this.refreshData()
+                });
                 break;
             default:
                 console.error("expected plus or minus in filterUpdate, got ", type);
@@ -183,7 +195,10 @@ class JobsList extends  React.Component {
 
     filterbarUpdated(newFilters){
         console.log("Filter bar updated: ", newFilters);
-        this.setState({activeFilters: newFilters}, ()=>this.refreshData());
+        this.setState({activeFilters: newFilters}, ()=>{
+            this.props.history.push(this.queryParamsFromFilters());
+            this.refreshData();
+        });
     }
 
     makeUpdateRequest(){
@@ -216,9 +231,48 @@ class JobsList extends  React.Component {
             this.refreshData());
         }
     }
+
+    /**
+     * converts the current status of filters dict to a query string
+     */
+    queryParamsFromFilters(){
+        return "?" + Object.keys(this.state.activeFilters).map(key=>key + "=" + this.state.activeFilters[key]).join("&");
+    }
+
+    /**
+     * parses an available query string and extracts relevant filters for intial page state
+     */
+    filtersFromQueryParams(){
+        const parts = this.props.location.search.split('&');
+
+        console.log(parts);
+        const breakdown = parts.reduce((acc,entry)=>{
+            const kv = entry.split('=');
+            const key = kv[0][0] === '?' ? kv[0].substr(1) : kv[0];
+            acc[key] = kv[1];
+            return acc;
+        }, {});
+
+        console.log(breakdown);
+        return Object.keys(breakdown)
+            .filter(key=>JobsList.knownKeys.includes(key))
+            .reduce((acc, key)=>{
+                acc[key]=breakdown[key];
+                return acc;
+            }, {});
+    }
+
     componentWillMount(){
+        const qpFilters = this.filtersFromQueryParams();
+        console.log(qpFilters);
+        const initialFilters = qpFilters.length===0 ? this.state.activeFilters : qpFilters;
+
         this.setState(
-            {jobsList:[], specificJob: this.props.match.params.hasOwnProperty("jobid") ? this.props.match.params.jobid : null},
+            {
+                jobsList:[],
+                specificJob: this.props.match.params.hasOwnProperty("jobid") ? this.props.match.params.jobid : null,
+                activeFilters: initialFilters
+            },
             ()=>this.refreshData()
         );
     }
@@ -231,8 +285,12 @@ class JobsList extends  React.Component {
         if(this.state.lastError) return <ErrorViewComponent error={this.state.lastError}/>;
         return <div>
             <BreadcrumbComponent path={this.props.location.pathname}/>
-            <JobsFilterComponent activeFilters={this.state.activeFilters} filterChanged={this.filterbarUpdated}/>
-            <LoadingThrobber show={this.state.loading} caption="Loading data..." small={true}/>
+            <JobsFilterComponent activeFilters={this.state.activeFilters}
+                                 filterChanged={this.filterbarUpdated}
+                                 refreshClicked={this.refreshData}
+                                 isLoading={this.state.loading}
+            />
+
             {
                 this.state.showingLog && <Dialog modal={true}
                                                  title="Job log"
@@ -248,15 +306,17 @@ class JobsList extends  React.Component {
                                                      }]
                                                  }
                 >
-                    <div style={{height:"200px", overflowY: "auto"}}>{this.state.logContent.split("\n").map(para=><p className="centered longlines">{para}</p>)}</div>
+                    <div className="dialog-content">{this.state.logContent.split("\n").map(para=><p className="centered longlines">{para}</p>)}</div>
                 </Dialog>
             }
-            <SortableTable
+            <ReactTable
             data={this.state.jobsList}
             columns={this.columns}
-            style={this.style}
-            iconStyle={this.iconStyle}
-            tableProps={ {className: "dashboardpanel"} }
+            column={Object.assign({}, ReactTableDefaults.column, {headerClassName: 'dashboardheader'})}
+            defaultSorted={[{
+                id: 'startedAt',
+                desc: true
+            }]}
         />
             <ReactTooltip id="jobslist-tooltip"/>
         </div>

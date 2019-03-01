@@ -16,11 +16,12 @@ html, body, p, th, td, li, dd, dt, pre .ui-dialog-buttonset{
     left: 25%;
     /* don't forget to add prefixes */
     transform: translate(-50%, -50%);
+    z-index: 999 !important;
 }
 a {
     color: #AAAAAA;
 }
-tr.dashboardheader, th.dashboardheader {
+.dashboardheader {
     text-transform: inherit;
     font-weight: inherit;
     background-color: lavender;
@@ -481,7 +482,7 @@ p.large {
 .filter-bar {
     margin-left: auto;
     margin-right: auto;
-    width: 400px;
+    width: 600px;
     margin-bottom: 1em;
 }
 
@@ -555,4 +556,14 @@ pre.inline-log {
 .bulk-selections-scroll {
     overflow-y: hidden;
     overflow-x: auto;
+}
+
+.inline-throbber {
+    margin-top: -1em;
+    margin-bottom: -0.5em;
+}
+
+div.dialog-content {
+    height: 200px;
+    overflow-y: auto;
 }
