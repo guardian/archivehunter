@@ -18,6 +18,12 @@ import JobsFilterComponent from "./JobsFilterComponent.jsx";
 import ResubmitComponent from "./ResubmitComponent.jsx";
 
 class JobsList extends  React.Component {
+    static knownKeys = [
+        "jobType",
+        "jobStatus",
+        "sourceId"
+    ];  //we will respond to these parameters on the query string as filters
+
     constructor(props){
         super(props);
 
@@ -26,7 +32,9 @@ class JobsList extends  React.Component {
             loading: false,
             showRelativeTimes: true,
             lastError: null,
-            activeFilters: {},
+            activeFilters: {
+                jobType: "proxy"
+            },
             showingLog: false,
             logContent: "",
             specificJob: null,
@@ -168,12 +176,18 @@ class JobsList extends  React.Component {
                 toUpdate[fieldName] = values;
                 this.setState({
                     activeFilters: Object.assign({}, this.state.activeFilters, toUpdate)
-                }, ()=>this.refreshData());
+                }, ()=>{
+                    this.props.history.push(this.queryParamsFromFilters());
+                    this.refreshData()
+                });
                 break;
             case "minus":
                 this.setState({
                     activeFilters: omit(this.state.activeFilters, fieldName)
-                }, ()=>this.refreshData());
+                }, ()=>{
+                    this.props.history.push(this.queryParamsFromFilters());
+                    this.refreshData()
+                });
                 break;
             default:
                 console.error("expected plus or minus in filterUpdate, got ", type);
@@ -182,7 +196,10 @@ class JobsList extends  React.Component {
 
     filterbarUpdated(newFilters){
         console.log("Filter bar updated: ", newFilters);
-        this.setState({activeFilters: newFilters}, ()=>this.refreshData());
+        this.setState({activeFilters: newFilters}, ()=>{
+            this.props.history.push(this.queryParamsFromFilters());
+            this.refreshData();
+        });
     }
 
     makeUpdateRequest(){
@@ -216,9 +233,47 @@ class JobsList extends  React.Component {
         }
     }
 
+    /**
+     * converts the current status of filters dict to a query string
+     */
+    queryParamsFromFilters(){
+        return "?" + Object.keys(this.state.activeFilters).map(key=>key + "=" + this.state.activeFilters[key]).join("&");
+    }
+
+    /**
+     * parses an available query string and extracts relevant filters for intial page state
+     */
+    filtersFromQueryParams(){
+        const parts = this.props.location.search.split('&');
+
+        console.log(parts);
+        const breakdown = parts.reduce((acc,entry)=>{
+            const kv = entry.split('=');
+            const key = kv[0][0] === '?' ? kv[0].substr(1) : kv[0];
+            acc[key] = kv[1];
+            return acc;
+        }, {});
+
+        console.log(breakdown);
+        return Object.keys(breakdown)
+            .filter(key=>JobsList.knownKeys.includes(key))
+            .reduce((acc, key)=>{
+                acc[key]=breakdown[key];
+                return acc;
+            }, {});
+    }
+
     componentWillMount(){
+        const qpFilters = this.filtersFromQueryParams();
+        console.log(qpFilters);
+        const initialFilters = qpFilters.length===0 ? this.state.activeFilters : qpFilters;
+
         this.setState(
-            {jobsList:[], specificJob: this.props.match.params.hasOwnProperty("jobid") ? this.props.match.params.jobid : null},
+            {
+                jobsList:[],
+                specificJob: this.props.match.params.hasOwnProperty("jobid") ? this.props.match.params.jobid : null,
+                activeFilters: initialFilters
+            },
             ()=>this.refreshData()
         );
     }
@@ -259,6 +314,10 @@ class JobsList extends  React.Component {
             data={this.state.jobsList}
             columns={this.columns}
             column={Object.assign({}, ReactTableDefaults.column, {headerClassName: 'dashboardheader'})}
+            defaultSorted={[{
+                id: 'startedAt',
+                desc: true
+            }]}
             // style={this.style}
             // iconStyle={this.iconStyle}
             // tableProps={ {className: "dashboardpanel"} }

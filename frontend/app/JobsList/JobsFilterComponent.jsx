@@ -65,7 +65,6 @@ class JobsFilterComponent extends React.Component {
             <span className="filter-entry">
                 <label htmlFor="jobtype-selector" className="filter-control-label">Job type</label>
                 <select id="jobtype-selector" onChange={this.selectorChanged} value={this.jobTypeFilter()}>
-                    <option value="">(any)</option>
                     <option value="proxy">Proxy</option>
                     <option value="thumbnail">Thumbnail</option>
                     <option value="RESTORE">Restore</option>
