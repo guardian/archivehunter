@@ -172,7 +172,7 @@ class ScanTargetEdit extends React.Component {
 
     triggerValidateConfig(){
         const targetId = this.state.idToLoad;
-        this.setState({loading: true, currentActionCaption: "Validating config..."}, ()=>axios.post("/api/scanTarget/" + encodeURIComponent(targetId) + "/" + "checkTranscoder")
+        this.setState({loading: true,  lastError:null, currentActionCaption: "Validating config..."}, ()=>axios.post("/api/scanTarget/" + encodeURIComponent(targetId) + "/" + "checkTranscoder")
             .then(result=>{
                 console.log("Config validation has been started with job ID " + result.data.entity);
                 this.setState({loading: false, lastError: null, currentActionCaption: null}, ()=>window.setTimeout(this.updatePendingJobs, 500));
@@ -184,7 +184,7 @@ class ScanTargetEdit extends React.Component {
 
     triggerTranscodeSetup(){
         const targetId = this.state.idToLoad;
-        this.setState({loading:true, currentActionCaption: "Starting setup..."}, ()=>axios.post("/api/scanTarget/" + encodeURIComponent(targetId) + "/" + "createPipelines?force=true")
+        this.setState({loading:true, lastError:null, currentActionCaption: "Starting setup..."}, ()=>axios.post("/api/scanTarget/" + encodeURIComponent(targetId) + "/" + "createPipelines?force=true")
             .then(result=>{
                 console.log("Transcode setup has been started with job ID " + result.data.entity);
                 this.setState({loading: false, lastError: null, currentActionCaption: null}, ()=>window.setTimeout(this.updatePendingJobs, 500));
@@ -196,7 +196,7 @@ class ScanTargetEdit extends React.Component {
 
     triggerProxyGen(){
         const targetId = this.state.idToLoad;
-        this.setState({loading: true, currentActionCaption: "Starting proxy generation..."},()=>axios.post("/api/scanTarget/" + encodeURIComponent(targetId) + "/" + "genProxies")
+        this.setState({loading: true,  lastError:null, currentActionCaption: "Starting proxy generation..."},()=>axios.post("/api/scanTarget/" + encodeURIComponent(targetId) + "/" + "genProxies")
             .then(result=>{
                 console.log("Proxy generation has been triggered");
                 this.setState({loading:false, lastError:null, scanTargets:[],currentActionCaption: null}, ()=>window.setTimeout(this.updatePendingJobs, 500));
@@ -213,7 +213,7 @@ class ScanTargetEdit extends React.Component {
      */
     triggerProxyRelink(){
         const targetId = this.state.idToLoad;
-        this.setState({loading:true}, ()=>axios.post("/api/proxy/relink/global")
+        this.setState({loading:true,  lastError:null}, ()=>axios.post("/api/proxy/relink/global")
             .then(result=>{
                 console.log("Global proxy relink has been triggered");
                 this.setState({loading: false, lastError:null}, ()=>window.setTimeout(this.updatePendingJobs, 500));
@@ -227,8 +227,9 @@ class ScanTargetEdit extends React.Component {
         const targetId = this.state.idToLoad;
         console.log(this.state);
         console.log(targetId);
-        this.setState({loading: true,currentActionCaption: "Starting scan..."},()=>axios.post("/api/scanTarget/" + encodeURIComponent(targetId) + "/" + type)
+        this.setState({loading: true, lastError:null, currentActionCaption: "Starting scan..."},()=>axios.post("/api/scanTarget/" + encodeURIComponent(targetId) + "/" + type)
             .then(result=>{
+                this.setState({currentActionCaption: "Scan started"});
                 console.log("Manual rescan has been triggered");
                 window.setTimeout(this.updatePendingJobs, 500);
             })
@@ -322,6 +323,8 @@ class ScanTargetEdit extends React.Component {
                 </li>
             </ul>
             <h3>Pending jobs</h3>
+            <ErrorViewComponent error={this.state.lastError}/>
+            <span>{this.state.currentActionCaption}</span>
             <ul className="no-bullets">
                 {
                     this.state.pendingJobIds ?

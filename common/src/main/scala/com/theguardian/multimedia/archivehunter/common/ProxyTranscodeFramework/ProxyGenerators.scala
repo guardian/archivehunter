@@ -176,6 +176,15 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration,
     internalDoProxy(jobDesc, requestType, proxyType, targetFuture, uriToProxyFuture)
   }
 
+  /**
+    * internal function that actually builds and transmits the proxy request. this is shared between `requestProxyJob` and `rerunProxyJob`.
+    * @param jobDesc [[JobModel]] describing the job that's going to be done
+    * @param requestType is this a proxy, thumbnail, etc.
+    * @param proxyType is the proxy a video, audio, etc.
+    * @param targetFuture Future that resolves to the [[ScanTarget]] of the source media
+    * @param uriToProxyFuture Future that resolves to the URI of the media to proxy
+    * @return
+    */
   private def internalDoProxy(jobDesc:JobModel, requestType:RequestType.Value, proxyType: Option[ProxyType.Value], targetFuture:Future[ScanTarget],uriToProxyFuture:Future[Option[String]]) =
     Future.sequence(Seq(targetFuture, uriToProxyFuture)).map(results=> {
       logger.debug("Saving job description...")
