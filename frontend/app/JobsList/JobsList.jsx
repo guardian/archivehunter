@@ -37,8 +37,7 @@ class JobsList extends  React.Component {
             },
             showingLog: false,
             logContent: "",
-            specificJob: null,
-            notesBanner: ""
+            specificJob: null
         };
 
         this.filterUpdated = this.filterUpdated.bind(this);
@@ -318,9 +317,6 @@ class JobsList extends  React.Component {
                 id: 'startedAt',
                 desc: true
             }]}
-            // style={this.style}
-            // iconStyle={this.iconStyle}
-            // tableProps={ {className: "dashboardpanel"} }
         />
             <ReactTooltip id="jobslist-tooltip"/>
         </div>

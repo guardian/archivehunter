@@ -180,7 +180,7 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration,
     Future.sequence(Seq(targetFuture, uriToProxyFuture)).map(results=> {
       logger.debug("Saving job description...")
       val target = results.head.asInstanceOf[ScanTarget]
-      val updatedJobDesc = jobDesc.copy(transcodeInfo = Some(TranscodeInfo(target.proxyBucket, target.region, proxyType)))
+      val updatedJobDesc = jobDesc.copy(transcodeInfo = Some(TranscodeInfo(target.proxyBucket, target.region, proxyType, requestType)))
       results ++ Seq(jobModelDAO.putJob(updatedJobDesc))
     }).flatMap(results=>{
       val target = results.head.asInstanceOf[ScanTarget]
@@ -223,38 +223,26 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration,
         val jobModel = params._1
         val entry = params._2
 
-        val requestType = jobModel.jobType match {
-          case "thumbnail"=>Right(RequestType.THUMBNAIL)
-          case "proxy"=>Right(RequestType.PROXY)
-          case "analyse"=>Right(RequestType.ANALYSE)
-          case other=>Left(s"$other is not a proxying job")
-        }
+        val targetFuture = scanTargetDAO.targetForBucket(entry.bucket).map({
+          case None => throw new RuntimeException(s"Entry's source bucket ${entry.bucket} is not registered")
+          case Some(Left(err)) => throw new RuntimeException(err.toString)
+          case Some(Right(target)) => target
+        })
 
-        requestType match {
-          case Right(actualRequestType)=>
-            val targetFuture = scanTargetDAO.targetForBucket(entry.bucket).map({
-              case None => throw new RuntimeException(s"Entry's source bucket ${entry.bucket} is not registered")
-              case Some(Left(err)) => throw new RuntimeException(err.toString)
-              case Some(Right(target)) => target
+        val uriToProxyFuture = getUriToProxy(entry)
+
+        jobModel.transcodeInfo match {
+          case Some(transcodeInfo)=>
+            internalDoProxy(jobModel, transcodeInfo.requestType, transcodeInfo.proxyType, targetFuture, uriToProxyFuture).map({
+              case Success(result)=>Right(result)
+              case Failure(err)=>
+                logger.error("Could not run proxying: ", err)
+                Left(err.toString)
             })
-
-            val uriToProxyFuture = getUriToProxy(entry)
-
-            jobModel.transcodeInfo match {
-              case Some(transcodeInfo)=>
-                internalDoProxy(jobModel, requestType.right.get, transcodeInfo.proxyType, targetFuture, uriToProxyFuture).map({
-                  case Success(result)=>Right(result)
-                  case Failure(err)=>
-                    logger.error("Could not run proxying: ", err)
-                    Left(err.toString)
-                })
-              case None=>
-                Future(Left("No transcode info on this job"))
-            }
-
-          case Left(err)=>
-            Future(Left(err))
+          case None=>
+            Future(Left("No transcode info on this job"))
         }
+
     })
   }
 

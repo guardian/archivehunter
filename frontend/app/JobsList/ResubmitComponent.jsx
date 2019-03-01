@@ -18,8 +18,7 @@ class ResubmitComponent extends React.Component {
         this.state = {
             loading: false,
             lastError: null,
-            success: false,
-            attempted: false
+            success: false
         };
 
         this.resubmit = this.resubmit.bind(this);
