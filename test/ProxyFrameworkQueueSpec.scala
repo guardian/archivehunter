@@ -369,7 +369,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
 
         toTest ! fakeMessage
 
-        testProbe.expectMsg(10 seconds, akka.actor.Status.Success())
+        testProbe.expectMsg(10 seconds, akka.actor.Status.Success)
         there was one(mockedJobModelDAO).putJob(any)
         there was one(mockUpdateProxyRef).apply("s3://proxybucket/path/to/file.mp4", mockedArchiveEntry, ProxyType.VIDEO)
         there was one(mockedSqsClient).deleteMessage(any)
@@ -421,7 +421,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
 
         toTest ! fakeMessage
 
-        testProbe.expectMsg(10 seconds, akka.actor.Status.Success())
+        testProbe.expectMsg(10 seconds, akka.actor.Status.Success)
         there was one(mockedJobModelDAO).putJob(any)
         there was no(mockThumnailJobOriginalMedia).apply(any)
         there was no(mockUpdateProxyRef).apply(any, any, any)
