@@ -4,12 +4,9 @@ import java.time.ZonedDateTime
 import java.util.UUID
 
 import akka.actor.{ActorRef, ActorSystem}
-import akka.stream.alpakka.dynamodb.scaladsl.DynamoClient
 import akka.stream.{ActorMaterializer, Materializer}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager}
-import com.amazonaws.services.s3.AmazonS3
 import com.gu.scanamo.error.DynamoReadError
-import com.sksamuel.elastic4s.http.HttpClient
 import com.theguardian.multimedia.archivehunter.common._
 import javax.inject.{Inject, Named, Singleton}
 import play.api.{Configuration, Logger}
@@ -17,7 +14,6 @@ import play.api.libs.circe.Circe
 import play.api.mvc.{AbstractController, ControllerComponents}
 import io.circe.generic.auto._
 import io.circe.syntax._
-import models._
 import com.theguardian.multimedia.archivehunter.common.cmn_models._
 import helpers.InjectableRefresher
 import play.api.libs.ws.WSClient
@@ -28,7 +24,6 @@ import scala.util.{Failure, Success, Try}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.Future
-import akka.pattern.ask
 import com.theguardian.multimedia.archivehunter.common.ProxyTranscodeFramework.ProxyGenerators
 
 @Singleton
