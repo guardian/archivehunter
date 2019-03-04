@@ -12,7 +12,7 @@ import javax.inject.Inject
 import play.api.{Configuration, Logger}
 import com.sksamuel.elastic4s.streams.ReactiveElastic._
 import com.sksamuel.elastic4s.streams.{RequestBuilder, ResponseListener, SubscriberConfig}
-import com.theguardian.multimedia.archivehunter.common.cmn_models.{JobModelDAO, JobStatus}
+import com.theguardian.multimedia.archivehunter.common.cmn_models.{JobModelDAO, JobStatus, ScanTargetDAO}
 import helpers.{EOSDetect, ProxyLocatorFlow, ProxyVerifyFlow, SearchHitToArchiveEntryFlow}
 import models.IndexUpdateCounter
 import play.api.inject.Injector
@@ -28,6 +28,7 @@ object ProxiesRelinker {
   trait RelinkReply
 
   case class RelinkRequest(fileId:String) extends RelinkMsg
+  case class RelinkScanTargetRequest(jobId:String, collectionName: String) extends RelinkMsg
   case class RelinkAllRequest(jobId:String) extends RelinkMsg
 
   case class RelinkSuccess(indexUpdateCounter: IndexUpdateCounter) extends RelinkReply
@@ -36,7 +37,8 @@ object ProxiesRelinker {
 
 class ProxiesRelinker @Inject() (config:Configuration,
                                  esClientMgr:ESClientManager, ddbClientMgr:DynamoClientManager, system:ActorSystem,
-                                 proxyVerifyFlow: ProxyVerifyFlow, jobModelDAO:JobModelDAO)  extends Actor with ArchiveEntryRequestBuilder {
+                                 proxyVerifyFlow: ProxyVerifyFlow, jobModelDAO:JobModelDAO, scanTargetDAO:ScanTargetDAO)
+  extends Actor with ArchiveEntryRequestBuilder {
   import ProxiesRelinker._
   import com.sksamuel.elastic4s.http.ElasticDsl._
 
@@ -46,8 +48,13 @@ class ProxiesRelinker @Inject() (config:Configuration,
   private implicit val mat:Materializer = ActorMaterializer.create(system)
   private val esClient = esClientMgr.getClient()
 
-  protected def getIndexScanSource = {
-    val pub = esClient.publisher(search(indexName) query boolQuery().must(termQuery("proxied", false)) scroll "1m")
+  protected def getIndexScanSource(targetBucket:Option[String]) = {
+    val queryTerms = Seq(
+      Some(termQuery("proxied", false)),
+      targetBucket.map(bucketName=>matchQuery("bucketName", bucketName))
+    ).collect({case Some(term)=>term})
+
+    val pub = esClient.publisher(search(indexName) query boolQuery().must(queryTerms) scroll "1m")
     Source.fromPublisher(pub)
   }
 
@@ -79,13 +86,13 @@ class ProxiesRelinker @Inject() (config:Configuration,
     Sink.fromSubscriber(sub)
   }
 
-  private def globalRelinkScan(jobId:String) = {
+  private def relinkScan(jobId:String, bucketName:Option[String]) = {
     val completionPromise = Promise[IndexUpdateCounter]()
     val eosPromise = Promise[Unit]()
 
     logger.info("Starting global relink scan")
     val eosDetect = new EOSDetect[Unit, ArchiveEntry](eosPromise, ())
-    getIndexScanSource
+    getIndexScanSource(bucketName)
       .via(new SearchHitToArchiveEntryFlow)
       .via(proxyVerifyFlow)
       .via(eosDetect)
@@ -152,13 +159,32 @@ class ProxiesRelinker @Inject() (config:Configuration,
           val updatedJob = jobModel.copy(startedAt = Some(ZonedDateTime.now()),jobStatus=JobStatus.ST_RUNNING)
           jobModelDAO.putJob(updatedJob).onComplete({
             case Success(None)=>
-              globalRelinkScan(jobId)
+              relinkScan(jobId,None)
             case Success(Some(Right(updatedJobModel)))=>
-              globalRelinkScan(jobId)
+              relinkScan(jobId,None)
             case Success(Some(Left(err)))=>
               logger.error(s"Could not update database: $err")
+            case Failure(err)=>
+              logger.error(s"Could not update job: $err")
           })
       })
 
+    case RelinkScanTargetRequest(jobId, collectionName)=>
+      jobModelDAO.jobForId(jobId).map({
+        case None=>
+          logger.error("ProxiesRelinker was sent and invalid job ID, can't continue.")
+        case Some(Left(err))=>
+          logger.error(s"Could not retrieve job entry from database: $err, can't continue")
+        case Some(Right(jobModel))=>
+          val updatedJob = jobModel.copy(startedAt = Some(ZonedDateTime.now()), jobStatus=JobStatus.ST_RUNNING)
+          jobModelDAO.putJob(updatedJob).onComplete({
+            case Success(Some(Left(err)))=>
+              logger.error(s"Could not update database: $err")
+            case Success(_)=>
+              relinkScan(jobId, Some(collectionName))
+            case Failure(err)=>
+              logger.error(s"Could not update job: $err")
+          })
+      })
   }
 }

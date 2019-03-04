@@ -110,17 +110,6 @@ class ScanTargetsList extends React.Component {
                 </span>
             }*/
         ];
-        // this.style = {
-        //     backgroundColor: '#eee',
-        //     border: '1px solid black',
-        //     borderCollapse: 'collapse'
-        // };
-        //
-        // this.iconStyle = {
-        //     color: '#aaa',
-        //     paddingLeft: '5px',
-        //     paddingRight: '5px'
-        // };
 
     }
 
@@ -242,6 +231,7 @@ class ScanTargetsList extends React.Component {
             data={this.state.scanTargets}
             columns={this.columns}
             column={Object.assign({}, ReactTableDefaults.column, {headerClassName: 'dashboardheader'})}
+            pageSize={5}
         />
             {
                 this.state.showingDeleteConfirm && <Dialog modal={true}

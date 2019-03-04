@@ -2,6 +2,7 @@ package controllers
 
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
+import java.util.UUID
 
 import akka.actor.{ActorRef, ActorSystem}
 import akka.stream.{ActorMaterializer, Materializer}
@@ -22,7 +23,7 @@ import com.amazonaws.auth.{AWSStaticCredentialsProvider, InstanceProfileCredenti
 import com.gu.pandomainauth.action.AuthActions
 import com.theguardian.multimedia.archivehunter.common.ProxyTranscodeFramework.ProxyGenerators
 import com.theguardian.multimedia.archivehunter.common.cmn_helpers.ZonedTimeFormat
-import com.theguardian.multimedia.archivehunter.common.cmn_models.{JobModelEncoder, ScanTarget, ScanTargetDAO}
+import com.theguardian.multimedia.archivehunter.common.cmn_models._
 import helpers.InjectableRefresher
 import play.api.libs.ws.WSClient
 import services.{BucketScanner, BulkThumbnailer, LegacyProxiesScanner}
@@ -41,7 +42,8 @@ class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner
                                       override val refresher:InjectableRefresher,
                                       ddbClientMgr:DynamoClientManager,
                                       proxyGenerators:ProxyGenerators,
-                                      scanTargetDAO:ScanTargetDAO)
+                                      scanTargetDAO:ScanTargetDAO,
+                                      jobModelDAO:JobModelDAO)
                                      (implicit system:ActorSystem)
   extends AbstractController(controllerComponents) with PanDomainAuthActions with Circe with ZonedDateTimeEncoder with ZonedTimeFormat with JobModelEncoder with AdminsOnly {
   private val logger=Logger(getClass)
@@ -116,29 +118,60 @@ class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner
       block(tgt)
   }).getOrElse(Future(NotFound(ObjectCreatedResponse[String]("not_found","scan_target",targetName).asJson)))
 
-  def manualTrigger(targetName:String) = APIAuthAction { request=>
-    adminsOnlySync(request) {
-      withLookup(targetName) { tgt =>
-        bucketScanner ! BucketScanner.PerformDeletionScan(tgt, thenScanForNew = true)
-        Ok(GenericErrorResponse("ok", "scan started").asJson)
+  /**
+    * tries to create and save a scan job and then calls the block with the saved result.
+    * if the db operation fails then an InternalServerError is returned
+    * @param targetName target name being scanned
+    * @param jobType job type name to use
+    * @param block a block receiving the JobModel and returning a Future of Result
+    * @return
+    */
+  private def withNewScanJob(tgt:ScanTarget, jobType:String)(block: JobModel=>Result) = {
+    val jobUuid = UUID.randomUUID()
+    val job = JobModel(jobUuid.toString,jobType,Some(ZonedDateTime.now()),None,JobStatus.ST_RUNNING,None,tgt.bucketName,None,SourceType.SRC_SCANTARGET,lastUpdatedTS=None)
+    jobModelDAO.putJob(job).map({
+      case None=>
+        val updatedTarget = tgt.withAnotherPendingJob(job.jobId)
+        scanTargetDAO.put(updatedTarget)
+        block(job)
+      case Some(Right(rec))=>
+        val updatedTarget = tgt.withAnotherPendingJob(job.jobId)
+        scanTargetDAO.put(updatedTarget)
+        block(job)
+      case Some(Left(err))=>
+        InternalServerError(GenericErrorResponse("db_error",err.toString).asJson)
+    })
+  }
+
+  def manualTrigger(targetName:String) = APIAuthAction.async { request=>
+    adminsOnlyAsync(request) {
+      withLookupAsync(targetName) { tgt =>
+        withNewScanJob(tgt, "ManualScan") { job =>
+          bucketScanner ! BucketScanner.PerformDeletionScan(tgt, thenScanForNew = true, Some(job))
+          Ok(GenericErrorResponse("ok", "scan started").asJson)
+        }
       }
     }
   }
 
-  def manualTriggerAdditionScan(targetName:String) = APIAuthAction { request=>
-    adminsOnlySync(request) {
-      withLookup(targetName) { tgt =>
-        bucketScanner ! BucketScanner.PerformTargetScan(tgt)
-        Ok(GenericErrorResponse("ok", "scan started").asJson)
+  def manualTriggerAdditionScan(targetName:String) = APIAuthAction.async { request=>
+    adminsOnlyAsync(request) {
+      withLookupAsync(targetName) { tgt =>
+        withNewScanJob(tgt,"AdditionScan") { job =>
+          bucketScanner ! BucketScanner.PerformTargetScan(tgt, Some(job))
+          Ok(GenericErrorResponse("ok", "scan started").asJson)
+        }
       }
     }
   }
 
-  def manualTriggerDeletionScan(targetName:String) = APIAuthAction { request=>
-    adminsOnlySync(request) {
-      withLookup(targetName) { tgt =>
-        bucketScanner ! BucketScanner.PerformDeletionScan(tgt)
-        Ok(GenericErrorResponse("ok", "scan started").asJson)
+  def manualTriggerDeletionScan(targetName:String) = APIAuthAction.async { request=>
+    adminsOnlyAsync(request) {
+      withLookupAsync(targetName) { tgt =>
+        withNewScanJob(tgt, "DeletionScan") { job =>
+          bucketScanner ! BucketScanner.PerformDeletionScan(tgt, maybeJob=Some(job))
+          Ok(GenericErrorResponse("ok", "scan started").asJson)
+        }
       }
     }
   }
@@ -146,7 +179,7 @@ class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner
   def scanForLegacyProxies(targetName:String) = APIAuthAction { request=>
     adminsOnlySync(request) {
       withLookup(targetName) { tgt =>
-        proxyScanner ! new LegacyProxiesScanner.ScanBucket(tgt)
+        proxyScanner ! LegacyProxiesScanner.ScanBucket(tgt)
         Ok(GenericErrorResponse("ok", "scan started").asJson)
       }
     }

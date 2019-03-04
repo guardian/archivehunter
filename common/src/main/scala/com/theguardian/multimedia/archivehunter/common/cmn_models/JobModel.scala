@@ -13,7 +13,7 @@ object JobStatus extends Enumeration {
 }
 
 object SourceType extends Enumeration {
-  val SRC_MEDIA, SRC_PROXY, SRC_THUMBNAIL, SRC_GLOBAL = Value
+  val SRC_MEDIA, SRC_PROXY, SRC_THUMBNAIL, SRC_SCANTARGET, SRC_GLOBAL = Value
 }
 
 case class JobModel (jobId:String, jobType:String, startedAt: Option[ZonedDateTime],

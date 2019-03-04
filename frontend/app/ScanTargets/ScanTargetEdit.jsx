@@ -72,7 +72,7 @@ class ScanTargetEdit extends React.Component {
         this.setState({error:null, loading:true},
             ()=>axios.get("/api/scanTarget/" + encodeURIComponent(this.state.idToLoad))
                 .then(response=>{
-                    this.setState({loading: false, error: null, pendingJobIds: response.data.entry.pendingJobIds ? response.data.entry.pending : []})
+                    this.setState({loading: false, error: null, pendingJobIds: response.data.entry.pendingJobIds ? response.data.entry.pendingJobIds : []})
                 })
                 .catch(err=>{
                     console.error(err);
@@ -175,7 +175,7 @@ class ScanTargetEdit extends React.Component {
         this.setState({loading: true,  lastError:null, currentActionCaption: "Validating config..."}, ()=>axios.post("/api/scanTarget/" + encodeURIComponent(targetId) + "/" + "checkTranscoder")
             .then(result=>{
                 console.log("Config validation has been started with job ID " + result.data.entity);
-                this.setState({loading: false, lastError: null, currentActionCaption: null}, ()=>window.setTimeout(this.updatePendingJobs, 500));
+                this.setState({loading: false, lastError: null, currentActionCaption: null}, );
             }).catch(err=>{
                 console.error(err);
                 this.setState({loading: false, lastError: err, currentActionCaption: null});
@@ -187,7 +187,7 @@ class ScanTargetEdit extends React.Component {
         this.setState({loading:true, lastError:null, currentActionCaption: "Starting setup..."}, ()=>axios.post("/api/scanTarget/" + encodeURIComponent(targetId) + "/" + "createPipelines?force=true")
             .then(result=>{
                 console.log("Transcode setup has been started with job ID " + result.data.entity);
-                this.setState({loading: false, lastError: null, currentActionCaption: null}, ()=>window.setTimeout(this.updatePendingJobs, 500));
+                this.setState({loading: false, lastError: null, currentActionCaption: null});
             }).catch(err=>{
                 console.error(err);
                 this.setState({loading: false, lastError: err, currentActionCaption: null});
@@ -199,7 +199,7 @@ class ScanTargetEdit extends React.Component {
         this.setState({loading: true,  lastError:null, currentActionCaption: "Starting proxy generation..."},()=>axios.post("/api/scanTarget/" + encodeURIComponent(targetId) + "/" + "genProxies")
             .then(result=>{
                 console.log("Proxy generation has been triggered");
-                this.setState({loading:false, lastError:null, scanTargets:[],currentActionCaption: null}, ()=>window.setTimeout(this.updatePendingJobs, 500));
+                this.setState({loading:false, lastError:null, scanTargets:[],currentActionCaption: null});
             })
             .catch(err=>{
                 console.error(err);
@@ -207,16 +207,12 @@ class ScanTargetEdit extends React.Component {
             }))
     }
 
-    /**
-     * FIXME: this does not belong in this UI location.
-     * @param targetId
-     */
     triggerProxyRelink(){
         const targetId = this.state.idToLoad;
-        this.setState({loading:true,  lastError:null}, ()=>axios.post("/api/proxy/relink/global")
+        this.setState({loading:true,  lastError:null}, ()=>axios.post("/api/proxy/relink/" + this.state.entry.bucketName)
             .then(result=>{
                 console.log("Global proxy relink has been triggered");
-                this.setState({loading: false, lastError:null}, ()=>window.setTimeout(this.updatePendingJobs, 500));
+                this.setState({loading: false, lastError:null});
             }).catch(err=>{
                 console.error(err);
                 this.setState({loading: false, lastError:err});
@@ -231,7 +227,6 @@ class ScanTargetEdit extends React.Component {
             .then(result=>{
                 this.setState({currentActionCaption: "Scan started"});
                 console.log("Manual rescan has been triggered");
-                window.setTimeout(this.updatePendingJobs, 500);
             })
             .catch(err=>{
                 console.error(err);
@@ -328,7 +323,7 @@ class ScanTargetEdit extends React.Component {
             <ul className="no-bullets">
                 {
                     this.state.pendingJobIds ?
-                        this.state.pendingJobIds.map(jobId=><li key={jobId}><JobEntry jobId={jobId}/></li>) : <li><i>no pending job ids</i></li>
+                        this.state.pendingJobIds.map(jobId=><li key={jobId}><JobEntry jobId={jobId} showLink={true}/></li>) : <li><i>no pending job ids</i></li>
                 }
             </ul>
             <input type="submit" value="Save"/>
