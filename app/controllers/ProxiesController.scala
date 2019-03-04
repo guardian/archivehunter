@@ -58,7 +58,6 @@ class ProxiesController @Inject()(override val config:Configuration,
   private val awsProfile = config.getOptional[String]("externalData.awsProfile")
   protected val tableName:String = config.get[String]("proxies.tableName")
   private val table = Table[ProxyLocation](tableName)
-  private implicit val dynamoClient = ddbClientMgr.getNewAlpakkaDynamoClient(awsProfile)
 
   implicit val esClient = esClientMgr.getClient()
   implicit val timeout:Timeout = 55 seconds
@@ -399,7 +398,7 @@ class ProxiesController @Inject()(override val config:Configuration,
                   logger.error(s"Could not access proxy at s3://${proxySetRequest.proxyBucket}/${proxySetRequest.proxyType}: ", err)
                   Future(InternalServerError(GenericErrorResponse("error", err.toString).asJson))
                 case Success(Some(proxyMeta)) => //proxy exists
-                  val newLoc = ProxyLocation.fromS3(proxySetRequest.proxyBucket, proxySetRequest.proxyPath, proxySetRequest.entryId, proxyMeta, proxySetRequest.proxyType)
+                  val newLoc = ProxyLocation.fromS3(proxySetRequest.proxyBucket, proxySetRequest.proxyPath, proxySetRequest.entryId, proxyMeta, Some(proxySetRequest.region), proxySetRequest.proxyType)
                   proxyLocationDAO.saveProxy(newLoc).map({
                     case Some(Left(err)) =>
                       InternalServerError(GenericErrorResponse("db_error", err.toString).asJson)

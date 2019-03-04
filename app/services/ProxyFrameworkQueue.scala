@@ -418,7 +418,7 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
               originalSender ! akka.actor.Status.Failure(new RuntimeException(s"Could not update job model in database: ${err.toString}"))
             case Success(_)=>
               sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle(receiptHandle))
-              originalSender ! akka.actor.Status.Success()
+              originalSender ! akka.actor.Status.Success
             case Failure(err)=>
               logger.error("Could not update job model in database", err)
               originalSender ! akka.actor.Status.Failure(err)

@@ -36,11 +36,11 @@ object ProxyLocation extends DocId {
     new URI(proto, host, "/"+path, "")
   }
 
-  def fromS3(bucket:String, path:String, mainMediaId:String, meta:ObjectMetadata,proxyType:ProxyType.Value) = {
-    new ProxyLocation(mainMediaId, makeDocId(bucket,path), proxyType,bucket,path,StorageClass.withName(meta.getStorageClass))
+  def fromS3(bucket:String, path:String, mainMediaId:String, meta:ObjectMetadata, maybeRegion:Option[String], proxyType:ProxyType.Value) = {
+    new ProxyLocation(mainMediaId, makeDocId(bucket,path), proxyType,bucket,path,maybeRegion, StorageClass.withName(meta.getStorageClass))
   }
 
-  def newInS3(proxyLocationString:String, mainMediaId:String, proxyType:ProxyType.Value)(implicit s3Client:AmazonS3) = Try {
+  def newInS3(proxyLocationString:String, mainMediaId:String, region:String, proxyType:ProxyType.Value)(implicit s3Client:AmazonS3) = Try {
     val proxyLocationURI = getUrlElems(proxyLocationString)
     logger.debug(s"newInS3: bucket is ${proxyLocationURI.getHost} path is ${proxyLocationURI.getPath}")
     val fixedPath = if(proxyLocationURI.getPath.startsWith("/")){
