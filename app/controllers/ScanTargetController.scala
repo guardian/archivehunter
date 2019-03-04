@@ -16,11 +16,7 @@ import io.circe.generic.auto._
 import io.circe.syntax._
 import play.api.libs.circe.Circe
 import responses.{GenericErrorResponse, ObjectCreatedResponse, ObjectGetResponse, ObjectListResponse}
-import akka.stream.alpakka.dynamodb.scaladsl._
-import akka.stream.alpakka.dynamodb.impl._
 import com.theguardian.multimedia.archivehunter.common.clientManagers.DynamoClientManager
-import com.amazonaws.auth.{AWSStaticCredentialsProvider, InstanceProfileCredentialsProvider}
-import com.gu.pandomainauth.action.AuthActions
 import com.theguardian.multimedia.archivehunter.common.ProxyTranscodeFramework.ProxyGenerators
 import com.theguardian.multimedia.archivehunter.common.cmn_helpers.ZonedTimeFormat
 import com.theguardian.multimedia.archivehunter.common.cmn_models._
@@ -124,11 +120,12 @@ class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner
     * @param targetName target name being scanned
     * @param jobType job type name to use
     * @param block a block receiving the JobModel and returning a Future of Result
-    * @return
+    * @return either the Result of the block as a future or an InternalServerError describing the database failure
     */
   private def withNewScanJob(tgt:ScanTarget, jobType:String)(block: JobModel=>Result) = {
     val jobUuid = UUID.randomUUID()
     val job = JobModel(jobUuid.toString,jobType,Some(ZonedDateTime.now()),None,JobStatus.ST_RUNNING,None,tgt.bucketName,None,SourceType.SRC_SCANTARGET,lastUpdatedTS=None)
+
     jobModelDAO.putJob(job).map({
       case None=>
         val updatedTarget = tgt.withAnotherPendingJob(job.jobId)
