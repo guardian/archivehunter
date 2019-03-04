@@ -1,7 +1,10 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import axios from 'axios';
-import SortableTable from 'react-sortable-table';
+import ReactTable from 'react-table';
+import { ReactTableDefaults } from 'react-table';
+import 'react-table/react-table.css'
+
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { Link } from 'react-router-dom';
 import TimeIntervalComponent from '../common/TimeIntervalComponent.jsx';
@@ -38,77 +41,63 @@ class ScanTargetsList extends React.Component {
 
         this.columns = [
             {
-                header: "Delete",
-                key: "bucketName",
-                headerProps: {className: "dashboardheader"},
-                render: value=><FontAwesomeIcon icon="trash-alt" className="inline-icon clickable" onClick={()=>this.deleteClicked(value)}/>
+                Header: "Delete",
+                accessor: "bucketName",
+                Cell: props=><FontAwesomeIcon icon="trash-alt" className="inline-icon clickable" onClick={()=>this.deleteClicked(props.value)}/>
             },
             {
-                header: "Bucket",
-                key: "bucketName",
+                Header: "Bucket",
+                accessor: "bucketName",
                 defaultSorting: "desc",
-                headerProps: {className: "dashboardheader"},
-                render: value=><Link to={"scanTargets/" + value}>{value}</Link>
+                Cell: props=><Link to={"scanTargets/" + props.value}>{props.value}</Link>
             },
             {
-                header: "Region",
-                key: "region",
-                headerProps: {className: "dashboardheader"}
+                Header: "Region",
+                accessor: "region",
             },
             {
-                header: "Enabled",
-                key: "enabled",
-                headerProps: {className: "dashboardheader"},
-                render: value=> value ? <span><FontAwesomeIcon icon="check-circle" className="inline-icon" style={{color:"green"}}/>yes</span> : <span><FontAwesomeIcon icon="times-circle" className="far inline-icon" style={{color: "darkred"}}/>no</span>
+                Header: "Enabled",
+                accessor: "enabled",
+                Cell: props=> props.value ? <span><FontAwesomeIcon icon="check-circle" className="inline-icon" style={{color:"green"}}/>yes</span> : <span><FontAwesomeIcon icon="times-circle" className="far inline-icon" style={{color: "darkred"}}/>no</span>
             },
             {
-                header: "Last Scan",
-                key: "lastScanned",
-                headerProps: {className: "dashboardheader"},
-                render: value=><TimestampFormatter relative={true} value={value}/>
+                Header: "Last Scan",
+                accessor: "lastScanned",
+                Cell: props=><TimestampFormatter relative={true} value={props.value}/>
             },
             {
-                header: "Scan Interval",
-                key: "scanInterval",
-                headerProps: {className: "dashboardheader"},
-                render: value=><TimeIntervalComponent editable={false} value={value}/>
+                Header: "Scan Interval",
+                accessor: "scanInterval",
+                Cell: props=><TimeIntervalComponent editable={false} value={props.value}/>
             },
             {
-                header: "Currently scanning",
-                key: "scanInProgress",
-                headerProps: {className: "dashboardheader"},
-                render: value=> value ? "yes" : "no"
+                Header: "Currently scanning",
+                accessor: "scanInProgress",
+                Cell: props=> props.value ? "yes" : "no"
             },
             {
-                header: "Last scan error",
-                key: "lastError",
-                headerProps: {className: "dashboardheader"},
-                render: value=>value ? value : "-"
+                Header: "Last scan error",
+                accessor: "lastError",
+                Cell: props=>props.value ? props.value : "-"
             },
             {
-                header: "Proxy Bucket",
-                key: "proxyBucket",
-                headerProps: {className: "dashboardheader"}
+                Header: "Proxy Bucket",
+                accessor: "proxyBucket",
             },
             {
-                header: "Transcoder check",
-                headerProps: {className: "dashboardheader"},
-                key: "transcoderCheck",
-                render: value=> value ? <TranscoderCheckComponent status={value.status} checkedAt={value.checkedAt} log={value.log}/> : <p className="information">Not checked</p>
+                Header: "Transcoder check",
+                accessor: "transcoderCheck",
+                Cell: props=> props.value ? <TranscoderCheckComponent status={props.value.status} checkedAt={props.value.checkedAt} log={props.value.log}/> : <p className="information">Not checked</p>
             },
             {
-                header: "Pending jobs",
-                headerProps: {className: "dashboardheader"},
-                key: "pendingJobIds",
-                render: value=> value ? <ul className="jobs-list">{
-                    value.map(entry=><li key={entry}><JobEntry jobId={entry}/></li>)
-                }</ul> : <ul className="jobs-list"/>
-            },
+                Header: "Pending jobs",
+                accessor: "pendingJobIds",
+                Cell: props=> props.value && props.value.length>0 ? props.value.length : <p className="information">none</p>
+            } /*,
             {
-                header: "Trigger",
-                key: "bucketName",
-                headerProps: {className: "dashboardheader"},
-                render: value=><span>
+                Header: "Trigger",
+                accessor: "bucketName",
+                Cell: value=><span>
                     <span data-tip="Addition scan"><FontAwesomeIcon icon="folder-plus" className="clickable button-row" onClick={()=>this.triggerAddedScan(value)}/></span>
                     <span data-tip="Removal scan"><FontAwesomeIcon icon="folder-minus" className="clickable button-row" onClick={()=>this.triggerRemovedScan(value)}/></span>
                     <span data-tip="Full scan"><FontAwesomeIcon icon="folder" className="clickable button-row " onClick={()=>this.triggerFullScan(value)}/></span>
@@ -119,19 +108,8 @@ class ScanTargetsList extends React.Component {
                     <span data-tip="Validate transcode config"><FontAwesomeIcon icon="bug" className="clickable button-row" onClick={()=>this.triggerValidateConfig(value)}/></span>
                     <FontAwesomeIcon icon="industry" className="clickable button-row" data-tip="(Redo) Transcode Setup" onClick={()=>this.triggerTranscodeSetup(value)}/>
                 </span>
-            }
+            }*/
         ];
-        this.style = {
-            backgroundColor: '#eee',
-            border: '1px solid black',
-            borderCollapse: 'collapse'
-        };
-
-        this.iconStyle = {
-            color: '#aaa',
-            paddingLeft: '5px',
-            paddingRight: '5px'
-        };
 
     }
 
@@ -240,7 +218,8 @@ class ScanTargetsList extends React.Component {
 
     render(){
         return <div>
-            <BreadcrumbComponent path={this.props.location.pathname}/>
+            <ReactTooltip/>
+            <BreadcrumbComponent path={this.props.location ? this.props.location.pathname : "/unknown"}/>
             <div id="right-button-holder" style={{float: "right"}}>
                 <button type="button" onClick={this.newButtonClicked}>New</button>
             </div>
@@ -248,12 +227,11 @@ class ScanTargetsList extends React.Component {
                 <LoadingThrobber show={this.state.loading} small={true} caption={this.state.currentActionCaption ? this.state.currentActionCaption : "Loading..."}/>
                 <ErrorViewComponent error={this.state.lastError}/>
             </div>
-            <SortableTable
+            <ReactTable
             data={this.state.scanTargets}
             columns={this.columns}
-            style={this.style}
-            iconStyle={this.iconStyle}
-            tableProps={ {className: "dashboardpanel"} }
+            column={Object.assign({}, ReactTableDefaults.column, {headerClassName: 'dashboardheader'})}
+            pageSize={5}
         />
             {
                 this.state.showingDeleteConfirm && <Dialog modal={true}
@@ -277,7 +255,6 @@ class ScanTargetsList extends React.Component {
                     <p style={{height:"200px"}} className="centered">Are you sure you want to delete the scan target for {this.state.deletionTarget}?</p>
                 </Dialog>
             }
-            <ReactTooltip/>
         </div>
     }
 }

@@ -7,7 +7,8 @@ import ErrorViewComponent from '../common/ErrorViewComponent.jsx';
 
 class JobEntry extends React.Component {
     static propTypes = {
-        jobId: PropTypes.string.isRequired
+        jobId: PropTypes.string.isRequired,
+        showLink: PropTypes.bool
     };
 
     constructor(props){
@@ -23,11 +24,15 @@ class JobEntry extends React.Component {
     componentWillMount(){
         this.setState({loading:true}, ()=>axios.get("/api/job/" + this.props.jobId)
             .then(response=>{
-                this.setState({loading: false, jobData: response.data.entity})
+                this.setState({loading: false, jobData: response.data.entry})
             }).catch(err=>{
                 console.error(err);
                 this.setState({loading: false, lastError:err});
             }))
+    }
+
+    spanBody(){
+        return this.props.showLink ? <a href={"/admin/jobs/" + this.state.jobData.jobId}>{this.state.jobData.jobType}</a>: this.state.jobData.jobType;
     }
 
     render(){
@@ -36,7 +41,8 @@ class JobEntry extends React.Component {
         } else if(this.state.loading){
             return <LoadingThrobber show={true} />
         } else {
-            return this.state.jobData ? <span><JobStatusIcon status={this.state.jobData.jobStatus}/>{this.state.jobData.jobType}</span> : <span>{this.props.jobId}</span>
+            return this.state.jobData ? <span>
+                <JobStatusIcon status={this.state.jobData.jobStatus}/>{this.spanBody()}</span> : <span>{this.props.jobId}</span>
         }
     }
 }

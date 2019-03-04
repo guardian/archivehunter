@@ -16,7 +16,7 @@ import com.sksamuel.elastic4s.http.HttpClient
 import com.sksamuel.elastic4s.http.bulk.BulkResponseItem
 import helpers._
 import javax.inject.Inject
-import com.theguardian.multimedia.archivehunter.common.cmn_models.{ScanTarget, ScanTargetDAO}
+import com.theguardian.multimedia.archivehunter.common.cmn_models._
 import play.api.{Configuration, Logger}
 import com.sksamuel.elastic4s.streams.ReactiveElastic._
 import com.sksamuel.elastic4s.streams.{RequestBuilder, ResponseListener, SubscriberConfig}
@@ -33,14 +33,15 @@ object BucketScanner {
   case object TickKey
 
   case class ScanTargetsUpdated() extends BSMsg
-  case class PerformTargetScan(record:ScanTarget) extends BSMsg
-  case class PerformDeletionScan(record:ScanTarget, thenScanForNew: Boolean=false) extends BSMsg
+  case class PerformTargetScan(record:ScanTarget, maybeJob:Option[JobModel]=None) extends BSMsg
+  case class PerformDeletionScan(record:ScanTarget, thenScanForNew: Boolean=false, maybeJob:Option[JobModel]=None) extends BSMsg
   case object RegularScanTrigger extends BSMsg
 }
 
 
 class BucketScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientManager, s3ClientMgr:S3ClientManager,
-                              esClientMgr:ESClientManager, scanTargetDAO: ScanTargetDAO, injector:Injector)(implicit system:ActorSystem)
+                              esClientMgr:ESClientManager, scanTargetDAO: ScanTargetDAO, jobModelDAO:JobModelDAO,
+                              injector:Injector)(implicit system:ActorSystem)
   extends Actor with ZonedTimeFormat with ArchiveEntryRequestBuilder{
   import BucketScanner._
 
@@ -226,7 +227,7 @@ class BucketScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientMan
         case Failure(err)=>
           logger.error("Could not perform regular scan check", err)
       })
-    case PerformTargetScan(tgt)=>
+    case PerformTargetScan(tgt, maybeJob)=>
       scanTargetDAO.setInProgress(tgt, newValue=true).flatMap(updatedScanTarget=> {
         val promise = tgt.paranoid match {
           case Some(value) =>
@@ -236,8 +237,16 @@ class BucketScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientMan
 
         promise.future.andThen({
           case Success(x) =>
+            maybeJob.map(job=>{
+              val updatedJob = job.copy(completedAt=Some(ZonedDateTime.now()), jobStatus = JobStatus.ST_SUCCESS)
+              jobModelDAO.putJob(updatedJob)
+            })
             scanTargetDAO.setScanCompleted(updatedScanTarget)
           case Failure(err) =>
+            maybeJob.map(job=>{
+              val updatedJob = job.copy(completedAt=Some(ZonedDateTime.now()), jobStatus = JobStatus.ST_ERROR, log=Some(err.toString))
+              jobModelDAO.putJob(updatedJob)
+            })
             scanTargetDAO.setScanCompleted(updatedScanTarget, error = Some(err))
         })
       }).onComplete({
@@ -246,7 +255,7 @@ class BucketScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientMan
         case Failure(err)=>
           logger.error(s"Could not scan ${tgt.bucketName}: ", err)
       })
-    case PerformDeletionScan(tgt, thenScanForNew)=>
+    case PerformDeletionScan(tgt, thenScanForNew, maybeJob)=>
       scanTargetDAO.setInProgress(tgt, newValue = true).flatMap(updatedScanTarget=>
         doScanDeleted(updatedScanTarget).future.andThen({
           case Success(_)=>
@@ -260,9 +269,20 @@ class BucketScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientMan
           if(thenScanForNew){
             logger.info(s"Scheduling scan for new items in ${tgt.bucketName}")
             self ! PerformTargetScan(tgt)
+            //don't complete the job here, it's done in PerformTargetScan
+          } else {
+            //PerformTargetScan not happening, need to complete the job here
+            maybeJob.map(job=>{
+              val updatedJob = job.copy(completedAt=Some(ZonedDateTime.now()), jobStatus = JobStatus.ST_SUCCESS)
+              jobModelDAO.putJob(updatedJob)
+            })
           }
         case Failure(err)=>
           logger.error(s"Could not scan ${tgt.bucketName}", err)
+          maybeJob.map(job=>{
+            val updatedJob = job.copy(completedAt=Some(ZonedDateTime.now()), jobStatus = JobStatus.ST_ERROR, log=Some(err.toString))
+            jobModelDAO.putJob(updatedJob)
+          })
       })
   }
 }

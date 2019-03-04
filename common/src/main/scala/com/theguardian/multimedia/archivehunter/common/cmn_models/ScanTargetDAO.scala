@@ -123,4 +123,10 @@ class ScanTargetDAO @Inject()(config:ArchiveHunterConfiguration, ddbClientMgr: D
   }
 
   def allScanTargets():Future[List[Either[DynamoReadError,ScanTarget]]] = ScanamoAlpakka.exec(alpakkaClient)(table.scan())
+
+  def get(scanTargetName:String) = ScanamoAlpakka.exec(alpakkaClient)(table.get('bucketName->scanTargetName))
+
+  def withScanTarget[T](scanTargetName:String)(block:ScanTarget=>T):Future[Option[Either[DynamoReadError,T]]] = {
+    get(scanTargetName).map(_.map(_.map(tgt=>block(tgt))))
+  }
 }

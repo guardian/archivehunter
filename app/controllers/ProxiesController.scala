@@ -1,5 +1,6 @@
 package controllers
 
+import java.time.ZonedDateTime
 import java.util.UUID
 
 import akka.actor.{ActorRef, ActorSystem}
@@ -28,6 +29,7 @@ import helpers.{InjectableRefresher, ProxyLocator}
 import services.ProxiesRelinker
 import com.theguardian.multimedia.archivehunter.common.ProxyTranscodeFramework.{ProxyGenerators, RequestType}
 import play.api.libs.ws.WSClient
+
 import scala.concurrent.duration._
 import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
@@ -314,7 +316,35 @@ class ProxiesController @Inject()(override val config:Configuration,
         proxiesRelinker ! ProxiesRelinker.RelinkAllRequest(jobId)
         Ok(responses.ObjectCreatedResponse("ok","job",jobId).asJson)
     })
+  }
 
+  def relinkProxiesForTarget(scanTargetName:String) = APIAuthAction.async {
+    val jobId = UUID.randomUUID().toString
+    val jobDesc = JobModel(jobId, "RelinkProxies",Some(ZonedDateTime.now()),None,JobStatus.ST_RUNNING,None,scanTargetName,None,SourceType.SRC_SCANTARGET,None)
+
+    jobModelDAO.putJob(jobDesc).flatMap({
+      case None=>
+        proxiesRelinker ! ProxiesRelinker.RelinkScanTargetRequest(jobId, scanTargetName)
+
+        scanTargetDAO.withScanTarget(scanTargetName) { target=>
+          val updatedScanTarget = target.withAnotherPendingJob(jobDesc.jobId)
+          scanTargetDAO.put(updatedScanTarget)
+        } map {
+          case None=>
+            Ok(responses.ObjectCreatedResponse("ok","job",jobId).asJson)
+          case Some(Left(err))=>
+            logger.error(s"Could not updated scan target: $err")
+            InternalServerError(GenericErrorResponse("db_error", err.toString).asJson)
+          case Some(Right(rec))=>
+            Ok(responses.ObjectCreatedResponse("ok","job",jobId).asJson)
+        }
+
+      case Some(Left(dberr))=>
+        Future(InternalServerError(GenericErrorResponse("db_error",dberr.toString).asJson))
+      case Some(Right(entry))=>
+        proxiesRelinker ! ProxiesRelinker.RelinkScanTargetRequest(jobId, scanTargetName)
+        Future(Ok(responses.ObjectCreatedResponse("ok","job",jobId).asJson))
+    })
   }
 
   def analyseMetadata(entryId:String) = APIAuthAction.async {
