@@ -30,13 +30,19 @@ parser.add_option("--id", dest="entry_id", help="ArchiveHunter ID of media to se
 parser.add_option("-b", "--proxy-bucket", dest="proxy_bucket", help="Bucket where proxy is stored")
 parser.add_option("-p", "--proxy-path", dest="proxy_path", help="Path where proxy is stored")
 parser.add_option("-t", "--proxy-type", dest="proxy_type", help="Type of proxy to set")
+parser.add_option("-r", "--region", dest="region", help="Region of the proxy bucket")
+parser.add_option("--rm", dest="remove", help="Remove the given proxy as opposed to adding. You only need to specify --proxy-type and --id for this.", action="store_true")
 (options, args) = parser.parse_args()
 
 if options.secret is None:
     print "You must supply the password in --secret"
     exit(1)
 
-uri = "https://{host}/api/proxy".format(host=options.host)
+if options.remove:
+    uri = "https://{host}/api/proxy/{fileid}/{proxytype}".format(host=options.host,fileid=options.entry_id, proxytype=quote_plus(options.proxy_type))
+else:
+    uri = "https://{host}/api/proxy".format(host=options.host)
+
 print "uri is " + uri
 authtoken, httpdate = get_token(uri, options.secret)
 print authtoken
@@ -44,21 +50,26 @@ print authtoken
 headers = {
         'X-Gu-Tools-HMAC-Date': httpdate,
         'X-Gu-Tools-HMAC-Token': authtoken,
-        'Content-Type': "application/json"
 }
 
 print headers
 extra_kwargs = {}
-if options.sslnoverify==True:
+if options.sslnoverify:
     extra_kwargs['verify'] = False
 
-requestbody = json.dumps({
-    "entryId": options.entry_id,
-    "proxyBucket": options.proxy_bucket,
-    "proxyPath": options.proxy_path,
-    "proxyType": options.proxy_type
-})
-response = requests.post(uri, data=requestbody, headers=headers, **extra_kwargs)
+if options.remove:
+    response = requests.delete(uri, headers=headers, **extra_kwargs)
+else:
+    requestbody = json.dumps({
+        "entryId": options.entry_id,
+        "proxyBucket": options.proxy_bucket,
+        "proxyPath": options.proxy_path,
+        "proxyType": options.proxy_type,
+        "region": options.region
+    })
+    headers['Content-Type'] = "application/json"
+    response = requests.post(uri, data=requestbody, headers=headers, **extra_kwargs)
+
 print "Server returned {0}".format(response.status_code)
 pprint(response.headers)
 if response.status_code==200:

@@ -37,7 +37,8 @@ object ProxyLocation extends DocId {
   }
 
   def fromS3(bucket:String, path:String, mainMediaId:String, meta:ObjectMetadata, maybeRegion:Option[String], proxyType:ProxyType.Value) = {
-    new ProxyLocation(mainMediaId, makeDocId(bucket,path), proxyType,bucket,path,maybeRegion, StorageClass.withName(meta.getStorageClass))
+    val storageClass = Option(meta.getStorageClass).map(actualClass=>StorageClass.withName(actualClass)).getOrElse(StorageClass.STANDARD)
+    new ProxyLocation(mainMediaId, makeDocId(bucket,path), proxyType,bucket,path,maybeRegion,storageClass)
   }
 
   def newInS3(proxyLocationString:String, mainMediaId:String, region:String, proxyType:ProxyType.Value)(implicit s3Client:AmazonS3) = Try {

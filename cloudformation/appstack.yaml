@@ -93,6 +93,10 @@ Parameters:
     Description: ETS Preset ID to use when transcoding video proxies
     Type: String
     Default: 1351620000001-300040
+  ServerSharedSecret:
+    Description: Shared secret for script->server communication
+    Type: String
+    NoEcho: true
 Resources:
   AccessorSG: #this group is exported and used by bucketmonitor yaml. defined here so that it can be marked for access to ES
     Type: AWS::EC2::SecurityGroup
@@ -939,6 +943,10 @@ Resources:
              deployedUrl = "https://${App}.${DeploymentDomain}"
              domain = "${DeploymentDomain}"
              userProfileTable = "${UserProfileTable}"
+          }
+
+          serverAuth {
+            sharedSecret = "${ServerSharedSecret}"
           }
 
           akka.actor {

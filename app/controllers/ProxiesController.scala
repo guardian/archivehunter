@@ -443,8 +443,8 @@ class ProxiesController @Inject()(override val config:Configuration,
     * @param inputProxyType type of proxy to delete.
     * @return
     */
-  def manualDelete(fileId:String, inputProxyType:String)  = APIAuthAction.async {request=>
-    adminsOnlyAsync(request) {
+  def manualDelete(fileId:String, inputProxyType:String)  = APIHMACAuthAction.async {request=>
+    adminsOnlyAsync(request, allowHmac=true) {
       try {
         val proxyType = ProxyType.withName(inputProxyType)
         proxyLocationDAO.getProxy(fileId,proxyType).flatMap({

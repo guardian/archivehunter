@@ -70,7 +70,11 @@ class BulkThumbnailer @Inject() (@Named("dynamoCapacityActor") dynamoCapacityAct
       }
 
     case CapacityOkDoThumbnails(tgt)=>
-      val searchHitPublisher = esClient.publisher(search(indexName) matchQuery ("bucket.keyword", tgt.bucketName) scroll "1m")
+      val queries = boolQuery().withMust(Seq(
+        matchQuery("bucket.keyword", tgt.bucketName),
+        not(matchQuery("storageClass.keyword","GLACIER"))
+      ))
+      val searchHitPublisher = esClient.publisher(search(indexName) bool queries scroll "1m")
       val searchHitSource = Source.fromPublisher(searchHitPublisher)
       val archiveEntryConverter = new SearchHitToArchiveEntryFlow
       val streamCompletionPromise = Promise[Unit]()

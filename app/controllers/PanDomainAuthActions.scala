@@ -22,8 +22,6 @@ trait PanDomainAuthActions extends AuthActions {
   override def validateUser(authedUser: AuthenticatedUser): Boolean =
     authedUser.user.email endsWith "@guardian.co.uk"
 
-
-
   override def readCookie(request: RequestHeader): Option[Cookie] = {
     Logger.debug(s"Requesting cookie ${PublicSettings.assymCookieName}")
     Logger.debug(request.cookies.map(c=>c.name -> c.value).toMap.toString())
