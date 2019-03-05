@@ -3,10 +3,6 @@ import Keys._
 
 enablePlugins(RiffRaffArtifact, JDebPackaging, SystemdPlugin)
 
-resolvers += Resolver.mavenLocal
-
-//libraryDependencies += "org.vafer" % "jdeb" % "1.3" artifacts (Artifact("jdeb", "jar", "jar"))
-
 val elastic4sVersion = "6.0.4"
 val awsSdkVersion = "1.11.346"
 
