@@ -104,10 +104,23 @@ class ProxiesController @Inject()(override val config:Configuration,
     }
   }
 
-  def getPlayable(fileId:String, proxyType:Option[String]) = APIAuthAction.async {
-    try {
-      val ddbClient = ddbClientMgr.getNewAlpakkaDynamoClient(awsProfile)
+  def getAllProxyRefs(fileId:String) = APIHMACAuthAction.async {
+    ScanamoAlpakka.exec(ddbAkkaClient)(
+      table.query('fileId->fileId)
+    ).map(results=>{
+      val failures = results.collect({ case Left(err) => err})
+      if(failures.nonEmpty){
+        failures.foreach(err=>logger.error(s"Could not retrieve proxy reference: $err"))
+        InternalServerError(GenericErrorResponse("db_error", failures.mkString(", ")).asJson)
+      } else {
+        val success = results.collect({ case Right(location)=>location})
+        Ok(ObjectListResponse("ok","ProxyLocation",success, success.length).asJson)
+      }
+    })
+  }
 
+  def getPlayable(fileId:String, proxyType:Option[String]) = APIHMACAuthAction.async {
+    try {
       val actualType = proxyType match {
         case None=>"VIDEO"
         case Some(t)=>t.toUpperCase
