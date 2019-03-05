@@ -1,7 +1,7 @@
 package controllers
 
 import com.amazonaws.services.s3.AmazonS3
-import com.amazonaws.services.s3.model.ListObjectsRequest
+import com.amazonaws.services.s3.model.{ListObjectsRequest, S3ObjectSummary}
 import com.sksamuel.elastic4s.http.search.TermsAggResult
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{ESClientManager, S3ClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{ScanTarget, ScanTargetDAO}
@@ -20,6 +20,7 @@ import requests.SearchRequest
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
+import scala.util.Try
 
 class BrowseCollectionController @Inject() (override val config:Configuration,
                                             s3ClientMgr:S3ClientManager,

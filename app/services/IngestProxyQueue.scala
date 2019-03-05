@@ -52,6 +52,7 @@ class IngestProxyQueue @Inject()(config: Configuration,
   override protected implicit val implSystem = system
   override protected implicit val mat: Materializer = ActorMaterializer.create(system)
 
+
   //override this in testing
   protected val ownRef: ActorRef = self
 

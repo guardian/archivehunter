@@ -3,6 +3,7 @@ package com.theguardian.multimedia.archivehunter.common
 import java.net.URI
 
 import com.amazonaws.services.s3.AmazonS3
+import com.amazonaws.services.s3.model.ObjectMetadata
 import com.gu.scanamo.DynamoFormat
 import com.theguardian.multimedia.archivehunter.common.clientManagers.S3ClientManager
 import io.circe.{Decoder, Encoder}
@@ -33,6 +34,11 @@ object ProxyLocation extends DocId {
   protected def getUrlElems(str:String) = {
     val urlxtractor(proto, host, path) = str
     new URI(proto, host, "/"+path, "")
+  }
+
+  def fromS3(bucket:String, path:String, mainMediaId:String, meta:ObjectMetadata, maybeRegion:Option[String], proxyType:ProxyType.Value) = {
+    val storageClass = Option(meta.getStorageClass).map(actualClass=>StorageClass.withName(actualClass)).getOrElse(StorageClass.STANDARD)
+    new ProxyLocation(mainMediaId, makeDocId(bucket,path), proxyType,bucket,path,maybeRegion,storageClass)
   }
 
   def newInS3(proxyLocationString:String, mainMediaId:String, region:String, proxyType:ProxyType.Value)(implicit s3Client:AmazonS3) = Try {

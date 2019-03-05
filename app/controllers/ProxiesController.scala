@@ -9,7 +9,7 @@ import akka.stream.{ActorMaterializer, Materializer}
 import akka.util.Timeout
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager}
 import com.amazonaws.HttpMethod
-import com.amazonaws.services.s3.model.GeneratePresignedUrlRequest
+import com.amazonaws.services.s3.model.{AmazonS3Exception, GeneratePresignedUrlRequest, GetObjectMetadataRequest, ObjectMetadata}
 import com.gu.scanamo.{ScanamoAlpakka, Table}
 import com.theguardian.multimedia.archivehunter.common._
 import javax.inject.{Inject, Named, Singleton}
@@ -29,6 +29,10 @@ import helpers.{InjectableRefresher, ProxyLocator}
 import services.ProxiesRelinker
 import com.theguardian.multimedia.archivehunter.common.ProxyTranscodeFramework.{ProxyGenerators, RequestType}
 import play.api.libs.ws.WSClient
+import requests.ManualProxySet
+import com.gu.pandahmac.HMACAuthActions
+import com.gu.pandomainauth.action.UserRequest
+
 
 import scala.concurrent.duration._
 import scala.concurrent.Future
@@ -45,7 +49,7 @@ class ProxiesController @Inject()(override val config:Configuration,
                                   override val refresher:InjectableRefresher,
                                   @Named("proxiesRelinker") proxiesRelinker:ActorRef)
                                  (implicit actorSystem:ActorSystem, scanTargetDAO:ScanTargetDAO, jobModelDAO:JobModelDAO, proxyLocationDAO:ProxyLocationDAO)
-  extends AbstractController(controllerComponents) with Circe with ProxyLocationEncoder with PanDomainAuthActions with AdminsOnly {
+  extends AbstractController(controllerComponents) with Circe with ProxyLocationEncoder with PanDomainAuthActions with AdminsOnly with HMACAuthActions {
   import akka.pattern.ask
   implicit private val mat:Materializer = ActorMaterializer.create(actorSystem)
   private val logger=Logger(getClass)
@@ -54,19 +58,23 @@ class ProxiesController @Inject()(override val config:Configuration,
   private val awsProfile = config.getOptional[String]("externalData.awsProfile")
   protected val tableName:String = config.get[String]("proxies.tableName")
   private val table = Table[ProxyLocation](tableName)
-  private implicit val dynamoClient = ddbClientMgr.getNewAlpakkaDynamoClient(awsProfile)
 
   implicit val esClient = esClientMgr.getClient()
   implicit val timeout:Timeout = 55 seconds
   implicit val indexer = new Indexer(indexName)
 
+  private val s3conn = s3ClientMgr.getClient(awsProfile)
+
+  private implicit val ddbClient = ddbClientMgr.getClient(awsProfile)
+  private implicit val ddbAkkaClient = ddbClientMgr.getNewAlpakkaDynamoClient(awsProfile)
+
+  override def secret:String = config.get[String]("serverAuth.sharedSecret")
+
   def proxyForId(fileId:String, proxyType:Option[String]) = APIAuthAction.async {
     try {
-      val ddbClient = ddbClientMgr.getNewAlpakkaDynamoClient(awsProfile)
-
       proxyType match {
         case None=>
-          ScanamoAlpakka.exec(ddbClient)(table.query('fileId->fileId)).map(result=>{
+          ScanamoAlpakka.exec(ddbAkkaClient)(table.query('fileId->fileId)).map(result=>{
             val failures = result.collect({case Left(err)=>err})
             if(failures.nonEmpty){
               logger.error(s"Could not look up proxy for $fileId: $failures")
@@ -78,7 +86,7 @@ class ProxiesController @Inject()(override val config:Configuration,
             }
           })
         case Some(t)=>
-          ScanamoAlpakka.exec(ddbClient)(table.get('fileId->fileId and ('proxyType->t.toUpperCase))).map({
+          ScanamoAlpakka.exec(ddbAkkaClient)(table.get('fileId->fileId and ('proxyType->t.toUpperCase))).map({
             case None=>
               NotFound(GenericErrorResponse("not_found","No proxy was registered").asJson)
             case Some(Left(err))=>
@@ -96,16 +104,29 @@ class ProxiesController @Inject()(override val config:Configuration,
     }
   }
 
-  def getPlayable(fileId:String, proxyType:Option[String]) = APIAuthAction.async {
-    try {
-      val ddbClient = ddbClientMgr.getNewAlpakkaDynamoClient(awsProfile)
+  def getAllProxyRefs(fileId:String) = APIHMACAuthAction.async {
+    ScanamoAlpakka.exec(ddbAkkaClient)(
+      table.query('fileId->fileId)
+    ).map(results=>{
+      val failures = results.collect({ case Left(err) => err})
+      if(failures.nonEmpty){
+        failures.foreach(err=>logger.error(s"Could not retrieve proxy reference: $err"))
+        InternalServerError(GenericErrorResponse("db_error", failures.mkString(", ")).asJson)
+      } else {
+        val success = results.collect({ case Right(location)=>location})
+        Ok(ObjectListResponse("ok","ProxyLocation",success, success.length).asJson)
+      }
+    })
+  }
 
+  def getPlayable(fileId:String, proxyType:Option[String]) = APIHMACAuthAction.async {
+    try {
       val actualType = proxyType match {
         case None=>"VIDEO"
         case Some(t)=>t.toUpperCase
       }
 
-      ScanamoAlpakka.exec(ddbClient)(
+      ScanamoAlpakka.exec(ddbAkkaClient)(
         table.get('fileId->fileId and ('proxyType->actualType))
       ).map({
         case None=>
@@ -320,48 +341,146 @@ class ProxiesController @Inject()(override val config:Configuration,
 
   def relinkProxiesForTarget(scanTargetName:String) = APIAuthAction.async {
     val jobId = UUID.randomUUID().toString
-    val jobDesc = JobModel(jobId, "RelinkProxies",Some(ZonedDateTime.now()),None,JobStatus.ST_RUNNING,None,scanTargetName,None,SourceType.SRC_SCANTARGET,None)
+    val jobDesc = JobModel(jobId, "RelinkProxies", Some(ZonedDateTime.now()), None, JobStatus.ST_RUNNING, None, scanTargetName, None, SourceType.SRC_SCANTARGET, None)
 
     jobModelDAO.putJob(jobDesc).flatMap({
-      case None=>
+      case None =>
         proxiesRelinker ! ProxiesRelinker.RelinkScanTargetRequest(jobId, scanTargetName)
 
-        scanTargetDAO.withScanTarget(scanTargetName) { target=>
+        scanTargetDAO.withScanTarget(scanTargetName) { target =>
           val updatedScanTarget = target.withAnotherPendingJob(jobDesc.jobId)
           scanTargetDAO.put(updatedScanTarget)
         } map {
-          case None=>
-            Ok(responses.ObjectCreatedResponse("ok","job",jobId).asJson)
-          case Some(Left(err))=>
+          case None =>
+            Ok(responses.ObjectCreatedResponse("ok", "job", jobId).asJson)
+          case Some(Left(err)) =>
             logger.error(s"Could not updated scan target: $err")
             InternalServerError(GenericErrorResponse("db_error", err.toString).asJson)
-          case Some(Right(rec))=>
-            Ok(responses.ObjectCreatedResponse("ok","job",jobId).asJson)
+          case Some(Right(rec)) =>
+            Ok(responses.ObjectCreatedResponse("ok", "job", jobId).asJson)
         }
 
-      case Some(Left(dberr))=>
-        Future(InternalServerError(GenericErrorResponse("db_error",dberr.toString).asJson))
-      case Some(Right(entry))=>
+      case Some(Left(dberr)) =>
+        Future(InternalServerError(GenericErrorResponse("db_error", dberr.toString).asJson))
+      case Some(Right(entry)) =>
         proxiesRelinker ! ProxiesRelinker.RelinkScanTargetRequest(jobId, scanTargetName)
-        Future(Ok(responses.ObjectCreatedResponse("ok","job",jobId).asJson))
+        Future(Ok(responses.ObjectCreatedResponse("ok", "job", jobId).asJson))
     })
+
   }
 
+  def checkProxyExists(bucket:String, path:String):Try[Option[ObjectMetadata]] = {
+    try {
+      val result = s3conn.getObjectMetadata(bucket, path)
+      Success(Some(result))
+    } catch {
+      case ex:AmazonS3Exception=>
+        if(ex.getStatusCode==404){ //object does not exist
+          Success(None)
+        } else {
+          Failure(ex)
+        }
+      case ex:Throwable=>
+        Failure(ex)
+    }
+  }
+
+  /**
+    * this represents an endpoint that allows the manual association of a proxy uri to an item
+    * you trigger it with a ManualProxySet request passed as Json
+    * if the given item already has a proxy then a 409 Conflict is returned
+    * if nothing can be read by the server at the proxy address given then 404 Not Found is returned
+    * if the proxy is set then 200 OK is returned
+    * otherwise a 400 for invalid data or a 500 if there is a server-side error
+    * @return
+    */
+  def manualSet = APIHMACAuthAction.async(circe.json(2048)) { request=>
+    adminsOnlyAsync(request, allowHmac = true) {
+      request.body.as[ManualProxySet].fold(
+        failure =>
+          Future(BadRequest(GenericErrorResponse("bad_request", failure.toString).asJson)),
+        proxySetRequest => {
+          proxyLocationDAO.getProxy(proxySetRequest.entryId, proxySetRequest.proxyType).flatMap({
+            case Some(existingProxy) =>
+              Future(Conflict(responses.ObjectCreatedResponse("proxy_exists", "proxy_id", existingProxy.proxyId).asJson))
+            case None =>
+              checkProxyExists(proxySetRequest.proxyBucket, proxySetRequest.proxyPath) match {
+                case Success(None) => //proxy does not exist
+                  Future(NotFound(GenericErrorResponse("no_proxy", "Requested proxy file does not exist").asJson))
+                case Failure(err) =>
+                  logger.error(s"Could not access proxy at s3://${proxySetRequest.proxyBucket}/${proxySetRequest.proxyType}: ", err)
+                  Future(InternalServerError(GenericErrorResponse("error", err.toString).asJson))
+                case Success(Some(proxyMeta)) => //proxy exists
+                  val newLoc = ProxyLocation.fromS3(proxySetRequest.proxyBucket, proxySetRequest.proxyPath, proxySetRequest.entryId, proxyMeta, Some(proxySetRequest.region), proxySetRequest.proxyType)
+                  proxyLocationDAO.saveProxy(newLoc).map({
+                    case Some(Left(err)) =>
+                      InternalServerError(GenericErrorResponse("db_error", err.toString).asJson)
+                    case Some(Right(record)) =>
+                      Ok(ObjectGetResponse("ok", "proxy", record).asJson)
+                    case None =>
+                      Ok(ObjectCreatedResponse("ok", "proxy", newLoc.proxyId).asJson)
+                  })
+              }
+          })
+        }
+      )
+    }
+  }
+
+
   def analyseMetadata(entryId:String) = APIAuthAction.async {
-    indexer.getById(entryId).flatMap(entry=>{
+    indexer.getById(entryId).flatMap(entry => {
       proxyGenerators
-        .requestMetadataAnalyse(entry,config.getOptional[String]("externalData.awsRegion").getOrElse("eu-west-1"))
+        .requestMetadataAnalyse(entry, config.getOptional[String]("externalData.awsRegion").getOrElse("eu-west-1"))
         .map({
-          case Left(err)=>
+          case Left(err) =>
             logger.error(s"Could not request analyse: $err")
             InternalServerError(GenericErrorResponse("error", err).asJson)
-          case Right(jobId)=>
-            Ok(ObjectCreatedResponse("ok","job",jobId).asJson)
+          case Right(jobId) =>
+            Ok(ObjectCreatedResponse("ok", "job", jobId).asJson)
         })
     }).recover({
-      case err:Throwable=>
+      case err: Throwable =>
         logger.error("Could not request analyse: ", err)
         InternalServerError(GenericErrorResponse("error", err.toString).asJson)
     })
+  }
+
+  def deleteProxyFile(proxyLocation:ProxyLocation) = Try {
+    s3conn.deleteObject(proxyLocation.bucketName, proxyLocation.bucketPath)
+  }
+
+  /**
+    * manually delete the given proxy.
+    * @param fileId file ID of the main media
+    * @param inputProxyType type of proxy to delete.
+    * @return
+    */
+  def manualDelete(fileId:String, inputProxyType:String)  = APIHMACAuthAction.async {request=>
+    adminsOnlyAsync(request, allowHmac=true) {
+      try {
+        val proxyType = ProxyType.withName(inputProxyType)
+        proxyLocationDAO.getProxy(fileId,proxyType).flatMap({
+          case None=>Future(NotFound(GenericErrorResponse("not_found","No proxy found").asJson))
+          case Some(loc)=>
+            deleteProxyFile(loc) match {
+              case Success(_)=>
+                proxyLocationDAO.deleteProxyRecord(fileId, proxyType).map(result=>
+                  Ok(ObjectCreatedResponse("deleted","proxy",s"${fileId}:${inputProxyType}").asJson)
+                ).recoverWith({
+                  case err:Throwable=>
+                    logger.error("Could not delete proxy record in database", err)
+                    Future(InternalServerError(GenericErrorResponse("db_error",err.toString).asJson))
+                })
+              case Failure(err)=>
+                logger.error("Could not delete proxy file: ", err)
+                Future(InternalServerError(GenericErrorResponse("error", err.toString).asJson))
+            }
+        })
+      } catch {
+        case ex:Throwable=>
+          Future(BadRequest(GenericErrorResponse("error",s"Did not recognise proxy type $inputProxyType").asJson))
+      }
+    }
   }
 }
