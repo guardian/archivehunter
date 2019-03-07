@@ -13,8 +13,8 @@ const reAuthUrl = "/loginAuthStub";
  */
 function handle419(err){
     return new Promise((resolve,reject)=> {
-        console.log(err);
-        if (err.response.status === 419) {
+        //console.log(err);
+        if (err && err.response && err.response.status === 419) {
             console.log("Received 419 error indicating expired credentials");
             reEstablishSession(reAuthUrl,5000).then(result=>{   //need a timeout
                 console.log("Re-established session");
