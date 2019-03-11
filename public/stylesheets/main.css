@@ -160,12 +160,16 @@ div.entry-view {
 }
 
 div.bulk-selection-view {
-    height: 75px;
+    height: 95px;
     width: 280px;
     overflow: hidden;
     white-space: nowrap;
 }
 
+.bulk-download-link {
+    font-size: 0.8em;
+    z-index: 999;
+}
 .black {
     color: black;
     background-color: inherit;

@@ -6,7 +6,7 @@ import com.amazonaws.HttpMethod
 import com.amazonaws.services.s3.model.{GeneratePresignedUrlRequest, ResponseHeaderOverrides}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{LightboxBulkEntry, LightboxBulkEntryDAO, LightboxEntryDAO}
 import javax.inject.Inject
-import models.{ServerTokenDAO, ServerTokenEntry}
+import models.{ArchiveEntryDownloadSynopsis, ServerTokenDAO, ServerTokenEntry}
 import play.api.{Configuration, Logger}
 import play.api.libs.circe.Circe
 import play.api.mvc.{AbstractController, ControllerComponents}
@@ -15,7 +15,7 @@ import io.circe.generic.auto._
 import io.circe.syntax._
 import com.sksamuel.elastic4s.circe._
 import com.sksamuel.elastic4s.searches.sort.SortOrder
-import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer}
+import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ArchiveEntryHitReader, Indexer}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{ESClientManager, S3ClientManager}
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -27,7 +27,7 @@ class BulkDownloadsController @Inject()(config:Configuration,serverTokenDAO: Ser
                                         esClientManager: ESClientManager,
                                         s3ClientManager: S3ClientManager,
                                         cc:ControllerComponents)
-  extends AbstractController(cc) with Circe {
+  extends AbstractController(cc) with Circe with ArchiveEntryHitReader {
 
   private val logger = Logger(getClass)
 
@@ -85,9 +85,9 @@ class BulkDownloadsController @Inject()(config:Configuration,serverTokenDAO: Ser
                           val retrievalToken = ServerTokenEntry.create(duration=7200) //create a 2 hour token to cover the download.
                           serverTokenDAO.put(retrievalToken).map({
                             case None=>
-                              Ok(BulkDownloadInitiateResponse("ok",bulkEntry,retrievalToken.value,esResult.result.hits.hits.map(_.id)).asJson)
+                              Ok(BulkDownloadInitiateResponse("ok",bulkEntry,retrievalToken.value,esResult.result.to[ArchiveEntry].map(entry=>ArchiveEntryDownloadSynopsis.fromArchiveEntry(entry))).asJson)
                             case Some(Right(_))=>
-                              Ok(BulkDownloadInitiateResponse("ok",bulkEntry,retrievalToken.value,esResult.result.hits.hits.map(_.id)).asJson)
+                              Ok(BulkDownloadInitiateResponse("ok",bulkEntry,retrievalToken.value,esResult.result.to[ArchiveEntry].map(entry=>ArchiveEntryDownloadSynopsis.fromArchiveEntry(entry))).asJson)
                             case Some(Left(err))=>
                               logger.error(s"Could not save retrieval token: $err")
                               InternalServerError(GenericErrorResponse("db_error", s"Could not save retrieval token: $err").asJson)

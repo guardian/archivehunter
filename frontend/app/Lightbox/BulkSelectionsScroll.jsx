@@ -60,7 +60,7 @@ class BulkSelectionsScroll extends React.Component {
                         <a onClick={()=>{
                             this.initiateDownloadInApp(entry.id);
                             return false;
-                        }} style={{zIndex: 999}}>Download in app</a>
+                        }} className="bulk-download-link">Download in app</a>
                         <FontAwesomeIcon icon="trash-alt" className="clickable" style={{color: "red", float: "right"}} onClick={evt=>{
                             evt.stopPropagation();
                             this.props.onDeleteClicked(entry.id);
