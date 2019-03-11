@@ -44,7 +44,7 @@ class BulkSelectionsScroll extends React.Component {
 
                     return <div className={classList} onClick={()=>this.props.onSelected(entry.id)}>
                         <p className="entry-title dont-expand"><FontAwesomeIcon style={{marginRight: "0.5em"}} icon="hdd"/>{bulkInfo.name}</p>
-                        <p className="black small dont-expand"><FontAwesomeIcon style={{marginRight: "0.5em"}} icon="folder"/>{bulkInfo.pathArray.length>0 ? bulkInfo.pathArray.slice(-1) : ""}</p>
+                        <p className="black small dont-expand deal-with-long-names"><FontAwesomeIcon style={{marginRight: "0.5em"}} icon="folder"/>{bulkInfo.pathArray.length>0 ? bulkInfo.pathArray.slice(-1) : ""}</p>
                         <p className="black small dont-expand"><FontAwesomeIcon style={{marginRight: "0.5em"}} icon="list-ol"/>{entry.availCount} items</p>
                         <FontAwesomeIcon icon="trash-alt" className="clickable" style={{color: "red", float: "right"}} onClick={evt=>{
                             evt.stopPropagation();

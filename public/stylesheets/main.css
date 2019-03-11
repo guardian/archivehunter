@@ -162,6 +162,8 @@ div.entry-view {
 div.bulk-selection-view {
     height: 75px;
     width: 280px;
+    overflow: hidden;
+    white-space: nowrap;
 }
 
 .black {
@@ -575,4 +577,9 @@ li.list-grid {
 div.dialog-content {
     height: 200px;
     overflow-y: auto;
+}
+
+p.deal-with-long-names {
+    width: 282px;
+    overflow: hidden;
 }
