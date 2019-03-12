@@ -2,6 +2,9 @@ package controllers
 
 import java.util.UUID
 
+import akka.actor.ActorSystem
+import akka.stream.{ActorMaterializer, Materializer}
+import akka.stream.scaladsl.{Keep, Sink, Source}
 import com.amazonaws.HttpMethod
 import com.amazonaws.services.s3.model.{GeneratePresignedUrlRequest, ResponseHeaderOverrides}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{LightboxBulkEntry, LightboxBulkEntryDAO, LightboxEntryDAO}
@@ -14,9 +17,9 @@ import responses.{BulkDownloadInitiateResponse, GenericErrorResponse, ObjectGetR
 import io.circe.generic.auto._
 import io.circe.syntax._
 import com.sksamuel.elastic4s.circe._
-import com.sksamuel.elastic4s.searches.sort.SortOrder
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ArchiveEntryHitReader, Indexer}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{ESClientManager, S3ClientManager}
+import helpers.SearchHitToArchiveEntryFlow
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -26,12 +29,13 @@ class BulkDownloadsController @Inject()(config:Configuration,serverTokenDAO: Ser
                                         lightboxEntryDAO: LightboxEntryDAO,
                                         esClientManager: ESClientManager,
                                         s3ClientManager: S3ClientManager,
-                                        cc:ControllerComponents)
+                                        cc:ControllerComponents)(implicit system:ActorSystem)
   extends AbstractController(cc) with Circe with ArchiveEntryHitReader {
 
   private val logger = Logger(getClass)
 
   import com.sksamuel.elastic4s.http.ElasticDsl._
+  import com.sksamuel.elastic4s.streams.ReactiveElastic._
 
   val indexName = config.getOptional[String]("externalData.indexName").getOrElse("archivehunter")
   private val profileName = config.getOptional[String]("externalData.awsProfile")
@@ -39,18 +43,33 @@ class BulkDownloadsController @Inject()(config:Configuration,serverTokenDAO: Ser
 
   private val indexer = new Indexer(config.get[String]("externalData.indexName"))
 
+  private implicit val mat:Materializer = ActorMaterializer.create(system)
+
   private def errorResponse(updatedToken:ServerTokenEntry) = serverTokenDAO
     .put(updatedToken)
     .map(saveResult=>{
       Forbidden(GenericErrorResponse("forbidden","invalid or expired token").asJson)
     })
 
-  protected def entriesForBulk(bulkEntry:LightboxBulkEntry) = esClient.execute {
-    search(indexName) query {
-      nestedQuery("lightboxEntries", {
-        matchQuery("lightboxEntries.memberOfBulk", bulkEntry.id)
-      })
-    } sortBy fieldSort("path.keyword")
+  /**
+    * bring back a list of all entries for the given bulk. This _may_ need pagination in future but right now we just get
+    * everything
+    * @param bulkEntry bulkEntry identifying the objects to query
+    * @return a Future, containing a sequence of ArchiveEntryDownloadSynopsis
+    */
+  protected def entriesForBulk(bulkEntry:LightboxBulkEntry) = {
+    val query = search(indexName) query {
+          nestedQuery("lightboxEntries", {
+            matchQuery("lightboxEntries.memberOfBulk", bulkEntry.id)
+          })
+        } sortBy fieldSort("path.keyword") scroll "1m"
+
+    val source = Source.fromPublisher(esClient.publisher(query))
+    val hitConverter = new SearchHitToArchiveEntryFlow()
+    val sink = Sink.fold[Seq[ArchiveEntryDownloadSynopsis], ArchiveEntryDownloadSynopsis](Seq())({ (acc,entry)=>
+      acc ++ Seq(entry)
+    })
+    source.via(hitConverter).map(entry=>ArchiveEntryDownloadSynopsis.fromArchiveEntry(entry)).toMat(sink)(Keep.right).run()
   }
 
   /**
@@ -80,19 +99,19 @@ class BulkDownloadsController @Inject()(config:Configuration,serverTokenDAO: Ser
                   serverTokenDAO
                     .put(updatedToken)
                     .flatMap(saveResult=>{
-                      entriesForBulk(bulkEntry).flatMap({
-                        case Right(esResult)=>
-                          val retrievalToken = ServerTokenEntry.create(duration=7200) //create a 2 hour token to cover the download.
-                          serverTokenDAO.put(retrievalToken).map({
-                            case None=>
-                              Ok(BulkDownloadInitiateResponse("ok",bulkEntry,retrievalToken.value,esResult.result.to[ArchiveEntry].map(entry=>ArchiveEntryDownloadSynopsis.fromArchiveEntry(entry))).asJson)
-                            case Some(Right(_))=>
-                              Ok(BulkDownloadInitiateResponse("ok",bulkEntry,retrievalToken.value,esResult.result.to[ArchiveEntry].map(entry=>ArchiveEntryDownloadSynopsis.fromArchiveEntry(entry))).asJson)
-                            case Some(Left(err))=>
-                              logger.error(s"Could not save retrieval token: $err")
-                              InternalServerError(GenericErrorResponse("db_error", s"Could not save retrieval token: $err").asJson)
-                          })
-                        case Left(err)=>
+                      entriesForBulk(bulkEntry).flatMap(results=> {
+                        val retrievalToken = ServerTokenEntry.create(duration = 7200) //create a 2 hour token to cover the download.
+                        serverTokenDAO.put(retrievalToken).map({
+                          case None =>
+                            Ok(BulkDownloadInitiateResponse("ok", bulkEntry, retrievalToken.value, results).asJson)
+                          case Some(Right(_)) =>
+                            Ok(BulkDownloadInitiateResponse("ok", bulkEntry, retrievalToken.value, results).asJson)
+                          case Some(Left(err)) =>
+                            logger.error(s"Could not save retrieval token: $err")
+                            InternalServerError(GenericErrorResponse("db_error", s"Could not save retrieval token: $err").asJson)
+                        })
+                      }).recoverWith({
+                        case err:Throwable=>
                           logger.error(s"Could not search index for bulk entries: $err")
                           Future(Forbidden(GenericErrorResponse("forbidden", "invalid or expired token").asJson))
                       })

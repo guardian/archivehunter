@@ -983,6 +983,10 @@ Resources:
              userProfileTable = "${UserProfileTable}"
           }
 
+          serverToken {
+            serverTokenTable = "${ServerTokensTable}"
+          }
+
           serverAuth {
             sharedSecret = "${ServerSharedSecret}"
           }
