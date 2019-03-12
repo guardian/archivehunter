@@ -173,6 +173,7 @@ object LightboxHelper {
     val resultFutures = flow.run()
 
     Future.sequence(Seq(resultFutures._1, resultFutures._2)).map(addedCounts=>{
+      logger.info(s"addedCounts (dynamo) ${addedCounts.head}, addedCounts (ES) ${addedCounts(1)}")
       if(addedCounts.head != addedCounts(1)){
         logger.warn(s"Mismatch between dynamodb and elastic outputs - ${addedCounts.head} records saved to dynamo but ${addedCounts(1)} records saved to ES")
       }
