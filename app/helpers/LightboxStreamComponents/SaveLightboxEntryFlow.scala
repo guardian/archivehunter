@@ -45,12 +45,17 @@ class SaveLightboxEntryFlow (bulkId:String,userProfile: UserProfile)
         override def onPush(): Unit = {
           val elem = grab(in)
 
-          Await.result(LightboxHelper.saveLightboxEntry(userProfile, elem, Some(bulkId)), 30 seconds) match {
+          val saveFuture = LightboxHelper.saveLightboxEntry(userProfile, elem, Some(bulkId)).recover({
+            case err:Throwable=>Failure(err) //ensure that an outer exception is caught too
+          })
+
+          Await.result(saveFuture, 30 seconds) match {
             case Success(entry)=>
               logger.info("Saved lightbox entry")
               ctr+=1
               push(out, (elem, entry))
             case Failure(err)=>
+              logger.error("Could not save lightbox entry", err)
               //fail the output immediately, this should get seen by the stream's user
               promise.failure(err)
               throw err
