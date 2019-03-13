@@ -130,7 +130,10 @@ class LightboxController @Inject() (override val config:Configuration,
                             case Some(Left(err))=>
                               InternalServerError(GenericErrorResponse("db_error",err.toString).asJson)
                           })
-
+                        }).recover({
+                          case err:Throwable=>
+                            logger.error("Could not save lightbox entry: ", err)
+                            InternalServerError(GenericErrorResponse("error", err.toString).asJson)
                         })
 
                       case Left(err)=>

@@ -51,6 +51,8 @@ class SaveLightboxEntryFlow (bulkId:String,userProfile: UserProfile)
               ctr+=1
               push(out, (elem, entry))
             case Failure(err)=>
+              //fail the output immediately, this should get seen by the stream's user
+              promise.failure(err)
               throw err
           }
         }
@@ -61,7 +63,8 @@ class SaveLightboxEntryFlow (bulkId:String,userProfile: UserProfile)
       })
 
       override def postStop(): Unit = {
-        promise.success(ctr)
+        //if we've already failed the promise no point generating random error messages
+        if(!promise.isCompleted) promise.success(ctr)
       }
     }
     (logic, promise.future)

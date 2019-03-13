@@ -36,6 +36,7 @@ class RemoveLightboxEntrySink (userEmail:String)(implicit lightboxEntryDAO:Light
               ctr+=1
             case Failure(err)=>
               logger.error(s"Could not delete lightbox entry $elem: ", err)
+              promise.failure(err)
               throw err
           })
 

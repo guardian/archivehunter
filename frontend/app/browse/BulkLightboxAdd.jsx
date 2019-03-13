@@ -96,9 +96,6 @@ class BulkLightboxAdd extends React.Component {
     render(){
         return <div className="centered" style={{marginTop: "0.1em", paddingLeft: "0.5em", display: this.props.path ? "inline":"none"}}>
             {
-                this.state.lastError ? <ErrorViewComponent error={this.state.lastError}/> : ""
-            }
-            {
                 this.state.quotaExceeded ? <span><p><FontAwesomeIcon icon="lightbulb" className="button-icon"/>Can't add as this would exceed your quota. You would need <BytesFormatter value={this.state.quotaRequired*1048576}/> but only have <BytesFormatter value={this.state.quotaLevel*1048576}/>.</p></span> : ""
             }
             {
@@ -113,7 +110,9 @@ class BulkLightboxAdd extends React.Component {
                     <a>Saved to lightbox</a>
                 </span> : ""
             }
-
+            {
+                this.state.lastError ? <span className="error-text" style={{marginLeft: "0.6em"}}>Server error, not all items were added</span> : ""
+            }
         </div>
     }
 }

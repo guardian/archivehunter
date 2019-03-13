@@ -193,7 +193,7 @@ object LightboxHelper {
     * @param indexer
     * @param mat
     * @param ec
-    * @return a Future, containing an Int of the number of items removed
+    * @return a Future, containing an Int of the number of items removed.  If the stream errors then the future fails.
     */
   def removeBulkContents(indexName:String, userProfile:UserProfile, bulk:LightboxBulkEntry)
                         (implicit lightboxEntryDAO: LightboxEntryDAO, system:ActorSystem, esClient:HttpClient, indexer:Indexer, mat:Materializer, ec:ExecutionContext) = {
