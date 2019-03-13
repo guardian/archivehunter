@@ -52,6 +52,7 @@ class UpdateLightboxIndexInfoSink (bulkId:String,userProfile: UserProfile, userA
               pull(in)
             case Failure(err)=>
               logger.error("Could not update lightbox info: ", err)
+              promise.failure(err)
               throw err
           }
         }

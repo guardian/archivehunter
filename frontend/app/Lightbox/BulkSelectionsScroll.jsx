@@ -2,6 +2,7 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import TimestampFormatter from "../common/TimestampFormatter.jsx";
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome";
+import axios from 'axios';
 
 class BulkSelectionsScroll extends React.Component {
     static propTypes = {
@@ -34,6 +35,16 @@ class BulkSelectionsScroll extends React.Component {
         }
     }
 
+    initiateDownloadInApp(entryId) {
+        axios.get("/api/lightbox/bulk/appDownload/" + entryId, )
+            .then(result=>{
+                window.location.href = result.data.objectId;
+            }).catch(err=>{
+                console.error(err);
+                this.setState({lastError: err});
+        })
+    }
+
     render(){
         return <div className="bulk-selections-scroll">
             {
@@ -46,6 +57,10 @@ class BulkSelectionsScroll extends React.Component {
                         <p className="entry-title dont-expand"><FontAwesomeIcon style={{marginRight: "0.5em"}} icon="hdd"/>{bulkInfo.name}</p>
                         <p className="black small dont-expand deal-with-long-names"><FontAwesomeIcon style={{marginRight: "0.5em"}} icon="folder"/>{bulkInfo.pathArray.length>0 ? bulkInfo.pathArray.slice(-1) : ""}</p>
                         <p className="black small dont-expand"><FontAwesomeIcon style={{marginRight: "0.5em"}} icon="list-ol"/>{entry.availCount} items</p>
+                        <a onClick={()=>{
+                            this.initiateDownloadInApp(entry.id);
+                            return false;
+                        }} className="bulk-download-link">Download in app</a>
                         <FontAwesomeIcon icon="trash-alt" className="clickable" style={{color: "red", float: "right"}} onClick={evt=>{
                             evt.stopPropagation();
                             this.props.onDeleteClicked(entry.id);

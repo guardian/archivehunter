@@ -66,6 +66,7 @@ DELETE  /api/lightbox/my/:fileId        @controllers.LightboxController.removeFr
 GET     /api/lightbox/my/bulks          @controllers.LightboxController.myBulks
 DELETE  /api/lightbox/bulk/:bulkId      @controllers.LightboxController.deleteBulk(bulkId)
 PUT     /api/lightbox/bulk/query        @controllers.LightboxController.haveBulkEntryFor
+GET     /api/lightbox/bulk/appDownload/:bulkId  @controllers.LightboxController.bulkDownloadInApp(bulkId)
 
 GET     /api/download/:fileId           @controllers.LightboxController.getDownloadLink(fileId)
 
@@ -79,6 +80,9 @@ POST    /api/proxyFramework/deployments             @controllers.ProxyFrameworkA
 POST    /api/proxyFramework/deploymentDirect        @controllers.ProxyFrameworkAdminController.addDeploymentDirect
 DELETE  /api/proxyFramework/deployments/:forRegion  @controllers.ProxyFrameworkAdminController.removeDeployment(forRegion)
 GET     /api/regions                    @controllers.ProxyFrameworkAdminController.getRegions
+
+GET     /api/bulk/:codeValue                @controllers.BulkDownloadsController.initiateWithOnetimeCode(codeValue)
+GET     /api/bulk/:tokenValue/get/:fileId   @controllers.BulkDownloadsController.getDownloadIdWithToken(tokenValue, fileId)
 
 # Map static resources from the /public folder to the /assets URL path
 GET     /assets/*file               controllers.Assets.at(path="/public", file)

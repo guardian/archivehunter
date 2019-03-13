@@ -21,6 +21,7 @@ import play.api.mvc.{AbstractController, ControllerComponents}
 import responses._
 import io.circe.syntax._
 import io.circe.generic.auto._
+import models.{ServerTokenDAO, ServerTokenEntry}
 import play.api.libs.ws.WSClient
 import requests.SearchRequest
 import services.GlacierRestoreActor
@@ -38,7 +39,8 @@ class LightboxController @Inject() (override val config:Configuration,
                                     esClientMgr:ESClientManager,
                                     s3ClientMgr:S3ClientManager,
                                     @Named("glacierRestoreActor") glacierRestoreActor:ActorRef,
-                                    lightboxBulkEntryDAO: LightboxBulkEntryDAO)
+                                    lightboxBulkEntryDAO: LightboxBulkEntryDAO,
+                                    serverTokenDAO: ServerTokenDAO)
                                    (implicit val system:ActorSystem, injector:Injector)
   extends AbstractController(controllerComponents) with PanDomainAuthActions with Circe with ZonedDateTimeEncoder with RestoreStatusEncoder {
   private val logger=Logger(getClass)
@@ -49,6 +51,8 @@ class LightboxController @Inject() (override val config:Configuration,
   private implicit val ec:ExecutionContext  = controllerComponents.executionContext
   private val indexName = config.get[String]("externalData.indexName")
   private implicit val mat:Materializer = ActorMaterializer.create(system)
+
+  val tokenShortDuration = config.getOptional[Int]("serverToken.shortLivedDuration").getOrElse(10)  //default value is 2 hours
 
   def removeFromLightbox(fileId:String) = APIAuthAction.async { request=>
     userProfileFromSession(request.session) match {
@@ -128,7 +132,10 @@ class LightboxController @Inject() (override val config:Configuration,
                             case Some(Left(err))=>
                               InternalServerError(GenericErrorResponse("db_error",err.toString).asJson)
                           })
-
+                        }).recover({
+                          case err:Throwable=>
+                            logger.error("Could not save lightbox entry: ", err)
+                            InternalServerError(GenericErrorResponse("error", err.toString).asJson)
                         })
 
                       case Left(err)=>
@@ -325,5 +332,35 @@ class LightboxController @Inject() (override val config:Configuration,
         }
       }
     )
+  }
+
+  def bulkDownloadInApp(entryId:String) = APIAuthAction.async { request=>
+    implicit val lightboxEntryDAOImpl = lightboxEntryDAO
+    userProfileFromSession(request.session) match {
+      case None=>Future(BadRequest(GenericErrorResponse("session_error","no session present").asJson))
+      case Some(Left(err))=>
+        logger.error(s"Session is corrupted: ${err.toString}")
+        Future(InternalServerError(GenericErrorResponse("session_error","session is corrupted, log out and log in again").asJson))
+      case Some(Right(profile))=>
+        lightboxBulkEntryDAO.entryForId(UUID.fromString(entryId)).flatMap({
+          case None=>
+            Future(NotFound(GenericErrorResponse("not_found","No bulk with that ID is present").asJson))
+          case Some(Right(entry))=>
+            //create a token that is valid for 10 seconds
+            val token = ServerTokenEntry.create(associatedId = Some(entryId),duration=tokenShortDuration)
+            serverTokenDAO.put(token).map({
+              case None=>
+                Ok(ObjectCreatedResponse("ok","link",s"archivehunter:bulkdownload:${token.value}").asJson)
+              case Some(Right(_))=>
+                Ok(ObjectCreatedResponse("ok","link",s"archivehunter:bulkdownload:${token.value}").asJson)
+              case Some(Left(err))=>
+                logger.error(s"Could not save token to database: $err")
+                InternalServerError(GenericErrorResponse("db_error", err.toString).asJson)
+            })
+          case Some(Left(err))=>
+            logger.error(s"Could not look up bulk entry in dynamo: ${err.toString}")
+            Future(InternalServerError(GenericErrorResponse("db_error",err.toString).asJson))
+        })
+    }
   }
 }
