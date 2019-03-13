@@ -38,6 +38,9 @@ class BulkDownloadsController @Inject()(config:Configuration,serverTokenDAO: Ser
   import com.sksamuel.elastic4s.streams.ReactiveElastic._
 
   val indexName = config.getOptional[String]("externalData.indexName").getOrElse("archivehunter")
+
+  val tokenLongDuration = config.getOptional[Int]("serverToken.longLivedDuration").getOrElse(7200)  //default value is 2 hours
+
   private val profileName = config.getOptional[String]("externalData.awsProfile")
   protected implicit val esClient = esClientManager.getClient()
 
@@ -49,7 +52,11 @@ class BulkDownloadsController @Inject()(config:Configuration,serverTokenDAO: Ser
     .put(updatedToken)
     .map(saveResult=>{
       Forbidden(GenericErrorResponse("forbidden","invalid or expired token").asJson)
-    })
+    }).recover({
+    case err:Throwable=>
+      logger.error(s"Could not update token: ", err)
+      Forbidden(GenericErrorResponse("forbidden","invalid or expired token").asJson)
+  })
 
   /**
     * bring back a list of all entries for the given bulk. This _may_ need pagination in future but right now we just get
@@ -83,6 +90,7 @@ class BulkDownloadsController @Inject()(config:Configuration,serverTokenDAO: Ser
       case None=>
         Future(Forbidden(GenericErrorResponse("forbidden", "invalid or expired token").asJson))
       case Some(Left(err))=>
+        logger.error(s"Could not verify one-time token: ${err.toString}")
         Future(Forbidden(GenericErrorResponse("forbidden", "invalid or expired token").asJson))
       case Some(Right(token))=>
         val updatedToken = token.updateCheckExpired(maxUses=Some(1)).copy(uses = token.uses+1)
@@ -90,7 +98,9 @@ class BulkDownloadsController @Inject()(config:Configuration,serverTokenDAO: Ser
           errorResponse(updatedToken)
         } else {
           token.associatedId match {
-            case None=>errorResponse(updatedToken)
+            case None=>
+              logger.error(s"Token ${token.value} has no bulk associated with it!")
+              errorResponse(updatedToken)
             case Some(associatedId)=>
               lightboxBulkEntryDAO.entryForId(UUID.fromString(associatedId)).flatMap({
                 case Some(Left(err))=>errorResponse(updatedToken)
@@ -100,7 +110,7 @@ class BulkDownloadsController @Inject()(config:Configuration,serverTokenDAO: Ser
                     .put(updatedToken)
                     .flatMap(saveResult=>{
                       entriesForBulk(bulkEntry).flatMap(results=> {
-                        val retrievalToken = ServerTokenEntry.create(duration = 7200) //create a 2 hour token to cover the download.
+                        val retrievalToken = ServerTokenEntry.create(duration = tokenLongDuration) //create a 2 hour token to cover the download.
                         serverTokenDAO.put(retrievalToken).map({
                           case None =>
                             Ok(BulkDownloadInitiateResponse("ok", bulkEntry, retrievalToken.value, results).asJson)

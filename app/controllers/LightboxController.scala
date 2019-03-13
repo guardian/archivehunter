@@ -52,6 +52,8 @@ class LightboxController @Inject() (override val config:Configuration,
   private val indexName = config.get[String]("externalData.indexName")
   private implicit val mat:Materializer = ActorMaterializer.create(system)
 
+  val tokenShortDuration = config.getOptional[Int]("serverToken.shortLivedDuration").getOrElse(10)  //default value is 2 hours
+
   def removeFromLightbox(fileId:String) = APIAuthAction.async { request=>
     userProfileFromSession(request.session) match {
       case None => Future(BadRequest(GenericErrorResponse("session_error", "no session present").asJson))
@@ -345,7 +347,7 @@ class LightboxController @Inject() (override val config:Configuration,
             Future(NotFound(GenericErrorResponse("not_found","No bulk with that ID is present").asJson))
           case Some(Right(entry))=>
             //create a token that is valid for 10 seconds
-            val token = ServerTokenEntry.create(associatedId = Some(entryId),duration=10)
+            val token = ServerTokenEntry.create(associatedId = Some(entryId),duration=tokenShortDuration)
             serverTokenDAO.put(token).map({
               case None=>
                 Ok(ObjectCreatedResponse("ok","link",s"archivehunter:bulkdownload:${token.value}").asJson)
