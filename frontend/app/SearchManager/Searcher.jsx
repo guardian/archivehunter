@@ -42,11 +42,12 @@ class Searcher {
     cancel(msg){
         return new Promise((resolve, reject)=>{
             if(this.operationInProgress){
+                console.log("operationInProgress is true, waiting for axios to cancel");
                 this.terminationCompletedCb = resolve;
                 this.isCancelling = true;
                 this.cancelTokenSource.cancel(msg); //this is picked up in axios.isCancel() within getNextPage() - the promise is then completed.
             } else {
-                this.isCancelling = true;
+                //if we are not in progress then there is nothing to cancel
                 resolve();
             }
         })
@@ -59,8 +60,11 @@ class Searcher {
         console.log("getNextPage: isCancelling? ", this.isCancelling);
 
         if(this.isCancelling){
+            console.log("isCancelling, so returning");
             this.operationInProgress = false;
             if(this.cancelledCb) this.cancelledCb(this.searchId);
+            this.isCancelling = false;
+            if(this.terminationCompletedCb) this.terminationCompletedCb();
             return;
         }
         this.operationInProgress = true;
@@ -88,16 +92,21 @@ class Searcher {
                 const shouldContinue = this.nextPageCb(response, this.searchId);
                 this.startAt+=this.pageSize;
                 if(shouldContinue){
+                    console.log("loading next page as callback returned true");
                     this.getNextPage();
                 } else {
+                    console.log("stopping as callback returned false");
                     this.operationInProgress = false;
                 }
             }
         }).catch(err=>{
             this.operationInProgress = false;
             if(axios.isCancel(err)){
+                console.log("axios cancel received");
                 if(this.cancelledCb) this.cancelledCb(this.searchId);
                 if(this.terminationCompletedCb){
+                    this.isCancelling = false;  //cancellation has been completed
+                    console.log("calling terminationCompletedCb", this.terminationCompletedCb);
                     this.terminationCompletedCb();  //completes the Promise that we return on a cancel() call.
                     this.terminationCompletedCb=null;
                 }
