@@ -8,7 +8,9 @@ class SearchResultsComponent extends React.Component {
         onItemOpen: PropTypes.func.isRequired,
         onItemClose: PropTypes.func.isRequired,
         selectedEntry: PropTypes.object,
-        cancelToken: PropTypes.object
+        cancelToken: PropTypes.object,
+        loadMoreClicked: PropTypes.func,
+        showLoadMore: PropTypes.bool
     };
 
     constructor(props){
@@ -32,6 +34,9 @@ class SearchResultsComponent extends React.Component {
                                                          cancelToken={this.props.cancelToken}
                                                          itemOpenRequest={this.props.onItemOpen}
                 />)
+            }
+            {
+                this.props.loadMoreClicked && this.props.showLoadMore ? <p className="centered"><a className="clickable" onClick={this.props.loadMoreClicked}>Load more</a></p> : <span/>
             }
         </div>
     }

@@ -46,7 +46,7 @@ class SearchManager {
         return new Promise((resolve, reject) => {
             const searchId = this.generateId();
             if (this.currentSearch) {
-                console.log("Cancelling current search");
+                console.log("Cancelling current search - makeNewSearch has been called");
                 this.currentSearch.cancel("new search terms").then(result => {
                     console.log("Cancellation prcessed, building new one...");
                     this.currentSearch = this._buildSearch(searchId, method, url, params, bodyContent, pageSize, nextPageCb, completedCb, cancelledCb, errorCb);
@@ -61,7 +61,13 @@ class SearchManager {
         });
     }
 
-
+    resumeSearch() {
+        if(this.currentSearch) {
+            this.currentSearch.getNextPage();
+        } else {
+            console.error("Cannot resume, no currentSearch");
+        }
+    }
 
 }
 

@@ -30,7 +30,9 @@ class BrowseComponent extends CommonSearchView {
             entriesCancelTokenSource: null,
             sortOrder: "Ascending",
             sortField: "last_modified",
-            showDotFiles: false
+            showDotFiles: false,
+            currentLoadTarget: 5,   //how many more items we are expecting to get
+            visiblePageSize: 5      //the maximum number of items to load in each time "Load more" is clicked. If the page size from server is greater, then it supercedes the value here
         };
 
         this.treeStyle = Object.assign({}, defaultTheme);
@@ -55,6 +57,8 @@ class BrowseComponent extends CommonSearchView {
         this.onItemClose = this.onItemClose.bind(this);
         this.onItemOpen = this.onItemOpen.bind(this);
         this.addedToLightbox = this.addedToLightbox.bind(this);
+
+        this.loadMoreClicked = this.loadMoreClicked.bind(this);
 
         /* callback for BrowsePathSummary */
         this.refreshContents = this.refreshContents.bind(this);
@@ -102,9 +106,9 @@ class BrowseComponent extends CommonSearchView {
         const nodeName = pathParts.length>1 ? pathParts[pathParts.length-2] : pathParts[1];
 
         const shouldToggle = openedPath.length>0 && this.arrayCompare(openedPath.slice(0,pathParts.length-1),pathParts.slice(0,pathParts.length-1));
-        console.log("openedPath: ",openedPath.slice(0,pathParts.length-1));
-        console.log("pathParts: ", pathParts.slice(0,pathParts.length-1));
-        console.log("shouldToggle: ", shouldToggle);
+        // console.log("openedPath: ",openedPath.slice(0,pathParts.length-1));
+        // console.log("pathParts: ", pathParts.slice(0,pathParts.length-1));
+        // console.log("shouldToggle: ", shouldToggle);
 
         return {
             name: nodeName,
@@ -155,6 +159,14 @@ class BrowseComponent extends CommonSearchView {
                 this.triggerSearch().then(()=>resolve()).catch(err=>reject(err));
             }
         });
+    }
+
+    loadMoreClicked(){
+         if(this.searchManager){
+             this.setState({currentLoadTarget: this.state.currentLoadTarget + this.state.visiblePageSize}, ()=>this.searchManager.resumeSearch());
+         } else {
+             console.error("Cannot resume, no search manager present");
+         }
     }
 
     refreshTreeContents(){
@@ -229,7 +241,7 @@ class BrowseComponent extends CommonSearchView {
         } else {
             console.error("Received data for stale search " + searchId + ". Current search is " + this.state.currentSearch)
         }
-        return this.state.searchResults.length<450;
+        return this.state.searchResults.length<this.state.currentLoadTarget;
     }
 
 
@@ -258,7 +270,7 @@ class BrowseComponent extends CommonSearchView {
 
     triggerSearch(node, startingPos){
         return new Promise((resolve,reject)=>{
-            const pageSize = 100;
+            const pageSize = 20;
             const toSend = {
                 data: this.makeSearchJson(node),
                 contentType: "application/json"
@@ -345,7 +357,13 @@ class BrowseComponent extends CommonSearchView {
                                    showDotFiles={this.state.showDotFiles}
                                    showDotFilesUpdated={value=>this.setState({showDotFiles: value}, this.refreshContents)}
                 />
-                <SearchResultsComponent entries={this.state.searchResults} onItemOpen={this.onItemOpen} onItemClose={this.onItemClose} selectedEntry={this.state.showingPreview} cancelToken={this.entriesCancelTokenSource ? this.entriesCancelTokenSource.token : null}/>
+                <SearchResultsComponent entries={this.state.searchResults}
+                                        onItemOpen={this.onItemOpen}
+                                        onItemClose={this.onItemClose}
+                                        selectedEntry={this.state.showingPreview}
+                                        cancelToken={this.entriesCancelTokenSource ? this.entriesCancelTokenSource.token : null}
+                                        loadMoreClicked={this.loadMoreClicked}
+                                        showLoadMore={true}/>
             </div>
         } else if(this.state.searching) {
             return <img style={{marginLeft:"auto",marginRight:"auto",width:"200px",display:"block"}} src="/assets/images/Spinner-1s-200px.gif"/>
