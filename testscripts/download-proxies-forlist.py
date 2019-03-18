@@ -11,6 +11,8 @@ from functools import cmp_to_key
 import locale
 import json
 import logging
+from ProxyDownloader import ProxyDownloader
+from queue import Queue
 
 LOGFORMAT = '%(asctime)-15s - %(levelname)s - %(funcName)s: %(message)s'
 
@@ -136,6 +138,18 @@ def which_proxy_for(file_extension):
     else:
         return []
 
+def request_proxy_for(entry):
+    """
+    enqueues a download request
+    :param entry:
+    :return:
+    """
+    rq = {
+        "path": os.path.dirname(entry["bucketPath"]),
+        "name": os.path.basename(entry["bucketPath"]),
+        "archive_hunter_id": entry["fileId"]
+    }
+    download_queue.put(rq)
 
 ###START MAIN
 parser = argparse.ArgumentParser()
@@ -145,6 +159,7 @@ parser.add_argument("--hostname", dest="hostname")
 parser.add_argument("--secret", dest="secret")
 parser.add_argument("--strip", dest="strip")
 parser.add_argument("--test", dest="test", action="store_true")
+parser.add_argument("--download-threads", dest="threads", default=5)
 args = parser.parse_args()
 
 if not args.collection or not args.listfile or not args.hostname or not args.secret:
@@ -154,6 +169,13 @@ if not args.collection or not args.listfile or not args.hostname or not args.sec
 logger.info("Scanning for files...")
 n=0
 seen_extensions = []
+
+download_queue = Queue()
+download_thread_list = []
+for n in range(0, args.threads):
+    t = ProxyDownloader(queue=download_queue, hostname=args.hostname, secret=args.secret)
+    t.start()
+    download_thread_list.append(t)
 
 for filepath in each_filepath(args.listfile, args.strip):
     logger.debug(filepath)
@@ -184,6 +206,18 @@ for filepath in each_filepath(args.listfile, args.strip):
                         logger.exception("Could not request proxy")
             else:
                 logger.info("Got proxies: {0}".format(proxies["entries"]))
+                for entry in proxies["entries"]:
+                    request_proxy_for(entry)
+
 sorted_extns = sorted(filter(lambda x: x is not None, seen_extensions), key=cmp_to_key(locale.strcoll))
 
 logger.info("Seen extensions: {0}".format(sorted_extns))
+
+logger.info("Shutting down threads...")
+for n in range(0, args.threads):
+    download_queue.put(None)
+
+for t in download_thread_list:
+    t.join()
+
+logger.info("Done")
