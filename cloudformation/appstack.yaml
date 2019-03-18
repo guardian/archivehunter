@@ -395,6 +395,26 @@ Resources:
         - Key: Stage
           Value: !Ref Stage
 
+  FileExtensionTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: extension
+          AttributeType: S
+      KeySchema:
+        - AttributeName: extension
+          KeyType: HASH
+      ProvisionedThroughput:
+        WriteCapacityUnits: 1
+        ReadCapacityUnits: 2
+      Tags:
+        - Key: App
+          Value : !Sub ${App}-webapp
+        - Key: Stack
+          Value: !Ref Stack
+        - Key: Stage
+          Value: !Ref Stage
+
   LoadBalancerSG:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -708,6 +728,7 @@ Resources:
             - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${LightboxBulkEntryTable}/index/*
             - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ServerTokensTable}
             - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ServerTokensTable}/index/*
+            - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${FileExtensionTable}
       - PolicyName: TranscoderAccess
         PolicyDocument:
           Version: 2012-10-17

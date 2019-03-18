@@ -17,6 +17,7 @@ import JobsList from './JobsList/JobsList.jsx';
 import BrowseComponent from './browse/BrowseComponent.jsx';
 import LoginStatusComponent from './Login/LoginStatusComponent.jsx';
 import MyLightbox from './Lightbox/MyLightbox.jsx';
+import FileExtensionList from './FileExtension/FileExtensionList.jsx';
 
 import { library } from '@fortawesome/fontawesome-svg-core'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
@@ -90,6 +91,8 @@ class App extends React.Component {
                 <Route path="/admin/jobs" component={JobsList}/>
                 <Route path="/admin/scanTargets/:id" component={ScanTargetEdit}/> /*this also handles "new" */
                 <Route path="/admin/scanTargets" component={ScanTargetsList}/>
+                <Route path="/admin/fileExtensions" component={FileExtensionList}/>
+
                 <Route path="/admin" exact={true} component={AdminFront}/>
                 <Route path="/lightbox" exact={true} component={MyLightbox}/>
                 <Route path="/browse" exact={true} component={BrowseComponent}/>

@@ -68,6 +68,9 @@ DELETE  /api/lightbox/bulk/:bulkId      @controllers.LightboxController.deleteBu
 PUT     /api/lightbox/bulk/query        @controllers.LightboxController.haveBulkEntryFor
 GET     /api/lightbox/bulk/appDownload/:bulkId  @controllers.LightboxController.bulkDownloadInApp(bulkId)
 
+GET     /api/fileextension              @controllers.KnownFileExtensionController.getAll
+PUT     /api/fileextension              @controllers.KnownFileExtensionController.putRecord
+
 GET     /api/download/:fileId           @controllers.LightboxController.getDownloadLink(fileId)
 
 GET     /api/archive/status/:fileId     @controllers.LightboxController.checkRestoreStatus(fileId)

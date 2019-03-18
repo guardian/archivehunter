@@ -123,7 +123,7 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration,
     case "video"=>Some(ProxyType.VIDEO)
     case "audio"=>Some(ProxyType.AUDIO)
     case "image"=>None
-    case "application"=>
+    case "application"=> //FIXME: need to use KnownFileExtension object to improve this
       if(entry.mimeType.minor=="octet-stream"){
         Some(ProxyType.VIDEO)
       } else {
