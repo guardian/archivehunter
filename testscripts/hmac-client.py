@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 
 import hashlib
 import hmac
@@ -8,7 +8,7 @@ import base64
 from email.utils import formatdate
 import requests
 from time import mktime
-from urlparse import urlparse
+from urllib.parse import urlparse
 from pprint import pprint
 import json
 
@@ -18,8 +18,8 @@ def get_token(uri, secret):
 
     string_to_sign = "{0}\n{1}".format(httpdate, url_parts.path)
     print("string_to_sign: " + string_to_sign)
-    hm = hmac.new(secret, string_to_sign,hashlib.sha256)
-    return "HMAC {0}".format(base64.b64encode(hm.digest())), httpdate
+    hm = hmac.new(secret.encode("UTF-8"), string_to_sign.encode("UTF-8"),hashlib.sha256)
+    return "HMAC {0}".format(base64.b64encode(hm.digest()).decode("UTF-8")), httpdate
 
 #START MAIN
 parser = OptionParser()
@@ -46,16 +46,16 @@ elif options.query:
 else:
     uri = "https://{host}/api/proxy".format(host=options.host)
 
-print "uri is " + uri
+print("uri is " + uri)
 authtoken, httpdate = get_token(uri, options.secret)
-print authtoken
+print(authtoken)
 
 headers = {
         'X-Gu-Tools-HMAC-Date': httpdate,
         'X-Gu-Tools-HMAC-Token': authtoken,
 }
 
-print headers
+print(headers)
 extra_kwargs = {}
 if options.sslnoverify:
     extra_kwargs['verify'] = False
