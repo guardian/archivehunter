@@ -254,7 +254,7 @@ class ProxiesController @Inject()(override val config:Configuration,
     })
   }
 
-  def generateProxy(fileId:String, typeStr:String) = APIAuthAction.async {
+  def generateProxy(fileId:String, typeStr:String) = APIHMACAuthAction.async {
     try {
       val pt = ProxyType.withName(typeStr.toUpperCase)
       indexer.getById(fileId).flatMap(entry=>{
