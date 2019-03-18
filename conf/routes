@@ -29,6 +29,7 @@ GET     /api/entry/:id                  @controllers.SearchController.getEntry(i
 PUT     /api/search/suggestions         @controllers.SearchController.suggestions
 POST    /api/search/browser             @controllers.SearchController.browserSearch(start:Int ?= 0, size:Int ?=100)
 GET     /api/search/myLightBox          @controllers.SearchController.lightboxSearch(start:Int ?= 0, size:Int ?=100, bulkId:Option[String])
+GET     /api/validate/:fileId           @controllers.SearchController.validateId(fileId)
 
 GET     /api/search/proxyStats          @controllers.SearchController.getProxyFacets
 

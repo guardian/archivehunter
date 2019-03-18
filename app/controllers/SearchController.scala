@@ -19,6 +19,7 @@ import play.api.libs.circe.Circe
 import requests.SearchRequest
 import play.api.libs.ws.WSClient
 import responses._
+import com.gu.pandahmac.HMACAuthActions
 
 import scala.concurrent.Future
 
@@ -29,13 +30,15 @@ class SearchController @Inject()(override val config:Configuration,
                                  override val wsClient:WSClient,
                                  override val refresher:InjectableRefresher)
   extends AbstractController(controllerComponents) with ArchiveEntryHitReader with ZonedDateTimeEncoder with StorageClassEncoder with Circe
-with PanDomainAuthActions {
+with PanDomainAuthActions with HMACAuthActions {
 
   private val logger=Logger(getClass)
   val indexName = config.getOptional[String]("externalData.indexName").getOrElse("archivehunter")
 
   private val esClient = esClientManager.getClient()
   import com.sksamuel.elastic4s.http.ElasticDsl._
+
+  override def secret:String = config.get[String]("serverAuth.sharedSecret")
 
   def getEntry(fileId:String) = APIAuthAction.async {
     esClient.execute {
@@ -102,6 +105,23 @@ with PanDomainAuthActions {
       case err:Throwable=>
         logger.error("Could not do suggestions search: ", err)
         InternalServerError(GenericErrorResponse("error", err.toString).asJson)
+    })
+  }
+
+  def validateId(fileId:String) = APIHMACAuthAction.async {
+    esClient.execute {
+      get(indexName,"entry",fileId)
+    }.map({
+      case Left(err)=>
+        logger.error(s"Could not get an item: $err")
+        InternalServerError(GenericErrorResponse("search_error", err.toString).asJson)
+      case Right(result)=>
+        logger.info(s"Got ${result.result.found} item ${result.result.id}")
+        if(result.result.found) {
+          Ok(ObjectGetResponse("ok", "entry", result.result.id).asJson)
+        } else {
+          NotFound(ObjectGetResponse("notfound", "entry", result.result.id).asJson)
+        }
     })
   }
 

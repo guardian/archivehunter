@@ -17,7 +17,7 @@ def get_token(uri, secret):
     url_parts = urlparse(uri)
 
     string_to_sign = "{0}\n{1}".format(httpdate, url_parts.path)
-    print "string_to_sign: " + string_to_sign
+    print("string_to_sign: " + string_to_sign)
     hm = hmac.new(secret, string_to_sign,hashlib.sha256)
     return "HMAC {0}".format(base64.b64encode(hm.digest())), httpdate
 
@@ -36,7 +36,7 @@ parser.add_option("-q", "--query", dest="query", help="Query what proxies are av
 (options, args) = parser.parse_args()
 
 if options.secret is None:
-    print "You must supply the password in --secret"
+    print("You must supply the password in --secret")
     exit(1)
 
 if options.remove:
@@ -75,9 +75,9 @@ else:
     headers['Content-Type'] = "application/json"
     response = requests.post(uri, data=requestbody, headers=headers, **extra_kwargs)
 
-print "Server returned {0}".format(response.status_code)
+print("Server returned {0}".format(response.status_code))
 pprint(response.headers)
 if response.status_code==200:
     pprint(response.json())
 else:
-    print response.text
+    print(response.text)
