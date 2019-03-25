@@ -16,6 +16,12 @@ Parameters:
     - DEV
     - PROD
     Description: Deployment stage
+  SentryDSN:
+    Type: String
+    Description: DSN for connecting to Sentry
+  SentryPublicDSN:
+    Type: String
+    Description: Sentry public DSN for javascript
   ElkStack:
     Description: Name of a deployed ELK6 stack (https://github.com/guardian/elk6) to send logs to
     Type: String
@@ -1061,6 +1067,12 @@ Resources:
           cat > /etc/security/limits.d/archivehunter.conf << EOF
           archivehunter hard  nofiles unlimited
           archivehunter soft  nofiles unlimited
+          EOF
+
+          cat > /usr/share/archivehunter/conf/sentry.properties << EOF
+          dsn=${SentryDSN}
+          public-dsn=${SentryPublicDSN}
+          stacktrace.app.packages=auth,controllers,drivers,exceptions,helpers,models,postrun,services,views
           EOF
 
           systemctl restart archivehunter
