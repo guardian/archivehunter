@@ -6,10 +6,11 @@ from ArchiveHunterHmac import signed_headers
 import os.path
 import re
 
+
 class ProxyDownloader(threading.Thread):
     filename_splitter=re.compile(r'^(.*)\.([^.]+)')
 
-    def __init__(self, *args, queue=None, thread_timeout=60, hostname="", secret="", target_path="/tmp", chunk_size=8192, **kwargs):
+    def __init__(self, *args, queue=None, thread_timeout=60, hostname="", secret="", target_path="/tmp", chunk_size=8192, list_writer_queue=None, **kwargs):
         super(ProxyDownloader, self).__init__(*args,**kwargs)
         if not isinstance(queue, Queue): raise TypeError
 
@@ -20,6 +21,7 @@ class ProxyDownloader(threading.Thread):
         self.secret = secret
         self.target_path = target_path
         self.chunk_size = chunk_size
+        self.list_writer_queue=list_writer_queue
 
     def run(self):
         """
@@ -41,6 +43,7 @@ class ProxyDownloader(threading.Thread):
 
             except Exception:
                 if item:
+                    self.list_writer_queue.put({"media_path": item["name"],"proxy_path": "", "error":""})
                     self.logger.exception("Could not process {0}".format(item))
                 else:
                     self.logger.exception("Thred error with no item")
@@ -83,16 +86,24 @@ class ProxyDownloader(threading.Thread):
         else:
             return download_path
 
-    def do_download(self, item, download_uri):
-        parts = self.filename_splitter.match(item["name"])
+    def split_filename(self, filename):
+        parts = self.filename_splitter.match(filename)
         if parts:
-            filename_no_ext = parts.group(1)
-            extension = parts.group(2)
+            return parts.group(1), parts.group(2)
         else:
-            filename_no_ext = item["name"]
-            extension=""
+            return filename, None
+
+    def do_download(self, item, download_uri):
+        filename_no_ext, extension = self.split_filename(item["name"])
+        if extension=="" or extension is None:
+            #set default file extensions for proxy type in case they are missing
+            if item["proxyType"]=="VIDEO":
+                extension = "mp4"
+            elif item["proxyType"]=="AUDIO":
+                extension = "mp3"
 
         download_path = self.find_acceptable_filename(filename_no_ext, extension)
+
         self.logger.info("Download path is {0}".format(download_path))
 
         with requests.get(download_uri, stream=True) as r:
@@ -102,6 +113,7 @@ class ProxyDownloader(threading.Thread):
                     if chunk:   #we get keepalive chunks apparently which evaluate to false
                         f.write(chunk)
 
+        self.list_writer_queue.put({"media_path": item["name"],"proxy_path": download_path, "error":""})
         self.logger.info("Download completed")
 
     def process_item(self, item):
@@ -117,3 +129,5 @@ class ProxyDownloader(threading.Thread):
             self.logger.error("Could not get any download URL for {0}".format(item))
             return
 
+        self.logger.info("download URL is {0}".format(download_url))
+        self.do_download(item, download_url)

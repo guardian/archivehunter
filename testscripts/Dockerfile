@@ -7,4 +7,4 @@ COPY requirements.txt /usr/local/scripts
 RUN pip install -r /usr/local/scripts/requirements.txt
 COPY * /usr/local/scripts/
 RUN chmod a+r /usr/local/scripts/*
-USER daemon
+#USER daemon
