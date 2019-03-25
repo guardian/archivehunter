@@ -64,6 +64,7 @@ lazy val `archivehunter` = (project in file("."))
       "com.typesafe.akka" %% "akka-testkit" % akkaVersion,
       "com.gu" %% "pan-domain-auth-play_2-6" % "0.7.1",
       "com.gu" %% "panda-hmac-play_2-6" % "1.3.1",
+      "io.sentry" % "sentry-logback" % "1.7.2",
         jdbc, ehcache, ws)
   )
 

@@ -14,6 +14,12 @@
         </encoder>
     </appender>
 
+    <appender name="Sentry" class="io.sentry.logback.SentryAppender">
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>WARN</level>
+        </filter>
+    </appender>
+
     <appender name="FILE" class="ch.qos.logback.core.FileAppender">
         <file>/var/log/archivehunter/application.log</file>
         <encoder>
@@ -88,7 +94,7 @@
     <root level="WARN">
         <appender-ref ref="STDOUT" />
         <appender-ref ref="ASYNCFILE"/>
-        <!-- <appender-ref ref="Sentry" />-->
+        <appender-ref ref="Sentry" />
     </root>
 
 </configuration>
