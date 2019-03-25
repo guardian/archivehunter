@@ -43,7 +43,7 @@ class ProxyDownloader(threading.Thread):
 
             except Exception:
                 if item:
-                    self.list_writer_queue.put({"media_path": item["name"],"proxy_path": "", "error":""})
+                    self.list_writer_queue.put({"media_path": os.path.join(item["path"], item["name"]), "proxy_path": "", "error":""})
                     self.logger.exception("Could not process {0}".format(item))
                 else:
                     self.logger.exception("Thred error with no item")
@@ -113,7 +113,7 @@ class ProxyDownloader(threading.Thread):
                     if chunk:   #we get keepalive chunks apparently which evaluate to false
                         f.write(chunk)
 
-        self.list_writer_queue.put({"media_path": item["name"],"proxy_path": download_path, "error":""})
+        self.list_writer_queue.put({"media_path": os.path.join(item["path"], item["name"]),"proxy_path": download_path, "error":""})
         self.logger.info("Download completed")
 
     def process_item(self, item):
@@ -123,7 +123,6 @@ class ProxyDownloader(threading.Thread):
         "archive_hunter_id" (archive hunter ID of the file)
         :return:
         """
-
         download_url = self.get_download_url(item["archive_hunter_id"])
         if download_url is None:
             self.logger.error("Could not get any download URL for {0}".format(item))

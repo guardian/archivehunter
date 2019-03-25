@@ -177,16 +177,16 @@ logger.info("Scanning for files...")
 n=0
 seen_extensions = []
 
-download_queue = Queue()
-download_thread_list = []
-for n in range(0, args.threads):
-    t = ProxyDownloader(queue=download_queue, hostname=args.hostname, secret=args.secret, target_path=args.holdingpath)
-    t.start()
-    download_thread_list.append(t)
-
 writer_queue = Queue()
 writer_thread = ListWriterThread(queue=writer_queue, output_file=args.outputlist)
 writer_thread.start()
+
+download_queue = Queue()
+download_thread_list = []
+for n in range(0, args.threads):
+    t = ProxyDownloader(queue=download_queue, thread_timeout=3600, hostname=args.hostname, secret=args.secret, target_path=args.holdingpath, list_writer_queue=writer_queue)
+    t.start()
+    download_thread_list.append(t)
 
 for filepath in each_filepath(args.listfile, args.strip):
     logger.debug(filepath)
