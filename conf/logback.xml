@@ -86,6 +86,7 @@
     <logger name="helpers.ProxyFramework" level="INFO"/>
     <logger name="services.ProxyFrameworkQueue" level="INFO"/>
 
+    <logger name="models.ChartFacet" level="DEBUG"/>
     <logger name="com.theguardian.multimedia.archivehunter.cmn_services.ProxyGenerators" level="INFO"/>
     <logger name="com.theguardian.multimedia.archivehunter.common.ProxyLocation$" level="INFO"/>
 

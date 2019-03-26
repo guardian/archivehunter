@@ -167,7 +167,7 @@ with PanDomainAuthActions {
     } else Left("Facet did not have buckets parameter")
   }
 
-  def chartIntermediateRepresentationInverted[T:io.circe.Encoder](aggs:Map[String,Any], forKey:String):Either[String, ChartFacet[T]] = {
+  def chartIntermediateRepresentation[T:io.circe.Encoder](aggs:Map[String,Any], forKey:String):Either[String, ChartFacet[T]] = {
     if(aggs.contains("buckets")){
       val buckets = aggs("buckets").asInstanceOf[List[Map[String,Any]]]
       val facetData = buckets.map(entry=>{
@@ -178,22 +178,6 @@ with PanDomainAuthActions {
         } else None
       }).collect({case Some(Right(d))=>d})
       Right(ChartFacet(forKey,facetData))
-    } else Left("Facet did not have buckets parameter")
-  }
-
-  def chartIntermediateRepresentation[T:io.circe.Encoder](aggs:Map[String,Any], forKey:String):Either[String, ChartFacet[T]] = {
-    if(aggs.contains("buckets")){
-      val buckets = aggs("buckets").asInstanceOf[List[Map[String,Any]]]
-
-      val facetData = buckets.map(entry=>{
-        if(entry.contains(forKey)){
-          Some(chartSubBucketsFor(entry(forKey).asInstanceOf[Map[String,Any]]).map(data=>
-            ChartFacetData[T](forKey,data)
-          ))
-        } else None
-      }).collect({case Some(Right(d))=>d})
-
-      Right(ChartFacet(forKey, facetData))
     } else Left("Facet did not have buckets parameter")
   }
 
@@ -215,8 +199,8 @@ with PanDomainAuthActions {
         logger.info(results.result.aggregations.toString)
 
         val intermediateContent = Seq(
-          chartIntermediateRepresentation[Int](results.result.aggregations.data("Collection").asInstanceOf[Map[String,Any]], "hasProxy"),
-          chartIntermediateRepresentation[Int](results.result.aggregations.data("Collection").asInstanceOf[Map[String,Any]], "mediaType")
+          chartIntermediateRepresentation[Int](results.result.aggregations.data("Collection").asInstanceOf[Map[String,Any]], "hasProxy").map(_.inverted()),
+          chartIntermediateRepresentation[Int](results.result.aggregations.data("Collection").asInstanceOf[Map[String,Any]], "mediaType").map(_.inverted())
         )
 
         val finalContent = intermediateContent.map(_.map(entry=>ChartDataResponse.fromIntermediateRepresentation(Seq(entry))))

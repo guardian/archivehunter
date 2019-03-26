@@ -76,4 +76,5 @@ object ChartDataResponse {
       )
     })
   }
+
 }

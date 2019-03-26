@@ -30,7 +30,7 @@ class ProxyHealthDash extends React.Component
 
     embellish(data){
         return Object.assign({}, data, {
-            datasets: data.datasets.map(dset=>Object.assign({}, dset, {backgroundColor: ProxyHealthDash.colourValues})),
+            datasets: data.datasets.map((dset,idx)=>Object.assign({}, dset, {backgroundColor: ProxyHealthDash.colourValues[idx]})),
         })
     }
 
@@ -63,6 +63,12 @@ class ProxyHealthDash extends React.Component
                     height={400}
                     width={400}
                     options={{
+                        title: {
+                            display: true,
+                            fontColor:"rgba(255,255,255,1)",
+                            fontSize: 24,
+                            text: "Proxied or Not?"
+                        },
                         maintainAspectRatio: false,
                         scales: {
                             yAxes: [{
@@ -70,8 +76,61 @@ class ProxyHealthDash extends React.Component
                                 gridLines: {
                                     display: true,
                                     color: "rgba(0,0,0,0.8)"
-                                }
+                                },
+                                ticks: {
+                                    autoSkip: false,
+                                    fontColor: "rgba(255,255,255,1)"
+                                },
+                                stacked: true
+                            }],
+                            xAxes: [{
+                                stacked: true,
                             }]
+                        },
+                        legend: {
+                            labels: {
+                                fontColor: "rgba(255,255,255,1)"
+                            },
+                            position: "bottom"
+                        }
+                    }}
+                />
+            </div>
+            <div className="chart-container">
+                <HorizontalBar
+                    data={this.state.typeBreakdownData}
+                    height={400}
+                    width={200}
+                    options={{
+                        title: {
+                            display: true,
+                            text: "Media Types by Collection",
+                            fontColor:"rgba(255,255,255,1)",
+                            fontSize: 24
+                        },
+                        maintainAspectRatio: false,
+                        scales: {
+                            yAxes: [{
+                                type: "category",
+                                gridLines: {
+                                    display: true,
+                                    color: "rgba(0,0,0,0.8)"
+                                },
+                                ticks: {
+                                    autoSkip: false,
+                                    fontColor: "rgba(255,255,255,1)"
+                                },
+                                stacked: true
+                            }],
+                            xAxes: [{
+                                stacked: true
+                            }]
+                        },
+                        legend: {
+                            labels: {
+                                fontColor: "rgba(255,255,255,1)"
+                            },
+                            position: "bottom"
                         }
                     }}
                 />
