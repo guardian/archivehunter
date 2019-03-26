@@ -10,9 +10,11 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import io.circe.generic.auto._
 import io.circe.syntax._
 import com.sksamuel.elastic4s.circe._
+import com.sksamuel.elastic4s.http.search.Aggregations
 import com.sksamuel.elastic4s.searches.sort.SortOrder
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ArchiveEntryHitReader, StorageClassEncoder, ZonedDateTimeEncoder}
 import helpers.InjectableRefresher
+import models.{ChartFacet, ChartFacetData}
 import play.api.libs.circe.Circe
 import requests.SearchRequest
 import play.api.libs.ws.WSClient
@@ -157,12 +159,53 @@ with PanDomainAuthActions {
     })
   }
 
+  def chartSubBucketsFor[T](data:Map[String,Any]):Either[String, Map[String,T]] = {
+    if(data.contains("buckets")){
+      Right(data("buckets").asInstanceOf[List[Map[String, Any]]].map(entry=>{
+        (entry.getOrElse("key_as_string", entry("key")).asInstanceOf[String], entry("doc_count").asInstanceOf[T])
+      }).toMap)
+    } else Left("Facet did not have buckets parameter")
+  }
+
+  def chartIntermediateRepresentationInverted[T:io.circe.Encoder](aggs:Map[String,Any], forKey:String):Either[String, ChartFacet[T]] = {
+    if(aggs.contains("buckets")){
+      val buckets = aggs("buckets").asInstanceOf[List[Map[String,Any]]]
+      val facetData = buckets.map(entry=>{
+        if(entry.contains(forKey)){
+          Some(chartSubBucketsFor(entry(forKey).asInstanceOf[Map[String, Any]]).map(data=>
+            ChartFacetData[T](entry.getOrElse("key_as_string",entry("key")).asInstanceOf[String], data)
+          ))
+        } else None
+      }).collect({case Some(Right(d))=>d})
+      Right(ChartFacet(forKey,facetData))
+    } else Left("Facet did not have buckets parameter")
+  }
+
+  def chartIntermediateRepresentation[T:io.circe.Encoder](aggs:Map[String,Any], forKey:String):Either[String, ChartFacet[T]] = {
+    if(aggs.contains("buckets")){
+      val buckets = aggs("buckets").asInstanceOf[List[Map[String,Any]]]
+
+      val facetData = buckets.map(entry=>{
+        if(entry.contains(forKey)){
+          Some(chartSubBucketsFor(entry(forKey).asInstanceOf[Map[String,Any]]).map(data=>
+            ChartFacetData[T](forKey,data)
+          ))
+        } else None
+      }).collect({case Some(Right(d))=>d})
+
+      Right(ChartFacet(forKey, facetData))
+    } else Left("Facet did not have buckets parameter")
+  }
+
   def getProxyFacets() = APIAuthAction.async {
     esClient.execute {
-      search(indexName) aggregations (
-        termsAgg("hasProxy","proxied"),
-        termsAgg("mediaType", "mimeType.major.keyword")
-      )
+      search(indexName) aggregations
+        termsAggregation("Collection")
+          .field("bucket.keyword")
+          .subAggregations(
+            termsAgg("hasProxy","proxied"),
+            termsAgg("mediaType", "mimeType.major.keyword")
+          )
     }.map({
       case Left(failure)=>
         InternalServerError(GenericErrorResponse("search failure", failure.toString).asJson)
@@ -171,17 +214,18 @@ with PanDomainAuthActions {
         logger.info(results.body.getOrElse("[empty body]"))
         logger.info(results.result.aggregations.toString)
 
-        val finalContent = Seq(
-          ChartDataResponse.fromAggregatesMap[Int](results.result.aggregations.data("mediaType").asInstanceOf[Map[String, Any]], "Media Type"),
-          ChartDataResponse.fromAggregatesMap[Int](results.result.aggregations.data("hasProxy").asInstanceOf[Map[String, Any]], "Has Proxy", totalForRemainder = Some(results.result.totalHits.toInt))
+        val intermediateContent = Seq(
+          chartIntermediateRepresentation[Int](results.result.aggregations.data("Collection").asInstanceOf[Map[String,Any]], "hasProxy"),
+          chartIntermediateRepresentation[Int](results.result.aggregations.data("Collection").asInstanceOf[Map[String,Any]], "mediaType")
         )
 
+        val finalContent = intermediateContent.map(_.map(entry=>ChartDataResponse.fromIntermediateRepresentation(Seq(entry))))
         val errors = finalContent.collect({case Left(err)=>err})
 
         if(errors.nonEmpty){
           InternalServerError(ErrorListResponse("render_error","could not process aggregations data", errors.toList).asJson)
         } else {
-          Ok(ChartDataListResponse("ok",finalContent.collect({case Right(data)=>data})).asJson)
+          Ok(ChartDataListResponse("ok",finalContent.collect({case Right(data)=>data}).flatten).asJson)
         }
     })
   }
