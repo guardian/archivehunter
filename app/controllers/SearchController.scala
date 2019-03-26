@@ -16,7 +16,7 @@ import helpers.InjectableRefresher
 import play.api.libs.circe.Circe
 import requests.SearchRequest
 import play.api.libs.ws.WSClient
-import responses.{BasicSuggestionsResponse, GenericErrorResponse, ObjectGetResponse, ObjectListResponse}
+import responses._
 
 import scala.concurrent.Future
 
@@ -154,6 +154,35 @@ with PanDomainAuthActions {
       case err:Throwable=>
         logger.error("Could not do browse search: ", err)
         InternalServerError(GenericErrorResponse("error", err.toString).asJson)
+    })
+  }
+
+  def getProxyFacets() = APIAuthAction.async {
+    esClient.execute {
+      search(indexName) aggregations (
+        termsAgg("hasProxy","proxied"),
+        termsAgg("mediaType", "mimeType.major.keyword")
+      )
+    }.map({
+      case Left(failure)=>
+        InternalServerError(GenericErrorResponse("search failure", failure.toString).asJson)
+      case Right(results)=>
+        logger.info("Got ES response:")
+        logger.info(results.body.getOrElse("[empty body]"))
+        logger.info(results.result.aggregations.toString)
+
+        val finalContent = Seq(
+          ChartDataResponse.fromAggregatesMap[Int](results.result.aggregations.data("mediaType").asInstanceOf[Map[String, Any]], "Media Type"),
+          ChartDataResponse.fromAggregatesMap[Int](results.result.aggregations.data("hasProxy").asInstanceOf[Map[String, Any]], "Has Proxy", totalForRemainder = Some(results.result.totalHits.toInt))
+        )
+
+        val errors = finalContent.collect({case Left(err)=>err})
+
+        if(errors.nonEmpty){
+          InternalServerError(ErrorListResponse("render_error","could not process aggregations data", errors.toList).asJson)
+        } else {
+          Ok(ChartDataListResponse("ok",finalContent.collect({case Right(data)=>data})).asJson)
+        }
     })
   }
 }
