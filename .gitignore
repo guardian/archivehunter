@@ -23,10 +23,12 @@ node_modules
 /conf/application-DEV.conf
 *.crt
 *.key
-/utils/revproxy/server.con
+
 /ProxyStatsGathering/scripts/ecs_rundev.yaml
 *.pem
 *.csv
 *.lst
 /ProxyStatsGathering/scripts/ecs_rundev-CODE.yaml
 testscripts/*.lst
+
+/testscripts/*/*.lst
