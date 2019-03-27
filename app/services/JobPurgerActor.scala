@@ -76,7 +76,12 @@ class JobPurgerActor @Inject() (config:Configuration, ddbClientMgr:DynamoClientM
             jobModelDAO.deleteJob(job.jobId).onComplete({
               case Success(result)=>
                 originalSender ! Status.Success
-                logger.info(s"Deleted job ${job.jobId}, consumed ${result.getConsumedCapacity.getCapacityUnits} capacity units")
+                 try {
+                  logger.info(s"Deleted job ${job.jobId}, consumed ${result.getConsumedCapacity.getCapacityUnits} capacity units")
+                 } catch {
+                  case err:Throwable =>
+                    logger.warn("Caught exception while logging job: ", err)
+                 }
               case Failure(err)=>
                 originalSender ! Status.Failure
                 logger.error(s"Unable to delete job: ", err)
