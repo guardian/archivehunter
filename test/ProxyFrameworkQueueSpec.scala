@@ -18,12 +18,13 @@ import services.{GenericSqsActor, ProxyFrameworkQueue, ProxyFrameworkQueueFuncti
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
+import scala.util.Success
 
 class ProxyFrameworkQueueSpec extends Specification with Mockito {
   sequential
 
   "ProxyFrameworkQueue!HandleSuccessfulProxy" should {
-    "call updateProxyRef, then update the database and return success" in new AkkaTestkitSpecs2Support {
+    "call updateProxyRef, then update the database/index and return success" in new AkkaTestkitSpecs2Support {
       implicit val ec: ExecutionContext = system.dispatcher
       val mockedJd = new JobModel("fake-job-id", "PROXY", None, None, JobStatus.ST_PENDING, None, "fake-source", None, SourceType.SRC_MEDIA, None)
 
@@ -43,6 +44,13 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
       val mockedSqsClient = mock[AmazonSQS]
       mockedSqsClient.deleteMessage(any) returns new DeleteMessageResult()
 
+      val mockedEntry = mock[ArchiveEntry]
+      val mockedUpdatedEntry = mock[ArchiveEntry]
+      mockedEntry.copy(any,any,any,any,any,any,any,any,any,any,any,any,any,any) returns mockedUpdatedEntry
+      val mockedIndexer = mock[Indexer]
+      mockedIndexer.getById(any)(any) returns Future(mockedEntry)
+      mockedIndexer.indexSingleItem(any,any,any)(any) returns Future(Success("fake-id"))
+
       val toTest = system.actorOf(Props(new ProxyFrameworkQueue(
         Configuration.from(Map("proxyFramework.notificationsQueue" -> "someQueue", "externalData.indexName" -> "someIndex")),
         system,
@@ -58,12 +66,15 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
         override def thumbnailJobOriginalMedia(jobDesc: JobModel): Future[Either[String, ArchiveEntry]] = Future(Right(mockedArchiveEntry))
 
         override def updateProxyRef(proxyUri: String, archiveEntry: ArchiveEntry, proxyType: ProxyType.Value): Future[Either[String, Option[ProxyLocation]]] = mockedUpdateProxyRef(proxyUri, archiveEntry, proxyType)
+
+        override protected implicit val indexer = mockedIndexer
       }))
 
       toTest ! fakeMessage
 
       testProbe.expectMsg(10 seconds, akka.actor.Status.Success)
       there was one(mockedUpdateProxyRef).apply("output-uri", mockedArchiveEntry, ProxyType.VIDEO)
+      there was one(mockedIndexer).indexSingleItem(any,any,any)(any)
       there was one(mockedJobModelDAO).putJob(any)
       there was one(mockedSqsClient).deleteMessage(any)
     }
@@ -89,6 +100,14 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
       val mockedSqsClient = mock[AmazonSQS]
       mockedSqsClient.deleteMessage(any) returns new DeleteMessageResult()
 
+      val mockedEntry = mock[ArchiveEntry]
+      val mockedUpdatedEntry = mock[ArchiveEntry]
+      mockedEntry.copy(any,any,any,any,any,any,any,any,any,any,any,any,any,any) returns mockedUpdatedEntry
+      val mockedIndexer = mock[Indexer]
+      mockedIndexer.getById(any)(any) returns Future(mockedEntry)
+      mockedIndexer.indexSingleItem(any,any,any)(any) returns Future(Success("fake-id"))
+
+
       val toTest = system.actorOf(Props(new ProxyFrameworkQueue(
         Configuration.from(Map("proxyFramework.notificationsQueue" -> "someQueue", "externalData.indexName" -> "someIndex")),
         system,
@@ -103,10 +122,10 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
 
         override def thumbnailJobOriginalMedia(jobDesc: JobModel): Future[Either[String, ArchiveEntry]] = Future(Left("So there"))
 
+        override protected implicit val indexer = mockedIndexer
       }))
 
       toTest ! fakeMessage
-
 
       testProbe.expectMsgType[akka.actor.Status.Failure](10 seconds)
       there was no(mockedUpdateProxyRef).apply(any, any)

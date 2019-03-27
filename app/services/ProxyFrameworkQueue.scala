@@ -85,7 +85,7 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
   private implicit val ddbClient = dynamoClientMgr.getNewAlpakkaDynamoClient(config.getOptional[String]("externalData.awsProfile"))
 
   private implicit val esClient = esClientMgr.getClient()
-  private implicit val indexer = new Indexer(config.get[String]("externalData.indexName"))
+  protected implicit val indexer = new Indexer(config.get[String]("externalData.indexName"))
 
   lazy val defaultRegion = config.getOptional[String]("externalData.awsRegion").getOrElse("eu-west-1")
 
@@ -229,11 +229,37 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
               case "proxy" => ProxyType.VIDEO
             }
         }
+
+        //set up parallel jobs, one to update dynamo, one to update elasticsearch
         val proxyUpdateFuture = thumbnailJobOriginalMedia(jobDesc).flatMap({
           case Left(err) => Future(Left(err))
           case Right(archiveEntry) => updateProxyRef(msg.output.get, archiveEntry, proxyType)
         })
-        proxyUpdateFuture.map({
+
+        val indexUpdateFuture = indexer.getById(jobDesc.sourceId).flatMap(entry=>{
+          val updatedEntry = entry.copy(proxied = true)
+          indexer.indexSingleItem(updatedEntry)
+        }).map({
+          case Failure(err)=>
+            logger.error("Could not update index: ", err)
+            Left(err.toString)
+          case Success(value)=>
+            Right(value)
+        })
+
+        //set up a future to complete when both of the update jobs have run. this marshals a single success/failure flag
+        val overallCompletionFuture = Future.sequence(Seq(proxyUpdateFuture, indexUpdateFuture)).map(results=>{
+          val errors = results.collect({case Left(err)=>err})
+          if(errors.nonEmpty){
+            logger.error(s"Could not update proxy: $errors")
+            Left(errors.mkString(","))
+          } else {
+            results.head
+          }
+        })
+
+        //handle overall success/failure
+        overallCompletionFuture.map({
           case Left(err) =>
             logger.error(s"Could not update proxy: $err")
             val updatedJd = jobDesc.copy(completedAt = Some(ZonedDateTime.now), log = Some(s"Could not update proxy: $err"), jobStatus = JobStatus.ST_ERROR)
