@@ -46,7 +46,7 @@
     <logger name="akka.cluster" level="ERROR"/>
     <logger name="helpers.LightboxStreamComponents" level="INFO"/>
     <logger name="helpers.S3ToArchiveEntryFlow" level="WARN"/>
-    <logger name="helpers.SearchHitToArchiveEntryFlow" level="DEBUG"/>
+    <logger name="helpers.SearchHitToArchiveEntryFlow" level="INFO"/>
     <logger name="helpers.ArchiveEntryVerifyFlow" level="WARN"/>
     <logger name="helpers.LightboxStreamComponents.SaveLightboxEntryFlow" level="DEBUG"/>
     <logger name="com.sksamuel.elastic4s.streams" level="WARN"/>
@@ -86,7 +86,7 @@
     <logger name="helpers.ProxyFramework" level="INFO"/>
     <logger name="services.ProxyFrameworkQueue" level="INFO"/>
 
-    <logger name="models.ChartFacet" level="DEBUG"/>
+    <logger name="models.ChartFacet" level="INFO"/>
     <logger name="com.theguardian.multimedia.archivehunter.cmn_services.ProxyGenerators" level="INFO"/>
     <logger name="com.theguardian.multimedia.archivehunter.common.ProxyLocation$" level="INFO"/>
 

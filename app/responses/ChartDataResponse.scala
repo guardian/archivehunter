@@ -68,10 +68,20 @@ object ChartDataResponse {
 
   }
 
+  /**
+    * return a complete list of unique keys for the provided list of ChartFacet objects
+    * @param data sequence of ChartFacets
+    * @tparam T type of the data for ChartFacet
+    * @return a Sequence of strings representing a single one of each data key contained in the facets
+    */
+  protected def uniqueKeySets[T](facetData:ChartFacet[T]):List[String] =
+    facetData.facets.flatMap(_.values.keys).distinct.toList
+
+
   def fromIntermediateRepresentation[T:Encoder](data:Seq[ChartFacet[T]]) = {
     data.map(facetData=>{
       new ChartDataResponse[T](facetData.name,
-        facetData.facets.head.values.keys.toList, //just take the first set of keys.
+        uniqueKeySets(facetData),
         facetData.facets.map(entry=>Dataset(entry.name, entry.values.values.toList)).toList
       )
     })

@@ -97,8 +97,6 @@ with PanDomainAuthActions {
       case Left(failure)=>
         InternalServerError(GenericErrorResponse("search failure", failure.toString).asJson)
       case Right(results)=>
-        logger.info("Got ES response:")
-        logger.info(results.body.getOrElse("[empty body]"))
         Ok(BasicSuggestionsResponse.fromEsResponse(results.result.termSuggestion("sg")).asJson)
     }).recover({
       case err:Throwable=>
@@ -113,7 +111,6 @@ with PanDomainAuthActions {
         Future(BadRequest(GenericErrorResponse("bad_request", error.toString).asJson))
       },
       request=> {
-        logger.info(s"search params are ${request.toSearchParams}")
         esClient.execute {
           search(indexName) query {
             boolQuery().must(request.toSearchParams)
@@ -176,8 +173,9 @@ with PanDomainAuthActions {
             ChartFacetData[T](entry.getOrElse("key_as_string",entry("key")).asInstanceOf[String], data)
           ))
         } else None
-      }).collect({case Some(Right(d))=>d})
-      Right(ChartFacet(forKey,facetData))
+      })
+      logger.debug(facetData.toString)
+      Right(ChartFacet(forKey,facetData.collect({case Some(Right(d))=>d})))
     } else Left("Facet did not have buckets parameter")
   }
 
@@ -194,10 +192,6 @@ with PanDomainAuthActions {
       case Left(failure)=>
         InternalServerError(GenericErrorResponse("search failure", failure.toString).asJson)
       case Right(results)=>
-        logger.info("Got ES response:")
-        logger.info(results.body.getOrElse("[empty body]"))
-        logger.info(results.result.aggregations.toString)
-
         val intermediateContent = Seq(
           chartIntermediateRepresentation[Int](results.result.aggregations.data("Collection").asInstanceOf[Map[String,Any]], "hasProxy").map(_.inverted()),
           chartIntermediateRepresentation[Int](results.result.aggregations.data("Collection").asInstanceOf[Map[String,Any]], "mediaType").map(_.inverted())

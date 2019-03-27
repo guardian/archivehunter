@@ -590,14 +590,13 @@ p.deal-with-long-names {
 
 div.chart-container-wide {
     float: left;
-    width: 50%;
-    /*height: 400px;*/
+    width: 50vw;
+    position: relative;
     overflow: hidden;
 }
 
 div.chart-container {
     float: left;
-    width: 33%;
-    /*height: 400px;*/
-    display: inline-block;
+    width: 33vw;
+    position: relative;
 }
