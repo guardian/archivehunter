@@ -51,7 +51,7 @@ class ProxiesRelinker @Inject() (config:Configuration,
   protected def getIndexScanSource(targetBucket:Option[String]) = {
     val queryTerms = Seq(
       Some(termQuery("proxied", false)),
-      targetBucket.map(bucketName=>matchQuery("bucketName", bucketName))
+      targetBucket.map(bucketName=>matchQuery("bucket.keyword", bucketName))
     ).collect({case Some(term)=>term})
 
     val pub = esClient.publisher(search(indexName) query boolQuery().must(queryTerms) scroll "5m")
@@ -90,7 +90,7 @@ class ProxiesRelinker @Inject() (config:Configuration,
     val completionPromise = Promise[IndexUpdateCounter]()
     val eosPromise = Promise[Unit]()
 
-    logger.info("Starting global relink scan")
+    logger.info(s"Starting ${bucketName.getOrElse("global")} relink scan")
     val eosDetect = new EOSDetect[Unit, ArchiveEntry](eosPromise, ())
     getIndexScanSource(bucketName)
       .via(new SearchHitToArchiveEntryFlow)
