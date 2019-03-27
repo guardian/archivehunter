@@ -74,7 +74,7 @@ class BulkThumbnailer @Inject() (@Named("dynamoCapacityActor") dynamoCapacityAct
         matchQuery("bucket.keyword", tgt.bucketName),
         not(matchQuery("storageClass.keyword","GLACIER"))
       ))
-      val searchHitPublisher = esClient.publisher(search(indexName) bool queries scroll "1m")
+      val searchHitPublisher = esClient.publisher(search(indexName) bool queries scroll "5m")
       val searchHitSource = Source.fromPublisher(searchHitPublisher)
       val archiveEntryConverter = new SearchHitToArchiveEntryFlow
       val streamCompletionPromise = Promise[Unit]()

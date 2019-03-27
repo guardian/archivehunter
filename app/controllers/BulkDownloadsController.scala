@@ -69,7 +69,7 @@ class BulkDownloadsController @Inject()(config:Configuration,serverTokenDAO: Ser
           nestedQuery("lightboxEntries", {
             matchQuery("lightboxEntries.memberOfBulk", bulkEntry.id)
           })
-        } sortBy fieldSort("path.keyword") scroll "1m"
+        } sortBy fieldSort("path.keyword") scroll "5m"
 
     val source = Source.fromPublisher(esClient.publisher(query))
     val hitConverter = new SearchHitToArchiveEntryFlow()

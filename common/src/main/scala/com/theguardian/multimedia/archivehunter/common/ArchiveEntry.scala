@@ -33,7 +33,7 @@ object ArchiveEntry extends ((String, String, String, Option[String], Option[Str
     * @param client implicitly provided instance of AmazonS3Client to use
     * @return a (blocking) Future, containing an [[ArchiveEntry]] if successful
     */
-  def fromS3(bucket: String, key: String, region:String)(implicit client:AmazonS3):Future[ArchiveEntry] = Future {
+  def fromS3Sync(bucket: String, key: String, region:String)(implicit client:AmazonS3):ArchiveEntry = {
     val meta = client.getObjectMetadata(bucket,key)
     val mimeType = Option(meta.getContentType) match {
       case Some(mimeTypeString) =>
@@ -55,6 +55,10 @@ object ArchiveEntry extends ((String, String, String, Option[String], Option[Str
         "STANDARD"
     }
     ArchiveEntry(makeDocId(bucket, key), bucket, key, Some(region), getFileExtension(key), meta.getContentLength, ZonedDateTime.ofInstant(meta.getLastModified.toInstant, ZoneId.systemDefault()), meta.getETag, mimeType, proxied = false, StorageClass.withName(storageClass), Seq(), beenDeleted = false, None)
+  }
+
+  def fromS3(bucket: String, key: String, region:String)(implicit client:AmazonS3):Future[ArchiveEntry] = Future {
+    fromS3Sync(bucket, key,region)
   }
 
   def fromIndex(bucket:String, key:String)(implicit indexer:Indexer, httpClient: HttpClient):Future[ArchiveEntry] =

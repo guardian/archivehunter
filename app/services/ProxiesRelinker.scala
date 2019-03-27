@@ -54,7 +54,7 @@ class ProxiesRelinker @Inject() (config:Configuration,
       targetBucket.map(bucketName=>matchQuery("bucketName", bucketName))
     ).collect({case Some(term)=>term})
 
-    val pub = esClient.publisher(search(indexName) query boolQuery().must(queryTerms) scroll "1m")
+    val pub = esClient.publisher(search(indexName) query boolQuery().must(queryTerms) scroll "5m")
     Source.fromPublisher(pub)
   }
 
