@@ -5,7 +5,7 @@ RUN mkdir /usr/local/scripts; apk add git
 #that usually change so they are at the end.
 COPY requirements.txt /usr/local/scripts
 RUN pip install -r /usr/local/scripts/requirements.txt
-RUN cd /tmp && git clone https://github.com/fredex42/gnmvidispine.git && cd gnmvidispine && git checkout python3 && pip install -r requirements.txt && python ./setup.py install && cd /tmp && rm -rf /tmp/gnmvidispine
+RUN cd /tmp && git clone https://github.com/fredex42/gnmvidispine.git && cd gnmvidispine && git checkout python3 && git log | head -n40 && pip install -r requirements.txt && python ./setup.py install && cd /tmp && rm -rf /tmp/gnmvidispine
 COPY * /usr/local/scripts/
 RUN chmod a+r /usr/local/scripts/*
 #USER daemon
