@@ -6,6 +6,9 @@ RUN mkdir /usr/local/scripts; apk add git
 COPY requirements.txt /usr/local/scripts
 RUN pip install -r /usr/local/scripts/requirements.txt
 RUN cd /tmp && git clone https://github.com/fredex42/gnmvidispine.git && cd gnmvidispine && git checkout python3 && git log | head -n40 && pip install -r requirements.txt && python ./setup.py install && cd /tmp && rm -rf /tmp/gnmvidispine
-COPY * /usr/local/scripts/
+COPY download-proxies/*.py /usr/local/scripts/
+COPY reintegrate-from-list/*.py /usr/local/scripts/
+COPY create-missing-from-list/*.py /usr/local/scripts/
+COPY certs/* /etc/ssl/certs/
 RUN chmod a+r /usr/local/scripts/*
 #USER daemon
