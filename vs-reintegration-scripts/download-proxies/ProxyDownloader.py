@@ -10,8 +10,8 @@ import re
 class ProxyDownloader(threading.Thread):
     filename_splitter=re.compile(r'^(.*)\.([^.]+)')
 
-    def __init__(self, *args, queue=None, thread_timeout=60, hostname="", secret="", target_path="/tmp", chunk_size=8192, list_writer_queue=None, **kwargs):
-        super(ProxyDownloader, self).__init__(*args,**kwargs)
+    def __init__(self, queue=None, thread_timeout=60, hostname="", secret="", target_path="/tmp", chunk_size=8192, list_writer_queue=None, **kwargs):
+        super(ProxyDownloader, self).__init__(**kwargs)
         if not isinstance(queue, Queue): raise TypeError
 
         self.logger = logging.getLogger(__name__)
@@ -106,11 +106,11 @@ class ProxyDownloader(threading.Thread):
                 extension = "mp3"
 
         #download_path = self.find_acceptable_filename(filename_no_ext, extension, failIfExists=failIfExists)
-        download_path = os.path.join(self.target_path, "{0}{1}".format(filename_no_ext, extension))
+        download_path = os.path.join(self.target_path, "{0}.{1}".format(filename_no_ext, extension))
         self.logger.info("Download path is {0}".format(download_path))
         return download_path
 
-    def do_download(self, item, download_path, download_uri):
+    def do_download(self, download_path, download_uri):
         with requests.get(download_uri, stream=True) as r:
             r.raise_for_status()
             with open(download_path, "wb") as f:
@@ -130,14 +130,13 @@ class ProxyDownloader(threading.Thread):
         download_path = self.get_download_path(item)
         if not os.path.exists(download_path):
             self.logger.info("Path {0} does not exist, downloading....".format(download_path))
-            raise Exception("testing")
             download_url = self.get_download_url(item["archive_hunter_id"])
             if download_url is None:
                 self.logger.error("Could not get any download URL for {0}".format(item))
                 return
 
             self.logger.info("download URL is {0}".format(download_url))
-            self.do_download(item, download_url)
+            self.do_download(download_path, download_url)
         else:
             self.logger.info("Path {0} already exists.".format(download_path))
 
