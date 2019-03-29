@@ -11,7 +11,7 @@ trait ESClientManager {
 @Singleton
 class ESClientManagerImpl @Inject()(config:ArchiveHunterConfiguration) extends ESClientManager with ExtValueConverters {
   val esHost:String = config.get[String]("elasticsearch.hostname")
-  val esPort:Int = config.get[Int]("elasticsearch.port")
+  val esPort:Int = config.getOptional[Int]("elasticsearch.port").getOrElse(443)
   val sslFlag:Boolean = config.getOptional[Boolean]("elasticsearch.ssl").getOrElse(false)
   def getClient() = HttpClient(s"elasticsearch://$esHost:$esPort?ssl=$sslFlag")
 }

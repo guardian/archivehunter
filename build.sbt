@@ -1,7 +1,9 @@
 import sbt._
 import Keys._
+import com.typesafe.sbt.packager.docker
+import com.typesafe.sbt.packager.docker._
 
-enablePlugins(RiffRaffArtifact, JDebPackaging, SystemdPlugin)
+enablePlugins(RiffRaffArtifact, DockerPlugin, JDebPackaging, SystemdPlugin)
 
 val elastic4sVersion = "6.0.4"
 val awsSdkVersion = "1.11.346"
@@ -117,6 +119,45 @@ lazy val inputLambda = (project in file("lambda/input"))
 
   }
 )
+
+lazy val proxyStatsGathering = (project in file("ProxyStatsGathering"))
+  .dependsOn(common)
+  .enablePlugins(JavaAppPackaging, AshScriptPlugin, DockerPlugin)
+  .settings(commonSettings,
+    libraryDependencies ++= Seq(
+      "com.amazonaws" % "aws-java-sdk-lambda" % awsSdkVersion,
+      "com.amazonaws" % "aws-lambda-java-events" % "2.1.0",
+      "com.amazonaws" % "aws-lambda-java-core" % "1.0.0",
+      "org.scala-lang.modules" %% "scala-java8-compat" % "0.8.0",
+      "com.amazonaws" % "aws-lambda-java-log4j2" % "1.0.0",
+      "com.sandinh" %% "akka-guice" % "3.2.0"
+    ),
+//    assemblyJarName in assembly := "proxyStatsGathering.jar",
+//    assemblyMergeStrategy in assembly := {
+//      case PathList("javax", "servlet", xs @ _*)         => MergeStrategy.first
+//      case PathList(ps @ _*) if ps.last endsWith ".html" => MergeStrategy.first
+//      case "application.conf" => MergeStrategy.concat
+//      //META-INF/org/apache/logging/log4j/core/config/plugins/Log4j2Plugins.dat
+//      case PathList("META-INF","org","apache","logging","log4j","core","config","plugins","Log4j2Plugins.dat") => MergeStrategy.last
+//      case meta(_)=>MergeStrategy.discard
+//      case x=>
+//        val oldStrategy = (assemblyMergeStrategy in assembly).value
+//        oldStrategy(x)
+//    }
+    version := sys.props.getOrElse("build.number","DEV"),
+    dockerUsername  := sys.props.get("docker.username"),
+    dockerRepository := Some("andyg42"),
+    dockerPermissionStrategy := DockerPermissionStrategy.None,
+    packageName in Docker := "andyg42/archivehunter-proxystats",
+    packageName := "archivehunter-proxystats",
+//    dockerBaseImage := "openjdk:8-jdk-alpine",
+    dockerAlias := docker.DockerAlias(sys.props.get("docker.host"),sys.props.get("docker.username"),"proxy-stats-gathering",Some(sys.props.getOrElse("build.number","DEV"))),
+    dockerCommands ++= Seq(
+      Cmd("USER", "root"),
+      Cmd("RUN", "chown -R 1001 /opt/docker"),
+      Cmd("USER", "demiourgos728")
+    )
+  )
 
 lazy val autoDowningLambda = (project in file("lambda/autodowning")).settings(commonSettings, name:="autoDowningLambda")
   .dependsOn(common)

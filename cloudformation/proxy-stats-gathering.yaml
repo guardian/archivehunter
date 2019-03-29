@@ -1,0 +1,123 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Proxy stats gathering app for ArchiveHunter
+Parameters:
+  App:
+    Type: String
+    Description: Application identifier for RiffRaff
+    Default: archivehunter
+  Stack:
+    Type: String
+    Description: Stack identifier for RiffRaff
+    Default: multimedia
+  Stage:
+    Type: String
+    AllowedValues:
+      - CODE
+      - DEV
+      - PROD
+    Description: Deployment stage
+  ESHost:
+    Description: Elasticsearch hostname
+    Type: String
+  IndexName:
+    Type: String
+    Description: ES index name
+  ProxiesTable:
+    Type: String
+    Description: ARchiveHunter proxies table in dynamodb
+  AppContainerImage:
+    Type: String
+    Description: Docker image containing the app
+
+Resources:
+  AppTaskLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 5
+
+  AppRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Path: "/"
+      Policies:
+        - PolicyName: LogsAccess
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              Effect: Allow
+              Action:
+                - "logs:CreateLogGroup"
+                - "logs:CreateLogStream"
+                - "logs:PutLogEvents"
+                - "logs:DescribeLogStreams"
+              Resource:
+                - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*
+        - PolicyName: DynamoAccess
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:Query
+                - dynamodb:Scan
+                - dynamodb:DescribeTable
+              Resource:
+                - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ProxiesTable}
+
+        - PolicyName: ImageDownloadAccess
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              Effect: Allow
+              Action:
+                - "ecr:BatchCheckLayerAvailability"
+                - "ecr:BatchGetImage"
+                - "ecr:GetDownloadUrlForLayer"
+                - "ecr:GetAuthorizationToken"
+              Resource: "*"
+
+  AppTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      ExecutionRoleArn: !GetAtt AppRole.Arn
+      ContainerDefinitions:
+        - Image: !Ref AppContainerImage #specified in "resources"
+          MemoryReservation: 4096 #this is the limit of memory rather than the actual amount allocated
+          Name: !Sub ${Stack}-${App}Proxy-${Stage}
+          Environment:
+            - Name: INDEX_NAME
+              Value: !Ref IndexName
+            - Name: ES_HOST_NAME
+              Value: !Ref ESHost
+            - Name: PROXIES_TABLE_NAME
+              Value: !Ref ProxiesTable
+            - Name: ELASTICSEARCH_SSL
+              Value: true
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref AppTaskLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: ecs
+      Cpu: 4096 #4 vCPU
+      NetworkMode: awsvpc
+      Memory: 8192  #minimum allowed with 4 vCPU
+      RequiresCompatibilities:
+        - FARGATE
+      TaskRoleArn: !GetAtt AppRole.Arn
+
+Outputs:
+  TaskDefinitionArn:
+    Description: ARN of the created ECS task definition
+    Value: !Ref AppTaskDefinition
+  LogGroupName:
+    Description: Log group name for the ECS task
+    Value: !Ref AppTaskLogGroup

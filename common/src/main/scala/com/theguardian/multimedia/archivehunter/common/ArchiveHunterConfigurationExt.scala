@@ -5,7 +5,9 @@ package com.theguardian.multimedia.archivehunter.common
 class ArchiveHunterConfigurationExt extends ArchiveHunterConfiguration {
   private val environmentKeyMapping = Map(
     "elasticsearch.index"->"INDEX_NAME",
+    "elasticsearch.ssl"->"ELASTICSEARCH_SSL",
     "externalData.awsProfile"->"AWS_PROFILE",
+    "elasticsearch.hostname"->"ES_HOST_NAME",
     "proxies.tableName" -> "PROXIES_TABLE_NAME",
     "instances.tableName" -> "INSTANCES_TABLE"
   )

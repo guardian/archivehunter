@@ -1,7 +1,7 @@
 package com.theguardian.multimedia.archivehunter.common
 
 import akka.stream.alpakka.dynamodb.scaladsl.DynamoClient
-import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsync
+import com.amazonaws.services.dynamodbv2.{AmazonDynamoDB, AmazonDynamoDBAsync}
 import com.amazonaws.services.dynamodbv2.model.DeleteItemResult
 import com.gu.scanamo.query.UniqueKey
 import com.gu.scanamo.{DynamoFormat, Scanamo, ScanamoAlpakka, Table}
@@ -32,6 +32,9 @@ class ProxyLocationDAO @Inject() (config:ArchiveHunterConfiguration) extends Pro
       case Some(Right(location))=>Some(location)
       case None=>None
     })
+
+  def getProxySync(fileId:String, proxyType:ProxyType.Value)(implicit client:AmazonDynamoDB) =
+    Scanamo.exec(client)(table.get('fileId->fileId and ('proxyType->proxyType.toString)))
 
   /**
     * Look up proxy by proxy ID
