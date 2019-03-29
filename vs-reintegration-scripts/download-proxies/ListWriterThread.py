@@ -42,7 +42,7 @@ class ListWriterThread(threading.Thread):
                     if item:
                         self.logger.exception("Could not process {0}".format(item))
                     else:
-                        self.logger.exception("Thred error with no item")
+                        self.logger.exception("Thread error with no item")
 
     def process_item(self, item, writer):
         """
@@ -52,4 +52,5 @@ class ListWriterThread(threading.Thread):
         :param writer: a CSV writer
         :return:
         """
-        writer.writerow([item["media_path"], item["proxy_path"], item["error"]])
+        self.logger.info(item)
+        writer.writerow([item["media_path"], item["media_bucket"], item["proxy_path"], item["error"]])

@@ -43,10 +43,10 @@ class ProxyDownloader(threading.Thread):
 
             except Exception:
                 if item:
-                    self.list_writer_queue.put({"media_path": os.path.join(item["path"], item["name"]), "proxy_path": "", "error":""})
+                    self.list_writer_queue.put({"media_path": item["source_path"], "media_bucket": item["source_bucket"], "proxy_path": "", "error":""})
                     self.logger.exception("Could not process {0}".format(item))
                 else:
-                    self.logger.exception("Thred error with no item")
+                    self.logger.exception("Thread error with no item")
 
     def get_download_url(self, archive_hunter_id):
         uri = "https://{host}/api/proxy/{id}/playable".format(host=self.hostname, id=archive_hunter_id)
@@ -66,7 +66,7 @@ class ProxyDownloader(threading.Thread):
             self.logger.exception("Could not get download URL for {0}".format(archive_hunter_id))
             return None
 
-    def find_acceptable_filename(self, filename_no_ext, ext, counter=0):
+    def find_acceptable_filename(self, filename_no_ext, ext, counter=0, failIfExists=False):
         """
         recursively find an available filename in the requested download location
         :param filename_no_ext: filename with no extension
@@ -93,7 +93,10 @@ class ProxyDownloader(threading.Thread):
         else:
             return filename, None
 
-    def do_download(self, item, download_uri):
+    def exists_already(self, item):
+        return os.path.exists(os.path.join(self.target_path, item["name"]))
+
+    def get_download_path(self,item, failIfExists=False):
         filename_no_ext, extension = self.split_filename(item["name"])
         if extension=="" or extension is None:
             #set default file extensions for proxy type in case they are missing
@@ -102,10 +105,12 @@ class ProxyDownloader(threading.Thread):
             elif item["proxyType"]=="AUDIO":
                 extension = "mp3"
 
-        download_path = self.find_acceptable_filename(filename_no_ext, extension)
-
+        #download_path = self.find_acceptable_filename(filename_no_ext, extension, failIfExists=failIfExists)
+        download_path = os.path.join(self.target_path, "{0}{1}".format(filename_no_ext, extension))
         self.logger.info("Download path is {0}".format(download_path))
+        return download_path
 
+    def do_download(self, item, download_path, download_uri):
         with requests.get(download_uri, stream=True) as r:
             r.raise_for_status()
             with open(download_path, "wb") as f:
@@ -113,7 +118,6 @@ class ProxyDownloader(threading.Thread):
                     if chunk:   #we get keepalive chunks apparently which evaluate to false
                         f.write(chunk)
 
-        self.list_writer_queue.put({"media_path": os.path.join(item["path"], item["name"]),"proxy_path": download_path, "error":""})
         self.logger.info("Download completed")
 
     def process_item(self, item):
@@ -123,10 +127,18 @@ class ProxyDownloader(threading.Thread):
         "archive_hunter_id" (archive hunter ID of the file)
         :return:
         """
-        download_url = self.get_download_url(item["archive_hunter_id"])
-        if download_url is None:
-            self.logger.error("Could not get any download URL for {0}".format(item))
-            return
+        download_path = self.get_download_path(item)
+        if not os.path.exists(download_path):
+            self.logger.info("Path {0} does not exist, downloading....".format(download_path))
+            raise Exception("testing")
+            download_url = self.get_download_url(item["archive_hunter_id"])
+            if download_url is None:
+                self.logger.error("Could not get any download URL for {0}".format(item))
+                return
 
-        self.logger.info("download URL is {0}".format(download_url))
-        self.do_download(item, download_url)
+            self.logger.info("download URL is {0}".format(download_url))
+            self.do_download(item, download_url)
+        else:
+            self.logger.info("Path {0} already exists.".format(download_path))
+
+        self.list_writer_queue.put({"media_path": item["source_path"], "media_bucket": item["source_bucket"], "proxy_path": download_path, "error":""})

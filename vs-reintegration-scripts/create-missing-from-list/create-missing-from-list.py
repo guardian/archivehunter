@@ -14,6 +14,8 @@ import os.path
 logger = logging.getLogger(__name__)
 temp = logging.getLogger("urllib3")
 temp.setLevel(logging.WARN)
+temp = logging.getLogger("botocore")
+temp.setLevel(logging.WARN)
 logging.basicConfig(level=logging.DEBUG)
 
 

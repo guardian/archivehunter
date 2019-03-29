@@ -140,18 +140,35 @@ def which_proxy_for(file_extension):
         return []
 
 
+def decode_location(fileid):
+    """
+    decodes the archivehunter file ID to a tuple of (bucket, filename)
+    :param fileid: file ID to unscrabme
+    :return: tuple of (bucket, filename)
+    """
+    data = base64.b64decode(fileid.encode('utf-8')).decode("utf-8")
+    return data.split(":")
+
+
 def request_proxy_for(entry):
     """
     enqueues a download request
     :param entry:
     :return:
     """
+    logger.info(entry)
+    decoded = decode_location(entry["fileId"])
+    logger.info(decoded)
+
     rq = {
         "path": os.path.dirname(entry["bucketPath"]),
         "name": os.path.basename(entry["bucketPath"]),
+        "source_path": decoded[1],
+        "source_bucket": decoded[0],
         "proxyType": entry["proxyType"],
         "archive_hunter_id": entry["fileId"]
     }
+    logger.info(rq)
     download_queue.put(rq)
 
 
@@ -203,9 +220,9 @@ for filepath in each_filepath(args.listfile, args.strip):
     if args.test:
         continue
 
-    if verify_item(archive_hunter_id):
-        logger.debug("{0}: Item verified as existing".format(filename_only))
-        if extension in expect_video_proxy or extension in expect_audio_proxy or extension in expect_image_proxy:
+    if extension in expect_video_proxy or extension in expect_audio_proxy or extension in expect_image_proxy:
+        if verify_item(archive_hunter_id):
+            logger.info("{0}: Item verified as existing".format(filename_only))
             proxies = proxies_for(archive_hunter_id)
 
             if(len(proxies["entries"])==0):
@@ -219,6 +236,8 @@ for filepath in each_filepath(args.listfile, args.strip):
                 logger.info("Got proxies: {0}".format(proxies["entries"]))
                 for entry in filter(lambda entry: entry["proxyType"]!="THUMBNAIL", proxies["entries"]):
                     request_proxy_for(entry)
+        else:
+            logger.info("{0}: Could not find item".format(filename_only))
 
 sorted_extns = sorted(filter(lambda x: x is not None, seen_extensions), key=cmp_to_key(locale.strcoll))
 
