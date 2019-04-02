@@ -61,8 +61,8 @@ object DockerMain extends MainContent {
 
       //"want proxy" branch
 
-      mtb.out(0) ~> mtwpb
-      mtb.out(1) ~> ftwpb
+      mtb.out(0) ~> mtwpb.in
+      mtb.out(1) ~> ftwpb.in
 
       mtwpb.out(0) ~> preVideoMerge
       ftwpb.out(0) ~> preVideoMerge

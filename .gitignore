@@ -24,3 +24,7 @@ node_modules
 *.crt
 *.key
 /utils/revproxy/server.conf
+/ProxyStatsGathering/scripts/ecs_rundev.yaml
+*.pem
+*.csv
+*.lst

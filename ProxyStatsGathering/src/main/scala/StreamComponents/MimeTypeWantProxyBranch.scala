@@ -44,28 +44,28 @@ class MimeTypeWantProxyBranch extends GraphStage[UniformFanOutShape[ArchiveEntry
       setHandler(outNo, new AbstractOutHandler {
         override def onPull(): Unit = {
           println("outThumb: pullFromDownstream")
-          if(isAvailable(in)) pull(in)
+          if(!hasBeenPulled(in)) pull(in)
         }
       })
 
       setHandler(outVideo, new AbstractOutHandler {
         override def onPull(): Unit = {
           println("outThumb: pullFromDownstream")
-          if(isAvailable(in)) pull(in)
+          if(!hasBeenPulled(in)) pull(in)
         }
       })
 
       setHandler(outAudio, new AbstractOutHandler {
         override def onPull(): Unit = {
           println("outThumb: pullFromDownstream")
-          if(isAvailable(in)) pull(in)
+          if(!hasBeenPulled(in)) pull(in)
         }
       })
 
       setHandler(outThumb, new AbstractOutHandler {
         override def onPull(): Unit = {
           println("outThumb: pullFromDownstream")
-          if(isAvailable(in)) pull(in)
+          if(!hasBeenPulled(in)) pull(in)
         }
       })
     }
