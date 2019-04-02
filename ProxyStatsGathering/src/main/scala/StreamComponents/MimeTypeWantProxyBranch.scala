@@ -31,10 +31,18 @@ class MimeTypeWantProxyBranch extends GraphStage[UniformFanOutShape[ArchiveEntry
             push(outVideo, ProxyVerifyResult(elem.id, ProxyType.VIDEO, wantProxy = false))
             push(outAudio, ProxyVerifyResult(elem.id, ProxyType.AUDIO, wantProxy = true))
             push(outThumb, ProxyVerifyResult(elem.id, ProxyType.THUMBNAIL, wantProxy = true))
-          } else if(elem.mimeType.major=="image"){
+          } else if(elem.mimeType.major=="image") {
             push(outVideo, ProxyVerifyResult(elem.id, ProxyType.VIDEO, wantProxy = false))
             push(outAudio, ProxyVerifyResult(elem.id, ProxyType.AUDIO, wantProxy = false))
             push(outThumb, ProxyVerifyResult(elem.id, ProxyType.THUMBNAIL, wantProxy = true))
+          } else if(elem.mimeType.major=="model") {
+            if(elem.mimeType.minor=="vnd.mts"){ //MTS files (from older tapeless cams) get mis-identified as this
+              push(outVideo, ProxyVerifyResult(elem.id, ProxyType.VIDEO, wantProxy = true))
+              push(outAudio, ProxyVerifyResult(elem.id, ProxyType.AUDIO, wantProxy = false))
+              push(outThumb, ProxyVerifyResult(elem.id, ProxyType.THUMBNAIL, wantProxy = true))
+            } else {
+              push (outNo, ProxyVerifyResult(elem.id, ProxyType.UNKNOWN, wantProxy = false))
+            }
           } else {
             push (outNo, ProxyVerifyResult(elem.id, ProxyType.UNKNOWN, wantProxy = false))
           }

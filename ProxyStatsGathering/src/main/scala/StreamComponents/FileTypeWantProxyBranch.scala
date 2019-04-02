@@ -15,7 +15,7 @@ class FileTypeWantProxyBranch extends GraphStage[UniformFanOutShape[ArchiveEntry
   final val outThumb:Outlet[ProxyVerifyResult] = Outlet.create("FileTypeWantProxyBranch.outThumb")
   final val outNo:Outlet[ProxyVerifyResult] = Outlet.create("FileTypeWantProxyBranch.no")
 
-  val shouldProxyExtensionsVideo:Array[String] = Array("mpg","mpe","mp2","mp4","avi","mov","mxf","mkv")
+  val shouldProxyExtensionsVideo:Array[String] = Array("mpg","mpe","mp2","mp4","avi","mov","mxf","mkv","mts")
   val shouldProxyExtensionsAudio:Array[String] = Array("mp3","aif","aiff", "wav")
   val shouldProxyExtensionsThumb:Array[String] = Array("cr2","nef","jpg","tif","tiff","tga","dxr")
 
@@ -28,8 +28,8 @@ class FileTypeWantProxyBranch extends GraphStage[UniformFanOutShape[ArchiveEntry
         override def onPush(): Unit = {
           val elem = grab(in)
 
-          println(s"${elem.path} has file extension ${elem.file_extension}")
-          elem.file_extension match {
+          println(s"${elem.path} has file extension ${elem.file_extension.map(_.toLowerCase)}")
+          elem.file_extension.map(_.toLowerCase) match {
             case None=>
               push(outNo, ProxyVerifyResult(elem.id, ProxyType.UNKNOWN, wantProxy = false))
             case Some(xtn)=>

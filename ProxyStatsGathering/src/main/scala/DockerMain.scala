@@ -41,9 +41,8 @@ object DockerMain extends MainContent {
       val mtb = builder.add(mimeTypeBranch)
       val mtwpb = builder.add(mimeTypeWantProxyBranch)
       val ftwpb = builder.add(fileTypeWantProxyBranch)
-      //val wantProxyMerge = builder.add(new Merge[ProxyVerifyResult](2, true))
-      //val splitter = builder.add(new Broadcast[ProxyVerifyResult](3, true))
 
+      val isDotFileBranch = builder.add(new IsDotFileBranch)
       val preVideoMerge = builder.add(new Merge[ProxyVerifyResult](2, false))
       val videoProxyRequest = builder.add(new VerifyProxy(ProxyType.VIDEO, injector))
       val preAudioMerge = builder.add(new Merge[ProxyVerifyResult](2, false))
@@ -54,13 +53,13 @@ object DockerMain extends MainContent {
       val postVerifyMerge = builder.add(new Merge[ProxyVerifyResult](3, false))
       val proxyResultGroup = builder.add(new ProxyResultGroup)
 
-      val preCounterMerge = builder.add(new Merge[GroupedResult](3, false))
-      //val counter = builder.add(counterSink)
+      val preCounterMerge = builder.add(new Merge[GroupedResult](4, false))
 
-      src ~> conv ~> mtb.in
+      src ~> conv ~> isDotFileBranch
+      isDotFileBranch.out(0).map(entry=>GroupedResult(entry.id, false, false, false, false, true)) ~> preCounterMerge
+      isDotFileBranch.out(1) ~> mtb.in
 
       //"want proxy" branch
-
       mtb.out(0) ~> mtwpb.in
       mtb.out(1) ~> ftwpb.in
 
@@ -73,7 +72,6 @@ object DockerMain extends MainContent {
       mtwpb.out(2) ~> preThumbMerge
       ftwpb.out(2) ~> preThumbMerge
 
-      //ftwpb.out(0) ~> wantProxyMerge.in(1)
 
       preVideoMerge ~> videoProxyRequest ~> postVerifyMerge.in(0)
       preAudioMerge ~> audioProxyRequest ~> postVerifyMerge.in(1)
@@ -82,8 +80,8 @@ object DockerMain extends MainContent {
       postVerifyMerge ~> proxyResultGroup ~> preCounterMerge
 
       //"don't want proxy" branch
-      mtwpb.out(3).map(verifyResult=>GroupedResult(verifyResult.fileId,false, false, false, true)).log("mtwbp-none") ~> preCounterMerge
-      ftwpb.out(3).map(verifyResult=>GroupedResult(verifyResult.fileId, false, false, false, true)).log("ftwpb-none") ~> preCounterMerge
+      mtwpb.out(3).map(verifyResult=>GroupedResult(verifyResult.fileId,false, false, false, true, false)).log("mtwbp-none") ~> preCounterMerge
+      ftwpb.out(3).map(verifyResult=>GroupedResult(verifyResult.fileId, false, false, false, true, false)).log("ftwpb-none") ~> preCounterMerge
 
       //completion
       preCounterMerge ~> counterSink

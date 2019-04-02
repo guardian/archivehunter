@@ -17,15 +17,15 @@ class ProxyResultGroup extends GraphStage[FlowShape[ProxyVerifyResult, GroupedRe
     def makeDecision(elemts:Seq[ProxyVerifyResult]):GroupedResult = {
       val wanted = elemts.filter(_.wantProxy)
       if(wanted.isEmpty){
-        GroupedResult(elemts.head.fileId,proxied=false, partial=false, unProxied = false, notNeeded = true)
+        GroupedResult(elemts.head.fileId,proxied=false, partial=false, unProxied = false, notNeeded = true, dotFile = false)
       } else {
         val have = wanted.filter(_.haveProxy.getOrElse(false))
         if(have.isEmpty){
-          GroupedResult(elemts.head.fileId, proxied = false, partial = false, unProxied = true, notNeeded = false)
+          GroupedResult(elemts.head.fileId, proxied = false, partial = false, unProxied = true, notNeeded = false, dotFile = false)
         } else if(have.length==wanted.length){
-          GroupedResult(elemts.head.fileId, proxied = true, partial = false, unProxied = false, notNeeded = false)
+          GroupedResult(elemts.head.fileId, proxied = true, partial = false, unProxied = false, notNeeded = false, dotFile = false)
         } else {
-          GroupedResult(elemts.head.fileId, proxied = false, partial = false, unProxied = false, notNeeded = false)
+          GroupedResult(elemts.head.fileId, proxied = false, partial = false, unProxied = false, notNeeded = false, dotFile = false)
         }
       }
     }
