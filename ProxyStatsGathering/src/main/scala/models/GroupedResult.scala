@@ -1,3 +1,7 @@
 package models
 
-case class GroupedResult (fileId:String, proxied:Boolean, partial:Boolean, unProxied:Boolean, notNeeded:Boolean, dotFile:Boolean)
+object ProxyResult extends Enumeration {
+  val Proxied, Partial, Unproxied, NotNeeded, DotFile, GlacierClass = Value
+}
+
+case class GroupedResult (fileId:String, result:ProxyResult.Value)

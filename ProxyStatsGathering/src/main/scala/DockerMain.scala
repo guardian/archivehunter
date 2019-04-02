@@ -3,7 +3,7 @@ import akka.{Done, NotUsed}
 import akka.stream.{ClosedShape, Graph, Outlet}
 import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge, RunnableGraph, Sink}
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ProxyType}
-import models.{FinalCount, GroupedResult, ProxyVerifyResult}
+import models.{FinalCount, GroupedResult, ProxyResult, ProxyVerifyResult}
 
 import scala.concurrent.{Await, Future}
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -56,7 +56,7 @@ object DockerMain extends MainContent {
       val preCounterMerge = builder.add(new Merge[GroupedResult](4, false))
 
       src ~> conv ~> isDotFileBranch
-      isDotFileBranch.out(0).map(entry=>GroupedResult(entry.id, false, false, false, false, true)) ~> preCounterMerge
+      isDotFileBranch.out(0).map(entry=>GroupedResult(entry.id, ProxyResult.DotFile)) ~> preCounterMerge
       isDotFileBranch.out(1) ~> mtb.in
 
       //"want proxy" branch
@@ -80,8 +80,8 @@ object DockerMain extends MainContent {
       postVerifyMerge ~> proxyResultGroup ~> preCounterMerge
 
       //"don't want proxy" branch
-      mtwpb.out(3).map(verifyResult=>GroupedResult(verifyResult.fileId,false, false, false, true, false)).log("mtwbp-none") ~> preCounterMerge
-      ftwpb.out(3).map(verifyResult=>GroupedResult(verifyResult.fileId, false, false, false, true, false)).log("ftwpb-none") ~> preCounterMerge
+      mtwpb.out(3).map(verifyResult=>GroupedResult(verifyResult.fileId, ProxyResult.NotNeeded)).log("mtwbp-none") ~> preCounterMerge
+      ftwpb.out(3).map(verifyResult=>GroupedResult(verifyResult.fileId, ProxyResult.NotNeeded)).log("ftwpb-none") ~> preCounterMerge
 
       //completion
       preCounterMerge ~> counterSink

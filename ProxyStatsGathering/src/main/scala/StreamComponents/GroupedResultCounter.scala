@@ -2,8 +2,9 @@ package StreamComponents
 
 import akka.stream.{Attributes, Inlet, SinkShape}
 import akka.stream.stage.{AbstractInHandler, GraphStageLogic, GraphStageWithMaterializedValue}
-import models.{FinalCount, GroupedResult}
+import models.{FinalCount, GroupedResult, ProxyResult}
 
+import scala.annotation.switch
 import scala.concurrent.{Future, Promise}
 
 class GroupedResultCounter extends GraphStageWithMaterializedValue[SinkShape[GroupedResult], Future[FinalCount]] {
@@ -23,11 +24,14 @@ class GroupedResultCounter extends GraphStageWithMaterializedValue[SinkShape[Gro
           val elem = grab(in)
 
           //println(s"counter is $n: got $elem")
-          if(elem.notNeeded) ctr = ctr.copy(notNeededCount = ctr.notNeededCount+1)
-          if(elem.partial) ctr = ctr.copy(partialCount = ctr.partialCount+1)
-          if(elem.proxied) ctr = ctr.copy(proxiedCount = ctr.proxiedCount+1)
-          if(elem.unProxied) ctr = ctr.copy(unProxiedCount = ctr.unProxiedCount+1)
-          if(elem.dotFile) ctr = ctr.copy(dotFile = ctr.dotFile+1)
+          (elem.result: @switch) match
+          {
+            case ProxyResult.NotNeeded=> ctr.copy(notNeededCount = ctr.notNeededCount + 1)
+            case ProxyResult.Partial=> ctr = ctr.copy(partialCount = ctr.partialCount + 1)
+            case ProxyResult.Proxied=> ctr = ctr.copy(proxiedCount = ctr.proxiedCount + 1)
+            case ProxyResult.Unproxied=> ctr = ctr.copy(unProxiedCount = ctr.unProxiedCount + 1)
+            case ProxyResult.DotFile=> ctr = ctr.copy(dotFile = ctr.dotFile + 1)
+          }
           n+=1
           println(s"Running total: $n $ctr")
           pull(in)

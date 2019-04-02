@@ -2,7 +2,7 @@ package StreamComponents
 
 import akka.stream._
 import akka.stream.stage.{AbstractInHandler, AbstractOutHandler, GraphStage, GraphStageLogic}
-import models.{GroupedResult, ProxyVerifyResult}
+import models.{GroupedResult, ProxyResult, ProxyVerifyResult}
 
 class ProxyResultGroup extends GraphStage[FlowShape[ProxyVerifyResult, GroupedResult]] {
   final val in:Inlet[ProxyVerifyResult] = Inlet.create("ProxyResultMerge.in")
@@ -17,15 +17,15 @@ class ProxyResultGroup extends GraphStage[FlowShape[ProxyVerifyResult, GroupedRe
     def makeDecision(elemts:Seq[ProxyVerifyResult]):GroupedResult = {
       val wanted = elemts.filter(_.wantProxy)
       if(wanted.isEmpty){
-        GroupedResult(elemts.head.fileId,proxied=false, partial=false, unProxied = false, notNeeded = true, dotFile = false)
+        GroupedResult(elemts.head.fileId,result = ProxyResult.NotNeeded)
       } else {
         val have = wanted.filter(_.haveProxy.getOrElse(false))
         if(have.isEmpty){
-          GroupedResult(elemts.head.fileId, proxied = false, partial = false, unProxied = true, notNeeded = false, dotFile = false)
+          GroupedResult(elemts.head.fileId, ProxyResult.Unproxied)
         } else if(have.length==wanted.length){
-          GroupedResult(elemts.head.fileId, proxied = true, partial = false, unProxied = false, notNeeded = false, dotFile = false)
+          GroupedResult(elemts.head.fileId, ProxyResult.Proxied)
         } else {
-          GroupedResult(elemts.head.fileId, proxied = false, partial = false, unProxied = false, notNeeded = false, dotFile = false)
+          GroupedResult(elemts.head.fileId, ProxyResult.Partial)
         }
       }
     }
