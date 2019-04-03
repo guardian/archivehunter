@@ -50,7 +50,7 @@ class ProxyResultGroup extends GraphStage[FlowShape[ProxyVerifyResult, GroupedRe
 
     setHandler(out, new AbstractOutHandler {
       override def onPull(): Unit = {
-        println("ProxyResultGroup: pull from downstream")
+        //println("ProxyResultGroup: pull from downstream")
         pull(in)
       }
     })

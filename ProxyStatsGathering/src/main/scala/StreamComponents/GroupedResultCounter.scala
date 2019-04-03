@@ -16,7 +16,7 @@ class GroupedResultCounter extends GraphStageWithMaterializedValue[SinkShape[Gro
     val promise = Promise[FinalCount]()
 
     val logic = new GraphStageLogic(shape) {
-      private var ctr = FinalCount(0,0,0,0,0)
+      private var ctr = FinalCount(0,0,0,0,0,0)
       private var n = 0
 
       setHandler(in, new AbstractInHandler {
@@ -31,6 +31,7 @@ class GroupedResultCounter extends GraphStageWithMaterializedValue[SinkShape[Gro
             case ProxyResult.Proxied=> ctr = ctr.copy(proxiedCount = ctr.proxiedCount + 1)
             case ProxyResult.Unproxied=> ctr = ctr.copy(unProxiedCount = ctr.unProxiedCount + 1)
             case ProxyResult.DotFile=> ctr = ctr.copy(dotFile = ctr.dotFile + 1)
+            case ProxyResult.GlacierClass=> ctr = ctr.copy(glacier = ctr.glacier + 1)
           }
           n+=1
           println(s"Running total: $n $ctr")

@@ -43,6 +43,7 @@ object DockerMain extends MainContent {
       val ftwpb = builder.add(fileTypeWantProxyBranch)
 
       val isDotFileBranch = builder.add(new IsDotFileBranch)
+      val isGlacierBranch = builder.add(injector.getInstance(classOf[IsGlacierBranch]))
       val preVideoMerge = builder.add(new Merge[ProxyVerifyResult](2, false))
       val videoProxyRequest = builder.add(new VerifyProxy(ProxyType.VIDEO, injector))
       val preAudioMerge = builder.add(new Merge[ProxyVerifyResult](2, false))
@@ -53,11 +54,14 @@ object DockerMain extends MainContent {
       val postVerifyMerge = builder.add(new Merge[ProxyVerifyResult](3, false))
       val proxyResultGroup = builder.add(new ProxyResultGroup)
 
-      val preCounterMerge = builder.add(new Merge[GroupedResult](4, false))
+      val preCounterMerge = builder.add(new Merge[GroupedResult](5, false))
 
       src ~> conv ~> isDotFileBranch
       isDotFileBranch.out(0).map(entry=>GroupedResult(entry.id, ProxyResult.DotFile)) ~> preCounterMerge
-      isDotFileBranch.out(1) ~> mtb.in
+      isDotFileBranch.out(1) ~> isGlacierBranch
+
+      isGlacierBranch.out(0).map(entry=>GroupedResult(entry.id, ProxyResult.GlacierClass)) ~> preCounterMerge
+      isGlacierBranch.out(1) ~> mtb
 
       //"want proxy" branch
       mtb.out(0) ~> mtwpb.in

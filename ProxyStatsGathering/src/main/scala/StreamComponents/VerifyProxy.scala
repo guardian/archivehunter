@@ -72,7 +72,7 @@ class VerifyProxy (proxyType: ProxyType.Value, injector:Injector) extends GraphS
 
     setHandler(out, new AbstractOutHandler {
       override def onPull(): Unit = {
-        println(s"verifyProxy $proxyType: pull from downstream")
+        //println(s"verifyProxy $proxyType: pull from downstream")
         pull(in)
       }
     })

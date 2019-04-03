@@ -32,7 +32,7 @@ class SearchHitToArchiveEntryFlow extends GraphStage[FlowShape[SearchHit,Archive
 
       setHandler(out, new AbstractOutHandler {
         override def onPull(): Unit = {
-          println("pull from downstream")
+          //println("pull from downstream")
           pull(in)
         }
       })

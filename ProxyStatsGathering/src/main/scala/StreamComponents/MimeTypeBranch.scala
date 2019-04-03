@@ -49,14 +49,14 @@ class MimeTypeBranch extends GraphStage[UniformFanOutShape[ArchiveEntry, Archive
 
       setHandler(outNo, new AbstractOutHandler {
         override def onPull(): Unit = {
-          println("mimeTypeBranch NO: pullFromDownstream")
+          //println("mimeTypeBranch NO: pullFromDownstream")
           if(!hasBeenPulled(in)) pull(in)
         }
       })
 
       setHandler(outYes, new AbstractOutHandler {
         override def onPull(): Unit = {
-          println("mimeTypeBranch YES: pullFromDownstream")
+          //println("mimeTypeBranch YES: pullFromDownstream")
           if(!hasBeenPulled(in)) pull(in)
         }
       })

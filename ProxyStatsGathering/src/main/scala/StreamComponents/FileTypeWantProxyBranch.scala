@@ -65,33 +65,33 @@ class FileTypeWantProxyBranch extends GraphStage[UniformFanOutShape[ArchiveEntry
 
       setHandler(outVideo, new AbstractOutHandler {
         override def onPull(): Unit = {
-          println("fileTypeWantProxyBranch VIDEO: pullFromDownstream")
+          //println("fileTypeWantProxyBranch VIDEO: pullFromDownstream")
           if(!hasBeenPulled(in)){
             pull(in)
           } else {
-            println("input port not available")
+            //println("input port not available")
           }
         }
       })
 
       setHandler(outAudio, new AbstractOutHandler {
         override def onPull(): Unit = {
-          println("fileTypeWantProxyBranch AUDIO: pullFromDownstream")
+          //println("fileTypeWantProxyBranch AUDIO: pullFromDownstream")
           if(!hasBeenPulled(in)){
             pull(in)
           } else {
-            println("input port not available")
+            //println("input port not available")
           }
         }
       })
 
       setHandler(outThumb, new AbstractOutHandler {
         override def onPull(): Unit = {
-          println("fileTypeWantProxyBranch THUMB: pullFromDownstream")
+          //println("fileTypeWantProxyBranch THUMB: pullFromDownstream")
           if(!hasBeenPulled(in)){
             pull(in)
           } else {
-            println("input port not available")
+            //println("input port not available")
           }
         }
       })
