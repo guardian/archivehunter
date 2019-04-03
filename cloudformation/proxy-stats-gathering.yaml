@@ -19,6 +19,9 @@ Parameters:
   ESHost:
     Description: Elasticsearch hostname
     Type: String
+  ProblemsIndexName:
+    Type: String
+    Description: Name of an elasticsearch index to output problem items to
   IndexName:
     Type: String
     Description: ES index name
@@ -111,6 +114,8 @@ Resources:
               Value: !Ref ProxiesTable
             - Name: ELASTICSEARCH_SSL
               Value: true
+            - Name: PROBLEMS_INDEX_NAME
+              Value: !Ref ProblemsIndexName
           LogConfiguration:
             LogDriver: awslogs
             Options:

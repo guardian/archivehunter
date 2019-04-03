@@ -2,8 +2,8 @@ package StreamComponents
 
 import akka.stream._
 import akka.stream.stage.{AbstractInHandler, AbstractOutHandler, GraphStage, GraphStageLogic}
+import com.theguardian.multimedia.archivehunter.common.cmn_models.ProxyVerifyResult
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ProxyType}
-import models.ProxyVerifyResult
 
 /**
   * branches to either a "yes" or "no" depending on whether we expect to have a proxy for the given MIME type

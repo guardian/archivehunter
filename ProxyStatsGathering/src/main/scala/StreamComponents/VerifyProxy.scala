@@ -5,8 +5,8 @@ import akka.stream.stage.{AbstractInHandler, AbstractOutHandler, GraphStage, Gra
 import com.google.inject.Injector
 import com.gu.scanamo.error.DynamoReadError
 import com.theguardian.multimedia.archivehunter.common.clientManagers.DynamoClientManager
+import com.theguardian.multimedia.archivehunter.common.cmn_models.ProxyVerifyResult
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ProxyLocation, ProxyLocationDAO, ProxyType}
-import models.ProxyVerifyResult
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
