@@ -1,22 +1,25 @@
 package StreamComponents
 
+import java.time.ZonedDateTime
+
 import akka.stream.{Attributes, Inlet, SinkShape}
 import akka.stream.stage.{AbstractInHandler, GraphStageLogic, GraphStageWithMaterializedValue}
-import models.{FinalCount, GroupedResult, ProxyResult}
+import com.theguardian.multimedia.archivehunter.common.cmn_models.ProblemItemCount
+import models.{GroupedResult, ProxyResult}
 
 import scala.annotation.switch
 import scala.concurrent.{Future, Promise}
 
-class GroupedResultCounter extends GraphStageWithMaterializedValue[SinkShape[GroupedResult], Future[FinalCount]] {
+class GroupedResultCounter extends GraphStageWithMaterializedValue[SinkShape[GroupedResult], Future[ProblemItemCount]] {
   final val in:Inlet[GroupedResult] = Inlet.create("GroupedResultCounter.in")
 
   override def shape: SinkShape[GroupedResult] = SinkShape.of(in)
 
-  override def createLogicAndMaterializedValue(inheritedAttributes: Attributes): (GraphStageLogic, Future[FinalCount]) = {
-    val promise = Promise[FinalCount]()
+  override def createLogicAndMaterializedValue(inheritedAttributes: Attributes): (GraphStageLogic, Future[ProblemItemCount]) = {
+    val promise = Promise[ProblemItemCount]()
 
     val logic = new GraphStageLogic(shape) {
-      private var ctr = FinalCount(0,0,0,0,0,0)
+      private var ctr = ProblemItemCount(ZonedDateTime.now(), None, 0,0,0,0,0,0)
       private var n = 0
 
       setHandler(in, new AbstractInHandler {
@@ -46,7 +49,7 @@ class GroupedResultCounter extends GraphStageWithMaterializedValue[SinkShape[Gro
 
       override def postStop(): Unit = {
         println("teardown: stream must have finished")
-        promise.success(ctr)
+        promise.success(ctr.copy(scanFinish = Some(ZonedDateTime.now())))
       }
     }
 

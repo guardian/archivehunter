@@ -45,6 +45,11 @@ class ProblemItemIndexer(indexName:String) extends ZonedDateTimeEncoder with Sto
     })
   }
 
+  def indexSummaryCount(entry:ProblemItemCount, refreshPolicy:RefreshPolicy=RefreshPolicy.WAIT_UNTIL)(implicit client:HttpClient) =
+    client.execute({
+      indexInto(s"$indexName/summary").doc(entry)
+    })
+
   /**
     * Requests that a single item be removed from the index
     * @param entryId ID of the archive entry to remove
