@@ -51,6 +51,7 @@
     <logger name="helpers.LightboxStreamComponents.SaveLightboxEntryFlow" level="DEBUG"/>
     <logger name="com.sksamuel.elastic4s.streams" level="WARN"/>
     <logger name="controllers.SearchController" level="INFO"/>
+    <logger name="controllers.ProxyHealthController" level="DEBUG"/>
     <logger name="controllers.ScanTargetController" level="INFO"/>
     <logger name="controllers.JobController" level="INFO"/>
     <logger name="controllers.BrowseCollectionController" level="INFO"/>

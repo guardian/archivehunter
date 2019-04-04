@@ -132,7 +132,10 @@ trait MainContent extends ProblemItemRequestBuilder{
 
       //once we have proxy results grouped, broadcast the results between a counter branch and a log-to-elastic branch
       postGroupBroadcast.out(0) ~> groupCounter ~> preCounterMerge
-      postGroupBroadcast.out(1).map(resultSeq=>ProblemItem(resultSeq.head.fileId, resultSeq)) ~> recordProblemSink
+      postGroupBroadcast.out(1).map(resultSeq=>{
+        val location = resultSeq.head.extractLocation
+        ProblemItem(resultSeq.head.fileId, location._1, location._2, resultSeq)
+      }) ~> recordProblemSink
 
       //"don't want proxy" branch
       mtwpb.out(3).map(verifyResult=>GroupedResult(verifyResult.fileId, ProxyResult.NotNeeded)) ~> preCounterMerge

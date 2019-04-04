@@ -10,21 +10,22 @@ import org.apache.logging.log4j.LogManager
 trait ProblemItemHitReader extends MediaMetadataMapConverters {
   private val ownLogger = LogManager.getLogger(getClass)
 
-  def mapToResult(data:Map[String,String]):ProxyVerifyResult =
-    ProxyVerifyResult(data("fileId"),ProxyType.withName(data("proxyType")),
+  private def mapToResult(data:Map[String,Any]):ProxyVerifyResult =
+    ProxyVerifyResult(data("fileId").asInstanceOf[String],ProxyType.withName(data("proxyType").asInstanceOf[String]),
       if(data.getOrElse("wantProxy","false")=="true") true else false,
-      Option(data.getOrElse("haveProxy", null)).map(str=>if(str=="true") true else false)
+      Option(data.getOrElse("haveProxy", null)).map(value=>value.asInstanceOf[Boolean])
     )
 
   implicit object ProblemItemHR extends HitReader[ProblemItem] {
     override def read(hit: Hit): Either[Throwable, ProblemItem] = {
 
       try {
-        val timestamp = ZonedDateTime.parse(hit.sourceField("last_modified").asInstanceOf[String])
         Right(
           ProblemItem(
-            hit.sourceField("id").asInstanceOf[String],
-            hit.sourceField("results").asInstanceOf[Seq[Map[String,String]]].map(entry=>mapToResult(entry))
+            hit.sourceField("fileId").asInstanceOf[String],
+            hit.sourceField("collection").asInstanceOf[String],
+            hit.sourceField("filePath").asInstanceOf[String],
+            hit.sourceField("verifyResults").asInstanceOf[Seq[Map[String,String]]].map(entry=>mapToResult(entry))
           )
         )
 
