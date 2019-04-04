@@ -18,6 +18,8 @@ import BrowseComponent from './browse/BrowseComponent.jsx';
 import LoginStatusComponent from './Login/LoginStatusComponent.jsx';
 import MyLightbox from './Lightbox/MyLightbox.jsx';
 
+import ProxyHealthDetail from './ProxyHealthDetail/ProxyHealthDetail.jsx';
+
 import { library } from '@fortawesome/fontawesome-svg-core'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faStroopwafel, faCheckCircle, faCheck, faTimes, faTimesCircle, faRoad, faSearch,faThList,faWrench, faLightbulb, faFolderPlus, faFolderMinus, faFolder, faBookReader, faRedoAlt, faHome } from '@fortawesome/free-solid-svg-icons'
@@ -84,7 +86,7 @@ class App extends React.Component {
             <LoginStatusComponent userData={this.state.userLogin} userLoggedOutCb={this.userLoggedOut}/>
             <Switch>
                 <Route path="/test/419" component={Test419Component}/>
-                <Route path="/admin/proxyHealth" component={ProxyHealthDash}/>
+                <Route path="/admin/proxyHealth" component={ProxyHealthDetail}/>
                 <Route path="/admin/proxyFramework/new" component={ProxyFrameworkAdd}/>
                 <Route path="/admin/proxyFramework" component={ProxyFrameworkList}/>
                 <Route path="/admin/about" component={AboutComponent}/>
