@@ -6,6 +6,7 @@ class ArchiveHunterConfigurationExt extends ArchiveHunterConfiguration {
   private val environmentKeyMapping = Map(
     "elasticsearch.index"->"INDEX_NAME",
     "elasticsearch.ssl"->"ELASTICSEARCH_SSL",
+    "elasticsearch.port"->"ELASTICSEARCH_PORT",
     "externalData.awsProfile"->"AWS_PROFILE",
     "elasticsearch.hostname"->"ES_HOST_NAME",
     "proxies.tableName" -> "PROXIES_TABLE_NAME",

@@ -31,21 +31,29 @@ object DockerMain extends MainContent {
     val problemsIndexName = getProblemsIndexName
 
     val problemsIndexer = new ProblemItemIndexer(problemsIndexName)
-    problemsIndexer.newIndex(3,1).map({
+    problemsIndexer.newIndex(5,1).map({
       case Failure(err)=>
         println(s"Warning: could not create problem index $problemsIndexName: $err")
       case Success(_)=>
         println(s"Created problem index at $problemsIndexName")
     })
 
+    val problemsSummaryIndexer = new ProblemItemIndexer(s"$problemsIndexName-summary")
+    problemsSummaryIndexer.newIndex(1,2).map({
+      case Failure(err)=>
+        println(s"Warning: Could not create problem summary index $problemsIndexName-summary: $err")
+      case Success(_)=>
+        println(s"Created problems summary index at $problemsIndexName-summary")
+    })
+
     val graphModel = buildGraphModel
 
     val resultFuture = RunnableGraph.fromGraph(graphModel).run()
 
-    val finalResult = Await.result(resultFuture, 3 hours)
+    val finalResult = Await.result(resultFuture, 8 hours)
     println(s"Final result is: $finalResult")
 
-    problemsIndexer.indexSummaryCount(finalResult).map({
+    problemsSummaryIndexer.indexSummaryCount(finalResult).map({
       case Right(success)=>
         println(s"Successfully output summary: ${success.body}")
       case Left(err)=>

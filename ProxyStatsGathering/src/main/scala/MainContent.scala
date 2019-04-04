@@ -60,7 +60,7 @@ trait MainContent extends ProblemItemRequestBuilder{
 
   def getStreamSource(indexName:String) = {
     //pull back the entire catalogue.  We'll check it one at a time.
-    Source.fromPublisher(esClient.publisher(search(indexName) scroll "5m"))
+    Source.fromPublisher(esClient.publisher(search(indexName) scroll "5m")).log("source")
   }
 
   def getProblemElementsSink(indexName:String) = {
@@ -135,8 +135,8 @@ trait MainContent extends ProblemItemRequestBuilder{
       postGroupBroadcast.out(1).map(resultSeq=>ProblemItem(resultSeq.head.fileId, resultSeq)) ~> recordProblemSink
 
       //"don't want proxy" branch
-      mtwpb.out(3).map(verifyResult=>GroupedResult(verifyResult.fileId, ProxyResult.NotNeeded)).log("mtwbp-none") ~> preCounterMerge
-      ftwpb.out(3).map(verifyResult=>GroupedResult(verifyResult.fileId, ProxyResult.NotNeeded)).log("ftwpb-none") ~> preCounterMerge
+      mtwpb.out(3).map(verifyResult=>GroupedResult(verifyResult.fileId, ProxyResult.NotNeeded)) ~> preCounterMerge
+      ftwpb.out(3).map(verifyResult=>GroupedResult(verifyResult.fileId, ProxyResult.NotNeeded)) ~> preCounterMerge
 
       //completion
       preCounterMerge ~> counterSink

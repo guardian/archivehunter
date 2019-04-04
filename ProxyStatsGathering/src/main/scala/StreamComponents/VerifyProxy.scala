@@ -6,7 +6,7 @@ import com.google.inject.Injector
 import com.gu.scanamo.error.DynamoReadError
 import com.theguardian.multimedia.archivehunter.common.clientManagers.DynamoClientManager
 import com.theguardian.multimedia.archivehunter.common.cmn_models.ProxyVerifyResult
-import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ProxyLocation, ProxyLocationDAO, ProxyType}
+import com.theguardian.multimedia.archivehunter.common._
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -24,11 +24,14 @@ class VerifyProxy (proxyType: ProxyType.Value, injector:Injector) extends GraphS
 
   val maxAttempts = 50
 
+  val config = injector.getInstance(classOf[ArchiveHunterConfiguration])
+  private val profileName = config.getOptional[String]("externalData.awsProfile")
+
   override def createLogic(inheritedAttributes: Attributes): GraphStageLogic = new GraphStageLogic(shape) {
     val proxyLocationDAO = injector.getInstance(classOf[ProxyLocationDAO])
     val dynamoClientManager = injector.getInstance(classOf[DynamoClientManager])
 
-    implicit val dynamoClient = dynamoClientManager.getNewDynamoClient()
+    implicit val dynamoClient = dynamoClientManager.getNewDynamoClient(profileName)
 
     /**
       * call synchronous getProxy and retry up to maxAttempts times, backing off by an extra 1/2 second each time

@@ -98,7 +98,7 @@ class ProblemItemIndexer(indexName:String) extends ZonedDateTimeEncoder with Sto
     * @return a Future containing either an ProblemItem or a subclass of IndexerError describing the actual error.
     */
   def getByIdFull(docId:String)(implicit client:HttpClient):Future[Either[IndexerError,ProblemItem]] = client.execute {
-    get(indexName, "entry", docId)
+    get(indexName, "problem", docId)
   }.map({
     case Left(failure)=>Left(ESError(docId, failure))
     case Right(success)=>
@@ -114,4 +114,8 @@ class ProblemItemIndexer(indexName:String) extends ZonedDateTimeEncoder with Sto
           Left(UnexpectedReturnCode(docId, other))
       }
   })
+
+  def mostRecentStats(implicit client:HttpClient) = client.execute(
+    search(s"$indexName/summary") sortByFieldDesc "scanStart" limit 1
+  ).map(_.map(success=>success.result.to[ProblemItemCount].headOption))
 }

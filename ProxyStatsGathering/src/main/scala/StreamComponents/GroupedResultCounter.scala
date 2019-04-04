@@ -19,7 +19,7 @@ class GroupedResultCounter extends GraphStageWithMaterializedValue[SinkShape[Gro
     val promise = Promise[ProblemItemCount]()
 
     val logic = new GraphStageLogic(shape) {
-      private var ctr = ProblemItemCount(ZonedDateTime.now(), None, 0,0,0,0,0,0)
+      private var ctr = ProblemItemCount(ZonedDateTime.now(), None, 0,0,0,0,0,0,0)
       private var n = 0
 
       setHandler(in, new AbstractInHandler {
@@ -29,15 +29,15 @@ class GroupedResultCounter extends GraphStageWithMaterializedValue[SinkShape[Gro
           //println(s"counter is $n: got $elem")
           (elem.result: @switch) match
           {
-            case ProxyResult.NotNeeded=> ctr.copy(notNeededCount = ctr.notNeededCount + 1)
-            case ProxyResult.Partial=> ctr = ctr.copy(partialCount = ctr.partialCount + 1)
-            case ProxyResult.Proxied=> ctr = ctr.copy(proxiedCount = ctr.proxiedCount + 1)
-            case ProxyResult.Unproxied=> ctr = ctr.copy(unProxiedCount = ctr.unProxiedCount + 1)
-            case ProxyResult.DotFile=> ctr = ctr.copy(dotFile = ctr.dotFile + 1)
-            case ProxyResult.GlacierClass=> ctr = ctr.copy(glacier = ctr.glacier + 1)
+            case ProxyResult.NotNeeded=> ctr.copy(notNeededCount = ctr.notNeededCount + 1, grandTotal = n)
+            case ProxyResult.Partial=> ctr = ctr.copy(partialCount = ctr.partialCount + 1, grandTotal = n)
+            case ProxyResult.Proxied=> ctr = ctr.copy(proxiedCount = ctr.proxiedCount + 1, grandTotal = n)
+            case ProxyResult.Unproxied=> ctr = ctr.copy(unProxiedCount = ctr.unProxiedCount + 1, grandTotal = n)
+            case ProxyResult.DotFile=> ctr = ctr.copy(dotFile = ctr.dotFile + 1, grandTotal = n)
+            case ProxyResult.GlacierClass=> ctr = ctr.copy(glacier = ctr.glacier + 1, grandTotal = n)
           }
           n+=1
-          println(s"Running total: $n $ctr")
+          println(s"Running total: $ctr")
           pull(in)
         }
       })
