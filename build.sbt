@@ -3,7 +3,7 @@ import Keys._
 import com.typesafe.sbt.packager.docker
 import com.typesafe.sbt.packager.docker._
 
-enablePlugins(RiffRaffArtifact, DockerPlugin, JDebPackaging, SystemdPlugin)
+enablePlugins(RiffRaffArtifact, DockerPlugin, SystemdPlugin)
 
 val elastic4sVersion = "6.0.4"
 val awsSdkVersion = "1.11.346"

@@ -937,8 +937,8 @@ Resources:
             //ddbHost="localhost"
             ddbHost="dynamodb.${AWS::Region}.amazonaws.com"
             indexName = "archivehunter"
-            problemItemsIndex="problem-items"
-            problemSummaryIndex="problem-items-summary"
+            problemItemsIndex="proxy-issues"
+            problemSummaryIndex="proxy-issues-summary"
           }
 
           scanner {

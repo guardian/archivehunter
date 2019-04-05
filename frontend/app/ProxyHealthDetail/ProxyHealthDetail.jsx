@@ -126,6 +126,9 @@ class ProxyHealthDetail extends React.Component {
                 if(this.state.tableData.length<this.state.tableMaxSize) this.loadMoreTableData();
             });
 
+        }).catch(err=>{
+            console.error(err);
+            this.setState({loading: false, lastError: err});
         }))
     }
 

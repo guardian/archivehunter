@@ -23,7 +23,7 @@ trait ProblemItemHitReader extends MediaMetadataMapConverters {
         Right(
           ProblemItem(
             hit.sourceField("fileId").asInstanceOf[String],
-            hit.sourceField("collection").asInstanceOf[String],
+            Option(hit.sourceField("collection")).getOrElse("unknown").asInstanceOf[String],
             hit.sourceField("filePath").asInstanceOf[String],
             hit.sourceField("verifyResults").asInstanceOf[Seq[Map[String,String]]].map(entry=>mapToResult(entry))
           )

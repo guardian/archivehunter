@@ -68,7 +68,7 @@ class InfoTable extends React.Component {
             {
                 Header: "Jobs",
                 accessor: "fileId",
-                Cell: (props)=><Link to={"/admin/jobs?jobId=" + props.value.value}>View jobs...</Link>
+                Cell: (props)=><Link to={"/admin/jobs?jobid=" + props.value}>View jobs...</Link>
             },
             {
                 Header: "Retry",
