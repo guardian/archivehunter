@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 import csv
-import requests
 import argparse
 from locate_project import ProjectLocator
 from setup_media_item import setup_item

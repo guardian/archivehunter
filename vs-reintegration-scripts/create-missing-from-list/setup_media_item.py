@@ -1,6 +1,7 @@
 from gnmvidispine.vs_item import VSItem
 from gnmvidispine.vs_job import VSJob
 from gnmvidispine.vs_collection import VSCollection
+import re
 import logging
 from datetime import datetime
 import urllib.parse
@@ -58,6 +59,16 @@ def wait_for_job(vsjob):
             break
 
 
+extension_extractor = re.compile(r'\.([^\.]+)$')
+
+
+def shape_tag_for_filepath(proxy_filepath):
+    groups = extension_extractor.search(proxy_filepath)
+    if groups is not None:
+        xtn = groups.group(1)
+        if(xtn=="mp3"): return "lowres"
+
+
 def setup_item(host, user, passwd, full_filepath, proxy_filepath, collection_name, archive_path, archive_timestamp, parent_project_id, wait=False):
     """
     create and populate a placeholder item for the given media in Vidispine
@@ -85,7 +96,7 @@ def setup_item(host, user, passwd, full_filepath, proxy_filepath, collection_nam
         mdbuilder.commit()
 
         #step three - add proxy shape(s)
-        vsjob = item.import_to_shape(uri="file:///{0}".format(urllib.parse.quote(proxy_filepath)))
+        vsjob = item.import_to_shape(uri="file:///{0}".format(urllib.parse.quote(proxy_filepath)), shape_tag=shape_tag_for_filepath(proxy_filepath))
         if wait:
             wait_for_job(vsjob)
 

@@ -99,7 +99,7 @@ def list_generator(filename, actual_holdingpath):
     with open(filename,"r") as f:
         reader = csv.reader(f)
         for row in reader:
-            transformed_loc = transform_proxy_location(row[1], actual_holdingpath)
+            transformed_loc = transform_proxy_location(row[2], actual_holdingpath)
             if len(transformed_loc)<2: continue #ignore null entries
 
             yield (row[0],transformed_loc)
@@ -124,9 +124,10 @@ if args.holdingpath is not None and not os.path.exists(args.holdingpath):
 with open(args.output, "w") as fpout:
     csvwriter = csv.writer(fpout)
     n=0
+
     for entry in list_generator(args.listfile, args.holdingpath):
         n+=1
-        print("{0}: Proxy location {1}".format(n,entry[1]))
+        print("{0}: Proxy location {1}".format(n, entry[1]))
         if not args.ignore and not os.path.exists(entry[1]):
             raise RuntimeError("Path does not exist")
         item = find_in_vidispine(entry[0], user, password)
