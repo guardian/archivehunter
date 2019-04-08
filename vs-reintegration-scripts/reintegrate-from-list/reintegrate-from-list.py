@@ -10,6 +10,22 @@ import re
 import os.path
 
 
+def does_filepath_match(item, filepath):
+    item_filepath = os.path.dirname(item.get("gnm_asset_filename"))
+    item_filename = os.path.basename(item.get("gnm_asset_filename"))
+
+    if item_filepath == "":
+        return False
+
+    if item_filename != os.path.basename(filepath):
+        return False
+
+    if os.path.dirname(filepath).endswith(item_filepath):
+        return True
+
+    return False
+
+
 def find_in_vidispine(filename, user, passwd):
     """
     try to find the given filename in vidispine, using the gnm_asset_filename field
@@ -39,7 +55,7 @@ def find_in_vidispine(filename, user, passwd):
         if result.totalItems==1:
             item_list.append(item)
         else:
-            if filename in item.get("gnm_asset_filename"):
+            if does_filepath_match(item, filename):
                 item_list.append(item)
         print("--------")
 
@@ -51,14 +67,8 @@ def find_in_vidispine(filename, user, passwd):
         if len(item_list)==1:
             return item_list[0]
         else:
-            print("Warning, {0} items still matched filter; not returning anything")
+            print("Warning, {0} items still matched filter; not returning anything".format(len(item_list)))
             return None
-        # matches = list(filter(lambda item: filename in item.get("gnm_asset_filename"), item_list))
-        # print("\tMatched {0} out of {1} items on full path".format(len(matches), result.totalItems))
-        # if len(matches)==1:
-        #     return matches[0]
-        # else:
-        #     return None
 
 
 def get_credentials_from_yaml(filename):
