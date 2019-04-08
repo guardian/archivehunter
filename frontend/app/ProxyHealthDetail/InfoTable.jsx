@@ -3,6 +3,8 @@ import PropTypes from "prop-types";
 import {Link} from "react-router-dom";
 import ReactTable, {ReactTableDefaults} from 'react-table';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import ThreeWayIcon from './ThreeWayIcon.jsx';
+import AttemptRetry from './AttemptRetry.jsx';
 
 class InfoTable extends React.Component {
     static propTypes = {
@@ -18,18 +20,13 @@ class InfoTable extends React.Component {
 
     static renderResult(props){
         return <span>
-            {InfoTable.threeWayIcon("check", props.value.haveProxy, "green", !props.value.wantProxy)}
-            {InfoTable.threeWayIcon("exclamation", props.value.wantProxy, "orange", false)}
-            {InfoTable.threeWayIcon("unlink", props.value.known, "black", props.value.known)}
+            <ThreeWayIcon iconName="check" state={props.value.haveProxy} onColour="green" hide={!props.value.wantProxy}/>
+            <ThreeWayIcon iconName="exclamation" state={props.value.wanted} onColour="orange" hide={false}/>
+            <ThreeWayIcon iconName="unlink" state={props.value.known} onColour="black" hide={props.value.known}/>
         </span>
     }
 
-    static threeWayIcon(iconName, state, truecolour, hide){
-        const colour = state ? truecolour : "grey";
-        const display = hide ? "none" : "inline";
 
-        return <FontAwesomeIcon icon={iconName}  size="1.5x" style={{display: display, color: colour, marginLeft: "1em", marginRight: "1em"}}/>
-    }
 
     constructor(props){
         super(props);
@@ -73,7 +70,7 @@ class InfoTable extends React.Component {
             {
                 Header: "Retry",
                 accessor: "fileId",
-                Cell: (props)=><a href="#" onClick={()=>this.attemptRetry(props.value)}>Attempt retry...</a>
+                Cell: (props)=><AttemptRetry itemId={props.value} haveVideo={props.row.videoResult.known}/>
             }
         ];
 
