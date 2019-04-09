@@ -15,8 +15,8 @@ class TestDoesFilepathMatch(unittest.TestCase):
     def test_should_match(self):
         from reintegrate_from_list import does_filepath_match
 
-        item = self.MockItem({"gnm_asset_filename": "/path/to/some/media.mp4"})
-        result = does_filepath_match(item, "/path/to/some/media.mp4")
+        item = self.MockItem({"gnm_asset_filename": "/srv/Multimedia2/Media Production/Assets/Multimedia_YouTube_Football/US_Sports/max_whittle_Muggsy_Bogues/ARCHIVE/Kblaze - Muggsy Bogues.mp4"})
+        result = does_filepath_match(item, "Multimedia_YouTube_Football/US_Sports/max_whittle_Muggsy_Bogues/ARCHIVE/Kblaze - Muggsy Bogues.mp4")
         self.assertTrue(result)
 
     def test_should_fail_filename(self):

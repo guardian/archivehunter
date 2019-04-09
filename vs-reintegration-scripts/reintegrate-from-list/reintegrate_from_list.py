@@ -20,7 +20,7 @@ def does_filepath_match(item, filepath):
     if item_filename != os.path.basename(filepath):
         return False
 
-    if os.path.dirname(filepath).endswith(item_filepath):
+    if item_filepath.endswith(os.path.dirname(filepath)):
         return True
 
     return False
@@ -69,16 +69,13 @@ def find_in_vidispine(filename, user, passwd):
             item_list.append(item)
         print("--------")
 
-    if result.totalItems==1:
+    if len(item_list)==1:
         return item_list[0]
     elif result.totalItems==0:
         return None
     else:
-        if len(item_list)==1:
-            return item_list[0]
-        else:
-            print("Warning, {0} items still matched filter; not returning anything".format(len(item_list)))
-            return None
+        print("Warning, {0} items still matched filter; not returning anything".format(len(item_list)))
+        return None
 
 
 def get_credentials_from_yaml(filename):
