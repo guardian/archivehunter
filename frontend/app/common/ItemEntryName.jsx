@@ -7,6 +7,7 @@ import LoadingThrobber from "./LoadingThrobber.jsx";
 class ItemEntryName extends React.Component {
     static propTypes = {
         entryId: PropTypes.string.isRequired,
+        showLink: PropTypes.bool,
         id: PropTypes.string  //CSS ID of to assign
     };
 
@@ -48,7 +49,7 @@ class ItemEntryName extends React.Component {
         } else if(this.state.loading){
             return <LoadingThrobber show={true} small={true}/>
         } else {
-            return <p className="inline" id={this.props.id}>{this.state.entryName}</p>
+            return <p className="inline" id={this.props.id}>{this.state.entryName}&nbsp;<a href={"/browse?open=" + this.props.entryId} style={{display: this.props.showLink ? "inline" : "none"}}>view ></a></p>
         }
     }
 }
