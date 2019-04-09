@@ -70,7 +70,9 @@ class InfoTable extends React.Component {
             {
                 Header: "Retry",
                 accessor: "fileId",
-                Cell: (props)=><AttemptRetry itemId={props.value} haveVideo={props.row.videoResult.known}/>
+                Cell: (props)=><AttemptRetry itemId={props.value} haveVideo={props.row.videoResult.haveProxy || !props.row.videoResult.wantProxy}
+                                             haveAudio={props.row.audioResult.haveProxy || !props.row.audioResult.wantProxy}
+                                             haveThumb={props.row.thumbnailResult.haveProxy || !props.row.thumbnailResult.wantProxy}/>
             }
         ];
 

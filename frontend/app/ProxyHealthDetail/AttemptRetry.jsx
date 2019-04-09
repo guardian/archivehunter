@@ -24,6 +24,11 @@ class AttemptRetry extends React.Component {
                 video: false,
                 thumb: false
             },
+            failed: {
+                audio: false,
+                video: false,
+                thumb: false
+            },
             completed: false,
             lastError:null
         };
@@ -42,7 +47,9 @@ class AttemptRetry extends React.Component {
                 this.setState({done: Object.assign(this.state.done,update)}, ()=>resolve());
             }).catch(err=>{
                 console.error(err);
-                this.setState({lastError: err}, ()=>reject(err))
+                let update ={};
+                update[proxyType] = true;
+                this.setState({lastError: err, failed:Object.assign(this.state.failed, update), done:Object.assign(this.state.failed, update)}, ()=>reject(err))
             }));
         }
     }
@@ -65,9 +72,9 @@ class AttemptRetry extends React.Component {
     render(){
         return <span>
             <LoadingThrobber show={this.state.loading} small={true} inline={true}/>
-            <ThreeWayIcon iconName="film" state={this.state.done.video} onColour="green" hide={! (this.state.loading || this.state.completed)}/>
-            <ThreeWayIcon iconName="volume-up" state={this.state.done.audio} onColour="green" hide={! (this.state.loading || this.state.completed)}/>
-            <ThreeWayIcon iconName="image" state={this.state.done.thumb} onColour="green" hide={! (this.state.loading || this.state.completed)}/>
+            <ThreeWayIcon iconName="film" state={this.state.done.video} onColour={this.state.failed.video ? "red": "green"} hide={! (this.state.loading || this.state.completed)}/>
+            <ThreeWayIcon iconName="volume-up" state={this.state.done.audio} onColour={this.state.failed.audio ? "red": "green"} hide={! (this.state.loading || this.state.completed)}/>
+            <ThreeWayIcon iconName="image" state={this.state.done.thumb} onColour={this.state.failed.video ? "red": "green"} hide={! (this.state.loading || this.state.completed)}/>
             <a onClick={this.retryClicked} className="clickable" style={{display: this.state.loading ? "none" : "inline"}}>Attempt retry...</a>
         </span>
     }
