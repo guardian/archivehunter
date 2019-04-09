@@ -24,7 +24,7 @@ class SearchHitToArchiveEntryFlow extends GraphStage[FlowShape[SearchHit,Archive
               println("Could not convert ElasticSearch record to archive entry:", err)
               pull(in)
             case Right(entry)=>
-              println(s"Got archive entry for s3://${entry.bucket}/${entry.path}")
+              //println(s"Got archive entry for s3://${entry.bucket}/${entry.path}")
               push(out, entry)
           }
         }

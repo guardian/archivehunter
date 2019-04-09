@@ -24,7 +24,7 @@ class MimeTypeBranch extends GraphStage[UniformFanOutShape[ArchiveEntry, Archive
         override def onPush(): Unit = {
           val elem = grab(in)
 
-          println(s"${elem.path} has MIME type ${elem.mimeType.toString}")
+          //println(s"${elem.path} has MIME type ${elem.mimeType.toString}")
           if(elem.mimeType==null) { //it should never be, but just in case...
             push(outNo, elem)
           } else if(elem.mimeType.major=="application"){

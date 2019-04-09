@@ -30,36 +30,36 @@ class IsGlacierBranch @Inject() (config:ArchiveHunterConfiguration, s3ClientMgr:
 
           (result.getStorageClass: @switch) match {
             case "STANDARD" =>
-              println(s"${elem.bucket}/${elem.path} is STANDARD")
+              //println(s"${elem.bucket}/${elem.path} is STANDARD")
               push(outNo, elem)
             case null =>
-              println(s"${elem.bucket}/${elem.path} is STANDARD with no reply")
+              //println(s"${elem.bucket}/${elem.path} is STANDARD with no reply")
               push(outNo, elem)
             case "STANDARD_IA" =>
-              println(s"${elem.bucket}/${elem.path} is IA")
+              //println(s"${elem.bucket}/${elem.path} is IA")
               push(outNo, elem)
             case "REDUCED_REDUNDANCY" =>
-              println(s"${elem.bucket}/${elem.path} is RR")
+              //println(s"${elem.bucket}/${elem.path} is RR")
               push(outNo, elem)
             case "OneZoneInfrequentAccess" =>
-              println(s"${elem.bucket}/${elem.path} is one-zone IA")
+              //println(s"${elem.bucket}/${elem.path} is one-zone IA")
               push(outNo, elem)
             case "INTELLIGENT_TIERING" =>
-              println(s"${elem.bucket}/${elem.path} is in intelligent tiering")
+              //println(s"${elem.bucket}/${elem.path} is in intelligent tiering")
               push(outNo, elem)
             case "GLACIER" =>
-              println(s"${elem.bucket}/${elem.path} is in Glacier")
+              //println(s"${elem.bucket}/${elem.path} is in Glacier")
               push(outYes, elem)
             case "DEEP_ARCHIVE" =>
-              println(s"${elem.bucket}/${elem.path} is in Glacier DEEP")
+              //println(s"${elem.bucket}/${elem.path} is in Glacier DEEP")
               push(outYes, elem)
             case _ =>
-              println(s"ERROR: Did not recognise storage class ${result.getStorageClass} for ${elem.bucket}/${elem.path}")
+              //println(s"ERROR: Did not recognise storage class ${result.getStorageClass} for ${elem.bucket}/${elem.path}")
               throw new RuntimeException("Unrecognised storage class")
           }
         } catch {
           case ex:AmazonS3Exception=>
-            println(s"WARNING: Could not process ${elem.bucket}/${elem.path}: $ex")
+            //println(s"WARNING: Could not process ${elem.bucket}/${elem.path}: $ex")
             pull(in)
         }
       }

@@ -10,11 +10,15 @@ import org.apache.logging.log4j.LogManager
 trait ProblemItemHitReader extends MediaMetadataMapConverters {
   private val ownLogger = LogManager.getLogger(getClass)
 
-  private def mapToResult(data:Map[String,Any]):ProxyVerifyResult =
-    ProxyVerifyResult(data("fileId").asInstanceOf[String],ProxyType.withName(data("proxyType").asInstanceOf[String]),
-      if(data.getOrElse("wantProxy","false")=="true") true else false,
-      Option(data.getOrElse("haveProxy", null)).map(value=>value.asInstanceOf[Boolean])
+  private def mapToResult(data:Map[String,Any]):ProxyVerifyResult = {
+    ownLogger.warn(data)
+    ProxyVerifyResult(
+      data("fileId").asInstanceOf[String],
+      ProxyType.withName(data("proxyType").asInstanceOf[String]),
+      data("wantProxy").asInstanceOf[Boolean],
+      Option(data.getOrElse("haveProxy", null)).map(value => value.asInstanceOf[Boolean])
     )
+  }
 
   implicit object ProblemItemHR extends HitReader[ProblemItem] {
     override def read(hit: Hit): Either[Throwable, ProblemItem] = {
@@ -25,7 +29,7 @@ trait ProblemItemHitReader extends MediaMetadataMapConverters {
             hit.sourceField("fileId").asInstanceOf[String],
             Option(hit.sourceField("collection")).getOrElse("unknown").asInstanceOf[String],
             hit.sourceField("filePath").asInstanceOf[String],
-            hit.sourceField("verifyResults").asInstanceOf[Seq[Map[String,String]]].map(entry=>mapToResult(entry))
+            hit.sourceField("verifyResults").asInstanceOf[Seq[Map[String,Any]]].map(entry=>mapToResult(entry))
           )
         )
 

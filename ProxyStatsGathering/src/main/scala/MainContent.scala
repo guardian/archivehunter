@@ -134,7 +134,11 @@ trait MainContent extends ProblemItemRequestBuilder{
       postGroupBroadcast.out(0) ~> groupCounter ~> preCounterMerge
       postGroupBroadcast.out(1).map(resultSeq=>{
         val location = resultSeq.head.extractLocation
-        ProblemItem(resultSeq.head.fileId, location._1, location._2, resultSeq)
+        val falseentries = resultSeq.filter(_.wantProxy==false)
+        if(falseentries.length==resultSeq.length) throw new RuntimeException(s"$resultSeq wants no proxies")
+        val result = ProblemItem(resultSeq.head.fileId, location._1, location._2, resultSeq)
+        println(s"DEBUG: Writing $result to index")
+        result
       }) ~> recordProblemSink
 
       //"don't want proxy" branch

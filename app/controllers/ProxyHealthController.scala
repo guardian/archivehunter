@@ -59,6 +59,7 @@ class ProxyHealthController @Inject()(override val config:Configuration,
   def itemsList(collection:Option[String], pathRegex:Option[String], start:Int, size:Int) = APIAuthAction.async {
     val queries = Seq(
       collection.map(collectionFilter=>termsQuery("collection.keyword", collectionFilter))
+
     ).collect({case Some(q)=>q})
 
     esCleint.execute {
@@ -76,9 +77,7 @@ class ProxyHealthController @Inject()(override val config:Configuration,
 
   def collectionsWithProblems = APIAuthAction.async {
     esCleint.execute {
-      search(problemItemIndexName) aggs (
-        termsAgg("collections","collection.keyword")
-        )
+      search(problemItemIndexName) aggs termsAgg("collections","collection.keyword")
     }.map({
       case Left(err)=>
         MDC.put("reason", err.error.reason)

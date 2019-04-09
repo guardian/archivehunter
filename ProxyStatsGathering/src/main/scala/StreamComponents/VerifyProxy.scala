@@ -56,16 +56,16 @@ class VerifyProxy (proxyType: ProxyType.Value, injector:Injector) extends GraphS
       override def onPush(): Unit = {
         val elem = grab(in)
 
-        println(s"DEBUG: checking proxy for $elem")
+        //println(s"DEBUG: checking proxy for $elem")
         val result = getProxySyncWithBackoff(elem.fileId, proxyType) match {
           case Some(Left(err))=>
             println(s"Could not read Dynamodb after $maxAttempts attempts: ${err.toString}")
             throw new RuntimeException("DynamoDB error")
           case Some(Right(proxyEntry))=>
-            println(s"DEBUG: Got $proxyType proxy $proxyEntry for $elem")
+            //println(s"DEBUG: Got $proxyType proxy $proxyEntry for $elem")
             elem.copy(haveProxy = Some(true))
           case None=>
-            println(s"DEBUG: Got no $proxyType proxy for $elem")
+            //println(s"DEBUG: Got no $proxyType proxy for $elem")
             elem.copy(haveProxy = Some(false))
         }
 

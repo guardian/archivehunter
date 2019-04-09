@@ -20,9 +20,9 @@ class InfoTable extends React.Component {
 
     static renderResult(props){
         return <span>
-            <ThreeWayIcon iconName="check" state={props.value.haveProxy} onColour="green" hide={!props.value.wantProxy}/>
-            <ThreeWayIcon iconName="exclamation" state={props.value.wanted} onColour="orange" hide={false}/>
-            <ThreeWayIcon iconName="unlink" state={props.value.known} onColour="black" hide={props.value.known}/>
+            <ThreeWayIcon iconName="check" title={props.value.haveProxy ? "Proxy exists" : "Proxy absent"} state={props.value.haveProxy} onColour="green" hide={!props.value.wantProxy}/>
+            <ThreeWayIcon iconName="exclamation" title={props.value.wantProxy ? "Need proxy" : "Don't need this proxy"} state={props.value.wantProxy} onColour="orange" hide={props.value.haveProxy}/>
+            <ThreeWayIcon iconName="unlink" title="Can't find existing proxy" state={props.value.known} onColour="black" hide={props.value.known}/>
         </span>
     }
 
@@ -54,7 +54,7 @@ class InfoTable extends React.Component {
             },
             {
                 Header: "Video",
-                accessor: "audioResult",
+                accessor: "videoResult",
                 Cell: InfoTable.renderResult
             },
             {
