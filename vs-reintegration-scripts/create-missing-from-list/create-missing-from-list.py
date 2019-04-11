@@ -15,7 +15,7 @@ temp = logging.getLogger("urllib3")
 temp.setLevel(logging.WARN)
 temp = logging.getLogger("botocore")
 temp.setLevel(logging.WARN)
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(name)s [%(levelname)s] %(funcName)s - %(message)s")
 
 
 def get_credentials_from_yaml(filename):
@@ -45,6 +45,7 @@ parser.add_argument("--insecure", dest='insecure', help='use http instead of htt
 parser.add_argument("--output-file", dest='output', help='write list to this file', default='in_vidispine.csv')
 args = parser.parse_args()
 
+logger.info("test")
 (user, password) = get_credentials_from_yaml(args.authfile)
 locator = ProjectLocator(host=args.host, port=args.port, user=user, passwd=password)
 
@@ -78,7 +79,7 @@ with open(args.listfile, "r") as f:
                        proxy_filepath=convert_path(entry["proxy_path"]),
                        collection_name=args.ah_collection,
                        archive_path=entry["path"],
-                       archive_timestamp=dateutil.parser.parse(s3meta["timestamp"]),
+                       archive_timestamp=s3meta["timestamp"],   #this is already a datetime object
                        parent_project_id=project_id,
                        wait=True)
 

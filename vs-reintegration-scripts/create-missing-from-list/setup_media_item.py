@@ -6,6 +6,7 @@ import logging
 from datetime import datetime
 import urllib.parse
 from time import sleep
+import os.path
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +67,12 @@ def shape_tag_for_filepath(proxy_filepath):
     groups = extension_extractor.search(proxy_filepath)
     if groups is not None:
         xtn = groups.group(1)
-        if(xtn=="mp3"): return "lowres"
+        if(xtn=="mp3"): return "lowaudio"
+        if(xtn=="mp4"): return "lowres"
+        if(xtn=="jpg"): return "lowimage"
+        raise Exception("Don't know what shape a {0} proxy should be, for {1}".format(xtn, proxy_filepath))
+    else:
+        raise Exception("No file extension for {0}".format(proxy_filepath))
 
 
 def setup_item(host, user, passwd, full_filepath, proxy_filepath, collection_name, archive_path, archive_timestamp, parent_project_id, wait=False):
@@ -86,7 +92,7 @@ def setup_item(host, user, passwd, full_filepath, proxy_filepath, collection_nam
     """
     #step one - create placeholder
     item = VSItem(host=host, user=user, passwd=passwd)
-    item.createPlaceholder()
+    item.createPlaceholder(metadata={'title': os.path.basename(full_filepath), 'created': datetime.now().isoformat('T')}, group="Asset")
     logger.info("Created placeholder with item ID {0}".format(item.name))
 
     try:
@@ -95,8 +101,9 @@ def setup_item(host, user, passwd, full_filepath, proxy_filepath, collection_nam
         configure_metadata(mdbuilder, full_filepath, collection_name, archive_path, archive_timestamp)
         mdbuilder.commit()
 
-        #step three - add proxy shape(s)
-        vsjob = item.import_to_shape(uri="file:///{0}".format(urllib.parse.quote(proxy_filepath)), shape_tag=shape_tag_for_filepath(proxy_filepath))
+        #step three - add proxy shape(s). Need to as as "original" too so that Portal realises it's not a placeholder and displays the proxy.
+        tag = shape_tag_for_filepath(proxy_filepath)
+        vsjob = item.import_to_shape(uri="file:///{0}".format(urllib.parse.quote(proxy_filepath)), shape_tag=["original",tag], essence=True, thumbnails=False)
         if wait:
             wait_for_job(vsjob)
 
@@ -105,6 +112,9 @@ def setup_item(host, user, passwd, full_filepath, proxy_filepath, collection_nam
         parent_collection.name = parent_project_id
         parent_collection.addToCollection(item)
 
+        #step five - remove dummy original shape
+        shape = item.get_shape('original')
+        shape.delete()
         #all done!
         return item
     except Exception as e:
