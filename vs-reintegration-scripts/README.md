@@ -19,11 +19,15 @@ ingested from; `gnm_asset_filename`) and will output another CSV list containing
 Vidispine ID, `gnm_external_archive_external_archive_status` and `gnm_external_archive_external_archive_status` added as 
 extra columns.  This lets you check whether the item is actually existing in VS and whether it is pushed to archive or not.
 
-3. `create-missing-from-list`.  Run this script with the CSV output by stage 1.  It needs access to ArchiveHunter and
+3. `create-missing-from-list`.  Run this script with the CSV output by stage 2.  It needs access to ArchiveHunter and
 Vidispine and it creates placeholder items in Vidispine, fully configured to the GNM metadata spec based on the limited
 metadata available.  It pre-populates it to an "archived" state and links to the original media in S3, and it
 adds the downloaded proxy as a lowres / lowaudio shape.  It also talks to the `gnm_asset_folder` custom Portal plugin
 to ascertain the project ownership based on the filepath that the media came from.
+
+4. `tidy-imported`.  Run this script with the CSV output by stage 2.  It needs access to Vidispine, and will attempt to
+set archive metadata and remove "original" shapes for items that have been imported.
+
 
 ## Running the scripts
 

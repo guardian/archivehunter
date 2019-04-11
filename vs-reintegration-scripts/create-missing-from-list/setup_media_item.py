@@ -52,11 +52,13 @@ def wait_for_job(vsjob):
     """
     if not isinstance(vsjob,VSJob): raise TypeError("wait_for_job must be called with a VSJob, not a {0}".format(vsjob.__class__.__name__))
 
+    logger.info("Waiting for VS job {0} to complete or fail...".format(vsjob.name))
     while True:
-        sleep(1)
+        sleep(10)
         vsjob.update()
         logger.debug("Checking {0}, job status is {1}".format(vsjob.name, vsjob.status()))
         if vsjob.finished(noraise=False):
+            logger.info("Job {0} completed".format(vsjob.name))
             break
 
 
@@ -103,7 +105,7 @@ def setup_item(host, user, passwd, full_filepath, proxy_filepath, collection_nam
 
         #step three - add proxy shape(s). Need to as as "original" too so that Portal realises it's not a placeholder and displays the proxy.
         tag = shape_tag_for_filepath(proxy_filepath)
-        vsjob = item.import_to_shape(uri="file:///{0}".format(urllib.parse.quote(proxy_filepath)), shape_tag=["original",tag], essence=True, thumbnails=False)
+        vsjob = item.import_to_shape(uri="file:///{0}".format(urllib.parse.quote(proxy_filepath)), shape_tag=["original", tag], essence=True, thumbnails=True)
         if wait:
             wait_for_job(vsjob)
 
@@ -112,9 +114,14 @@ def setup_item(host, user, passwd, full_filepath, proxy_filepath, collection_nam
         parent_collection.name = parent_project_id
         parent_collection.addToCollection(item)
 
+        sleep(2)
         #step five - remove dummy original shape
         shape = item.get_shape('original')
         shape.delete()
+
+        #step 6 - update invalid creation timestamp
+        item.set_metadata({'created': datetime.now().isoformat('T')})
+
         #all done!
         return item
     except Exception as e:

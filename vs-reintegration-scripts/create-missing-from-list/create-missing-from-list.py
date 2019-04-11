@@ -15,6 +15,8 @@ temp = logging.getLogger("urllib3")
 temp.setLevel(logging.WARN)
 temp = logging.getLogger("botocore")
 temp.setLevel(logging.WARN)
+temp = logging.getLogger("gnmvidispine.vidispine_api")
+temp.setLevel(logging.WARN)
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(name)s [%(levelname)s] %(funcName)s - %(message)s")
 
 
