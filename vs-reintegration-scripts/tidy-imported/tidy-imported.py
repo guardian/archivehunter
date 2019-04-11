@@ -7,6 +7,7 @@ import logging
 import yaml
 from validate_media import find_s3_media
 from pprint import pprint
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 temp = logging.getLogger("urllib3")
@@ -54,7 +55,7 @@ def item_archived_md(bucket, path, s3_ctime):
         'gnm_external_archive_external_archive_device': bucket,
         'gnm_external_archive_external_archive_path': path,
         'gnm_external_archive_committed_to_archive_at': s3_ctime.isoformat('T'),
-        'gnm_external_archive_external_archive_report': "Uploaded by Mr Pushy/ArchiveHunter",
+        'gnm_external_archive_external_archive_report': "{0}: Verified by Mr Pushy/ArchiveHunter".format(datetime.now().isoformat('T')),
         'gnm_external_archive_delete_shape': 'original'
     }
 
@@ -66,9 +67,9 @@ def filesize_for_shape(vsshape):
     :return: the size, or raises if none can be found
     """
     for file_entry in vsshape.files():
-        if file_entry.size is not None and file_entry.size>0:
-            return file_entry.size
-    raise Exception("Shape {0} has no file size".format(vsshape.name))
+        if file_entry.size is not None and int(file_entry.size)>0:
+            return int(file_entry.size)
+    return -1
 
 
 def handle_item_blank(entry, vsitem, bucket):
@@ -80,14 +81,13 @@ def handle_item_blank(entry, vsitem, bucket):
     :return:
     """
 
-    logger.info(bucket)
     #step one - double-check existence in S3
     mediainfo = find_s3_media(bucket, entry['media_path']) # raises if not present
 
     #step two - verify file size
     try:
         original_shape = vsitem.get_shape("original")
-        file_size = int(filesize_for_shape(original_shape))
+        file_size = filesize_for_shape(original_shape)
         logger.info("Size according to VS: {0}".format(file_size))
 
         logger.info("Size according to S3: {0}".format(mediainfo['size']))
@@ -115,6 +115,69 @@ def handle_item_blank(entry, vsitem, bucket):
         original_shape.delete()
 
     logger.info("Configured untagged item {0}".format(vsitem.name))
+
+
+def extract_fields_to_set(item, updated_meta):
+    """
+    takes an item and a dictionary of updates and removes un-necessary ones from the dictionary
+    :param item: VSItem
+    :param updated_meta: dict of metadata updates
+    :return: a dictionary containing only the entries form updated_meta that are not already present in the items' metadata
+    """
+    return dict(filter(lambda tuple: tuple[1]!=item.get(tuple[0]), updated_meta.items()))
+
+
+def handle_upload_failed(entry, vsitem, bucket):
+    """
+    handle an item that is tagged as "Upload Failed"
+    :param entry:
+    :param vsitem:
+    :param bucket:
+    :return:
+    """
+
+    #step one - double-check existence in S3
+    mediainfo = find_s3_media(bucket, entry['media_path']) # raises if not present
+
+    #step two - verify file size
+    try:
+        original_shape = vsitem.get_shape("original")
+        file_size = filesize_for_shape(original_shape)
+        logger.info("Size according to VS: {0}".format(file_size))
+
+        logger.info("Size according to S3: {0}".format(mediainfo['size']))
+        if file_size>0 and int(mediainfo['size']) != file_size:
+            logger.error("Sizes do not match, difference is {0}".format(int(mediainfo['size'])-file_size))
+            return
+
+        has_original_shape = True
+    except VSNotFound:
+        logger.info("Item has no original shape")
+        has_original_shape = False
+
+    #step three - now we have verified a good upload, fix up the metadata
+    assumed_metadata = item_archived_md(bucket, entry['media_path'], mediainfo['timestamp'])
+    for k,v in assumed_metadata.items():
+        logger.info("{field} - Expected: {expected}, Actual: {actual}".format(field=k, expected=v, actual=item.get(k)))
+    to_set = extract_fields_to_set(item, assumed_metadata)
+    #fix up log parameter
+    to_set['gnm_external_archive_external_archive_report'] = assumed_metadata['gnm_external_archive_external_archive_report'] + "\n" + item.get('gnm_external_archive_external_archive_report')
+    logger.info("items to set: {0}".format(to_set))
+
+    builder = item.get_metadata_builder()
+    rootmeta = extract_fields_to_set(item, {'gnm_asset_status': 'Archived to External', 'gnm_storage_rule_projects_completed': 'storage_rule_projects_completed', 'gnm_storage_rule_deep_archive': "storage_rule_deep_archive"})
+    logger.info(rootmeta)
+    builder.addMeta(rootmeta)
+    builder.addGroup("ExternalArchiveRequest", to_set)
+    builder.commit()
+
+    #step four - if an original shape is present we can delete it (good upload was verified in steo two)
+    if has_original_shape:
+        item.get_shape("original").delete()
+    else:
+        logger.warning("Item {0} is marked as upload failed, but no original shape present! ".format(vsitem.name))
+
+    raise Exception("testing")
 
 ###START MAIN
 parser = argparse.ArgumentParser()
@@ -148,5 +211,7 @@ for entry in read_list(args.listfile):
         for filepath in shape.fileURIs():
             logger.info("\t\t{0}".format(filepath))
 
-    if item.get("gnm_external_archive_external_archive_status") is None or item.get("gnm_external_archive_external_archive_status")=="None" or item.get("gnm_external_archive_external_archive_status")=="":
-        handle_item_blank(entry, item, args.ah_collection)
+    # if item.get("gnm_external_archive_external_archive_status") is None or item.get("gnm_external_archive_external_archive_status")=="None" or item.get("gnm_external_archive_external_archive_status")=="":
+    #     handle_item_blank(entry, item, args.ah_collection)
+    if item.get("gnm_external_archive_external_archive_status") == "Upload Failed":
+        handle_upload_failed(entry, item, args.ah_collection)

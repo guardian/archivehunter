@@ -9,6 +9,8 @@ RUN cd /tmp && git clone https://github.com/fredex42/gnmvidispine.git && cd gnmv
 COPY download-proxies/*.py /usr/local/scripts/
 COPY reintegrate-from-list/*.py /usr/local/scripts/
 COPY create-missing-from-list/*.py /usr/local/scripts/
+COPY tidy-imported/*.py /usr/local/scripts/
+
 #COPY certs/* /etc/ssl/certs/
 RUN chmod a+r /usr/local/scripts/*
 #USER daemon
