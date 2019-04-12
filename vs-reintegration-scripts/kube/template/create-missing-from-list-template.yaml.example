@@ -1,0 +1,62 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: create-missing-from-list-{{ job-number }}
+spec:
+  template:
+    metadata:
+      name: create-missing-from-list-{{ job-number }}
+      labels:
+        script-name: create-missing-from-list.py
+    spec:
+      nodeSelector:
+        has-san: "true"
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchExpressions:
+                    - key: script-name
+                      operator: In
+                      values:
+                        - create-missing-from-list.py
+      containers:
+        - image: {docker-image}:8
+          imagePullPolicy: Always
+          name: create-missing-from-list
+          command:
+            - /usr/local/scripts/create-missing-from-list.py
+            - "--list"
+            - /mnt/missing-from-vs-{{ job-number }}.csv
+            - "--authfile"
+            - /mnt/authfile
+            - "--archivehunter-collection"
+            - bucket-name
+            - "--host"
+            - pluto-host
+            - "--asset-folder-root"
+            - assetfolders
+          volumeMounts:
+            - name: holding-area
+              mountPath: holding-area
+            - name: lists-data
+              mountPath: /mnt
+            - name: secrets
+              mountPath: /root/.aws
+      volumes:
+      - name: holding-area
+        hostPath:
+          path: /srv/Proxies2/ProxiesDownloadHoldingArea
+          type: Directory
+      - name: lists-data
+        persistentVolumeClaim:
+          claimName: vs-reintegration-scripts-lists
+      - name: secrets
+        secret:
+          secretName: aws-credentials-secret
+
+      restartPolicy: Never
+  backoffLimit: 4
