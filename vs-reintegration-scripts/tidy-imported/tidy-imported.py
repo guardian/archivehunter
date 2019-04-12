@@ -51,6 +51,7 @@ def item_archived_md(bucket, path, s3_ctime):
     :return:
     """
     return {
+        'gnm_external_archive_external_archive_request': "None",
         'gnm_external_archive_external_archive_status': "Archived",
         'gnm_external_archive_external_archive_device': bucket,
         'gnm_external_archive_external_archive_path': path,
@@ -177,7 +178,6 @@ def handle_upload_failed(entry, vsitem, bucket):
     else:
         logger.warning("Item {0} is marked as upload failed, but no original shape present! ".format(vsitem.name))
 
-    raise Exception("testing")
 
 ###START MAIN
 parser = argparse.ArgumentParser()
