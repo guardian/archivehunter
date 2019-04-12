@@ -211,7 +211,7 @@ for entry in read_list(args.listfile):
         for filepath in shape.fileURIs():
             logger.info("\t\t{0}".format(filepath))
 
-    # if item.get("gnm_external_archive_external_archive_status") is None or item.get("gnm_external_archive_external_archive_status")=="None" or item.get("gnm_external_archive_external_archive_status")=="":
-    #     handle_item_blank(entry, item, args.ah_collection)
+    if item.get("gnm_external_archive_external_archive_status") is None or item.get("gnm_external_archive_external_archive_status")=="None" or item.get("gnm_external_archive_external_archive_status")=="":
+        handle_item_blank(entry, item, args.ah_collection)
     if item.get("gnm_external_archive_external_archive_status") == "Upload Failed":
         handle_upload_failed(entry, item, args.ah_collection)

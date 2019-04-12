@@ -31,3 +31,5 @@ node_modules
 testscripts/*.lst
 /vs-reintegration-scripts/*/*.lst
 /vs-reintegration-scripts/*/*.csv
+create-missing-from-list-*.yaml
+!/vs-reintegration-scripts/kube/template/create-missing-from-list-template.yaml

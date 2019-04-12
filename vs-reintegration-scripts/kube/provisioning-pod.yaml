@@ -1,0 +1,19 @@
+kind: Pod
+apiVersion: v1
+metadata:
+  name: provisioning-pod
+spec:
+  volumes:
+    - name: task-pv-storage
+      persistentVolumeClaim:
+        claimName: vs-reintegration-scripts-lists
+  containers:
+    - name: task-pv-container
+      image: dc1-gitlab-01.dc1.gnm.int/andyg42/vs-reintegration-scripts:8
+      command:
+      - /bin/sh
+      - "-c"
+      - sleep 3600
+      volumeMounts:
+        - mountPath: "/mnt"
+          name: task-pv-storage
