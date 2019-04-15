@@ -82,6 +82,7 @@
     <logger name="helpers.ProxyVerifyFlow" level="INFO"/>
     <logger name="services.JobPurgerActor" level="INFO"/>
     <logger name="services.IngestProxyQueue" level="INFO"/>
+    <logger name="services.ProblemItemRetry" level="DEBUG"/>
     <logger name="requests.JobSearchRequest" level="INFO"/>
 
     <logger name="helpers.ProxyFramework" level="INFO"/>

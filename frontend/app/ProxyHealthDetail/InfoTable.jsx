@@ -63,6 +63,15 @@ class InfoTable extends React.Component {
                 Cell: InfoTable.renderResult
             },
             {
+                Header: "Index status",
+                accessor: "esRecordSays",
+                /* it's an error if this is TRUE, because that would mean ES thinks that there IS a proxy but actually there isn't one. */
+                Cell: props=><span>
+                        <ThreeWayIcon iconName="check" state={!props.value} onColour="red" hide={!props.value}/>
+                        <ThreeWayIcon iconName="times" state={props.value} onColour="green" hide={props.value}/>
+                    </span>
+            },
+            {
                 Header: "Jobs",
                 accessor: "fileId",
                 Cell: (props)=><Link to={"/admin/jobs?sourceId=" + encodeURIComponent(props.value)}>View jobs...</Link>

@@ -3,7 +3,7 @@ package controllers
 import akka.actor.ActorRef
 import com.theguardian.multimedia.archivehunter.common.{ProblemItemHitReader, ProblemItemIndexer, ProxyTypeEncoder}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.ESClientManager
-import com.theguardian.multimedia.archivehunter.common.cmn_models.ProblemItem
+import com.theguardian.multimedia.archivehunter.common.cmn_models.{JobModel, JobModelDAO, ProblemItem}
 import helpers.InjectableRefresher
 import javax.inject.{Inject, Named}
 import org.slf4j.MDC
@@ -11,12 +11,14 @@ import play.api.{Configuration, Logger}
 import play.api.libs.circe.Circe
 import play.api.libs.ws.WSClient
 import play.api.mvc.{AbstractController, ControllerComponents}
-import responses.{GenericErrorResponse, ObjectGetResponse, ObjectListResponse, TermsBucketResponse}
+import responses._
 import io.circe.syntax._
 import io.circe.generic.auto._
 import services.ProblemItemRetry
 
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
+import scala.concurrent.duration._
 
 /**
   * controller to return proxy health stats
@@ -36,6 +38,7 @@ class ProxyHealthController @Inject()(override val config:Configuration,
 {
   import com.sksamuel.elastic4s.http.ElasticDsl._
   import com.sksamuel.elastic4s.circe._
+  import akka.pattern.ask
 
   private implicit val esCleint = esClientMgr.getClient()
   private val logger = Logger(getClass)
@@ -95,9 +98,21 @@ class ProxyHealthController @Inject()(override val config:Configuration,
     })
   }
 
-  def triggerProblemItemsFor(collectionName:String) = APIAuthAction {
-    problemItemRetry ! ProblemItemRetry.RetryForCollection(collectionName)
-    Ok(GenericErrorResponse("ok","Scan started").asJson)
+  def triggerProblemItemsFor(collectionName:String) = APIAuthAction.async {
+    implicit val timeout:akka.util.Timeout = 10.seconds
+
+    try {
+      (problemItemRetry ? ProblemItemRetry.RetryForCollection(collectionName)).map({
+        case akka.actor.Status.Success=>
+          Ok(GenericErrorResponse("ok", "Scan started").asJson)
+        case akka.actor.Status.Failure(err)=>
+          InternalServerError(GenericErrorResponse("error", err.toString).asJson)
+      })
+
+    } catch {
+      case err:Throwable=>
+        Future(InternalServerError(GenericErrorResponse("error",err.toString).asJson))
+    }
   }
 
 }

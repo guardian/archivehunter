@@ -1,19 +1,35 @@
 package services
 
+import java.time.ZonedDateTime
+
 import akka.actor.{Actor, ActorSystem}
 import akka.stream.{ActorMaterializer, Materializer}
 import com.theguardian.multimedia.archivehunter.common.ProxyTranscodeFramework.ProxyGenerators
 import com.theguardian.multimedia.archivehunter.common.clientManagers.ESClientManager
-import com.theguardian.multimedia.archivehunter.common.{ProblemItemIndexer, ProxyLocationDAO}
-import helpers.{CreateProxySink, SearchHitToArchiveEntryFlow}
+import com.theguardian.multimedia.archivehunter.common.cmn_models.{JobModel, JobModelDAO, JobStatus, SourceType}
+import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ProblemItemIndexer, ProxyLocationDAO}
+import helpers.{CreateProxySink, EOSDetect, SearchHitToArchiveEntryFlow}
 import javax.inject.Inject
 import play.api.{Configuration, Logger}
+
+import scala.concurrent.Promise
+import scala.util.{Failure, Success}
 
 object ProblemItemRetry {
   case class RetryForCollection(collectionName: String)
 }
 
-class ProblemItemRetry @Inject()(config:Configuration, proxyGenerators:ProxyGenerators, esClientManager:ESClientManager)(implicit actorSystem: ActorSystem, proxyLocationDAO:ProxyLocationDAO) extends Actor {
+/**
+  * this actor sets up an Akka stream to re-run all selected proxies from the ProblemItems index
+  * @param config
+  * @param proxyGenerators
+  * @param esClientManager
+  * @param jobModelDAO
+  * @param actorSystem
+  * @param proxyLocationDAO
+  */
+class ProblemItemRetry @Inject()(config:Configuration, proxyGenerators:ProxyGenerators, esClientManager:ESClientManager, jobModelDAO:JobModelDAO)
+                                (implicit actorSystem: ActorSystem, proxyLocationDAO:ProxyLocationDAO) extends Actor {
   import ProblemItemRetry._
 
   private val logger=Logger(getClass)
@@ -23,13 +39,40 @@ class ProblemItemRetry @Inject()(config:Configuration, proxyGenerators:ProxyGene
   private val problemItemIndexer = new ProblemItemIndexer(problemItemIndexName)
 
   protected implicit val esClient = esClientManager.getClient()
+  implicit val ec = actorSystem.dispatcher
 
   override def receive: Receive = {
     case RetryForCollection(collectionName)=>
-      logger.info(s"Starting problem item scan for $collectionName")
-      problemItemIndexer.sourceForCollection(collectionName)
-        .via(new SearchHitToArchiveEntryFlow()).log("ProblemItemRetry").async
-        .to(new CreateProxySink(proxyGenerators))
-      logger.info(s"Problem item scan underway for $collectionName")
+      val originalSender = sender()
+
+      val job = JobModel.newJob("ProblemItemRerun",collectionName, SourceType.SRC_SCANTARGET).copy(jobStatus = JobStatus.ST_RUNNING)
+
+      jobModelDAO.putJob(job).map({
+        case Some(Left(err))=>
+          logger.error(s"Could not save job record: $err")
+          originalSender ! akka.actor.Status.Failure(new RuntimeException(s"Could not save job record: $err"))
+        case _=>
+          logger.info(s"Starting problem item scan for $collectionName")
+          val completionPromise = Promise[Unit]()
+          val detector = new EOSDetect[Unit, ArchiveEntry](completionPromise, ())
+
+          problemItemIndexer.sourceForCollection(collectionName)
+            .via(new SearchHitToArchiveEntryFlow()).log("ProblemItemRetry").async
+            .via(detector)
+            .to(new CreateProxySink(proxyGenerators)).run()
+          logger.info(s"Problem item scan underway for $collectionName")
+
+          originalSender ! akka.actor.Status.Success
+          completionPromise.future.onComplete({
+            case Success(_)=>
+              val updatedJob = job.copy(completedAt = Some(ZonedDateTime.now()),jobStatus = JobStatus.ST_SUCCESS)
+              jobModelDAO.putJob(updatedJob)
+              logger.info(s"Problem item scan completed for $collectionName")
+            case Failure(err)=>
+              val updatedJob = job.copy(completedAt = Some(ZonedDateTime.now()), jobStatus=JobStatus.ST_ERROR, log = Some(err.toString))
+              jobModelDAO.putJob(updatedJob)
+              logger.error(s"Problem item scan failed for $collectionName: ", err)
+          })
+      })
   }
 }

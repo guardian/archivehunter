@@ -7,6 +7,7 @@ import ErrorViewComponent from "../common/ErrorViewComponent.jsx";
 import ByCollectionChart from "./ByCollectionChart.jsx";
 import GeneralOverviewChart from "./GeneralOverviewChart.jsx";
 import InfoTable from "./InfoTable.jsx";
+import LoadingThrobber from "../common/LoadingThrobber.jsx";
 
 class ProxyHealthDetail extends React.Component {
     constructor(props) {
@@ -22,10 +23,12 @@ class ProxyHealthDetail extends React.Component {
             selectedCollection: null,
             tableStart: 0,
             tablePageSize: 100,
-            tableMaxSize: 100
+            tableMaxSize: 100,
+            triggerInProgress: false
         };
 
         this.collectionSelectedCb = this.collectionSelectedCb.bind(this);
+        this.triggerSelectedCollectionFix = this.triggerSelectedCollectionFix.bind(this);
     }
 
     collectionSelectedCb(selected) {
@@ -101,6 +104,7 @@ class ProxyHealthDetail extends React.Component {
             return {
                 fileId: entry.fileId,
                 collection: entry.collection,
+                esRecordSays: entry.esRecordSays,
                 filePath: pathParts[0],
                 fileName: pathParts[1],
                 thumbnailResult: this.convertVerifyResultFor(entry.verifyResults, "THUMBNAIL"),
@@ -143,6 +147,16 @@ class ProxyHealthDetail extends React.Component {
         this.loadData().then(()=>this.reloadTableData());
     }
 
+    triggerSelectedCollectionFix(){
+        this.setState({triggerInProgress: true}, ()=>axios.post("/api/proxyhealth/triggerproblems/" + this.state.selectedCollection)
+            .then(response=>{
+                this.setState({triggerInProgress: false})
+            }).catch(err=>{
+                console.error(err);
+                this.setState({triggerInProgress: false, lastError: err});
+            }))
+    }
+
     render() {
         return <div>
             <BreadcrumbComponent path={this.props.location.pathname}/>
@@ -162,6 +176,10 @@ class ProxyHealthDetail extends React.Component {
                         </ul>
                 </div> : <div className="info-box"><p>Loading...</p></div>
                 }
+                <div style={{display: this.state.selectedCollection ? "block" : "none"}}>
+                    <LoadingThrobber show={this.state.triggerInProgress} small={true}/>
+                    <a onClick={this.triggerSelectedCollectionFix} className="clickable">Re-run proxies for {this.state.selectedCollection ? this.state.selectedCollection : "(none)" }</a>
+                </div>
             </div>
             <div className="chart-container">
                 <GeneralOverviewChart recentCountData={this.state.mostRecentRun}/>

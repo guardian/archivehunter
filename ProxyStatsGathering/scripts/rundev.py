@@ -98,7 +98,7 @@ def run_task(cluster_id, task_arn, container_name, subnet_list, sg_list, allow_e
             ]
         }
     else:
-        overrides = None
+        overrides = {}
 
     result = client.run_task(cluster=cluster_id, taskDefinition=task_arn, networkConfiguration=network_config, overrides=overrides, launchType="FARGATE")
 
