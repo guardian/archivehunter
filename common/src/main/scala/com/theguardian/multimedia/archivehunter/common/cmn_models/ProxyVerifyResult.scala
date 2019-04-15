@@ -5,7 +5,7 @@ import java.util.Base64
 
 import com.theguardian.multimedia.archivehunter.common.ProxyType
 
-case class ProxyVerifyResult(fileId:String, proxyType:ProxyType.Value, wantProxy:Boolean, haveProxy:Option[Boolean]=None) {
+case class ProxyVerifyResult(fileId:String, proxyType:ProxyType.Value, wantProxy:Boolean, esRecordSays:Boolean, haveProxy:Option[Boolean]=None) {
 
   /**
     * decodes the fileID to a tuple of (collectionName, filePath)

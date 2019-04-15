@@ -46,7 +46,8 @@ object DockerMain extends MainContent {
         println(s"Created problems summary index at $problemsIndexName-summary")
     })
 
-    val graphModel = buildGraphModel
+    val forCollection = sys.env.get("FOR_COLLECTION")
+    val graphModel = buildGraphModel(forCollection)
 
     val resultFuture = RunnableGraph.fromGraph(graphModel).run()
 

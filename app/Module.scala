@@ -19,6 +19,7 @@ class Module extends AbstractModule with AkkaGuiceSupport {
     bindActor[JobPurgerActor]("jobPurgerActor")
     bindActor[IngestProxyQueue]("ingestProxyQueue")
     bindActor[ProxyFrameworkQueue]("proxyFrameworkQueue")
+    bindActor[ProblemItemRetry]("problemItemRetry")
     bind(classOf[AppStartup]).asEagerSingleton() //do app startup
   }
 }

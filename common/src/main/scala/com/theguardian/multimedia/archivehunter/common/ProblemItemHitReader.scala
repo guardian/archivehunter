@@ -16,6 +16,7 @@ trait ProblemItemHitReader extends MediaMetadataMapConverters {
       data("fileId").asInstanceOf[String],
       ProxyType.withName(data("proxyType").asInstanceOf[String]),
       data("wantProxy").asInstanceOf[Boolean],
+      data("esRecordSays").asInstanceOf[Boolean],
       Option(data.getOrElse("haveProxy", null)).map(value => value.asInstanceOf[Boolean])
     )
   }
@@ -29,6 +30,7 @@ trait ProblemItemHitReader extends MediaMetadataMapConverters {
             hit.sourceField("fileId").asInstanceOf[String],
             Option(hit.sourceField("collection")).getOrElse("unknown").asInstanceOf[String],
             hit.sourceField("filePath").asInstanceOf[String],
+            hit.sourceField("esRecordSays").asInstanceOf[Boolean],
             hit.sourceField("verifyResults").asInstanceOf[Seq[Map[String,Any]]].map(entry=>mapToResult(entry))
           )
         )

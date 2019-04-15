@@ -133,6 +133,9 @@ Outputs:
   TaskDefinitionArn:
     Description: ARN of the created ECS task definition
     Value: !Ref AppTaskDefinition
+  AppContainerName:
+    Description: Container name for the app, needed when applying customisations
+    Value: !Sub ${Stack}-${App}Proxy-${Stage} #keep in-sync with AppTaskDefinition.Properties.ContainerDefinitions[0].Name
   LogGroupName:
     Description: Log group name for the ECS task
     Value: !Ref AppTaskLogGroup

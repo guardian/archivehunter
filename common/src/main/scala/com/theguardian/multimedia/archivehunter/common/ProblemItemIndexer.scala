@@ -1,4 +1,6 @@
 package com.theguardian.multimedia.archivehunter.common
+import akka.actor.ActorSystem
+import akka.stream.Materializer
 import com.sksamuel.elastic4s.RefreshPolicy
 import com.sksamuel.elastic4s.http.index.CreateIndexResponse
 import com.sksamuel.elastic4s.http.search.SearchHit
@@ -13,6 +15,7 @@ import io.circe.generic.auto._
 import io.circe.syntax._
 
 import scala.annotation.switch
+import akka.stream.scaladsl._
 
 /**
   * I don't like this because it's not DRY, but I can't work out how to make this generic _and_ compile properly with
@@ -22,7 +25,12 @@ import scala.annotation.switch
 
 class ProblemItemIndexer(indexName:String) extends ZonedDateTimeEncoder with StorageClassEncoder with ProblemItemHitReader with ProblemItemCountHitReader with ProxyTypeEncoder {
   import com.sksamuel.elastic4s.http.ElasticDsl._
+  import com.sksamuel.elastic4s.streams.ReactiveElastic._
   import com.sksamuel.elastic4s.circe._
+
+  def sourceForCollection(collectionName:String)(implicit client:HttpClient, mat:Materializer, system:ActorSystem) = {
+    Source.fromPublisher(client.publisher(search(indexName) query termQuery("bucket.keyword", collectionName) scroll "5m"))
+  }
 
   /**
     * Requests that a single item be added to the index

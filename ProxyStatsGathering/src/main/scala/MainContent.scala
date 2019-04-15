@@ -15,6 +15,7 @@ trait MainContent extends ProblemItemRequestBuilder{
   import com.sksamuel.elastic4s.circe._
   import com.sksamuel.elastic4s.streams.ReactiveElastic._
 
+
   implicit val system:ActorSystem = ActorSystem("root")
   implicit val mat:Materializer = ActorMaterializer.create(system)
 
@@ -58,16 +59,20 @@ trait MainContent extends ProblemItemRequestBuilder{
 
   protected implicit val esClient = esClientMgr.getClient()
 
-  def getStreamSource(indexName:String) = {
+  def getStreamSource(indexName:String, forCollection:Option[String]) = {
+    val queryParams = forCollection match {
+      case Some(collectionName)=>termQuery("bucket.keyword", collectionName)
+      case None=>matchAllQuery()
+    }
     //pull back the entire catalogue.  We'll check it one at a time.
-    Source.fromPublisher(esClient.publisher(search(indexName) scroll "5m")).log("source")
+    Source.fromPublisher(esClient.publisher(search(indexName) query queryParams scroll "5m")).log("source")
   }
 
   def getProblemElementsSink(indexName:String) = {
     Sink.fromSubscriber(esClient.subscriber[ProblemItem](writeBatchSize, concurrentRequests=3))
   }
 
-  def buildGraphModel = {
+  def buildGraphModel(forCollection:Option[String]=None) = {
     val converter = new SearchHitToArchiveEntryFlow()
     val mimeTypeBranch = new MimeTypeBranch()
     val mimeTypeWantProxyBranch = new MimeTypeWantProxyBranch()
@@ -78,7 +83,7 @@ trait MainContent extends ProblemItemRequestBuilder{
     GraphDSL.create(counterSink){ implicit builder:GraphDSL.Builder[Future[ProblemItemCount]] =>counterSink =>
       import GraphDSL.Implicits._
 
-      val src = builder.add(getStreamSource(getIndexName))
+      val src = builder.add(getStreamSource(getIndexName, forCollection))
       val conv = builder.add(converter)
       val mtb = builder.add(mimeTypeBranch)
       val mtwpb = builder.add(mimeTypeWantProxyBranch)
@@ -104,10 +109,10 @@ trait MainContent extends ProblemItemRequestBuilder{
       val recordProblemSink = builder.add(getProblemElementsSink(problemsIndexName))
 
       src ~> conv ~> isDotFileBranch
-      isDotFileBranch.out(0).map(entry=>GroupedResult(entry.id, ProxyResult.DotFile)) ~> preCounterMerge
+      isDotFileBranch.out(0).map(entry=>GroupedResult(entry.id, entry.proxied,ProxyResult.DotFile)) ~> preCounterMerge
       isDotFileBranch.out(1) ~> isGlacierBranch
 
-      isGlacierBranch.out(0).map(entry=>GroupedResult(entry.id, ProxyResult.GlacierClass)) ~> preCounterMerge
+      isGlacierBranch.out(0).map(entry=>GroupedResult(entry.id, entry.proxied, ProxyResult.GlacierClass)) ~> preCounterMerge
       isGlacierBranch.out(1) ~> mtb
 
       //"want proxy" branch
@@ -135,15 +140,13 @@ trait MainContent extends ProblemItemRequestBuilder{
       postGroupBroadcast.out(1).map(resultSeq=>{
         val location = resultSeq.head.extractLocation
         val falseentries = resultSeq.filter(_.wantProxy==false)
-        if(falseentries.length==resultSeq.length) throw new RuntimeException(s"$resultSeq wants no proxies")
-        val result = ProblemItem(resultSeq.head.fileId, location._1, location._2, resultSeq)
-        println(s"DEBUG: Writing $result to index")
-        result
+        if(falseentries.length==resultSeq.length) println(s"WARNING: $resultSeq wants no proxies")
+        ProblemItem(resultSeq.head.fileId, location._1, location._2, esRecordSays=resultSeq.head.esRecordSays, resultSeq)
       }) ~> recordProblemSink
 
       //"don't want proxy" branch
-      mtwpb.out(3).map(verifyResult=>GroupedResult(verifyResult.fileId, ProxyResult.NotNeeded)) ~> preCounterMerge
-      ftwpb.out(3).map(verifyResult=>GroupedResult(verifyResult.fileId, ProxyResult.NotNeeded)) ~> preCounterMerge
+      mtwpb.out(3).map(verifyResult=>GroupedResult(verifyResult.fileId, verifyResult.esRecordSays, ProxyResult.NotNeeded)) ~> preCounterMerge
+      ftwpb.out(3).map(verifyResult=>GroupedResult(verifyResult.fileId, verifyResult.esRecordSays, ProxyResult.NotNeeded)) ~> preCounterMerge
 
       //completion
       preCounterMerge ~> counterSink

@@ -26,6 +26,8 @@ object ProxyFrameworkQueue extends GenericSqsActorMessages {
   case class HandleSuccessfulProxy(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
   case class HandleSuccessfulAnalyse(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
 
+  case class UpdateProblemsIndexSuccess(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
+
   case class HandleFailure(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
   case class HandleWarning(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
   case class HandleRunning(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
@@ -89,6 +91,8 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
 
   lazy val defaultRegion = config.getOptional[String]("externalData.awsRegion").getOrElse("eu-west-1")
 
+  private val problemItemIndexName = config.get[String]("externalData.problemItemsIndex")
+  private val problemItemIndexer = new ProblemItemIndexer(problemItemIndexName)
 
   /**
     * looks up the ArchiveEntry for the original media associated with the given JobModel
@@ -211,6 +215,23 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
 
   override def receive: Receive = {
     /**
+      * update problem items index to show that an item has been successfully proxied
+      */
+    case UpdateProblemsIndexSuccess(msg, jobDesc, rq, receiptHandle, originalSender)=>
+      logger.info("Updating problems index: ")
+      msg.proxyType match {
+        case Some(proxyType) =>
+          problemItemIndexer.getById(jobDesc.sourceId).map(problemItem => {
+            problemItemIndexer.indexSingleItem(problemItem.copyExcludingResult(proxyType))
+          }).recover({
+            case err: Throwable =>
+              logger.warn(s"Could not update problems index for $jobDesc: ", err)
+          })
+        case None=>
+          logger.info(s"Can't update problems index for non-proxy jobs")
+      }
+
+    /**
       * if a proxy job completed successfully, then update the proxy location table with the newly generated proxy
       */
     case HandleSuccessfulProxy(msg, jobDesc, rq, receiptHandle, originalSender)=>
@@ -270,6 +291,7 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
                 originalSender ! akka.actor.Status.Failure(dbErr)
             })
           case Right(_) =>
+            ownRef ! UpdateProblemsIndexSuccess(msg, jobDesc, rq, receiptHandle, originalSender)
             ownRef ! HandleGenericSuccess(msg, jobDesc, rq, receiptHandle, originalSender)
         }).recover({
           case err:Throwable=>

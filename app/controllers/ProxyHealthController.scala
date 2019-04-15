@@ -1,10 +1,11 @@
 package controllers
 
+import akka.actor.ActorRef
 import com.theguardian.multimedia.archivehunter.common.{ProblemItemHitReader, ProblemItemIndexer, ProxyTypeEncoder}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.ESClientManager
 import com.theguardian.multimedia.archivehunter.common.cmn_models.ProblemItem
 import helpers.InjectableRefresher
-import javax.inject.Inject
+import javax.inject.{Inject, Named}
 import org.slf4j.MDC
 import play.api.{Configuration, Logger}
 import play.api.libs.circe.Circe
@@ -13,6 +14,7 @@ import play.api.mvc.{AbstractController, ControllerComponents}
 import responses.{GenericErrorResponse, ObjectGetResponse, ObjectListResponse, TermsBucketResponse}
 import io.circe.syntax._
 import io.circe.generic.auto._
+import services.ProblemItemRetry
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -28,7 +30,8 @@ class ProxyHealthController @Inject()(override val config:Configuration,
                                      override val controllerComponents:ControllerComponents,
                                      esClientMgr:ESClientManager,
                                      override val wsClient:WSClient,
-                                     override val refresher:InjectableRefresher)
+                                     override val refresher:InjectableRefresher,
+                                      @Named("problemItemRetry") problemItemRetry:ActorRef)
   extends AbstractController(controllerComponents) with Circe with PanDomainAuthActions with ProblemItemHitReader with ProxyTypeEncoder
 {
   import com.sksamuel.elastic4s.http.ElasticDsl._
@@ -91,4 +94,10 @@ class ProxyHealthController @Inject()(override val config:Configuration,
         Ok(TermsBucketResponse.fromRawData("ok", collectionsData).asJson)
     })
   }
+
+  def triggerProblemItemsFor(collectionName:String) = APIAuthAction {
+    problemItemRetry ! ProblemItemRetry.RetryForCollection(collectionName)
+    Ok(GenericErrorResponse("ok","Scan started").asJson)
+  }
+
 }

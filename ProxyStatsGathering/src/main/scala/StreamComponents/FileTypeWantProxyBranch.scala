@@ -31,22 +31,22 @@ class FileTypeWantProxyBranch extends GraphStage[UniformFanOutShape[ArchiveEntry
           println(s"${elem.path} has file extension ${elem.file_extension.map(_.toLowerCase)}")
           elem.file_extension.map(_.toLowerCase) match {
             case None=>
-              push(outNo, ProxyVerifyResult(elem.id, ProxyType.UNKNOWN, wantProxy = false))
+              push(outNo, ProxyVerifyResult(elem.id, ProxyType.UNKNOWN,esRecordSays=elem.proxied,  wantProxy = false))
             case Some(xtn)=>
               if(shouldProxyExtensionsVideo.contains(xtn)){
-                push(outVideo, ProxyVerifyResult(elem.id, ProxyType.VIDEO, wantProxy = true))
-                push(outAudio, ProxyVerifyResult(elem.id, ProxyType.AUDIO, wantProxy = false))
-                push(outThumb, ProxyVerifyResult(elem.id, ProxyType.THUMBNAIL, wantProxy = true))
+                push(outVideo, ProxyVerifyResult(elem.id, ProxyType.VIDEO,esRecordSays=elem.proxied,  wantProxy = true))
+                push(outAudio, ProxyVerifyResult(elem.id, ProxyType.AUDIO, esRecordSays=elem.proxied, wantProxy = false))
+                push(outThumb, ProxyVerifyResult(elem.id, ProxyType.THUMBNAIL, esRecordSays=elem.proxied, wantProxy = true))
               } else if(shouldProxyExtensionsAudio.contains(xtn)){
-                push(outVideo, ProxyVerifyResult(elem.id, ProxyType.VIDEO, wantProxy = false))
-                push(outAudio, ProxyVerifyResult(elem.id, ProxyType.AUDIO, wantProxy = true))
-                push(outThumb, ProxyVerifyResult(elem.id, ProxyType.THUMBNAIL, wantProxy = true))
+                push(outVideo, ProxyVerifyResult(elem.id, ProxyType.VIDEO,esRecordSays=elem.proxied,  wantProxy = false))
+                push(outAudio, ProxyVerifyResult(elem.id, ProxyType.AUDIO, esRecordSays=elem.proxied, wantProxy = true))
+                push(outThumb, ProxyVerifyResult(elem.id, ProxyType.THUMBNAIL,esRecordSays=elem.proxied,  wantProxy = true))
               } else if(shouldProxyExtensionsThumb.contains(xtn)){
-                push(outVideo, ProxyVerifyResult(elem.id, ProxyType.VIDEO, wantProxy = false))
-                push(outAudio, ProxyVerifyResult(elem.id, ProxyType.AUDIO, wantProxy = false))
-                push(outThumb, ProxyVerifyResult(elem.id, ProxyType.THUMBNAIL, wantProxy = true))
+                push(outVideo, ProxyVerifyResult(elem.id, ProxyType.VIDEO, esRecordSays=elem.proxied, wantProxy = false))
+                push(outAudio, ProxyVerifyResult(elem.id, ProxyType.AUDIO, esRecordSays=elem.proxied, wantProxy = false))
+                push(outThumb, ProxyVerifyResult(elem.id, ProxyType.THUMBNAIL, esRecordSays=elem.proxied, wantProxy = true))
               } else {
-                push(outNo, ProxyVerifyResult(elem.id, ProxyType.UNKNOWN, wantProxy = false))
+                push(outNo, ProxyVerifyResult(elem.id, ProxyType.UNKNOWN, esRecordSays=elem.proxied, wantProxy = false))
               }
           }
         }

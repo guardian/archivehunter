@@ -15,15 +15,15 @@ class GroupCounter extends GraphStage[FlowShape[Seq[ProxyVerifyResult], GroupedR
     def makeDecision(elemts:Seq[ProxyVerifyResult]):GroupedResult = {
       val wanted = elemts.filter(_.wantProxy)
       if(wanted.isEmpty){
-        GroupedResult(elemts.head.fileId,result = ProxyResult.NotNeeded)
+        GroupedResult(elemts.head.fileId, esRecordSays=elemts.head.esRecordSays, result = ProxyResult.NotNeeded)
       } else {
         val have = wanted.filter(_.haveProxy.getOrElse(false))
         if(have.isEmpty){
-          GroupedResult(elemts.head.fileId, ProxyResult.Unproxied)
+          GroupedResult(elemts.head.fileId, esRecordSays=elemts.head.esRecordSays, ProxyResult.Unproxied)
         } else if(have.length==wanted.length){
-          GroupedResult(elemts.head.fileId, ProxyResult.Proxied)
+          GroupedResult(elemts.head.fileId, esRecordSays=elemts.head.esRecordSays, ProxyResult.Proxied)
         } else {
-          GroupedResult(elemts.head.fileId, ProxyResult.Partial)
+          GroupedResult(elemts.head.fileId, esRecordSays=elemts.head.esRecordSays, ProxyResult.Partial)
         }
       }
     }
