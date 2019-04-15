@@ -91,8 +91,8 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
 
   lazy val defaultRegion = config.getOptional[String]("externalData.awsRegion").getOrElse("eu-west-1")
 
-  private val problemItemIndexName = config.get[String]("externalData.problemItemsIndex")
-  private val problemItemIndexer = new ProblemItemIndexer(problemItemIndexName)
+  protected val problemItemIndexName = config.get[String]("externalData.problemItemsIndex")
+  protected val problemItemIndexer = new ProblemItemIndexer(problemItemIndexName)
 
   /**
     * looks up the ArchiveEntry for the original media associated with the given JobModel

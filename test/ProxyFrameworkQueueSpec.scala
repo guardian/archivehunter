@@ -13,7 +13,7 @@ import models.{JobReportNew, JobReportStatus}
 import org.specs2.mock.Mockito
 import org.specs2.mutable.Specification
 import play.api.Configuration
-import services.ProxyFrameworkQueue.HandleRunning
+import services.ProxyFrameworkQueue.{HandleRunning, UpdateProblemsIndexSuccess}
 import services.{GenericSqsActor, ProxyFrameworkQueue, ProxyFrameworkQueueFunctions}
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -47,12 +47,13 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
       val mockedEntry = mock[ArchiveEntry]
       val mockedUpdatedEntry = mock[ArchiveEntry]
       mockedEntry.copy(any,any,any,any,any,any,any,any,any,any,any,any,any,any) returns mockedUpdatedEntry
+
       val mockedIndexer = mock[Indexer]
       mockedIndexer.getById(any)(any) returns Future(mockedEntry)
       mockedIndexer.indexSingleItem(any,any,any)(any) returns Future(Success("fake-id"))
 
       val toTest = system.actorOf(Props(new ProxyFrameworkQueue(
-        Configuration.from(Map("proxyFramework.notificationsQueue" -> "someQueue", "externalData.indexName" -> "someIndex")),
+        Configuration.from(Map("proxyFramework.notificationsQueue" -> "someQueue", "externalData.indexName" -> "someIndex", "externalData.problemItemsIndex" -> "problem-items")),
         system,
         mock[SQSClientManager],
         mock[S3ClientManager],
@@ -109,7 +110,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
 
 
       val toTest = system.actorOf(Props(new ProxyFrameworkQueue(
-        Configuration.from(Map("proxyFramework.notificationsQueue" -> "someQueue", "externalData.indexName" -> "someIndex")),
+        Configuration.from(Map("proxyFramework.notificationsQueue" -> "someQueue", "externalData.indexName" -> "someIndex", "externalData.problemItemsIndex" -> "problem-items")),
         system,
         mock[SQSClientManager],
         mock[S3ClientManager],
@@ -156,7 +157,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
       mockedSqsClient.deleteMessage(any) returns new DeleteMessageResult()
 
       val toTest = system.actorOf(Props(new ProxyFrameworkQueue(
-        Configuration.from(Map("proxyFramework.notificationsQueue" -> "someQueue", "externalData.indexName" -> "someIndex")),
+        Configuration.from(Map("proxyFramework.notificationsQueue" -> "someQueue", "externalData.indexName" -> "someIndex", "externalData.problemItemsIndex" -> "problem-items")),
         system,
         mock[SQSClientManager],
         mock[S3ClientManager],
@@ -197,7 +198,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
       mockedSqsClient.deleteMessage(any) returns new DeleteMessageResult()
 
       val toTest = system.actorOf(Props(new ProxyFrameworkQueue(
-        Configuration.from(Map("proxyFramework.notificationsQueue" -> "someQueue", "externalData.indexName" -> "someIndex")),
+        Configuration.from(Map("proxyFramework.notificationsQueue" -> "someQueue", "externalData.indexName" -> "someIndex", "externalData.problemItemsIndex" -> "problem-items")),
         system,
         mock[SQSClientManager],
         mock[S3ClientManager],
@@ -242,7 +243,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
       mockedSqsClient.deleteMessage(any) returns new DeleteMessageResult()
 
       val toTest = system.actorOf(Props(new ProxyFrameworkQueue(
-        Configuration.from(Map("proxyFramework.notificationsQueue" -> "someQueue", "externalData.indexName" -> "someIndex")),
+        Configuration.from(Map("proxyFramework.notificationsQueue" -> "someQueue", "externalData.indexName" -> "someIndex", "externalData.problemItemsIndex" -> "problem-items")),
         system,
         mock[SQSClientManager],
         mock[S3ClientManager],
@@ -288,7 +289,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
       mockedSqsClient.deleteMessage(any) returns new DeleteMessageResult()
 
       val toTest = system.actorOf(Props(new ProxyFrameworkQueue(
-        Configuration.from(Map("proxyFramework.notificationsQueue" -> "someQueue", "externalData.indexName" -> "someIndex")),
+        Configuration.from(Map("proxyFramework.notificationsQueue" -> "someQueue", "externalData.indexName" -> "someIndex", "externalData.problemItemsIndex" -> "problem-items")),
         system,
         mock[SQSClientManager],
         mock[S3ClientManager],
@@ -368,7 +369,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
         mockThumnailJobOriginalMedia.apply(any) returns Future(Right(mockedArchiveEntry))
 
         val toTest = system.actorOf(Props(new ProxyFrameworkQueue(
-          Configuration.from(Map("proxyFramework.notificationsQueue" -> "someQueue", "externalData.indexName" -> "someIndex")),
+          Configuration.from(Map("proxyFramework.notificationsQueue" -> "someQueue", "externalData.indexName" -> "someIndex", "externalData.problemItemsIndex" -> "problem-items")),
           system,
           mock[SQSClientManager],
           mock[S3ClientManager],
@@ -421,7 +422,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
         mockThumnailJobOriginalMedia.apply(any) returns Future(Right(mockedArchiveEntry))
 
         val toTest = system.actorOf(Props(new ProxyFrameworkQueue(
-          Configuration.from(Map("proxyFramework.notificationsQueue" -> "someQueue", "externalData.indexName" -> "someIndex")),
+          Configuration.from(Map("proxyFramework.notificationsQueue" -> "someQueue", "externalData.indexName" -> "someIndex", "externalData.problemItemsIndex" -> "problem-items")),
           system,
           mock[SQSClientManager],
           mock[S3ClientManager],
@@ -446,6 +447,146 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
         there was no(mockUpdateProxyRef).apply(any, any, any)
         there was one(mockedSqsClient).deleteMessage(any)
       }
+    }
+  }
+
+  "ProxyFrameworkQueue!UpdateProblemsIndexSuccess" should {
+    "clear the problem marker for a specific proxy type" in new AkkaTestkitSpecs2Support {
+      implicit val ec: ExecutionContext = system.dispatcher
+      val mockedJd = new JobModel("fake-job-id", "PROXY", None, None, JobStatus.ST_PENDING, None, "fake-source", None, SourceType.SRC_MEDIA, None)
+
+      val mockedJobModelDAO = mock[JobModelDAO]
+      mockedJobModelDAO.putJob(any) returns Future(None)
+
+      val mockedScanTargetDAO = mock[ScanTargetDAO]
+
+      val mockedArchiveEntry = mock[ArchiveEntry]
+      val mockedUpdateProxyRef = mock[Function3[String, ArchiveEntry, ProxyType.Value, Future[Either[String, Option[ProxyLocation]]]]]
+      mockedUpdateProxyRef.apply(any, any, any) returns Future(Right(None))
+
+      val problemItemFake = ProblemItem("fake-fileid","fakecollection","/path/to/file", esRecordSays = false, verifyResults=Seq(
+        ProxyVerifyResult("fake-fileid",ProxyType.VIDEO, true, false, Some(false)),
+        ProxyVerifyResult("fake-fileid",ProxyType.THUMBNAIL, true, false, Some(false)),
+      ))
+      val mockedProblemItemIndexer = mock[ProblemItemIndexer]
+      mockedProblemItemIndexer.getById(any)(any) returns Future(problemItemFake)
+      mockedProblemItemIndexer.indexSingleItem(any,any,any)(any) returns Future(Success("some-id"))
+
+      val testProbe = TestProbe()
+      val fakeIncoming = JobReportNew(JobReportStatus.SUCCESS, None, "fake-job-id", Some("input-uri"), Some("output-uri"), Some(ProxyType.VIDEO), None, None)
+      val fakeMessage = ProxyFrameworkQueue.UpdateProblemsIndexSuccess(fakeIncoming, mockedJd, mock[ReceiveMessageRequest], "receipt-handle", testProbe.ref)
+
+      val mockedSqsClient = mock[AmazonSQS]
+      mockedSqsClient.deleteMessage(any) returns new DeleteMessageResult()
+
+      val mockedEntry = mock[ArchiveEntry]
+      val mockedUpdatedEntry = mock[ArchiveEntry]
+      mockedEntry.copy(any,any,any,any,any,any,any,any,any,any,any,any,any,any) returns mockedUpdatedEntry
+      val mockedIndexer = mock[Indexer]
+      mockedIndexer.getById(any)(any) returns Future(mockedEntry)
+      mockedIndexer.indexSingleItem(any,any,any)(any) returns Future(Success("fake-id"))
+
+      val mockedEsClient = mock[com.sksamuel.elastic4s.http.HttpClient]
+      val mockedEsClientManager = mock[ESClientManager]
+      mockedEsClientManager.getClient() returns mockedEsClient
+
+      val toTest = system.actorOf(Props(new ProxyFrameworkQueue(
+        Configuration.from(Map("proxyFramework.notificationsQueue" -> "someQueue", "externalData.indexName" -> "someIndex", "externalData.problemItemsIndex" -> "problem-items")),
+        system,
+        mock[SQSClientManager],
+        mock[S3ClientManager],
+        mock[DynamoClientManager],
+        mockedJobModelDAO,
+        mockedScanTargetDAO,
+        mockedEsClientManager
+      )(mock[ProxyLocationDAO]) {
+        override val problemItemIndexName = "problem-items"
+
+        override val problemItemIndexer = mockedProblemItemIndexer
+
+        override val sqsClient = mockedSqsClient
+
+        override def thumbnailJobOriginalMedia(jobDesc: JobModel): Future[Either[String, ArchiveEntry]] = Future(Right(mockedArchiveEntry))
+
+        override def updateProxyRef(proxyUri: String, archiveEntry: ArchiveEntry, proxyType: ProxyType.Value): Future[Either[String, Option[ProxyLocation]]] = mockedUpdateProxyRef(proxyUri, archiveEntry, proxyType)
+
+        override protected implicit val indexer = mockedIndexer
+      }))
+
+      toTest ! fakeMessage
+      Thread.sleep(1000)
+
+      there was one(mockedProblemItemIndexer).getById("fake-source")(mockedEsClient)
+      there was one(mockedProblemItemIndexer).indexSingleItem(any,any,any)(any)
+    }
+
+    "not fail if no problem marker is presemt" in new AkkaTestkitSpecs2Support {
+      implicit val ec: ExecutionContext = system.dispatcher
+      val mockedJd = new JobModel("fake-job-id", "PROXY", None, None, JobStatus.ST_PENDING, None, "fake-source", None, SourceType.SRC_MEDIA, None)
+
+      val mockedJobModelDAO = mock[JobModelDAO]
+      mockedJobModelDAO.putJob(any) returns Future(None)
+
+      val mockedScanTargetDAO = mock[ScanTargetDAO]
+
+      val mockedArchiveEntry = mock[ArchiveEntry]
+      val mockedUpdateProxyRef = mock[Function3[String, ArchiveEntry, ProxyType.Value, Future[Either[String, Option[ProxyLocation]]]]]
+      mockedUpdateProxyRef.apply(any, any, any) returns Future(Right(None))
+
+      val problemItemFake = ProblemItem("fake-fileid","fakecollection","/path/to/file", esRecordSays = false, verifyResults=Seq(
+        ProxyVerifyResult("fake-fileid",ProxyType.VIDEO, true, false, Some(false)),
+        ProxyVerifyResult("fake-fileid",ProxyType.THUMBNAIL, true, false, Some(false)),
+      ))
+      val mockedProblemItemIndexer = mock[ProblemItemIndexer]
+      mockedProblemItemIndexer.getById(any)(any) returns Future(problemItemFake)
+      mockedProblemItemIndexer.indexSingleItem(any,any,any)(any) returns Future(Success("some-id"))
+
+      val testProbe = TestProbe()
+      val fakeIncoming = JobReportNew(JobReportStatus.SUCCESS, None, "fake-job-id", Some("input-uri"), Some("output-uri"), Some(ProxyType.VIDEO), None, None)
+      val fakeMessage = ProxyFrameworkQueue.UpdateProblemsIndexSuccess(fakeIncoming, mockedJd, mock[ReceiveMessageRequest], "receipt-handle", testProbe.ref)
+
+      val mockedSqsClient = mock[AmazonSQS]
+      mockedSqsClient.deleteMessage(any) returns new DeleteMessageResult()
+
+      val mockedEntry = mock[ArchiveEntry]
+      val mockedUpdatedEntry = mock[ArchiveEntry]
+      mockedEntry.copy(any,any,any,any,any,any,any,any,any,any,any,any,any,any) returns mockedUpdatedEntry
+      val mockedIndexer = mock[Indexer]
+      mockedIndexer.getById(any)(any) throws new RuntimeException("nothing existed")
+      mockedIndexer.indexSingleItem(any,any,any)(any) returns Future(Success("fake-id"))
+
+      val mockedEsClient = mock[com.sksamuel.elastic4s.http.HttpClient]
+      val mockedEsClientManager = mock[ESClientManager]
+      mockedEsClientManager.getClient() returns mockedEsClient
+
+      val toTest = system.actorOf(Props(new ProxyFrameworkQueue(
+        Configuration.from(Map("proxyFramework.notificationsQueue" -> "someQueue", "externalData.indexName" -> "someIndex", "externalData.problemItemsIndex" -> "problem-items")),
+        system,
+        mock[SQSClientManager],
+        mock[S3ClientManager],
+        mock[DynamoClientManager],
+        mockedJobModelDAO,
+        mockedScanTargetDAO,
+        mockedEsClientManager
+      )(mock[ProxyLocationDAO]) {
+        override val problemItemIndexName = "problem-items"
+
+        override val problemItemIndexer = mockedProblemItemIndexer
+
+        override val sqsClient = mockedSqsClient
+
+        override def thumbnailJobOriginalMedia(jobDesc: JobModel): Future[Either[String, ArchiveEntry]] = Future(Right(mockedArchiveEntry))
+
+        override def updateProxyRef(proxyUri: String, archiveEntry: ArchiveEntry, proxyType: ProxyType.Value): Future[Either[String, Option[ProxyLocation]]] = mockedUpdateProxyRef(proxyUri, archiveEntry, proxyType)
+
+        override protected implicit val indexer = mockedIndexer
+      }))
+
+      toTest ! fakeMessage
+      Thread.sleep(1000)
+
+      there was one(mockedProblemItemIndexer).getById("fake-source")(mockedEsClient)
+      there was one(mockedProblemItemIndexer).indexSingleItem(any,any,any)(any)
     }
   }
 }
