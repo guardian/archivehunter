@@ -219,17 +219,36 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
       */
     case UpdateProblemsIndexSuccess(msg, jobDesc, rq, receiptHandle, originalSender)=>
       logger.info("Updating problems index: ")
-      msg.proxyType match {
-        case Some(proxyType) =>
-          problemItemIndexer.getById(jobDesc.sourceId).map(problemItem => {
-            problemItemIndexer.indexSingleItem(problemItem.copyExcludingResult(proxyType))
-          }).recover({
-            case err: Throwable =>
-              logger.warn(s"Could not update problems index for $jobDesc: ", err)
+      jobDesc.jobType.toLowerCase() match {
+        case "proxy" =>
+          msg.proxyType match {
+            case Some(proxyType) =>
+              logger.debug(s"Updating problem item for ${proxyType.toString}")
+              problemItemIndexer.getById(jobDesc.sourceId).map(problemItem => {
+                problemItemIndexer.indexSingleItem(problemItem.copyExcludingResult(proxyType))
+                ///don't send to originalSender as we are not on the critical path
+                //originalSender ! akka.actor.Status.Success
+
+              }).recover({
+                case err: Throwable =>
+                  logger.warn(s"Could not update problems index for $jobDesc: ", err)
+                  //originalSender ! akka.actor.Status.Failure(err)
+              })
+            case None =>
+              logger.warn(s"Can't update problems index for proxy if there is no proxy type")
+              //originalSender ! akka.actor.Status.Failure(new RuntimeException("Can't update problems index for proxy if there is no proxy type"))
+          }
+        case "thumbnail" =>
+          logger.debug("Updating problem item for thumbnail")
+          problemItemIndexer.getById(jobDesc.sourceId).map(item => {
+            problemItemIndexer.indexSingleItem(item.copyExcludingResult(ProxyType.THUMBNAIL))
+            //originalSender ! akka.actor.Status.Success
           })
-        case None=>
-          logger.info(s"Can't update problems index for non-proxy jobs")
+        case _=>
+          logger.warn("Can't update problems index for non proxy jobs")
+          //originalSender ! akka.actor.Status.Failure(new RuntimeException("Can't update problems index for non proxy jobs"))
       }
+
 
     /**
       * if a proxy job completed successfully, then update the proxy location table with the newly generated proxy

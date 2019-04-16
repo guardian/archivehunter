@@ -515,6 +515,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
 
       toTest ! fakeMessage
       Thread.sleep(1000)
+      //testProbe.expectMsg(10 seconds, akka.actor.Status.Success)
 
       there was one(mockedProblemItemIndexer).getById("fake-source")(mockedEsClient)
       there was one(mockedProblemItemIndexer).indexSingleItem(any,any,any)(any)
