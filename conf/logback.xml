@@ -85,6 +85,9 @@
     <logger name="services.ProblemItemRetry" level="DEBUG"/>
     <logger name="requests.JobSearchRequest" level="INFO"/>
 
+    <logger name="ProblemItemRetry" level="INFO"/>
+    <logger name="helpers.ProblemItemReproxySink" level="DEBUG"/>
+
     <logger name="helpers.ProxyFramework" level="INFO"/>
     <logger name="services.ProxyFrameworkQueue" level="INFO"/>
 

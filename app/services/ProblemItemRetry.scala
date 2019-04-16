@@ -3,12 +3,13 @@ package services
 import java.time.ZonedDateTime
 
 import akka.actor.{Actor, ActorSystem}
+import akka.stream.scaladsl.Keep
 import akka.stream.{ActorMaterializer, Materializer}
 import com.theguardian.multimedia.archivehunter.common.ProxyTranscodeFramework.ProxyGenerators
 import com.theguardian.multimedia.archivehunter.common.clientManagers.ESClientManager
-import com.theguardian.multimedia.archivehunter.common.cmn_models.{JobModel, JobModelDAO, JobStatus, SourceType}
-import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ProblemItemIndexer, ProxyLocationDAO}
-import helpers.{CreateProxySink, EOSDetect, SearchHitToArchiveEntryFlow}
+import com.theguardian.multimedia.archivehunter.common.cmn_models._
+import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ProblemItemHitReader, ProblemItemIndexer, ProxyLocationDAO}
+import helpers.{CreateProxySink, EOSDetect, ProblemItemReproxySink}
 import javax.inject.Inject
 import play.api.{Configuration, Logger}
 
@@ -28,8 +29,10 @@ object ProblemItemRetry {
   * @param actorSystem
   * @param proxyLocationDAO
   */
-class ProblemItemRetry @Inject()(config:Configuration, proxyGenerators:ProxyGenerators, esClientManager:ESClientManager, jobModelDAO:JobModelDAO)
-                                (implicit actorSystem: ActorSystem, proxyLocationDAO:ProxyLocationDAO) extends Actor {
+class ProblemItemRetry @Inject()(config:Configuration, proxyGenerators:ProxyGenerators,
+                                 esClientManager:ESClientManager, jobModelDAO:JobModelDAO,
+                                 problemItemReproxySink: ProblemItemReproxySink)
+                                (implicit actorSystem: ActorSystem, proxyLocationDAO:ProxyLocationDAO) extends Actor with ProblemItemHitReader{
   import ProblemItemRetry._
 
   private val logger=Logger(getClass)
@@ -56,18 +59,18 @@ class ProblemItemRetry @Inject()(config:Configuration, proxyGenerators:ProxyGene
           val completionPromise = Promise[Unit]()
           val detector = new EOSDetect[Unit, ArchiveEntry](completionPromise, ())
 
-          problemItemIndexer.sourceForCollection(collectionName)
-            .via(new SearchHitToArchiveEntryFlow()).log("ProblemItemRetry").async
-            .via(detector)
-            .to(new CreateProxySink(proxyGenerators)).run()
+          val result = problemItemIndexer.sourceForCollection(collectionName)
+            .map(_.to[ProblemItem]).log("ProblemItemRetry")
+            .toMat(problemItemReproxySink)(Keep.right).run()
+
           logger.info(s"Problem item scan underway for $collectionName")
 
           originalSender ! akka.actor.Status.Success
-          completionPromise.future.onComplete({
-            case Success(_)=>
+          result.onComplete({
+            case Success(count)=>
               val updatedJob = job.copy(completedAt = Some(ZonedDateTime.now()),jobStatus = JobStatus.ST_SUCCESS)
               jobModelDAO.putJob(updatedJob)
-              logger.info(s"Problem item scan completed for $collectionName")
+              logger.info(s"Problem item scan completed for $collectionName, with $count results")
             case Failure(err)=>
               val updatedJob = job.copy(completedAt = Some(ZonedDateTime.now()), jobStatus=JobStatus.ST_ERROR, log = Some(err.toString))
               jobModelDAO.putJob(updatedJob)

@@ -29,7 +29,7 @@ class ProblemItemIndexer(indexName:String) extends ZonedDateTimeEncoder with Sto
   import com.sksamuel.elastic4s.circe._
 
   def sourceForCollection(collectionName:String)(implicit client:HttpClient, mat:Materializer, system:ActorSystem) = {
-    Source.fromPublisher(client.publisher(search(indexName) query termQuery("bucket.keyword", collectionName) scroll "5m"))
+    Source.fromPublisher(client.publisher(search(indexName) query termQuery("collection.keyword", collectionName) scroll "5m"))
   }
 
   /**
