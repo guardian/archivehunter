@@ -73,7 +73,7 @@ def get_cloudformation_info(stackname):
     return extract_cf_outputs(info)
 
 
-def run_task(cluster_id, task_arn, container_name, subnet_list, sg_list, allow_external_ip, collection_name):
+def run_task(cluster_id, task_arn, container_name, subnet_list, sg_list, allow_external_ip, collection_name, mode):
     client = boto3.client('ecs', region_name=options.region)
     network_config = {
         "awsvpcConfiguration": {
@@ -83,22 +83,26 @@ def run_task(cluster_id, task_arn, container_name, subnet_list, sg_list, allow_e
         }
     }
 
+    overrides = {
+        'containerOverrides': [
+            {
+                'name': container_name,
+                'environment': [
+                ]
+            }
+        ]
+    }
+
     if collection_name:
-        overrides = {
-            'containerOverrides': [
-                {
-                    'name': container_name,
-                    'environment': [
-                        {
-                            'name': "FOR_COLLECTION",
-                            'value': collection_name
-                        }
-                    ]
-                }
-            ]
-        }
-    else:
-        overrides = {}
+        overrides['containerOverrides'][0]['environment'].append({
+            'name': "FOR_COLLECTION",
+            'value': collection_name
+        })
+    if mode:
+        overrides['containerOverrides'][0]['environment'].append({
+            'name': "MODE",
+            'value': mode
+        })
 
     result = client.run_task(cluster=cluster_id, taskDefinition=task_arn, networkConfiguration=network_config, overrides=overrides, launchType="FARGATE")
 
@@ -157,6 +161,7 @@ parser = OptionParser()
 parser.add_option("-c","--config", dest="configfile", help="Configuration YAML", default="ecs_rundev.yaml")
 parser.add_option("-r","--region", dest="region", help="AWS region", default="eu-west-1")
 parser.add_option("-s","--stackname", dest="stackname", help="Cloudformation stack that contains the deployed task")
+parser.add_option("-m","--mode", dest="mode", help="Run in stats-gathering or index fix mode. Specify either 'stats' or 'indexfix'", default="stats")
 parser.add_option("--collection", dest="collection", help="limit to this ArchiveHunter collection")
 (options, args) = parser.parse_args()
 
@@ -177,7 +182,7 @@ if not "TaskDefinitionArn" in cfinfo:
     raise StandardError("No TaskDefinitionArn output in {0}".format(options.stackname))
 logger.info("Got task ARN {0}".format(cfinfo["TaskDefinitionArn"]))
 
-taskinfo = run_task(config["ecs"].get("cluster"), cfinfo["TaskDefinitionArn"], cfinfo["AppContainerName"], config["ecs"].get("subnets"), config["ecs"].get("security_groups"), config["ecs"].get("external_ip"), options.collection)
+taskinfo = run_task(config["ecs"].get("cluster"), cfinfo["TaskDefinitionArn"], cfinfo["AppContainerName"], config["ecs"].get("subnets"), config["ecs"].get("security_groups"), config["ecs"].get("external_ip"), options.collection, options.mode)
 
 logger.debug(str(taskinfo))
 

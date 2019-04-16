@@ -1,16 +1,19 @@
 import StreamComponents._
 import akka.actor.ActorSystem
 import akka.stream.{ActorMaterializer, ClosedShape, Graph, Materializer}
-import akka.stream.scaladsl.{Broadcast, GraphDSL, Merge, Sink, Source}
+import akka.stream.scaladsl.{Broadcast, GraphDSL, Keep, Merge, Sink, Source}
 import com.google.inject.Guice
-import com.theguardian.multimedia.archivehunter.common.{Indexer, ProblemItemRequestBuilder, ProxyLocationDAO, ProxyType}
+import com.theguardian.multimedia.archivehunter.common._
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{ESClientManager, ESClientManagerImpl}
-import com.theguardian.multimedia.archivehunter.common.cmn_models.{ProblemItemCount, ProblemItem, ProxyVerifyResult}
+import com.theguardian.multimedia.archivehunter.common.cmn_models.{ProblemItem, ProblemItemCount, ProxyVerifyResult}
 import models.{GroupedResult, ProxyResult}
 
 import scala.concurrent.Future
+import scala.util.{Failure, Success}
 
-trait MainContent extends ProblemItemRequestBuilder{
+import scala.concurrent.ExecutionContext.Implicits.global
+
+trait MainContent extends ProblemItemRequestBuilder with ProblemItemHitReader{
   import com.sksamuel.elastic4s.http.ElasticDsl._
   import com.sksamuel.elastic4s.circe._
   import com.sksamuel.elastic4s.streams.ReactiveElastic._
@@ -65,8 +68,10 @@ trait MainContent extends ProblemItemRequestBuilder{
       case None=>matchAllQuery()
     }
     //pull back the entire catalogue.  We'll check it one at a time.
-    Source.fromPublisher(esClient.publisher(search(indexName) query queryParams scroll "5m")).log("source")
+    Source.fromPublisher(esClient.publisher(search(indexName) query queryParams scroll "5m"))
   }
+
+  def getProblemItemSource(indexName:String) = Source.fromPublisher(esClient.publisher(search(indexName) scroll "5m"))
 
   def getProblemElementsSink(indexName:String) = {
     Sink.fromSubscriber(esClient.subscriber[ProblemItem](writeBatchSize, concurrentRequests=3))
@@ -153,6 +158,18 @@ trait MainContent extends ProblemItemRequestBuilder{
 
       ClosedShape
     }
+  }
+
+  def runProblemItemFix = {
+   val result = getProblemItemSource(getProblemsIndexName).map(_.to[ProblemItem]).log("fix-stream").toMat(new ProblemItemDeleteIfEmpty(getIndexName))(Keep.right).run()
+
+    result.onComplete({
+      case Success((totalCount, deletedCount))=>
+        println(s"Fix problem index ran completed, removed $deletedCount out of $totalCount items")
+      case Failure(err)=>
+        println(s"Run failed: ${err.toString}")
+    })
+    result
   }
 
 }

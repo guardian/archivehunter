@@ -23,7 +23,7 @@ class ProxyHealthDetail extends React.Component {
             selectedCollection: null,
             tableStart: 0,
             tablePageSize: 100,
-            tableMaxSize: 100,
+            tableMaxSize: 2500,
             triggerInProgress: false
         };
 

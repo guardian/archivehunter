@@ -126,4 +126,8 @@ class ProblemItemIndexer(indexName:String) extends ZonedDateTimeEncoder with Sto
   def mostRecentStats(implicit client:HttpClient) = client.execute(
     search(s"$indexName/summary") sortByFieldDesc "scanStart" limit 1
   ).map(_.map(success=>success.result.to[ProblemItemCount].headOption))
+
+  def deleteEntry(entry:ProblemItem)(implicit client:HttpClient) = client.execute {
+    deleteByQuery(indexName, "problem", matchQuery("fileId", entry.fileId))
+  }
 }

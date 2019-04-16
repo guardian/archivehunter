@@ -225,7 +225,13 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
             case Some(proxyType) =>
               logger.debug(s"Updating problem item for ${proxyType.toString}")
               problemItemIndexer.getById(jobDesc.sourceId).map(problemItem => {
-                problemItemIndexer.indexSingleItem(problemItem.copyExcludingResult(proxyType))
+                val entry = problemItem.copyExcludingResult(proxyType)
+
+                if(entry.verifyResults.nonEmpty) {
+                  problemItemIndexer.indexSingleItem(entry)
+                } else {
+                  problemItemIndexer.deleteEntry(entry)
+                }
                 ///don't send to originalSender as we are not on the critical path
                 //originalSender ! akka.actor.Status.Success
 
@@ -241,8 +247,12 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
         case "thumbnail" =>
           logger.debug("Updating problem item for thumbnail")
           problemItemIndexer.getById(jobDesc.sourceId).map(item => {
-            problemItemIndexer.indexSingleItem(item.copyExcludingResult(ProxyType.THUMBNAIL))
-            //originalSender ! akka.actor.Status.Success
+            val entry = item.copyExcludingResult(ProxyType.THUMBNAIL)
+            if(entry.verifyResults.nonEmpty) {
+              problemItemIndexer.indexSingleItem(entry)
+            } else {
+              problemItemIndexer.deleteEntry(entry)
+            }
           })
         case _=>
           logger.warn("Can't update problems index for non proxy jobs")

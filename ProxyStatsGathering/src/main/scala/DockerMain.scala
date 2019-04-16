@@ -14,7 +14,14 @@ import scala.util.{Failure, Success}
 object DockerMain extends MainContent {
   def main(args:Array[String]) : Unit = {
     try {
-      runit(args)
+      println(s"mode is ${sys.env.get("MODE")}")
+
+      sys.env.get("MODE") match {
+        case None=> runit(args)
+        case Some("stats")=>runit(args)
+        case Some("indexfix")=>runFixIndex(args)
+        case Some(_)=>throw new RuntimeException("Invalid MODE parameter, you should specify stats or indexfix")
+      }
       System.exit(0)
     } catch {
       case ex:Throwable=>
@@ -60,5 +67,9 @@ object DockerMain extends MainContent {
       case Left(err)=>
         println(s"Could not output the summary count: $err")
     })
+  }
+
+  def runFixIndex(args:Array[String]) : Unit = {
+    Await.ready(runProblemItemFix, 1 hour)
   }
 }
