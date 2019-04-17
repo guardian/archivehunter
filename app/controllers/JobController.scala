@@ -18,7 +18,7 @@ import com.theguardian.multimedia.archivehunter.common.cmn_models._
 import helpers.InjectableRefresher
 import play.api.libs.ws.WSClient
 import requests.JobSearchRequest
-import responses.{GenericErrorResponse, ObjectCreatedResponse, ObjectGetResponse, ObjectListResponse}
+import responses._
 
 import scala.util.{Failure, Success, Try}
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -141,4 +141,14 @@ class JobController @Inject() (override val config:Configuration,
     Future(InternalServerError(GenericErrorResponse("not_implemented","Not currently implemented").asJson))
   }
 
+  def reRunJobsForCollection(collectionName:String) = APIAuthAction.async {
+    jobModelDAO.jobsForType("ProblemItemRerun").map(resultList=>{
+      val failures = resultList.collect({case Left(err)=>err})
+      if(failures.nonEmpty){
+        InternalServerError(ErrorListResponse("error","Could not look up jobs", failures.map(_.toString)).asJson)
+      }
+      val results = resultList.collect({case Right(job)=>job}).filter(_.sourceId==collectionName)
+      Ok(ObjectListResponse("ok","Job", results, results.length).asJson)
+    })
+  }
 }

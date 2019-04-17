@@ -18,21 +18,26 @@ import BrowseComponent from './browse/BrowseComponent.jsx';
 import LoginStatusComponent from './Login/LoginStatusComponent.jsx';
 import MyLightbox from './Lightbox/MyLightbox.jsx';
 
+import ProxyHealthDetail from './ProxyHealthDetail/ProxyHealthDetail.jsx';
+
 import { library } from '@fortawesome/fontawesome-svg-core'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faStroopwafel, faCheckCircle, faCheck, faTimes, faTimesCircle, faRoad, faSearch,faThList,faWrench, faLightbulb, faFolderPlus, faFolderMinus, faFolder, faBookReader, faRedoAlt, faHome } from '@fortawesome/free-solid-svg-icons'
 import { faChevronCircleDown,faChevronCircleRight,faTrashAlt, faFilm, faVolumeUp,faImage, faFile, faClock, faRunning, faExclamationTriangle, faHdd, faBalanceScale, faSyncAlt, faIndustry, faListOl} from '@fortawesome/free-solid-svg-icons'
-import { faCompressArrowsAlt, faBug } from '@fortawesome/free-solid-svg-icons'
+import { faCompressArrowsAlt, faBug, faExclamation, faUnlink } from '@fortawesome/free-solid-svg-icons'
 import UserList from "./Users/UserList.jsx";
 
 import ProxyFrameworkList from "./ProxyFramework/ProxyFrameworkList.jsx";
 import ProxyFrameworkAdd from './ProxyFramework/ProxyFrameworkAdd.jsx';
 import {handle419, setupInterceptor} from "./common/Handle419.jsx";
 
+import ProxyHealthDash from "./ProxyHealth/ProxyHealthDash.jsx";
+
 import Test419Component from "./testing/test419.jsx";
 
 library.add(faStroopwafel, faCheckCircle, faCheck, faTimes, faTimesCircle, faRoad,faSearch,faThList,faWrench, faLightbulb, faChevronCircleDown, faChevronCircleRight, faTrashAlt, faFolderPlus, faFolderMinus, faFolder);
 library.add(faFilm, faVolumeUp, faImage, faFile, faClock, faRunning, faExclamationTriangle, faHdd, faBalanceScale, faSyncAlt, faBookReader, faBug, faCompressArrowsAlt, faIndustry, faRedoAlt, faHome, faListOl,);
+library.add(faExclamation, faUnlink);
 window.React = require('react');
 
 /**
@@ -82,6 +87,7 @@ class App extends React.Component {
             <LoginStatusComponent userData={this.state.userLogin} userLoggedOutCb={this.userLoggedOut}/>
             <Switch>
                 <Route path="/test/419" component={Test419Component}/>
+                <Route path="/admin/proxyHealth" component={ProxyHealthDetail}/>
                 <Route path="/admin/proxyFramework/new" component={ProxyFrameworkAdd}/>
                 <Route path="/admin/proxyFramework" component={ProxyFrameworkList}/>
                 <Route path="/admin/about" component={AboutComponent}/>

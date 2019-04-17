@@ -10,13 +10,15 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import io.circe.generic.auto._
 import io.circe.syntax._
 import com.sksamuel.elastic4s.circe._
+import com.sksamuel.elastic4s.http.search.Aggregations
 import com.sksamuel.elastic4s.searches.sort.SortOrder
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ArchiveEntryHitReader, StorageClassEncoder, ZonedDateTimeEncoder}
 import helpers.InjectableRefresher
+import models.{ChartFacet, ChartFacetData}
 import play.api.libs.circe.Circe
 import requests.SearchRequest
 import play.api.libs.ws.WSClient
-import responses.{BasicSuggestionsResponse, GenericErrorResponse, ObjectGetResponse, ObjectListResponse}
+import responses._
 
 import scala.concurrent.Future
 
@@ -95,8 +97,6 @@ with PanDomainAuthActions {
       case Left(failure)=>
         InternalServerError(GenericErrorResponse("search failure", failure.toString).asJson)
       case Right(results)=>
-        logger.info("Got ES response:")
-        logger.info(results.body.getOrElse("[empty body]"))
         Ok(BasicSuggestionsResponse.fromEsResponse(results.result.termSuggestion("sg")).asJson)
     }).recover({
       case err:Throwable=>
@@ -111,7 +111,6 @@ with PanDomainAuthActions {
         Future(BadRequest(GenericErrorResponse("bad_request", error.toString).asJson))
       },
       request=> {
-        logger.info(s"search params are ${request.toSearchParams}")
         esClient.execute {
           search(indexName) query {
             boolQuery().must(request.toSearchParams)
@@ -154,6 +153,58 @@ with PanDomainAuthActions {
       case err:Throwable=>
         logger.error("Could not do browse search: ", err)
         InternalServerError(GenericErrorResponse("error", err.toString).asJson)
+    })
+  }
+
+  def chartSubBucketsFor[T](data:Map[String,Any]):Either[String, Map[String,T]] = {
+    if(data.contains("buckets")){
+      Right(data("buckets").asInstanceOf[List[Map[String, Any]]].map(entry=>{
+        (entry.getOrElse("key_as_string", entry("key")).asInstanceOf[String], entry("doc_count").asInstanceOf[T])
+      }).toMap)
+    } else Left("Facet did not have buckets parameter")
+  }
+
+  def chartIntermediateRepresentation[T:io.circe.Encoder](aggs:Map[String,Any], forKey:String):Either[String, ChartFacet[T]] = {
+    if(aggs.contains("buckets")){
+      val buckets = aggs("buckets").asInstanceOf[List[Map[String,Any]]]
+      val facetData = buckets.map(entry=>{
+        if(entry.contains(forKey)){
+          Some(chartSubBucketsFor(entry(forKey).asInstanceOf[Map[String, Any]]).map(data=>
+            ChartFacetData[T](entry.getOrElse("key_as_string",entry("key")).asInstanceOf[String], data)
+          ))
+        } else None
+      })
+      logger.debug(facetData.toString)
+      Right(ChartFacet(forKey,facetData.collect({case Some(Right(d))=>d})))
+    } else Left("Facet did not have buckets parameter")
+  }
+
+  def getProxyFacets() = APIAuthAction.async {
+    esClient.execute {
+      search(indexName) aggregations
+        termsAggregation("Collection")
+          .field("bucket.keyword")
+          .subAggregations(
+            termsAgg("hasProxy","proxied"),
+            termsAgg("mediaType", "mimeType.major.keyword")
+          )
+    }.map({
+      case Left(failure)=>
+        InternalServerError(GenericErrorResponse("search failure", failure.toString).asJson)
+      case Right(results)=>
+        val intermediateContent = Seq(
+          chartIntermediateRepresentation[Int](results.result.aggregations.data("Collection").asInstanceOf[Map[String,Any]], "hasProxy").map(_.inverted()),
+          chartIntermediateRepresentation[Int](results.result.aggregations.data("Collection").asInstanceOf[Map[String,Any]], "mediaType").map(_.inverted())
+        )
+
+        val finalContent = intermediateContent.map(_.map(entry=>ChartDataResponse.fromIntermediateRepresentation(Seq(entry))))
+        val errors = finalContent.collect({case Left(err)=>err})
+
+        if(errors.nonEmpty){
+          InternalServerError(ErrorListResponse("render_error","could not process aggregations data", errors.toList).asJson)
+        } else {
+          Ok(ChartDataListResponse("ok",finalContent.collect({case Right(data)=>data}).flatten).asJson)
+        }
     })
   }
 }

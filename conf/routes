@@ -30,6 +30,8 @@ PUT     /api/search/suggestions         @controllers.SearchController.suggestion
 POST    /api/search/browser             @controllers.SearchController.browserSearch(start:Int ?= 0, size:Int ?=100)
 GET     /api/search/myLightBox          @controllers.SearchController.lightboxSearch(start:Int ?= 0, size:Int ?=100, bulkId:Option[String])
 
+GET     /api/search/proxyStats          @controllers.SearchController.getProxyFacets
+
 GET     /api/proxy/searchForFile        @controllers.ProxiesController.searchFor(id:String)
 GET     /api/proxy/:id/associate        @controllers.ProxiesController.associate(fileId:Option[String],id)
 GET     /api/proxy/:id/playable         @controllers.ProxiesController.getPlayable(id, proxyType:Option[String])
@@ -44,12 +46,19 @@ POST    /api/proxy/generate/:id/thumbnail   @controllers.ProxiesController.gener
 POST    /api/proxy/generate/:id/:typeStr     @controllers.ProxiesController.generateProxy(id, typeStr)
 POST    /api/proxy/analyse/:id          @controllers.ProxiesController.analyseMetadata(id)
 
-GET     /api/job/all                    @controllers.JobController.getAllJobs(limit:Int ?=100, scanFrom:Option[String])
-GET     /api/job/:jobId                 @controllers.JobController.getJob(jobId)
-GET     /api/job/forFile/:fileId        @controllers.JobController.jobsFor(fileId)
-PUT     /api/job/search                 @controllers.JobController.jobSearch(linit:Int ?=100)
-PUT     /api/job/transcode/:jobId/refresh  @controllers.JobController.refreshTranscodeInfo(jobId)
-PUT     /api/job/rerunproxy/:jobId      @controllers.JobController.rerunProxy(jobId)
+GET     /api/proxyhealth/mostrecent                         @controllers.ProxyHealthController.mostRecentStats
+GET     /api/proxyhealth/problemitems                       @controllers.ProxyHealthController.itemsList(collection:Option[String], pathRegex:Option[String], start:Int ?=0, size:Int ?=100)
+GET     /api/proxyhealth/problemitems/collectionlist        @controllers.ProxyHealthController.collectionsWithProblems
+POST    /api/proxyhealth/triggerproblems/:collectionName    @controllers.ProxyHealthController.triggerProblemItemsFor(collectionName)
+
+
+GET     /api/job/all                            @controllers.JobController.getAllJobs(limit:Int ?=100, scanFrom:Option[String])
+GET     /api/job/:jobId                         @controllers.JobController.getJob(jobId)
+GET     /api/job/forFile/:fileId                @controllers.JobController.jobsFor(fileId)
+PUT     /api/job/search                         @controllers.JobController.jobSearch(linit:Int ?=100)
+PUT     /api/job/transcode/:jobId/refresh       @controllers.JobController.refreshTranscodeInfo(jobId)
+PUT     /api/job/rerunproxy/:jobId              @controllers.JobController.rerunProxy(jobId)
+GET     /api/job/fixproblems/:collectionName    @controllers.JobController.reRunJobsForCollection(collectionName)
 
 GET     /api/browse/collections         @controllers.BrowseCollectionController.getCollections
 GET     /api/browse/:collection         @controllers.BrowseCollectionController.getFolders(collection, prefix:Option[String])

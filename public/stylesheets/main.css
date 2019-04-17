@@ -587,3 +587,16 @@ p.deal-with-long-names {
     width: 282px;
     overflow: hidden;
 }
+
+div.chart-container-wide {
+    float: left;
+    width: 50vw;
+    position: relative;
+    overflow: hidden;
+}
+
+div.chart-container {
+    float: left;
+    width: 31vw;
+    position: relative;
+}

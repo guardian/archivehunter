@@ -26,6 +26,8 @@ object ProxyFrameworkQueue extends GenericSqsActorMessages {
   case class HandleSuccessfulProxy(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
   case class HandleSuccessfulAnalyse(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
 
+  case class UpdateProblemsIndexSuccess(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
+
   case class HandleFailure(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
   case class HandleWarning(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
   case class HandleRunning(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
@@ -85,10 +87,12 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
   private implicit val ddbClient = dynamoClientMgr.getNewAlpakkaDynamoClient(config.getOptional[String]("externalData.awsProfile"))
 
   private implicit val esClient = esClientMgr.getClient()
-  private implicit val indexer = new Indexer(config.get[String]("externalData.indexName"))
+  protected implicit val indexer = new Indexer(config.get[String]("externalData.indexName"))
 
   lazy val defaultRegion = config.getOptional[String]("externalData.awsRegion").getOrElse("eu-west-1")
 
+  protected val problemItemIndexName = config.get[String]("externalData.problemItemsIndex")
+  protected val problemItemIndexer = new ProblemItemIndexer(problemItemIndexName)
 
   /**
     * looks up the ArchiveEntry for the original media associated with the given JobModel
@@ -211,6 +215,52 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
 
   override def receive: Receive = {
     /**
+      * update problem items index to show that an item has been successfully proxied
+      */
+    case UpdateProblemsIndexSuccess(msg, jobDesc, rq, receiptHandle, originalSender)=>
+      logger.info("Updating problems index: ")
+      jobDesc.jobType.toLowerCase() match {
+        case "proxy" =>
+          msg.proxyType match {
+            case Some(proxyType) =>
+              logger.debug(s"Updating problem item for ${proxyType.toString}")
+              problemItemIndexer.getById(jobDesc.sourceId).map(problemItem => {
+                val entry = problemItem.copyExcludingResult(proxyType)
+
+                if(entry.verifyResults.nonEmpty) {
+                  problemItemIndexer.indexSingleItem(entry)
+                } else {
+                  problemItemIndexer.deleteEntry(entry)
+                }
+                ///don't send to originalSender as we are not on the critical path
+                //originalSender ! akka.actor.Status.Success
+
+              }).recover({
+                case err: Throwable =>
+                  logger.warn(s"Could not update problems index for $jobDesc: ", err)
+                  //originalSender ! akka.actor.Status.Failure(err)
+              })
+            case None =>
+              logger.warn(s"Can't update problems index for proxy if there is no proxy type")
+              //originalSender ! akka.actor.Status.Failure(new RuntimeException("Can't update problems index for proxy if there is no proxy type"))
+          }
+        case "thumbnail" =>
+          logger.debug("Updating problem item for thumbnail")
+          problemItemIndexer.getById(jobDesc.sourceId).map(item => {
+            val entry = item.copyExcludingResult(ProxyType.THUMBNAIL)
+            if(entry.verifyResults.nonEmpty) {
+              problemItemIndexer.indexSingleItem(entry)
+            } else {
+              problemItemIndexer.deleteEntry(entry)
+            }
+          })
+        case _=>
+          logger.warn("Can't update problems index for non proxy jobs")
+          //originalSender ! akka.actor.Status.Failure(new RuntimeException("Can't update problems index for non proxy jobs"))
+      }
+
+
+    /**
       * if a proxy job completed successfully, then update the proxy location table with the newly generated proxy
       */
     case HandleSuccessfulProxy(msg, jobDesc, rq, receiptHandle, originalSender)=>
@@ -229,11 +279,37 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
               case "proxy" => ProxyType.VIDEO
             }
         }
+
+        //set up parallel jobs, one to update dynamo, one to update elasticsearch
         val proxyUpdateFuture = thumbnailJobOriginalMedia(jobDesc).flatMap({
           case Left(err) => Future(Left(err))
           case Right(archiveEntry) => updateProxyRef(msg.output.get, archiveEntry, proxyType)
         })
-        proxyUpdateFuture.map({
+
+        val indexUpdateFuture = indexer.getById(jobDesc.sourceId).flatMap(entry=>{
+          val updatedEntry = entry.copy(proxied = true)
+          indexer.indexSingleItem(updatedEntry)
+        }).map({
+          case Failure(err)=>
+            logger.error("Could not update index: ", err)
+            Left(err.toString)
+          case Success(value)=>
+            Right(value)
+        })
+
+        //set up a future to complete when both of the update jobs have run. this marshals a single success/failure flag
+        val overallCompletionFuture = Future.sequence(Seq(proxyUpdateFuture, indexUpdateFuture)).map(results=>{
+          val errors = results.collect({case Left(err)=>err})
+          if(errors.nonEmpty){
+            logger.error(s"Could not update proxy: $errors")
+            Left(errors.mkString(","))
+          } else {
+            results.head
+          }
+        })
+
+        //handle overall success/failure
+        overallCompletionFuture.map({
           case Left(err) =>
             logger.error(s"Could not update proxy: $err")
             val updatedJd = jobDesc.copy(completedAt = Some(ZonedDateTime.now), log = Some(s"Could not update proxy: $err"), jobStatus = JobStatus.ST_ERROR)
@@ -244,6 +320,7 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
                 originalSender ! akka.actor.Status.Failure(dbErr)
             })
           case Right(_) =>
+            ownRef ! UpdateProblemsIndexSuccess(msg, jobDesc, rq, receiptHandle, originalSender)
             ownRef ! HandleGenericSuccess(msg, jobDesc, rq, receiptHandle, originalSender)
         }).recover({
           case err:Throwable=>

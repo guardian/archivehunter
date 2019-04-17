@@ -51,6 +51,7 @@
     <logger name="helpers.LightboxStreamComponents.SaveLightboxEntryFlow" level="DEBUG"/>
     <logger name="com.sksamuel.elastic4s.streams" level="WARN"/>
     <logger name="controllers.SearchController" level="INFO"/>
+    <logger name="controllers.ProxyHealthController" level="INFO"/>
     <logger name="controllers.ScanTargetController" level="INFO"/>
     <logger name="controllers.JobController" level="INFO"/>
     <logger name="controllers.BrowseCollectionController" level="INFO"/>
@@ -81,11 +82,16 @@
     <logger name="helpers.ProxyVerifyFlow" level="INFO"/>
     <logger name="services.JobPurgerActor" level="INFO"/>
     <logger name="services.IngestProxyQueue" level="INFO"/>
+    <logger name="services.ProblemItemRetry" level="INFO"/>
     <logger name="requests.JobSearchRequest" level="INFO"/>
+
+    <logger name="ProblemItemRetry" level="INFO"/>
+    <logger name="helpers.ProblemItemReproxySink" level="INFO"/>
 
     <logger name="helpers.ProxyFramework" level="INFO"/>
     <logger name="services.ProxyFrameworkQueue" level="INFO"/>
 
+    <logger name="models.ChartFacet" level="INFO"/>
     <logger name="com.theguardian.multimedia.archivehunter.cmn_services.ProxyGenerators" level="INFO"/>
     <logger name="com.theguardian.multimedia.archivehunter.common.ProxyLocation$" level="INFO"/>
 

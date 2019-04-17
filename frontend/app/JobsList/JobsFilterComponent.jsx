@@ -86,7 +86,7 @@ class JobsFilterComponent extends React.Component {
             <span className="filter-entry" style={{display: this.props.activeFilters.hasOwnProperty("sourceId") ? "inherit" : "none"}}>
                 <ClickableIcon icon="times" onClick={this.sourceIdRemoved} style={{paddingRight: "0.4em"}}/>
                 <label htmlFor="entry-filter" className="filter-control-label">Specific item:</label>
-                <ItemEntryName id="entry-filter" entryId={this.props.activeFilters.hasOwnProperty("sourceId") ? this.props.activeFilters.sourceId : null}/>
+                <ItemEntryName id="entry-filter" showLink={true} entryId={this.props.activeFilters.hasOwnProperty("sourceId") ? this.props.activeFilters.sourceId : null}/>
             </span>
             <RefreshButton isRunning={this.props.isLoading} clickedCb={this.props.refreshClicked} showText={true} caption={this.props.isLoading ? "Loading..." : "Refresh"}/>
         </div>
