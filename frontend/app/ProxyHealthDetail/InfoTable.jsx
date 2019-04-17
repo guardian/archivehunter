@@ -11,13 +11,6 @@ class InfoTable extends React.Component {
         tableData: PropTypes.array.isRequired
     };
 
-    // static renderResult(props){
-    //     return <span>{props.value.known ? "known" : "missing"}
-    //     {props.value.haveProxy ? "have": "missing"}
-    //     {props.value.wantProxy ? "want" : "dontcare"}
-    //     </span>
-    // }
-
     static renderResult(props){
         return <span>
             <ThreeWayIcon iconName="check" title={props.value.haveProxy ? "Proxy exists" : "Proxy absent"} state={props.value.haveProxy} onColour="green" hide={!props.value.wantProxy}/>

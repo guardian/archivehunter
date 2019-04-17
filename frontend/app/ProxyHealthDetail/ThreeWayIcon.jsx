@@ -2,22 +2,6 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
-/*
-    static renderResult(props){
-        return <span>
-            {InfoTable.threeWayIcon("check", props.value.haveProxy, "green", !props.value.wantProxy)}
-            {InfoTable.threeWayIcon("exclamation", props.value.wantProxy, "orange", false)}
-            {InfoTable.threeWayIcon("unlink", props.value.known, "black", props.value.known)}
-        </span>
-    }
-
-    static threeWayIcon(iconName, state, truecolour, hide){
-        const colour = state ? truecolour : "grey";
-        const display = hide ? "none" : "inline";
-
-        return <FontAwesomeIcon icon={iconName}  size="1.5x" style={{display: display, color: colour, marginLeft: "1em", marginRight: "1em"}}/>
-    }
- */
 class ThreeWayIcon extends React.Component {
     static propTypes = {
         iconName: PropTypes.string.isRequired,  //name of FontAwesome icon to display

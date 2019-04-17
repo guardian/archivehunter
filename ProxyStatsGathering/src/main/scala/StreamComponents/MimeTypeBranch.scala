@@ -10,12 +10,11 @@ import com.theguardian.multimedia.archivehunter.common.ArchiveEntry
   * in practise, a "valid" MIME type means that we can switch on it to determine what proxies should be available.
   * an "invalid" MIME type means that we must fall back to checking the file extension.
   */
-class MimeTypeBranch extends GraphStage[UniformFanOutShape[ArchiveEntry, ArchiveEntry]] {//GraphStage[FanOutShape2[ArchiveEntry, ArchiveEntry, ArchiveEntry]]{
+class MimeTypeBranch extends GraphStage[UniformFanOutShape[ArchiveEntry, ArchiveEntry]] {
   final val in:Inlet[ArchiveEntry] = Inlet.create("MimeTypeBranch.in")
   final val outYes:Outlet[ArchiveEntry] = Outlet.create("MimeTypeBranch.yes")
   final val outNo:Outlet[ArchiveEntry] = Outlet.create("MimeTypeBranch.no")
 
-  //override def shape: FanOutShape2[ArchiveEntry, ArchiveEntry, ArchiveEntry] = FanOutShape.Ports(in,scala.collection.immutable.Seq(outYes,outNo))
   override def shape: UniformFanOutShape[ArchiveEntry, ArchiveEntry] = new UniformFanOutShape[ArchiveEntry, ArchiveEntry](in,Array(outYes,outNo))
 
   override def createLogic(inheritedAttributes: Attributes): GraphStageLogic =

@@ -46,11 +46,6 @@ def find_sbt_dir(starting_path):
 
 
 def build_and_push(host, user, sbtdir):
-    # proc = subprocess.Popen(["sbt", "-Ddocker.host={0}".format(host), "-Ddocker.username={0}".format(user)],
-    #                         stdin=subprocess.PIPE, cwd=sbtdir)
-    #
-    # proc.communicate("""project proxyStatsGathering\ndocker:publish\nexit\n""")
-
     proc = subprocess.Popen(["sbt", "-Ddocker.host={0}".format(host), "-Ddocker.username={0}".format(user), "project proxyStatsGathering", "docker:publish"], cwd=sbtdir)
     proc.wait()
     if proc.returncode!=0:
@@ -121,7 +116,6 @@ def run_task(cluster_id, task_arn, container_name, subnet_list, sg_list, allow_e
 
 def monitor_task(cluster_arn, task_arn): #, log_group_name, log_stream_name):
     client = boto3.client('ecs', region_name=options.region)
-    #viewer = LogViewer(log_group_name, log_stream_name)
     while True:
         try:
             response = client.describe_tasks(cluster=cluster_arn, tasks=[task_arn],)
@@ -141,9 +135,6 @@ def monitor_task(cluster_arn, task_arn): #, log_group_name, log_stream_name):
             logger.info("Task status is {0} (desired status {1})".format(info["lastStatus"], info["desiredStatus"]))
             if start_time:
                 logger.info("Running since {0} ({1})".format(start_time, datetime.now(get_localzone())-start_time))
-
-            # for line in viewer.get_loglines():
-            #     print line
 
             if finish_time:
                 logger.info("Ran from {0} to {1}, total of {2}".format(start_time, finish_time, finish_time-start_time))
