@@ -1071,10 +1071,13 @@ Resources:
           archivehunter soft  nofiles unlimited
           EOF
 
+          declare -x BUILD_NUMBER=$(grep buildNumber /usr/share/archivehunter/conf/version.properties | awk -F= '{print $2}')
           cat > /usr/share/archivehunter/conf/sentry.properties << EOF
           dsn=${SentryDSN}
           public-dsn=${SentryPublicDSN}
           stacktrace.app.packages=auth,controllers,drivers,exceptions,helpers,models,postrun,services,views
+          environment=${Stage}
+          release=${!BUILD_NUMBER}
           EOF
 
           systemctl restart archivehunter
