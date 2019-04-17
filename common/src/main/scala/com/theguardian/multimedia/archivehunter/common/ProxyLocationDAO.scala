@@ -33,9 +33,18 @@ class ProxyLocationDAO @Inject() (config:ArchiveHunterConfiguration) extends Pro
       case None=>None
     })
 
+  /**
+    * Synchronous (non-Akka) version of getProxy, used in streams.
+    * @param fileId
+    * @param proxyType
+    * @param client
+    * @return
+    */
   def getProxySync(fileId:String, proxyType:ProxyType.Value)(implicit client:AmazonDynamoDB) =
     Scanamo.exec(client)(table.get('fileId->fileId and ('proxyType->proxyType.toString)))
 
+  def getAllProxiesFor(fileId:String)(implicit client:DynamoClient) =
+    ScanamoAlpakka.exec(client)(table.query('fileId->fileId))
   /**
     * Look up proxy by proxy ID
     * @param proxyId proxyID to look up
