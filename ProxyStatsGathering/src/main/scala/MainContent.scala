@@ -6,8 +6,8 @@ import com.google.inject.Guice
 import com.theguardian.multimedia.archivehunter.common._
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{ESClientManager, ESClientManagerImpl}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{ProblemItem, ProblemItemCount, ProxyVerifyResult}
-import models.{GroupedResult, ProxyResult}
-
+import models.GroupedResult
+import com.theguardian.multimedia.archivehunter.common.cmn_models.ProxyHealth
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
@@ -103,6 +103,7 @@ trait MainContent extends ProblemItemRequestBuilder with ProblemItemHitReader{
       val preThumbMerge = builder.add(new Merge[ProxyVerifyResult](2, false))
       val thumbProxyRequest = builder.add(new VerifyProxy(ProxyType.THUMBNAIL, injector))
 
+      val convertToProblemItemFilter = builder.add(new ConvertToProblemItemFilter)
       val postVerifyMerge = builder.add(new Merge[ProxyVerifyResult](3, false))
       val proxyResultGroup = builder.add(new ProxyResultGroup)
       val groupCounter = builder.add(new GroupCounter)
@@ -114,10 +115,10 @@ trait MainContent extends ProblemItemRequestBuilder with ProblemItemHitReader{
       val recordProblemSink = builder.add(getProblemElementsSink(problemsIndexName))
 
       src ~> conv ~> isDotFileBranch
-      isDotFileBranch.out(0).map(entry=>GroupedResult(entry.id, entry.proxied,ProxyResult.DotFile)) ~> preCounterMerge
+      isDotFileBranch.out(0).map(entry=>GroupedResult(entry.id, entry.proxied,ProxyHealth.DotFile)) ~> preCounterMerge
       isDotFileBranch.out(1) ~> isGlacierBranch
 
-      isGlacierBranch.out(0).map(entry=>GroupedResult(entry.id, entry.proxied, ProxyResult.GlacierClass)) ~> preCounterMerge
+      isGlacierBranch.out(0).map(entry=>GroupedResult(entry.id, entry.proxied, ProxyHealth.GlacierClass)) ~> preCounterMerge
       isGlacierBranch.out(1) ~> mtb
 
       //"want proxy" branch
@@ -142,16 +143,11 @@ trait MainContent extends ProblemItemRequestBuilder with ProblemItemHitReader{
 
       //once we have proxy results grouped, broadcast the results between a counter branch and a log-to-elastic branch
       postGroupBroadcast.out(0) ~> groupCounter ~> preCounterMerge
-      postGroupBroadcast.out(1).map(resultSeq=>{
-        val location = resultSeq.head.extractLocation
-        val falseentries = resultSeq.filter(_.wantProxy==false)
-        if(falseentries.length==resultSeq.length) println(s"WARNING: $resultSeq wants no proxies")
-        ProblemItem(resultSeq.head.fileId, location._1, location._2, esRecordSays=resultSeq.head.esRecordSays, resultSeq)
-      }) ~> recordProblemSink
+      postGroupBroadcast.out(1) ~> convertToProblemItemFilter ~> recordProblemSink
 
       //"don't want proxy" branch
-      mtwpb.out(3).map(verifyResult=>GroupedResult(verifyResult.fileId, verifyResult.esRecordSays, ProxyResult.NotNeeded)) ~> preCounterMerge
-      ftwpb.out(3).map(verifyResult=>GroupedResult(verifyResult.fileId, verifyResult.esRecordSays, ProxyResult.NotNeeded)) ~> preCounterMerge
+      mtwpb.out(3).map(verifyResult=>GroupedResult(verifyResult.fileId, verifyResult.esRecordSays, ProxyHealth.NotNeeded)) ~> preCounterMerge
+      ftwpb.out(3).map(verifyResult=>GroupedResult(verifyResult.fileId, verifyResult.esRecordSays, ProxyHealth.NotNeeded)) ~> preCounterMerge
 
       //completion
       preCounterMerge ~> counterSink
@@ -161,7 +157,9 @@ trait MainContent extends ProblemItemRequestBuilder with ProblemItemHitReader{
   }
 
   def runProblemItemFix = {
-   val result = getProblemItemSource(getProblemsIndexName).map(_.to[ProblemItem]).log("fix-stream").toMat(new ProblemItemDeleteIfEmpty(getIndexName))(Keep.right).run()
+   val result = getProblemItemSource(getProblemsIndexName)
+     .map(_.to[ProblemItem]).log("fix-stream")
+     .toMat(new ProblemItemDeleteIfEmpty(getProblemsIndexName))(Keep.right).run()
 
     result.onComplete({
       case Success((totalCount, deletedCount))=>

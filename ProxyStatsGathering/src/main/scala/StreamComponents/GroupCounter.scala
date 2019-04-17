@@ -3,7 +3,8 @@ package StreamComponents
 import akka.stream.{Attributes, FlowShape, Inlet, Outlet}
 import akka.stream.stage.{AbstractInHandler, AbstractOutHandler, GraphStage, GraphStageLogic}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.ProxyVerifyResult
-import models.{GroupedResult, ProxyResult}
+import models.GroupedResult
+import com.theguardian.multimedia.archivehunter.common.cmn_models.ProxyHealth
 
 class GroupCounter extends GraphStage[FlowShape[Seq[ProxyVerifyResult], GroupedResult]]{
   final val in:Inlet[Seq[ProxyVerifyResult]] = Inlet.create("GroupCounter.in")
@@ -15,15 +16,15 @@ class GroupCounter extends GraphStage[FlowShape[Seq[ProxyVerifyResult], GroupedR
     def makeDecision(elemts:Seq[ProxyVerifyResult]):GroupedResult = {
       val wanted = elemts.filter(_.wantProxy)
       if(wanted.isEmpty){
-        GroupedResult(elemts.head.fileId, esRecordSays=elemts.head.esRecordSays, result = ProxyResult.NotNeeded)
+        GroupedResult(elemts.head.fileId, esRecordSays=elemts.head.esRecordSays, result = ProxyHealth.NotNeeded)
       } else {
         val have = wanted.filter(_.haveProxy.getOrElse(false))
         if(have.isEmpty){
-          GroupedResult(elemts.head.fileId, esRecordSays=elemts.head.esRecordSays, ProxyResult.Unproxied)
+          GroupedResult(elemts.head.fileId, esRecordSays=elemts.head.esRecordSays, ProxyHealth.Unproxied)
         } else if(have.length==wanted.length){
-          GroupedResult(elemts.head.fileId, esRecordSays=elemts.head.esRecordSays, ProxyResult.Proxied)
+          GroupedResult(elemts.head.fileId, esRecordSays=elemts.head.esRecordSays, ProxyHealth.Proxied)
         } else {
-          GroupedResult(elemts.head.fileId, esRecordSays=elemts.head.esRecordSays, ProxyResult.Partial)
+          GroupedResult(elemts.head.fileId, esRecordSays=elemts.head.esRecordSays, ProxyHealth.Partial)
         }
       }
     }

@@ -467,7 +467,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
       val problemItemFake = ProblemItem("fake-fileid","fakecollection","/path/to/file", esRecordSays = false, verifyResults=Seq(
         ProxyVerifyResult("fake-fileid",ProxyType.VIDEO, true, false, Some(false)),
         ProxyVerifyResult("fake-fileid",ProxyType.THUMBNAIL, true, false, Some(false)),
-      ))
+      ), decision=None)
       val mockedProblemItemIndexer = mock[ProblemItemIndexer]
       mockedProblemItemIndexer.getById(any)(any) returns Future(problemItemFake)
       mockedProblemItemIndexer.indexSingleItem(any,any,any)(any) returns Future(Success("some-id"))
@@ -537,7 +537,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
       val problemItemFake = ProblemItem("fake-fileid","fakecollection","/path/to/file", esRecordSays = false, verifyResults=Seq(
         ProxyVerifyResult("fake-fileid",ProxyType.VIDEO, true, false, Some(false)),
         ProxyVerifyResult("fake-fileid",ProxyType.THUMBNAIL, true, false, Some(false)),
-      ))
+      ), decision=None)
       val mockedProblemItemIndexer = mock[ProblemItemIndexer]
       mockedProblemItemIndexer.getById(any)(any) returns Future(problemItemFake)
       mockedProblemItemIndexer.indexSingleItem(any,any,any)(any) returns Future(Success("some-id"))

@@ -23,7 +23,8 @@ import akka.stream.scaladsl._
   * @param indexName
   */
 
-class ProblemItemIndexer(indexName:String) extends ZonedDateTimeEncoder with StorageClassEncoder with ProblemItemHitReader with ProblemItemCountHitReader with ProxyTypeEncoder {
+class ProblemItemIndexer(indexName:String) extends ZonedDateTimeEncoder with StorageClassEncoder with ProblemItemHitReader
+  with ProblemItemCountHitReader with ProxyTypeEncoder with ProxyHealthEncoder {
   import com.sksamuel.elastic4s.http.ElasticDsl._
   import com.sksamuel.elastic4s.streams.ReactiveElastic._
   import com.sksamuel.elastic4s.circe._

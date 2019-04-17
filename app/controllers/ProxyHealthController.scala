@@ -3,7 +3,7 @@ package controllers
 import akka.actor.ActorRef
 import com.theguardian.multimedia.archivehunter.common.{ProblemItemHitReader, ProblemItemIndexer, ProxyTypeEncoder}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.ESClientManager
-import com.theguardian.multimedia.archivehunter.common.cmn_models.{JobModel, JobModelDAO, ProblemItem}
+import com.theguardian.multimedia.archivehunter.common.cmn_models.{JobModel, JobModelDAO, ProblemItem, ProxyHealthEncoder}
 import helpers.InjectableRefresher
 import javax.inject.{Inject, Named}
 import org.slf4j.MDC
@@ -34,7 +34,7 @@ class ProxyHealthController @Inject()(override val config:Configuration,
                                      override val wsClient:WSClient,
                                      override val refresher:InjectableRefresher,
                                       @Named("problemItemRetry") problemItemRetry:ActorRef)
-  extends AbstractController(controllerComponents) with Circe with PanDomainAuthActions with ProblemItemHitReader with ProxyTypeEncoder
+  extends AbstractController(controllerComponents) with Circe with PanDomainAuthActions with ProblemItemHitReader with ProxyTypeEncoder with ProxyHealthEncoder
 {
   import com.sksamuel.elastic4s.http.ElasticDsl._
   import com.sksamuel.elastic4s.circe._

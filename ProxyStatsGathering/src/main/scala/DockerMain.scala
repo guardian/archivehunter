@@ -1,10 +1,5 @@
-import StreamComponents._
-import akka.{Done, NotUsed}
-import akka.stream.{ClosedShape, Graph, Outlet}
-import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge, RunnableGraph, Sink}
-import com.theguardian.multimedia.archivehunter.common.cmn_models.{ProblemItem, ProxyVerifyResult}
-import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ProblemItemIndexer, ProxyType}
-import models.{GroupedResult, ProxyResult}
+import akka.stream.scaladsl.RunnableGraph
+import com.theguardian.multimedia.archivehunter.common.ProblemItemIndexer
 
 import scala.concurrent.{Await, Future}
 import scala.concurrent.ExecutionContext.Implicits.global

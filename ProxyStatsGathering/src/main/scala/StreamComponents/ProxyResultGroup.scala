@@ -3,7 +3,6 @@ package StreamComponents
 import akka.stream._
 import akka.stream.stage.{AbstractInHandler, AbstractOutHandler, GraphStage, GraphStageLogic}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.ProxyVerifyResult
-import models.{GroupedResult, ProxyResult}
 
 class ProxyResultGroup extends GraphStage[FlowShape[ProxyVerifyResult, Seq[ProxyVerifyResult]]] {
   final val in:Inlet[ProxyVerifyResult] = Inlet.create("ProxyResultMerge.in")

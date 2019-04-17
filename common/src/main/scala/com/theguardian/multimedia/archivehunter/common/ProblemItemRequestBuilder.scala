@@ -1,12 +1,12 @@
 package com.theguardian.multimedia.archivehunter.common
 
 import com.sksamuel.elastic4s.streams.RequestBuilder
-import com.theguardian.multimedia.archivehunter.common.cmn_models.ProblemItem
+import com.theguardian.multimedia.archivehunter.common.cmn_models.{ProblemItem, ProxyHealthEncoder}
 
 /**
   * mix in this class to be able to use the streaming API in Elastic4s
   */
-trait ProblemItemRequestBuilder extends ProxyTypeEncoder {
+trait ProblemItemRequestBuilder extends ProxyTypeEncoder with ProxyHealthEncoder {
   val problemsIndexName:String  //anyone extending this class must set the index name
   import com.sksamuel.elastic4s.circe._
   import com.sksamuel.elastic4s.http.ElasticDsl._

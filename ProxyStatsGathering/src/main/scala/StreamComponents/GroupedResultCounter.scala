@@ -5,7 +5,8 @@ import java.time.ZonedDateTime
 import akka.stream.{Attributes, Inlet, SinkShape}
 import akka.stream.stage.{AbstractInHandler, GraphStageLogic, GraphStageWithMaterializedValue}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.ProblemItemCount
-import models.{GroupedResult, ProxyResult}
+import models.GroupedResult
+import com.theguardian.multimedia.archivehunter.common.cmn_models.ProxyHealth
 
 import scala.annotation.switch
 import scala.concurrent.{Future, Promise}
@@ -29,12 +30,12 @@ class GroupedResultCounter extends GraphStageWithMaterializedValue[SinkShape[Gro
           //println(s"counter is $n: got $elem")
           (elem.result: @switch) match
           {
-            case ProxyResult.NotNeeded=> ctr.copy(notNeededCount = ctr.notNeededCount + 1, grandTotal = n)
-            case ProxyResult.Partial=> ctr = ctr.copy(partialCount = ctr.partialCount + 1, grandTotal = n)
-            case ProxyResult.Proxied=> ctr = ctr.copy(proxiedCount = ctr.proxiedCount + 1, grandTotal = n)
-            case ProxyResult.Unproxied=> ctr = ctr.copy(unProxiedCount = ctr.unProxiedCount + 1, grandTotal = n)
-            case ProxyResult.DotFile=> ctr = ctr.copy(dotFile = ctr.dotFile + 1, grandTotal = n)
-            case ProxyResult.GlacierClass=> ctr = ctr.copy(glacier = ctr.glacier + 1, grandTotal = n)
+            case ProxyHealth.NotNeeded=> ctr.copy(notNeededCount = ctr.notNeededCount + 1, grandTotal = n)
+            case ProxyHealth.Partial=> ctr = ctr.copy(partialCount = ctr.partialCount + 1, grandTotal = n)
+            case ProxyHealth.Proxied=> ctr = ctr.copy(proxiedCount = ctr.proxiedCount + 1, grandTotal = n)
+            case ProxyHealth.Unproxied=> ctr = ctr.copy(unProxiedCount = ctr.unProxiedCount + 1, grandTotal = n)
+            case ProxyHealth.DotFile=> ctr = ctr.copy(dotFile = ctr.dotFile + 1, grandTotal = n)
+            case ProxyHealth.GlacierClass=> ctr = ctr.copy(glacier = ctr.glacier + 1, grandTotal = n)
           }
           n+=1
           println(s"Running total: $ctr")

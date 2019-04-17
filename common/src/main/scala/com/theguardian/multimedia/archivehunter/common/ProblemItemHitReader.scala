@@ -4,7 +4,7 @@ import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 
 import com.sksamuel.elastic4s.{Hit, HitReader}
-import com.theguardian.multimedia.archivehunter.common.cmn_models.{MediaMetadataMapConverters, ProblemItem, ProxyVerifyResult}
+import com.theguardian.multimedia.archivehunter.common.cmn_models.{MediaMetadataMapConverters, ProblemItem, ProxyHealth, ProxyVerifyResult}
 import org.apache.logging.log4j.LogManager
 
 trait ProblemItemHitReader extends MediaMetadataMapConverters {
@@ -31,7 +31,8 @@ trait ProblemItemHitReader extends MediaMetadataMapConverters {
             Option(hit.sourceField("collection")).getOrElse("unknown").asInstanceOf[String],
             hit.sourceField("filePath").asInstanceOf[String],
             hit.sourceField("esRecordSays").asInstanceOf[Boolean],
-            hit.sourceField("verifyResults").asInstanceOf[Seq[Map[String,Any]]].map(entry=>mapToResult(entry))
+            hit.sourceField("verifyResults").asInstanceOf[Seq[Map[String,Any]]].map(entry=>mapToResult(entry)),
+            hit.sourceAsMap.get("decision").map(value=>ProxyHealth.withName(value.asInstanceOf[String]))
           )
         )
 
