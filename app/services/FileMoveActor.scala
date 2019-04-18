@@ -53,7 +53,8 @@ class FileMoveActor @Inject() (config:Configuration,
   val fileMoveChain:Seq[ActorRef] = Seq(
     system.actorOf(Props(new VerifySource(indexer, proxyLocationDAO))),
     system.actorOf(Props(new CopyMainFile(s3ClientManager))),
-    system.actorOf(Props(new CopyProxyFiles(s3ClientManager)))
+    system.actorOf(Props(new CopyProxyFiles(s3ClientManager))),
+
   )
 
   override def receive:Receive = {

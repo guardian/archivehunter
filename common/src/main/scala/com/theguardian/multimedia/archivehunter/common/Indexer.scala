@@ -102,4 +102,8 @@ class Indexer(indexName:String) extends ZonedDateTimeEncoder with StorageClassEn
           Left(UnexpectedReturnCode(docId, other))
       }
   })
+
+  def deleteById(docId:String)(implicit client:HttpClient) = client.execute {
+    delete(docId) from indexName
+  }
 }
