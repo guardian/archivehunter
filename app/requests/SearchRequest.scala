@@ -13,7 +13,8 @@ case class SearchRequest (q:Option[String],
                           collection:Option[String],
                           hideDotFiles:Option[Boolean],
                           sortBy:Option[String],
-                          sortOrder:Option[String]) {
+                          sortOrder:Option[String],
+                          reasonGiven:Option[String]) {
   /**
     * converts this SearchRequest object to a sequence of QueryDefinition, suitable for passing to Elastic4s
     * @return a Seq[QueryDefinition] representing the search parameters of this request.

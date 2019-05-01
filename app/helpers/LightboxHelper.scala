@@ -12,7 +12,7 @@ import com.sksamuel.elastic4s.searches.queries.QueryDefinition
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer, LightboxIndex, StorageClass}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{LightboxBulkEntry, LightboxEntry, LightboxEntryDAO, RestoreStatus}
 import helpers.LightboxStreamComponents._
-import models.UserProfile
+import models.{AuditBulk, AuditEntryClass, AuditEntryDAO, UserProfile}
 import play.api.Logger
 import requests.SearchRequest
 import responses.{GenericErrorResponse, ObjectListResponse, QuotaExceededResponse}
@@ -147,13 +147,13 @@ object LightboxHelper {
     * @param mat implicitly provided ActorMaterializer
     * @return a Future, with the LightboxBulkEntry updated to show the number of items it now has associated
     */
-  def addToBulkFromSearch(indexName:String, userProfile:UserProfile, userAvatarUrl:Option[String], rq:SearchRequest, bulk:LightboxBulkEntry)
-                         (implicit lightboxEntryDAO: LightboxEntryDAO, system:ActorSystem, esClient:HttpClient, indexer:Indexer, mat:Materializer, ec:ExecutionContext, injector:Injector) = {
+  def addToBulkFromSearch(indexName:String, userProfile:UserProfile, userAvatarUrl:Option[String], rq:SearchRequest, bulk:LightboxBulkEntry, auditBulk: AuditBulk)
+                         (implicit lightboxEntryDAO: LightboxEntryDAO, system:ActorSystem, esClient:HttpClient,
+                          indexer:Indexer, mat:Materializer, ec:ExecutionContext, injector:Injector, auditEntryDAO:AuditEntryDAO) = {
     val archiveEntryConverter = new SearchHitToArchiveEntryFlow
 
     val dynamoSaveFlow = new SaveLightboxEntryFlow(bulk.id, userProfile)
     val maybeRestoreSink = injector.getInstance(classOf[InitiateRestoreSink])
-
     val esSaveSink = new UpdateLightboxIndexInfoSink(bulk.id, userProfile, userAvatarUrl)
 
     logger.info(s"Starting add of $rq to bulk lightbox ${bulk.id}" )
@@ -163,9 +163,13 @@ object LightboxHelper {
 
       val src = b.add(getElasticSource(indexName, boolQuery().must(rq.toSearchParams)))
       val entryConverter = b.add(archiveEntryConverter)
-      val bcast = b.add(new Broadcast[ArchiveEntry](2, eagerCancel = true))
-      src ~> entryConverter ~> bcast ~> actualDynamoFlow ~> actualRestoreSink
+      val auditSink = b.add(auditEntryDAO.addBulkFlow(userProfile.userEmail,AuditEntryClass.Restore,Some(auditBulk.bulkId.toString)))
+      val dummySink = b.add(Sink.ignore)
+      val bcast = b.add(new Broadcast[ArchiveEntry](3, eagerCancel = true))
+
+      src ~> entryConverter ~> bcast ~> actualDynamoFlow ~> dummySink
       bcast ~> actualESSink
+      bcast ~> auditSink
 
       ClosedShape
     })

@@ -16,7 +16,7 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
 /**
-  * an akka Flow that creates LightboxEntry records for each ArchiveEntry that it receives, and outputs the saved LightboxEntry and incoming ARchiveEntry as a tuple
+  * an akka Flow that creates LightboxEntry records for each ArchiveEntry that it receives, and outputs the saved LightboxEntry and incoming ArchiveEntry as a tuple
   * @param bulkId ID of the bulk entry to add to
   * @param userProfile UserProfile object for the user doing the adding
   * @param lightboxEntryDAO implicitly provided Data Access Object for lightboxEntry

@@ -98,6 +98,9 @@
 
     <logger name="helpers.LightboxHelper$" level="INFO"/>
     <logger name="helpers.LightboxHelper" level="INFO"/>
+
+    <logger name="setupstream" level="DEBUG"/>
+
     <root level="WARN">
         <appender-ref ref="STDOUT" />
         <appender-ref ref="ASYNCFILE"/>
