@@ -13,7 +13,7 @@ import com.sksamuel.elastic4s.circe._
 import com.sksamuel.elastic4s.http.search.Aggregations
 import com.sksamuel.elastic4s.searches.sort.SortOrder
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ArchiveEntryHitReader, StorageClassEncoder, ZonedDateTimeEncoder}
-import helpers.InjectableRefresher
+import helpers.{InjectableRefresher, LightboxHelper}
 import models.{ChartFacet, ChartFacetData}
 import play.api.libs.circe.Circe
 import requests.SearchRequest
@@ -131,17 +131,8 @@ with PanDomainAuthActions {
   }
 
   def lightboxSearch(startAt:Int, pageSize:Int, bulkId:Option[String]) = APIAuthAction.async {request=>
-    val queryTerms = Seq(
-      Some(matchQuery("lightboxEntries.owner", request.user.email)),
-      bulkId.map(actualBulkId=>matchQuery("lightboxEntries.memberOfBulk", actualBulkId))
-    ).collect({case Some(term)=>term})
-
     esClient.execute {
-      search(indexName) query {
-        nestedQuery(path="lightboxEntries", query = {
-          boolQuery().must(queryTerms)
-        })
-      } from startAt size pageSize sortBy fieldSort("path.keyword")
+      LightboxHelper.lightboxSearch(indexName, bulkId, request.user.email) from startAt size pageSize sortBy fieldSort("path.keyword")
     }.map({
       case Left(err)=>
         logger.error(s"Could not perform lightbox query: $err")

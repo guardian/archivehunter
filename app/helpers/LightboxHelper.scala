@@ -6,7 +6,7 @@ import akka.actor.{ActorRefFactory, ActorSystem}
 import akka.stream.{ClosedShape, Materializer}
 import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Keep, Merge, RunnableGraph, Sink, Source}
 import com.google.inject.Injector
-import com.sksamuel.elastic4s.http.HttpClient
+import com.sksamuel.elastic4s.http.{HttpClient, RequestFailure}
 import com.sksamuel.elastic4s.searches.SearchDefinition
 import com.sksamuel.elastic4s.searches.queries.QueryDefinition
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer, LightboxIndex, StorageClass}
@@ -179,6 +179,49 @@ object LightboxHelper {
       }
 
       bulk.copy(availCount = bulk.availCount + addedCounts.head)
+    })
+  }
+
+  /**
+    * return an ES query definition for the bulk id - either field not existing for "loose" or matching the id
+    * @param actualBulkId
+    * @return
+    */
+  protected def lightboxQuery(actualBulkId:String) =
+    if(actualBulkId=="loose"){
+      boolQuery().withNot(existsQuery("lightboxEntries.memberOfBulk"))
+    } else {
+      matchQuery("lightboxEntries.memberOfBulk", actualBulkId)
+    }
+
+
+  def lightboxSearch(indexName:String, bulkId:Option[String], userEmail:String) =  {
+    val queryTerms = Seq(
+      Some(matchQuery("lightboxEntries.owner", userEmail)),
+      bulkId.map(actualBulkId=>lightboxQuery(actualBulkId))
+    ).collect({case Some(term)=>term})
+
+    search(indexName) query {
+      nestedQuery(path="lightboxEntries", query = {
+        boolQuery().must(queryTerms)
+      })
+    }
+  }
+
+  /**
+    * returns a future that will contain the number of items that aren't associated with a given bulk entry
+    * @param indexName
+    * @param esClient
+    * @return
+    */
+  def getLooseCountForUser(indexName:String, userEmail:String)(implicit esClient:HttpClient, ec:ExecutionContext):Future[Either[RequestFailure, Int]] = {
+    esClient.execute {
+      lightboxSearch(indexName, Some("loose"), userEmail) limit(0)
+    }.map({
+      case Left(err)=>Left(err)
+      case Right(success)=>
+        Right(success.result.hits.total.toInt)
+//        Right(success.result.aggregationsAsMap("count").asInstanceOf[Map[String, Any]].getOrElse("value",0).asInstanceOf[Int])
     })
   }
 

@@ -265,13 +265,21 @@ class LightboxController @Inject() (override val config:Configuration,
         logger.error(s"Session is corrupted: ${err.toString}")
         Future(InternalServerError(GenericErrorResponse("session_error","session is corrupted, log out and log in again").asJson))
       case Some(Right(profile))=>
-        lightboxBulkEntryDAO.entriesForUser(profile.userEmail).map(results=>{
+        lightboxBulkEntryDAO.entriesForUser(profile.userEmail).flatMap(results=>{
           val failures = results.collect({ case Left(err)=>err })
           if(failures.nonEmpty){
-            InternalServerError(GenericErrorResponse("error",failures.map(_.toString).mkString(",")).asJson)
+            Future(InternalServerError(GenericErrorResponse("error",failures.map(_.toString).mkString(",")).asJson))
           } else {
-            val successes = results.collect({ case Right(value)=>value })
-            Ok(ObjectListResponse("ok","lightboxBulk",successes,successes.length).asJson)
+            LightboxHelper.getLooseCountForUser(indexName, request.user.email).map({
+              case Left(err)=>
+                logger.error(s"Could not look up count for loose lightbox items: $err")
+                val successes = results.collect({ case Right(value)=>value }) ++ List(LightboxBulkEntry("loose","Loose items", profile.userEmail, ZonedDateTime.now(),0,0,0))
+                Ok(ObjectListResponse("ok","lightboxBulk",successes,successes.length).asJson)
+              case Right(count)=>
+                val successes = results.collect({ case Right(value)=>value }) ++ List(LightboxBulkEntry("loose","Loose items", profile.userEmail, ZonedDateTime.now(),0,count,0))
+                Ok(ObjectListResponse("ok","lightboxBulk",successes,successes.length).asJson)
+            })
+
           }
         })
     }
