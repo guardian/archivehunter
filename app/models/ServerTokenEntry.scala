@@ -2,7 +2,7 @@ package models
 
 import java.time.{Instant, ZonedDateTime}
 
-case class ServerTokenEntry (value:String, createdAt:ZonedDateTime, expiry:Option[ZonedDateTime], uses:Int, expired:Boolean, associatedId:Option[String]) {
+case class ServerTokenEntry (value:String, createdAt:ZonedDateTime, createdForUser:Option[String], expiry:Option[ZonedDateTime], uses:Int, expired:Boolean, associatedId:Option[String]) {
   /**
     * return an updated version of the token with the expired flag set if expiry time is passed. If expiry time is not passed same object
     * is returned
@@ -32,7 +32,7 @@ case class ServerTokenEntry (value:String, createdAt:ZonedDateTime, expiry:Optio
   }
 }
 
-object ServerTokenEntry extends ((String, ZonedDateTime, Option[ZonedDateTime], Int, Boolean,Option[String])=>ServerTokenEntry) {
+object ServerTokenEntry extends ((String, ZonedDateTime, Option[String], Option[ZonedDateTime], Int, Boolean,Option[String])=>ServerTokenEntry) {
   def randomStringFromCharList(length: Int, chars: Seq[Char]): String = {
     val sb = new StringBuilder
     for (i <- 1 to length) {
@@ -52,9 +52,9 @@ object ServerTokenEntry extends ((String, ZonedDateTime, Option[ZonedDateTime], 
     * @param duration how long this token should be valid for
     * @return a ServerTokenEntry (not saved to db)
     */
-  def create(associatedId:Option[String]=None, duration:Int=60):ServerTokenEntry = {
+  def create(associatedId:Option[String]=None, duration:Int=60, forUser:Option[String]):ServerTokenEntry = {
     val expiry:ZonedDateTime = ZonedDateTime.now().plusSeconds(duration.toLong)
 
-    ServerTokenEntry(randomAlphaNumericString(36),ZonedDateTime.now(),Some(expiry),0,false, associatedId)
+    ServerTokenEntry(randomAlphaNumericString(36),ZonedDateTime.now(),forUser, Some(expiry),0,false, associatedId)
   }
 }

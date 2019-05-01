@@ -19,7 +19,7 @@ import io.circe.syntax._
 import com.sksamuel.elastic4s.circe._
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ArchiveEntryHitReader, Indexer}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{ESClientManager, S3ClientManager}
-import helpers.SearchHitToArchiveEntryFlow
+import helpers.{LightboxHelper, SearchHitToArchiveEntryFlow}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -51,6 +51,7 @@ class BulkDownloadsController @Inject()(config:Configuration,serverTokenDAO: Ser
   private def errorResponse(updatedToken:ServerTokenEntry) = serverTokenDAO
     .put(updatedToken)
     .map(saveResult=>{
+      logger.error("generic error response for token")
       Forbidden(GenericErrorResponse("forbidden","invalid or expired token").asJson)
     }).recover({
     case err:Throwable=>
@@ -65,11 +66,7 @@ class BulkDownloadsController @Inject()(config:Configuration,serverTokenDAO: Ser
     * @return a Future, containing a sequence of ArchiveEntryDownloadSynopsis
     */
   protected def entriesForBulk(bulkEntry:LightboxBulkEntry) = {
-    val query = search(indexName) query {
-          nestedQuery("lightboxEntries", {
-            matchQuery("lightboxEntries.memberOfBulk", bulkEntry.id)
-          })
-        } sortBy fieldSort("path.keyword") scroll "5m"
+    val query = LightboxHelper.lightboxSearch(indexName,Some(bulkEntry.id), bulkEntry.userEmail) sortBy fieldSort("path.keyword") scroll "5m"
 
     val source = Source.fromPublisher(esClient.publisher(query))
     val hitConverter = new SearchHitToArchiveEntryFlow()
@@ -79,6 +76,26 @@ class BulkDownloadsController @Inject()(config:Configuration,serverTokenDAO: Ser
     source.via(hitConverter).map(entry=>ArchiveEntryDownloadSynopsis.fromArchiveEntry(entry)).toMat(sink)(Keep.right).run()
   }
 
+  protected def saveTokenAndGetDownload(updatedToken:ServerTokenEntry, bulkEntry: LightboxBulkEntry) = serverTokenDAO
+    .put(updatedToken)
+    .flatMap(saveResult=>{
+      entriesForBulk(bulkEntry).flatMap(results=> {
+        val retrievalToken = ServerTokenEntry.create(duration = tokenLongDuration, forUser = updatedToken.createdForUser) //create a 2 hour token to cover the download.
+        serverTokenDAO.put(retrievalToken).map({
+          case None =>
+            Ok(BulkDownloadInitiateResponse("ok", bulkEntry, retrievalToken.value, results).asJson)
+          case Some(Right(_)) =>
+            Ok(BulkDownloadInitiateResponse("ok", bulkEntry, retrievalToken.value, results).asJson)
+          case Some(Left(err)) =>
+            logger.error(s"Could not save retrieval token: $err")
+            InternalServerError(GenericErrorResponse("db_error", s"Could not save retrieval token: $err").asJson)
+        })
+      }).recoverWith({
+        case err:Throwable=>
+          logger.error(s"Could not search index for bulk entries: $err")
+          Future(Forbidden(GenericErrorResponse("forbidden", "invalid or expired token").asJson))
+      })
+    })
   /**
     * take a one-time code generated in LightboxController, validate and expire it, then return the information of the
     * associated LightboxBulkEntry
@@ -88,6 +105,7 @@ class BulkDownloadsController @Inject()(config:Configuration,serverTokenDAO: Ser
   def initiateWithOnetimeCode(codeValue:String) = Action.async {
     serverTokenDAO.get(codeValue).flatMap({
       case None=>
+        logger.error(s"No token exists for $codeValue")
         Future(Forbidden(GenericErrorResponse("forbidden", "invalid or expired token").asJson))
       case Some(Left(err))=>
         logger.error(s"Could not verify one-time token: ${err.toString}")
@@ -95,6 +113,7 @@ class BulkDownloadsController @Inject()(config:Configuration,serverTokenDAO: Ser
       case Some(Right(token))=>
         val updatedToken = token.updateCheckExpired(maxUses=Some(1)).copy(uses = token.uses+1)
         if(updatedToken.expired){
+          logger.error(s"Token ${updatedToken.value} is expired, denying access")
           errorResponse(updatedToken)
         } else {
           token.associatedId match {
@@ -102,31 +121,17 @@ class BulkDownloadsController @Inject()(config:Configuration,serverTokenDAO: Ser
               logger.error(s"Token ${token.value} has no bulk associated with it!")
               errorResponse(updatedToken)
             case Some(associatedId)=>
-              lightboxBulkEntryDAO.entryForId(UUID.fromString(associatedId)).flatMap({
-                case Some(Left(err))=>errorResponse(updatedToken)
-                case None=>errorResponse(updatedToken)
-                case Some(Right(bulkEntry))=>
-                  serverTokenDAO
-                    .put(updatedToken)
-                    .flatMap(saveResult=>{
-                      entriesForBulk(bulkEntry).flatMap(results=> {
-                        val retrievalToken = ServerTokenEntry.create(duration = tokenLongDuration) //create a 2 hour token to cover the download.
-                        serverTokenDAO.put(retrievalToken).map({
-                          case None =>
-                            Ok(BulkDownloadInitiateResponse("ok", bulkEntry, retrievalToken.value, results).asJson)
-                          case Some(Right(_)) =>
-                            Ok(BulkDownloadInitiateResponse("ok", bulkEntry, retrievalToken.value, results).asJson)
-                          case Some(Left(err)) =>
-                            logger.error(s"Could not save retrieval token: $err")
-                            InternalServerError(GenericErrorResponse("db_error", s"Could not save retrieval token: $err").asJson)
-                        })
-                      }).recoverWith({
-                        case err:Throwable=>
-                          logger.error(s"Could not search index for bulk entries: $err")
-                          Future(Forbidden(GenericErrorResponse("forbidden", "invalid or expired token").asJson))
-                      })
-                    })
-              })
+              if(associatedId=="loose"){
+                val looseBulkEntry = LightboxBulkEntry.forLoose(updatedToken.createdForUser.getOrElse("unknown"),-1)
+                saveTokenAndGetDownload(updatedToken, looseBulkEntry)
+              } else {
+                lightboxBulkEntryDAO.entryForId(UUID.fromString(associatedId)).flatMap({
+                  case Some(Left(err)) => errorResponse(updatedToken)
+                  case None => errorResponse(updatedToken)
+                  case Some(Right(bulkEntry)) =>
+                    saveTokenAndGetDownload(updatedToken, bulkEntry)
+                })
+              }
           }
         }
     })

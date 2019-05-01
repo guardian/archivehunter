@@ -273,10 +273,10 @@ class LightboxController @Inject() (override val config:Configuration,
             LightboxHelper.getLooseCountForUser(indexName, request.user.email).map({
               case Left(err)=>
                 logger.error(s"Could not look up count for loose lightbox items: $err")
-                val successes = results.collect({ case Right(value)=>value }) ++ List(LightboxBulkEntry("loose","Loose items", profile.userEmail, ZonedDateTime.now(),0,0,0))
+                val successes = results.collect({ case Right(value)=>value }) ++ List(LightboxBulkEntry.forLoose(profile.userEmail, 0))
                 Ok(ObjectListResponse("ok","lightboxBulk",successes,successes.length).asJson)
               case Right(count)=>
-                val successes = results.collect({ case Right(value)=>value }) ++ List(LightboxBulkEntry("loose","Loose items", profile.userEmail, ZonedDateTime.now(),0,count,0))
+                val successes = results.collect({ case Right(value)=>value }) ++ List(LightboxBulkEntry.forLoose(profile.userEmail, count))
                 Ok(ObjectListResponse("ok","lightboxBulk",successes,successes.length).asJson)
             })
 
@@ -342,6 +342,19 @@ class LightboxController @Inject() (override val config:Configuration,
     )
   }
 
+  private def makeDownloadToken(entryId:String, userEmail:String) = {
+    val token = ServerTokenEntry.create(associatedId = Some(entryId),duration=tokenShortDuration, forUser = Some(userEmail))
+    serverTokenDAO.put(token).map({
+      case None =>
+        Ok(ObjectCreatedResponse("ok", "link", s"archivehunter:bulkdownload:${token.value}").asJson)
+      case Some(Right(_)) =>
+        Ok(ObjectCreatedResponse("ok", "link", s"archivehunter:bulkdownload:${token.value}").asJson)
+      case Some(Left(err)) =>
+        logger.error(s"Could not save token to database: $err")
+        InternalServerError(GenericErrorResponse("db_error", err.toString).asJson)
+    })
+  }
+
   def bulkDownloadInApp(entryId:String) = APIAuthAction.async { request=>
     implicit val lightboxEntryDAOImpl = lightboxEntryDAO
     userProfileFromSession(request.session) match {
@@ -350,25 +363,20 @@ class LightboxController @Inject() (override val config:Configuration,
         logger.error(s"Session is corrupted: ${err.toString}")
         Future(InternalServerError(GenericErrorResponse("session_error","session is corrupted, log out and log in again").asJson))
       case Some(Right(profile))=>
-        lightboxBulkEntryDAO.entryForId(UUID.fromString(entryId)).flatMap({
-          case None=>
-            Future(NotFound(GenericErrorResponse("not_found","No bulk with that ID is present").asJson))
-          case Some(Right(entry))=>
-            //create a token that is valid for 10 seconds
-            val token = ServerTokenEntry.create(associatedId = Some(entryId),duration=tokenShortDuration)
-            serverTokenDAO.put(token).map({
-              case None=>
-                Ok(ObjectCreatedResponse("ok","link",s"archivehunter:bulkdownload:${token.value}").asJson)
-              case Some(Right(_))=>
-                Ok(ObjectCreatedResponse("ok","link",s"archivehunter:bulkdownload:${token.value}").asJson)
-              case Some(Left(err))=>
-                logger.error(s"Could not save token to database: $err")
-                InternalServerError(GenericErrorResponse("db_error", err.toString).asJson)
-            })
-          case Some(Left(err))=>
-            logger.error(s"Could not look up bulk entry in dynamo: ${err.toString}")
-            Future(InternalServerError(GenericErrorResponse("db_error",err.toString).asJson))
-        })
+        if(entryId=="loose"){
+          makeDownloadToken(entryId, request.user.email)
+        } else {
+          lightboxBulkEntryDAO.entryForId(UUID.fromString(entryId)).flatMap({
+            case None =>
+              Future(NotFound(GenericErrorResponse("not_found", "No bulk with that ID is present").asJson))
+            case Some(Right(_)) =>
+              //create a token that is valid for 10 seconds
+              makeDownloadToken(entryId, request.user.email)
+            case Some(Left(err)) =>
+              logger.error(s"Could not look up bulk entry in dynamo: ${err.toString}")
+              Future(InternalServerError(GenericErrorResponse("db_error", err.toString).asJson))
+          })
+        }
     }
   }
 }
