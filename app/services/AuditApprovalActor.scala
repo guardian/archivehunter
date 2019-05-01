@@ -27,6 +27,6 @@ class AuditApprovalActor @Inject() (auditEntryDAO: AuditEntryDAO, auditBulkDAO: 
     case AutomatedApprovalCheck(auditBulk:AuditBulk)=>
       val originalSender = sender()
 
-      auditEntryDAO.totalSizeForBulk(auditBulk.bulkId)
+      //auditEntryDAO.totalSizeForBulk(auditBulk.bulkId)
   }
 }

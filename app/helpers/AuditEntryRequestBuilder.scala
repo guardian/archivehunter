@@ -13,6 +13,6 @@ trait AuditEntryRequestBuilder extends ZonedDateTimeEncoder with ApprovalStatusE
   import com.sksamuel.elastic4s.circe._
 
   implicit val auditEntryRequestBuilder = new RequestBuilder[AuditEntry] {
-    override def request(t: AuditEntry): BulkCompatibleDefinition = index(indexName,"auditEntry") doc(t)
+    override def request(t: AuditEntry): BulkCompatibleDefinition = index(indexName,"auditentry") doc(t)
   }
 }

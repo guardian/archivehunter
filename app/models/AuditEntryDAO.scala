@@ -7,6 +7,7 @@ import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.stream.{ActorMaterializer, Inlet, Materializer, SinkShape}
 import akka.stream.scaladsl.{Flow, GraphDSL, RunnableGraph, Sink, Source}
+import com.sksamuel.elastic4s.RefreshPolicy
 import com.sksamuel.elastic4s.bulk.BulkCompatibleDefinition
 import com.sksamuel.elastic4s.http.RequestFailure
 import com.sksamuel.elastic4s.http.search.aggs.SumAggregationBuilder
@@ -28,7 +29,7 @@ class AuditEntryDAO @Inject() (config:Configuration, esClientManager: ESClientMa
   import com.sksamuel.elastic4s.streams.ReactiveElastic._
 
   private val logger=Logger(getClass)
-  val indexName = config.getOptional[String]("externalData.indexName").getOrElse("archivehunter")
+  val indexName = config.get[String]("externalData.auditIndexName")
 
   private implicit val esClient = esClientManager.getClient()
 
@@ -77,13 +78,16 @@ class AuditEntryDAO @Inject() (config:Configuration, esClientManager: ESClientMa
     * @param forBulk bulk ID to count for
     * @return
     */
-  def totalSizeForBulk(forBulk:UUID) = {
+  def totalSizeForBulk(forBulk:UUID, auditEntryClass:AuditEntryClass.Value) = {
+    println(s"totalSizeForBulk: index name is $indexName. Bulk ID is ${forBulk.toString}")
     esClient.execute {
-      search(s"$indexName/auditentry") query matchQuery("forBulk.keyword", forBulk.toString) aggregations valueCountAgg("totalSize","fileSize")
+      search(indexName) query boolQuery().withMust(
+        matchQuery("forBulk.keyword", forBulk.toString),
+        matchQuery("entryClass.keyword", auditEntryClass.toString)
+      ) aggregations sumAgg("totalSize","fileSize")
     }.map({
       case Right(success)=>
-        println(s"Original aggregation response: ${success.result.aggregationsAsMap}")
-        Right(success.result.aggregationsAsMap("totalSize").asInstanceOf[Map[String,Double]])
+        Right(success.result.aggregationsAsMap("totalSize").asInstanceOf[Map[String,Double]]("value"))
       case Left(err)=>
         Left(err)
     })
@@ -92,10 +96,11 @@ class AuditEntryDAO @Inject() (config:Configuration, esClientManager: ESClientMa
   /**
     * save a single audit entry.  If saving multiple entries the streaming interface (addBulkFlow) is preferred
     * @param entry AuditEntry to save
+    * @param refreshPolicy RefreshPolicy to use - i.e. whether to wait until the value is committed or return. See elastic4s documentation.
     * @return
     */
-  def saveSingle(entry:AuditEntry) = esClient.execute {
-      indexInto(indexName) doc entry
+  def saveSingle(entry:AuditEntry, refreshPolicy:RefreshPolicy=RefreshPolicy.WAIT_UNTIL) = esClient.execute {
+      indexInto(indexName,"auditentry") doc entry refresh refreshPolicy
     }
 
   /**
