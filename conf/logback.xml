@@ -50,7 +50,7 @@
     <logger name="helpers.ArchiveEntryVerifyFlow" level="WARN"/>
     <logger name="helpers.LightboxStreamComponents.SaveLightboxEntryFlow" level="DEBUG"/>
     <logger name="com.sksamuel.elastic4s.streams" level="WARN"/>
-    <logger name="controllers.SearchController" level="INFO"/>
+    <logger name="controllers.SearchController" level="DEBUG"/>
     <logger name="controllers.ProxyHealthController" level="INFO"/>
     <logger name="controllers.ScanTargetController" level="INFO"/>
     <logger name="controllers.JobController" level="INFO"/>
@@ -62,6 +62,7 @@
     <logger name="controllers.ProxyFrameworkAdminController" level="INFO"/>
 
     <logger name="controllers.Auth" level="INFO"/>
+    <logger name="controllers.BulkDownloadsController" level="DEBUG"/>
 
     <logger name="com.gu.pandomainauth.action.AuthActions" level="INFO"/>
 

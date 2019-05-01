@@ -16,6 +16,8 @@ import io.circe.syntax._
 import models.{UserProfile, UserProfileDAO}
 import play.api.mvc.Results.Redirect
 
+import scala.util.{Failure, Success, Try}
+
 @Singleton
 class Auth @Inject() (
              override val controllerComponents: ControllerComponents,
@@ -63,14 +65,19 @@ class Auth @Inject() (
       Logger.debug(claimedAuth.toString)
       val authedUserData = existingCookie match {
         case Some(c) =>
-          val existingAuth = CookieUtils.parseCookieData(c.value, panDomainSettings.settings.publicKey)
-          Logger.debug("user re-authed, merging auth data")
+          Try {CookieUtils.parseCookieData(c.value, panDomainSettings.settings.publicKey) } match {
+            case Success(existingAuth) =>
+              Logger.debug("user re-authed, merging auth data")
 
-          claimedAuth.copy(
-            authenticatingSystem = panDomainSettings.system,
-            authenticatedIn = existingAuth.authenticatedIn ++ Set(panDomainSettings.system),
-            multiFactor = checkMultifactor(claimedAuth)
-          )
+              claimedAuth.copy(
+                authenticatingSystem = panDomainSettings.system,
+                authenticatedIn = existingAuth.authenticatedIn ++ Set(panDomainSettings.system),
+                multiFactor = checkMultifactor(claimedAuth)
+              )
+            case Failure(err)=>
+              Logger.warn("Could not decode existing cookie data, assuming fresh login", err)
+              claimedAuth.copy(multiFactor = checkMultifactor(claimedAuth))
+          }
         case None =>
           Logger.debug("fresh user login")
           claimedAuth.copy(multiFactor = checkMultifactor(claimedAuth))
