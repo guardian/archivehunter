@@ -101,6 +101,8 @@
 
     <logger name="setupstream" level="DEBUG"/>
 
+    <logger name="services.AuditApprovalActor" level="DEBUG"/>
+
     <root level="WARN">
         <appender-ref ref="STDOUT" />
         <appender-ref ref="ASYNCFILE"/>
