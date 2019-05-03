@@ -33,6 +33,8 @@ import {handle419, setupInterceptor} from "./common/Handle419.jsx";
 
 import ProxyHealthDash from "./ProxyHealth/ProxyHealthDash.jsx";
 
+import AuditApproval from './auditapproval/AuditApproval.jsx';
+
 import Test419Component from "./testing/test419.jsx";
 
 library.add(faStroopwafel, faCheckCircle, faCheck, faTimes, faTimesCircle, faRoad,faSearch,faThList,faWrench, faLightbulb, faChevronCircleDown, faChevronCircleRight, faTrashAlt, faFolderPlus, faFolderMinus, faFolder);
@@ -87,6 +89,7 @@ class App extends React.Component {
             <LoginStatusComponent userData={this.state.userLogin} userLoggedOutCb={this.userLoggedOut}/>
             <Switch>
                 <Route path="/test/419" component={Test419Component}/>
+                <Route path="/admin/audit" component={AuditApproval}/>
                 <Route path="/admin/proxyHealth" component={ProxyHealthDetail}/>
                 <Route path="/admin/proxyFramework/new" component={ProxyFrameworkAdd}/>
                 <Route path="/admin/proxyFramework" component={ProxyFrameworkList}/>

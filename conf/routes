@@ -93,8 +93,9 @@ GET     /api/regions                    @controllers.ProxyFrameworkAdminControll
 GET     /api/bulk/:codeValue                @controllers.BulkDownloadsController.initiateWithOnetimeCode(codeValue)
 GET     /api/bulk/:tokenValue/get/:fileId   @controllers.BulkDownloadsController.getDownloadIdWithToken(tokenValue, fileId)
 
-GET     /api/audit/authstats                @controllers.AuditApprovalController.sizeByUserAndTime
+GET     /api/audit/datastats                @controllers.AuditApprovalController.sizeByUserAndTime
 GET     /api/audit/monthTotal               @controllers.AuditApprovalController.totalForCurrentMonth
+GET     /api/audit/addDummyData             @controllers.AuditApprovalController.addDummyData
 
 # Map static resources from the /public folder to the /assets URL path
 GET     /assets/*file               controllers.Assets.at(path="/public", file)
