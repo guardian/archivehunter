@@ -1,6 +1,7 @@
 import React from 'react';
 import axios from 'axios';
 import RestoreStatsChart from './RestoreStatsChart.jsx';
+import MonthlyOverviewTable from "./MonthlyOverviewTable.jsx";
 
 class AuditApproval extends React.Component {
     constructor(props){
@@ -14,8 +15,9 @@ class AuditApproval extends React.Component {
 
     render(){
         return <div>
+            <div id="top-row" style={{overflow:"hidden", width: "100vw", height: "1200"}}>
             <RestoreStatsChart graphValues={this.state.mainGraphType} graphCategory={this.state.mainGraphCat}/>
-            <div style={{display:"inline"}}>
+
                 <select value={this.state.mainGraphType} onChange={evt=>this.setState({mainGraphType: evt.target.value})}>
                     <option value="Restore">Show Restores</option>
                     <option value="Download">Show Downloads</option>
@@ -26,6 +28,9 @@ class AuditApproval extends React.Component {
                     <option value="region">Group by regions</option>
                     <option value="collection">Group by archive collection</option>
                 </select>
+            </div>
+            <div id="bottom-row" style={{overflow:"hidden", width: "100vw", height: "1200"}}>
+                <MonthlyOverviewTable/>
             </div>
         </div>
     }

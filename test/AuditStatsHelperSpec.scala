@@ -145,4 +145,16 @@ class AuditStatsHelperSpec extends Specification with InjectHelper with BeforeAf
       )
     }
   }
+
+  "monthlyTotalsAggregateQuery" should {
+    "return a query that gets aggregate data across audit class and time" in {
+      val result = Await.result(esClient.execute {
+        AuditStatsHelper.monthlyTotalsAggregateQuery(indexName)
+      }, 10 seconds)
+
+      val aggregates = result.right.get.result.aggregationsAsMap
+      println(s"got $aggregates")
+      result must beRight
+    }
+  }
 }

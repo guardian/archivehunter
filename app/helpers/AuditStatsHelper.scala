@@ -9,10 +9,12 @@ import scala.concurrent.duration._
 import java.util.concurrent.TimeUnit
 
 import com.sksamuel.elastic4s.searches.DateHistogramInterval
-import models.AuditEntryClass
+import io.circe.Encoder
+import models.{AuditEntryClass, AuditEntryClassEncoder}
 import responses.{ChartDataResponse, Dataset}
+import io.circe.generic.auto._
 
-object AuditStatsHelper {
+object AuditStatsHelper extends AuditEntryClassEncoder {
   import com.sksamuel.elastic4s.http.ElasticDsl._
 
   /**
@@ -37,10 +39,18 @@ object AuditStatsHelper {
     def fromAggMap(mapData:Map[String,Any]) = new BucketByUser(mapData("key").asInstanceOf[String],mapData("totalSize").asInstanceOf[Map[String,Double]]("value"))
   }
 
-  case class BucketByDate(dateValue:String, users:List[BucketByUser])
-  object BucketByDate extends((String,List[BucketByUser])=>BucketByDate) {
+  case class BucketByMonthly(auditClass:AuditEntryClass.Value, value:Double)
+  object BucketByMonthly {
+    def fromAggMap(mapData:Map[String,Any]) = new BucketByMonthly(AuditEntryClass.withName(mapData("key").asInstanceOf[String]),mapData("totalSize").asInstanceOf[Map[String,Double]]("value"))
+  }
+
+  case class BucketByDate[T:Encoder](dateValue:String, entries:List[T])
+  object BucketByDate {
     def fromAggMap(mapData:Map[String,Any], secondLayerName:String) =
-      new BucketByDate(mapData("key_as_string").asInstanceOf[String], mapData(secondLayerName).asInstanceOf[Map[String,Any]]("buckets").asInstanceOf[List[Map[String,Any]]].map(userBucket=>BucketByUser.fromAggMap(userBucket)))
+      new BucketByDate[BucketByUser](mapData("key_as_string").asInstanceOf[String], mapData(secondLayerName).asInstanceOf[Map[String,Any]]("buckets").asInstanceOf[List[Map[String,Any]]].map(userBucket=>BucketByUser.fromAggMap(userBucket)))
+
+    def fromAggMapMonthies(mapData:Map[String,Any], secondLayerName:String) =
+      new BucketByDate[BucketByMonthly](mapData("key_as_string").asInstanceOf[String], mapData(secondLayerName).asInstanceOf[Map[String,Any]]("buckets").asInstanceOf[List[Map[String,Any]]].map(monthBucket=>BucketByMonthly.fromAggMap(monthBucket)))
   }
 
   /**
@@ -57,13 +67,13 @@ object AuditStatsHelper {
     val labelsList = bucketsList.map(_.dateValue)
 
     val knownUsers = bucketsList.flatMap(bucketEntry=>{
-      bucketEntry.users.map(_.userName)
+      bucketEntry.entries.map(_.userName)
     }).distinct
 
     val datasets = knownUsers.map(userName=>{
       val bucketContentForUser = bucketsList.map(entry=>{
         //should either be one or zero entry per user, let's find it
-        entry.users.find(_.userName==userName).map(_.value)
+        entry.entries.find(_.userName==userName).map(_.value)
       })
       Dataset(userName, bucketContentForUser.map(_.getOrElse(0.0)))
     })
@@ -72,7 +82,21 @@ object AuditStatsHelper {
   }
 
   def monthlyTotalsAggregateQuery(indexName:String, dateInterval:DateHistogramInterval = DateHistogramInterval.Month) =
-    search(indexName)
+    search(indexName) aggregations dateHistogramAgg("byDate","createdAt")
+        .interval(dateInterval)
+        .subAggregations(
+          termsAgg("byClass","entryClass.keyword").subAggregations(sumAgg("totalSize","fileSize"))
+        )
+
+  /**
+    * converts the data for the monthly totals aggregate into simpler case classes
+    * @param name
+    * @param aggregateAsMap
+    * @return
+    */
+  def simplyifyMonthlyTotalsAggregate(name:String, aggregateAsMap:Map[String,Any]) = {
+    aggregateAsMap("buckets").asInstanceOf[List[Map[String,Any]]].map(entry=>BucketByDate.fromAggMapMonthies(entry,"byClass"))
+  }
   /**
     * returns a query to get the total data for the specified audit entry class for the given calendar month
     * @param indexName

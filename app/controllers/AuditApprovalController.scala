@@ -133,6 +133,18 @@ var myChart = new Chart(ctx, {
     })
   }
 
+  def monthlyOverview = APIAuthAction.async {
+    esClient.execute {
+      AuditStatsHelper.monthlyTotalsAggregateQuery(indexName)
+    }.map({
+      case Left(err)=>
+        logger.error(s"Could not look up monthly overview: $err")
+        InternalServerError(GenericErrorResponse("error", err.toString).asJson)
+      case Right(result)=>
+        logger.info(s"Got result: $result")
+        Ok(AuditStatsHelper.simplyifyMonthlyTotalsAggregate("Monthly overview", result.result.aggregationsAsMap("byDate").asInstanceOf[Map[String,Any]]).asJson)
+    })
+  }
   def addDummyData = APIAuthAction.async {
     val testDataSeq = Seq(
       AuditEntry("fileid-1",2048000,"here","test1",ZonedDateTime.parse("2019-01-01T00:00:00Z"),"some-collection",AuditEntryClass.Restore,Some("5f4d9eb3-7605-4e90-9b81-598641b0f0cb")),
