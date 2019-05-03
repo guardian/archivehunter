@@ -9,18 +9,18 @@ import helpers.{AuditEntryRequestBuilder, AuditStatsHelper}
 import models.{AuditEntry, AuditEntryClass}
 import org.specs2.mutable._
 import org.specs2.specification.BeforeAfterAll
-import play.api.Logger
 import io.circe.generic.auto._
+import responses.{ChartDataResponse, Dataset}
 
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
 
 class AuditStatsHelperSpec extends Specification with InjectHelper with BeforeAfterAll with AuditEntryRequestBuilder {
+  sequential
+
   import com.sksamuel.elastic4s.http.ElasticDsl._
   import com.sksamuel.elastic4s.circe._
-
-  private val logger = Logger(getClass)
 
   val localNode = LocalNode("testcluster","/tmp/auditstats-helper-testdata")
   private val esClientMgr = inject[ESClientManager]
@@ -30,7 +30,7 @@ class AuditStatsHelperSpec extends Specification with InjectHelper with BeforeAf
   def beforeAll = {
     val existsResult = Await.result(esClient.execute {indexExists(indexName)}, 10 seconds)
     if(existsResult.isLeft){
-      logger.error(s"Could not check for test index existence: ${existsResult.left.get}")
+      println(s"Could not check for test index existence: ${existsResult.left.get}")
     } else {
       if(existsResult.right.get.result.exists) Await.ready(esClient.execute {deleteIndex(indexName)}, 10 seconds)
     }
@@ -41,7 +41,7 @@ class AuditStatsHelperSpec extends Specification with InjectHelper with BeforeAf
       ))
     }, 10 seconds)
     if(createResult.isLeft){
-      logger.error(s"Could not create test index: ${createResult.left.get}")
+      println(s"Could not create test index: ${createResult.left.get}")
     }
 
     val testDataSeq = Seq(
@@ -59,11 +59,11 @@ class AuditStatsHelperSpec extends Specification with InjectHelper with BeforeAf
       })
       val result = Await.result(Future.sequence(futureList), 10 seconds)
       val failures = result.collect({ case Left(err) => err })
-      if (failures.nonEmpty) failures.foreach(err => logger.error(s"Could not set up data: $err"))
+      if (failures.nonEmpty) failures.foreach(err => println(s"Could not set up data: $err"))
 
     } catch {
       case err:Throwable=>
-        logger.error(s"Could not set up data:", err)
+        println(s"Could not set up data:", err)
     }
   }
 
@@ -105,6 +105,44 @@ class AuditStatsHelperSpec extends Specification with InjectHelper with BeforeAf
       result must beRight
       val finalResult = aggregations("totalSize").asInstanceOf[Map[String,Double]]("value")
       finalResult mustEqual 6
+    }
+  }
+
+  "sizeTimeAggregateToChartData" should {
+    "take raw aggregations data and convert it into a ChartDataResponse" in {
+      val data:Map[String,Any] = Map("byDate" ->
+        Map("buckets" -> List(
+          Map("key_as_string" -> "2019-01-01T00:00:00.000Z", "byUser" ->
+            Map("doc_count_error_upper_bound" -> 0, "sum_other_doc_count" -> 0, "buckets" ->
+              List(
+                Map("key"-> "test1", "doc_count" -> 1, "totalSize" -> Map("value" -> 2.0))
+              )
+            ), "totalSize" -> Map("value" -> 2.0), "key" -> 1546300800000L, "doc_count" -> 1
+          ),
+          Map("key_as_string" ->"2019-02-01T00:00:00.000Z", "byUser" ->
+            Map("doc_count_error_upper_bound" -> 0, "sum_other_doc_count" -> 0, "buckets" ->
+              List(
+                Map("key" -> "test1", "doc_count" -> 1, "totalSize" -> Map("value" -> 2.0)),
+                Map("key" -> "test2", "doc_count" -> 1, "totalSize" -> Map("value" -> 2.0))
+              )
+            ), "totalSize" -> Map("value" -> 4.0), "key" -> 1548979200000L, "doc_count" -> 2
+          ),
+          Map("key_as_string" -> "2019-03-01T00:00:00.000Z", "byUser" ->
+            Map("doc_count_error_upper_bound" -> 0, "sum_other_doc_count" -> 0, "buckets" ->
+              List(
+                Map("key" -> "test3", "doc_count" -> 2, "totalSize" -> Map("value" -> 4.0)),
+                Map("key" -> "test1", "doc_count" -> 1, "totalSize" -> Map("value" -> 2.0))
+              )
+            ), "totalSize" -> Map("value" -> 6.0), "key" -> 1551398400000L, "doc_count" -> 3
+          )
+        ))
+      )
+
+      val result = AuditStatsHelper.sizeTimeAggregateToChartData("test chart",data("byDate").asInstanceOf[Map[String,Any]])
+      result mustEqual ChartDataResponse("test chart",
+        List("2019-01-01T00:00:00.000Z","2019-02-01T00:00:00.000Z","2019-03-01T00:00:00.000Z"),
+        List(Dataset("test1",List(2.0,2.0,2.0)), Dataset("test2",List(0.0,2.0,0.0)), Dataset("test3",List(0.0,0.0,4.0)))
+      )
     }
   }
 }
