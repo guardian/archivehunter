@@ -96,15 +96,25 @@ var myChart = new Chart(ctx, {
 });
    */
 
-  def sizeByUserAndTime = APIAuthAction.async {
+  def sizeByUserAndTime(graphType:Option[String], graphSubLevel:Option[String]) = APIAuthAction.async {
+    val subLevelRequest = graphSubLevel match {
+      case None=>"requestedBy"
+      case Some("region")=>"region"
+      case Some("collection")=>"forCollection"
+      case Some("user")=>"requestedBy"
+      case Some(_)=>"requestedBy"
+    }
     esClient.execute {
-      AuditStatsHelper.aggregateBySizeAndTimeQuery(indexName)
+      graphType match {
+        case None => AuditStatsHelper.aggregateBySizeAndTimeQuery(indexName, graphSubLevel=subLevelRequest)
+        case Some(wantGraphType) => AuditStatsHelper.aggregateBySizeAndTimeQuery(indexName, AuditEntryClass.withName(wantGraphType),graphSubLevel=subLevelRequest)
+      }
     }.map({
       case Left(err)=>
         logger.error(s"Could not look up size aggregation data: $err")
         InternalServerError(GenericErrorResponse("error", err.toString).asJson)
       case Right(result)=>
-        logger.info(s"Got result: ${result.result.aggregationsAsMap}")
+        //logger.info(s"Got result: ${result.result.aggregationsAsMap}")
         Ok(AuditStatsHelper.sizeTimeAggregateToChartData("Graph by user and time",result.result.aggregationsAsMap("byDate").asInstanceOf[Map[String,Any]]).asJson)
     })
   }
@@ -125,12 +135,18 @@ var myChart = new Chart(ctx, {
 
   def addDummyData = APIAuthAction.async {
     val testDataSeq = Seq(
-      AuditEntry("fileid-1",2,"here","test1",ZonedDateTime.parse("2019-01-01T00:00:00Z"),"some-collection",AuditEntryClass.Restore,Some("5f4d9eb3-7605-4e90-9b81-598641b0f0cb")),
-      AuditEntry("fileid-1",2,"here","test1",ZonedDateTime.parse("2019-02-02T00:00:00Z"),"some-collection",AuditEntryClass.Restore,Some("5f4d9eb3-7605-4e90-9b81-598641b0f0cb")),
-      AuditEntry("fileid-1",2,"here","test2",ZonedDateTime.parse("2019-02-04T00:00:00Z"),"some-collection",AuditEntryClass.Restore,Some("5f4d9eb3-7605-4e90-9b81-598641b0f0cb")),
-      AuditEntry("fileid-1",2,"here","test1",ZonedDateTime.parse("2019-03-03T00:00:00Z"),"some-collection",AuditEntryClass.Restore,Some("5f4d9eb3-7605-4e90-9b81-598641b0f0cb")),
-      AuditEntry("fileid-1",2,"here","test3",ZonedDateTime.parse("2019-03-03T00:00:00Z"),"some-collection",AuditEntryClass.Restore,Some("5f4d9eb3-7605-4e90-9b81-598641b0f0cb")),
-      AuditEntry("fileid-1",2,"here","test3",ZonedDateTime.parse("2019-03-05T00:00:00Z"),"some-collection",AuditEntryClass.Restore,Some("5f4d9eb3-7605-4e90-9b81-598641b0f0cb")),
+      AuditEntry("fileid-1",2048000,"here","test1",ZonedDateTime.parse("2019-01-01T00:00:00Z"),"some-collection",AuditEntryClass.Restore,Some("5f4d9eb3-7605-4e90-9b81-598641b0f0cb")),
+      AuditEntry("fileid-1",2048000,"here","test1",ZonedDateTime.parse("2019-02-02T00:00:00Z"),"some-collection",AuditEntryClass.Restore,Some("5f4d9eb3-7605-4e90-9b81-598641b0f0cb")),
+      AuditEntry("fileid-1",2048000,"here","test2",ZonedDateTime.parse("2019-02-04T00:00:00Z"),"some-collection",AuditEntryClass.Restore,Some("5f4d9eb3-7605-4e90-9b81-598641b0f0cb")),
+      AuditEntry("fileid-1",2048000,"here","test1",ZonedDateTime.parse("2019-03-03T00:00:00Z"),"some-collection",AuditEntryClass.Restore,Some("5f4d9eb3-7605-4e90-9b81-598641b0f0cb")),
+      AuditEntry("fileid-1",2048000,"here","test3",ZonedDateTime.parse("2019-03-03T00:00:00Z"),"some-collection",AuditEntryClass.Restore,Some("5f4d9eb3-7605-4e90-9b81-598641b0f0cb")),
+      AuditEntry("fileid-1",2048000,"here","test3",ZonedDateTime.parse("2019-03-05T00:00:00Z"),"some-collection",AuditEntryClass.Restore,Some("5f4d9eb3-7605-4e90-9b81-598641b0f0cb")),
+      AuditEntry("fileid-1",2048000,"here","test1",ZonedDateTime.parse("2019-03-01T00:00:00Z"),"some-collection",AuditEntryClass.Download,Some("5f4d9eb3-7605-4e90-9b81-598641b0f0cb")),
+      AuditEntry("fileid-1",2048000,"here","test1",ZonedDateTime.parse("2019-02-02T00:00:00Z"),"some-collection",AuditEntryClass.Download,Some("5f4d9eb3-7605-4e90-9b81-598641b0f0cb")),
+      AuditEntry("fileid-1",2048000,"here","test2",ZonedDateTime.parse("2019-02-04T00:00:00Z"),"some-collection",AuditEntryClass.Download,Some("5f4d9eb3-7605-4e90-9b81-598641b0f0cb")),
+      AuditEntry("fileid-1",2048000,"here","test1",ZonedDateTime.parse("2019-01-03T00:00:00Z"),"some-collection",AuditEntryClass.Download,Some("5f4d9eb3-7605-4e90-9b81-598641b0f0cb")),
+      AuditEntry("fileid-1",2048000,"here","test3",ZonedDateTime.parse("2019-01-03T00:00:00Z"),"some-collection",AuditEntryClass.Download,Some("5f4d9eb3-7605-4e90-9b81-598641b0f0cb")),
+      AuditEntry("fileid-1",2048000,"here","test3",ZonedDateTime.parse("2019-01-05T00:00:00Z"),"some-collection",AuditEntryClass.Download,Some("5f4d9eb3-7605-4e90-9b81-598641b0f0cb")),
     )
 
     val futureList = Future.sequence(testDataSeq.map(entry => esClient.execute {

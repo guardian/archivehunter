@@ -21,12 +21,12 @@ object AuditStatsHelper {
     * @param indexName
     * @return
     */
-  def aggregateBySizeAndTimeQuery(indexName:String, forClass:AuditEntryClass.Value = AuditEntryClass.Restore, dateInterval:DateHistogramInterval = DateHistogramInterval.Month) =
+  def aggregateBySizeAndTimeQuery(indexName:String, forClass:AuditEntryClass.Value = AuditEntryClass.Restore, graphSubLevel:String="requestedBy", dateInterval:DateHistogramInterval = DateHistogramInterval.Month) =
     search(indexName) query matchQuery("entryClass.keyword", forClass.toString) aggregations dateHistogramAgg("byDate","createdAt")
       .interval(dateInterval)
       .subAggregations(
         sumAgg("totalSize", "fileSize"),
-        termsAgg("byUser", "requestedBy.keyword").subAggregations(sumAgg("totalSize", "fileSize"))
+        termsAgg("byUser", s"$graphSubLevel.keyword").subAggregations(sumAgg("totalSize", "fileSize"))
       )
 
   /*
@@ -43,34 +43,22 @@ object AuditStatsHelper {
       new BucketByDate(mapData("key_as_string").asInstanceOf[String], mapData(secondLayerName).asInstanceOf[Map[String,Any]]("buckets").asInstanceOf[List[Map[String,Any]]].map(userBucket=>BucketByUser.fromAggMap(userBucket)))
   }
 
+  /**
+    * converts the data for our 3-layer aggregation from the generic map as returned by elastic4s into a data format suitable for chartjs.
+    * along the way it it uses the above case classes to make the data marshalling somewhat simpler to read
+    * @param name name parameter that gets returned in the ChartDataResponse field
+    * @param aggregateAsMap aggregation data as returned from Elastic4s.  This should be the specific key of the main dictionary, cast to the right fromat
+    *                       i.e. `result.result.aggregationsAsMap("byDate").asInstanceOf[Map[String,Any]]`
+    * @return an instance of ChartDataResponse[Double] containing the data
+    */
   def sizeTimeAggregateToChartData(name:String, aggregateAsMap:Map[String, Any]) = {
-//    val bucketsList = aggregateAsMap("buckets").asInstanceOf[List[Map[String,Any]]]
-//    val labelsList = bucketsList.map(_("key_as_string").asInstanceOf[String])
-
-//    val knownUsers = bucketsList.flatMap(entry=>{
-//      val bucketsByUser = entry("byUser").asInstanceOf[Map[String,Any]]("buckets").asInstanceOf[List[Map[String,Any]]]
-//      bucketsByUser.map(_("key").asInstanceOf[String])
-//    }).distinct
-//
-//    val datasets = knownUsers.flatMap(userName=>{
-//      bucketsList.map(entry=> {
-//        val bucketsByUser = entry("byUser").asInstanceOf[Map[String, Any]]("buckets").asInstanceOf[List[Map[String, Any]]]
-//
-//        Dataset(userName, bucketsByUser.filter(_.get("key").contains(userName).headOption.map(bucketByUser=>bucketByUser("totalSize").asInstanceOf[Map[String,Double]]("value")).getOrElse(0.0)))
-//      })
-//    })
-
     val bucketsList = aggregateAsMap("buckets").asInstanceOf[List[Map[String,Any]]].map(entry=>BucketByDate.fromAggMap(entry, "byUser"))
 
-    println(s"Bucketslist is $bucketsList")
     val labelsList = bucketsList.map(_.dateValue)
-    println(s"labelsList is $labelsList")
 
     val knownUsers = bucketsList.flatMap(bucketEntry=>{
       bucketEntry.users.map(_.userName)
     }).distinct
-
-    println(s"knownUsers is $knownUsers")
 
     val datasets = knownUsers.map(userName=>{
       val bucketContentForUser = bucketsList.map(entry=>{
@@ -80,11 +68,11 @@ object AuditStatsHelper {
       Dataset(userName, bucketContentForUser.map(_.getOrElse(0.0)))
     })
 
-    println(s"datasets are $datasets")
-
     ChartDataResponse(name, labelsList, datasets)
   }
 
+  def monthlyTotalsAggregateQuery(indexName:String, dateInterval:DateHistogramInterval = DateHistogramInterval.Month) =
+    search(indexName)
   /**
     * returns a query to get the total data for the specified audit entry class for the given calendar month
     * @param indexName

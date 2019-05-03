@@ -93,7 +93,7 @@ GET     /api/regions                    @controllers.ProxyFrameworkAdminControll
 GET     /api/bulk/:codeValue                @controllers.BulkDownloadsController.initiateWithOnetimeCode(codeValue)
 GET     /api/bulk/:tokenValue/get/:fileId   @controllers.BulkDownloadsController.getDownloadIdWithToken(tokenValue, fileId)
 
-GET     /api/audit/datastats                @controllers.AuditApprovalController.sizeByUserAndTime
+GET     /api/audit/datastats                @controllers.AuditApprovalController.sizeByUserAndTime(graphType:Option[String], graphSubLevel:Option[String])
 GET     /api/audit/monthTotal               @controllers.AuditApprovalController.totalForCurrentMonth
 GET     /api/audit/addDummyData             @controllers.AuditApprovalController.addDummyData
 

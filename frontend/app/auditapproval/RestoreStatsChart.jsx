@@ -4,8 +4,15 @@ import PropTypes from 'prop-types';
 import ErrorViewComponent from '../common/ErrorViewComponent.jsx';
 import LoadingThrobber from '../common/LoadingThrobber.jsx';
 import {Bar, HorizontalBar} from 'react-chartjs-2';
+import moment from 'moment';
+import BytesFormatterImplementation from "../common/BytesFormatterImplementation.jsx";
 
 class RestoreStatsChart extends React.Component {
+    static propTypes = {
+        graphCategory: PropTypes.string.isRequired,
+        graphValues: PropTypes.string.isRequired
+    };
+
     constructor(props){
         super(props);
 
@@ -32,8 +39,8 @@ class RestoreStatsChart extends React.Component {
         return Object.assign({}, content, {datasets: content.datasets.map((ds,ctr)=>Object.assign({},ds,{backgroundColor: RestoreStatsChart.colourValues[ctr], borderColor: RestoreStatsChart.borderValues[ctr]}))})
     }
 
-    componentWillMount() {
-        this.setState({loading: true}, ()=>axios.get("/api/audit/datastats").then(response=>{
+    updateChart(){
+        this.setState({loading: true}, ()=>axios.get("/api/audit/datastats?graphType=" + this.props.graphValues + "&graphSubLevel=" + this.props.graphCategory).then(response=>{
             this.setState({
                 loading: false,
                 chartData: this.addColourValues(response.data)
@@ -42,6 +49,15 @@ class RestoreStatsChart extends React.Component {
             console.error(err);
             this.setState({loading: false, lastError: err});
         }));
+    }
+
+    componentWillMount() {
+        this.updateChart();
+    }
+
+    componentDidUpdate(prevProps, prevState, snapshot) {
+        if(prevProps.graphCategory!==this.props.graphCategory) this.updateChart();
+        if(prevProps.graphValues!==this.props.graphValues) this.updateChart();
     }
 
     render(){
@@ -57,7 +73,7 @@ class RestoreStatsChart extends React.Component {
                 options={{
                     title: {
                         display: true,
-                        text: "Data usage by month",
+                        text: "Data usage on "+ this.props.graphValues +"/"+this.props.graphCategory+" by month",
                         fontColor: "rgba(255,255,255,1)",
                         fontSize: 24
                     },
@@ -69,13 +85,18 @@ class RestoreStatsChart extends React.Component {
                             },
                             ticks: {
                                 autoSkip: false,
-                                fontColor: "rgba(255,255,255,1)"
+                                fontColor: "rgba(255,255,255,1)",
+                                callback: (value, index, values)=>{
+                                    const result = BytesFormatterImplementation.getValueAndSuffix(value);
+                                    return ""+result[0]+" " + result[1];
+                                }
                             },
                             stacked: true
                         }],
                         xAxes: [{
                             ticks: {
-                                fontColor: "rgba(255,255,255,1)"
+                                fontColor: "rgba(255,255,255,1)",
+                                callback: (value, index,values)=>moment(value).format("MMM YYYY")
                             },
                             stacked: true
                         }]
