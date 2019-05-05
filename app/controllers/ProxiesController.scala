@@ -395,7 +395,7 @@ class ProxiesController @Inject()(override val config:Configuration,
     * @return
     */
   def manualSet = APIHMACAuthAction.async(circe.json(2048)) { request=>
-    adminsOnlyAsync(request, allowHmac = true) {
+    adminsOnlyAsync(request, allowHmac = true) {  maybeUserProfile=>
       request.body.as[ManualProxySet].fold(
         failure =>
           Future(BadRequest(GenericErrorResponse("bad_request", failure.toString).asJson)),
@@ -457,7 +457,7 @@ class ProxiesController @Inject()(override val config:Configuration,
     * @return
     */
   def manualDelete(fileId:String, inputProxyType:String)  = APIHMACAuthAction.async {request=>
-    adminsOnlyAsync(request, allowHmac=true) {
+    adminsOnlyAsync(request, allowHmac=true) {  maybeUserProfile=>
       try {
         val proxyType = ProxyType.withName(inputProxyType)
         proxyLocationDAO.getProxy(fileId,proxyType).flatMap({

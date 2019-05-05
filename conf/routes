@@ -96,6 +96,8 @@ GET     /api/bulk/:tokenValue/get/:fileId   @controllers.BulkDownloadsController
 GET     /api/audit/datastats                @controllers.AuditApprovalController.sizeByUserAndTime(graphType:Option[String], graphSubLevel:Option[String])
 GET     /api/audit/monthTotal               @controllers.AuditApprovalController.totalForCurrentMonth
 GET     /api/audit/monthlyOverview          @controllers.AuditApprovalController.monthlyOverview
+GET     /api/audit/approvals/byStatus       @controllers.AuditApprovalController.approvalsByStatus(statusString:String)
+POST    /api/audit/manualApproval           @controllers.AuditApprovalController.manualApprove
 GET     /api/audit/addDummyData             @controllers.AuditApprovalController.addDummyData
 
 # Map static resources from the /public folder to the /assets URL path

@@ -37,7 +37,7 @@ class UserController @Inject()(override val controllerComponents:ControllerCompo
   }
 
   def allUsers = APIAuthAction.async {request=>
-    adminsOnlyAsync(request) {
+    adminsOnlyAsync(request) { maybeUserProfile=>
       userProfileDAO.allUsers().map(resultList=>{
         val errors = resultList.collect({case Left(err)=>err})
         if(errors.nonEmpty){
@@ -126,7 +126,7 @@ class UserController @Inject()(override val controllerComponents:ControllerCompo
     * @return
     */
   def updateUserProfileField = APIAuthAction.async(circe.json(2048)) {request=>
-    adminsOnlyAsync(request) {
+    adminsOnlyAsync(request) { maybeUserProfile=>
       request.body.as[UserProfileFieldUpdate] match {
         case Left(err)=>
           logger.error(err.toString)

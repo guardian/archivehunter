@@ -41,7 +41,7 @@ class ProxyFrameworkAdminController @Inject() (override val config:Configuration
   private val awsProfile = config.getOptional[String]("externalData.awsProfile")
 
   def existingDeployments = APIAuthAction.async { request=>
-    adminsOnlyAsync(request) {
+    adminsOnlyAsync(request) {  maybeUserProfile=>
       proxyFrameworkInstanceDAO.allRecords.map(result=>{
         val failures = result.collect({case Left(err)=>err})
         if(failures.nonEmpty){
@@ -134,7 +134,7 @@ class ProxyFrameworkAdminController @Inject() (override val config:Configuration
     * @return
     */
   def lookupPotentialDeployments = APIAuthAction.async { request=>
-    adminsOnlyAsync(request) {
+    adminsOnlyAsync(request) { maybeUserProfile=>
       val lookupFutures = Regions.values().map(rgn=>scanRegionForDeployments(rgn.getName)).toSeq
 
       val resultsFuture = Future.sequence(lookupFutures).map(resultList=>{
@@ -169,7 +169,7 @@ class ProxyFrameworkAdminController @Inject() (override val config:Configuration
   }
 
   def addDeployment = APIAuthAction.async(circe.json(2048)) { request=>
-    adminsOnlyAsync(request) {
+    adminsOnlyAsync(request) { maybeUserProfile=>
       request.body.as[AddPFDeploymentRequest].fold(
         err=>Future(BadRequest(GenericErrorResponse("bad_request",err.toString).asJson)),
         clientRequest=> {
@@ -205,7 +205,7 @@ class ProxyFrameworkAdminController @Inject() (override val config:Configuration
   }
 
   def addDeploymentDirect = APIAuthAction.async(circe.json(2048)) { request=>
-    adminsOnlyAsync(request) {
+    adminsOnlyAsync(request) { maybeUserProfile=>
       request.body.as[ProxyFrameworkInstance].fold(
         err=>Future(BadRequest(GenericErrorResponse("bad_request", err.toString).asJson)),
         rec=>proxyFrameworkInstanceDAO.recordsForRegion(rec.region).flatMap(results=>{
@@ -227,7 +227,7 @@ class ProxyFrameworkAdminController @Inject() (override val config:Configuration
   }
 
   def removeDeployment(forRegion:String) = APIAuthAction.async { request=>
-    adminsOnlyAsync(request) {
+    adminsOnlyAsync(request) { maybeUserProfile=>
       proxyFrameworkInstanceDAO.recordsForRegion(forRegion).flatMap(results=>{
         val failures = results.collect({case Left(err)=>err})
         if(failures.nonEmpty){

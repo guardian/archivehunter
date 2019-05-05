@@ -15,7 +15,7 @@ object AuditApprovalActor {
 
   //input messages
   case class AutomatedApprovalCheck(auditBulk:AuditBulk) extends AAMMsg
-  case class AdminApprovalOverride(auditBulk:AuditBulk) extends  AAMMsg
+  case class AdminApprovalOverride(auditBulk:AuditBulk, approver:UserProfile, newStatus:ApprovalStatus.Value, notes:String) extends  AAMMsg
   //internal messages
 
   //output messages
@@ -90,7 +90,10 @@ class AuditApprovalActor @Inject() (auditEntryDAO: AuditEntryDAO, auditBulkDAO: 
         }
       })
 
-    case AdminApprovalOverride(auditBulk:AuditBulk)=>
+    /**
+      *
+      */
+    case AdminApprovalOverride(auditBulk:AuditBulk, approver:UserProfile, newStatus:ApprovalStatus.Value, notes:String)=>
 
   }
 }

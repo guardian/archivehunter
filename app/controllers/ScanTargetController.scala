@@ -81,7 +81,7 @@ class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner
   }
 
   def listScanTargets = APIAuthAction.async { request=>
-    adminsOnlyAsync(request) {
+    adminsOnlyAsync(request) { maybeUserProfile=>
       ScanamoAlpakka.exec(alpakkaClient)(table.scan()).map({ result =>
         val errors = result.collect({
           case Left(readError) => readError
@@ -141,7 +141,7 @@ class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner
   }
 
   def manualTrigger(targetName:String) = APIAuthAction.async { request=>
-    adminsOnlyAsync(request) {
+    adminsOnlyAsync(request) { maybeUserProfile=>
       withLookupAsync(targetName) { tgt =>
         withNewScanJob(tgt, "ManualScan") { job =>
           bucketScanner ! BucketScanner.PerformDeletionScan(tgt, thenScanForNew = true, Some(job))
@@ -152,7 +152,7 @@ class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner
   }
 
   def manualTriggerAdditionScan(targetName:String) = APIAuthAction.async { request=>
-    adminsOnlyAsync(request) {
+    adminsOnlyAsync(request) { maybeUserProfile=>
       withLookupAsync(targetName) { tgt =>
         withNewScanJob(tgt,"AdditionScan") { job =>
           bucketScanner ! BucketScanner.PerformTargetScan(tgt, Some(job))
@@ -163,7 +163,7 @@ class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner
   }
 
   def manualTriggerDeletionScan(targetName:String) = APIAuthAction.async { request=>
-    adminsOnlyAsync(request) {
+    adminsOnlyAsync(request) {  maybeUserProfile=>
       withLookupAsync(targetName) { tgt =>
         withNewScanJob(tgt, "DeletionScan") { job =>
           bucketScanner ! BucketScanner.PerformDeletionScan(tgt, maybeJob=Some(job))
@@ -197,7 +197,7 @@ class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner
     * @return
     */
   def initiateCheckJob(targetName:String) = APIAuthAction.async { request=>
-    adminsOnlyAsync(request) {
+    adminsOnlyAsync(request) { maybeUserProfile=>
       withLookupAsync(targetName){ tgt =>
         proxyGenerators.requestCheckJob(tgt.bucketName, tgt.proxyBucket, tgt.region).map({
           case Left(err) =>
@@ -220,7 +220,7 @@ class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner
   }
 
   def createPipelines(targetName:String, force:Boolean) = APIAuthAction.async { request=>
-    adminsOnlyAsync(request){
+    adminsOnlyAsync(request){ maybeUserProfile=>
       withLookupAsync(targetName){ tgt =>
         proxyGenerators.requestPipelineCreate(tgt.bucketName, tgt.proxyBucket, tgt.region, force).map({
           case Left(err)=>
