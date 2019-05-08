@@ -108,7 +108,7 @@ class ApprovalsListEntry extends React.Component {
                     <p className="error-text">{this.state.approvalErrorLabel}</p>
                 </span>
                 <span style={{display: this.props.data.approval ? "block" : "none"}}>
-                    <p>Administrator said: {this.props.data.approval.comment}</p>
+                    <p>Administrator said: {this.props.data.approval ? this.props.data.approval.comment : "nothing"}</p>
                 </span>
             </div>
         </li>

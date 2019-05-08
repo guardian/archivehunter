@@ -159,7 +159,7 @@ class LightboxController @Inject() (override val config:Configuration,
 
   protected def createBulkAuditRecord(lbBulkEntry:LightboxBulkEntry, searchReq:SearchRequest, userProfileEmail:String, reasonGiven:String) = {
       val auditBulk = AuditBulk.fromLightboxBulk(lbBulkEntry, searchReq.path.get, userProfileEmail, reasonGiven)
-      auditBulkDAO.saveSingle(auditBulk).map(_.map(result=>auditBulk))
+      auditBulkDAO.saveSingle(auditBulk).map(_.map(_=>auditBulk))
   }
 
   /**
@@ -175,19 +175,29 @@ class LightboxController @Inject() (override val config:Configuration,
     * @param userAvatarUrl
     * @return
     */
-  protected def newStyleBulkRestoreRequest(searchReq:SearchRequest, reasonGiven:String, userProfile:UserProfile, userAvatarUrl:Option[String]):Future[Either[String,LightboxBulkEntry]] = {
+  protected def createBulkEntries(searchReq:SearchRequest, reasonGiven:String, userProfile:UserProfile, userAvatarUrl:Option[String]):Future[Either[String,(LightboxBulkEntry, AuditBulk)]] = {
     getOrCreateBulkEntry(searchReq, userProfile.userEmail, reasonGiven).flatMap({
       case Left(err)=>
         logger.error(s"Could not create bulk lightbox entry: $err")
         Future(Left(err.toString))
       case Right(lbBulkEntry)=>
-        createBulkAuditRecord(lbBulkEntry, searchReq, userProfile.userEmail, reasonGiven).map({
+        lightboxBulkEntryDAO.putSimply(lbBulkEntry).flatMap({
+          case Right(_)=>
+            createBulkAuditRecord(lbBulkEntry, searchReq, userProfile.userEmail, reasonGiven).flatMap({
+              case Left(err)=>
+                logger.error(s"Could not create audit record: $err")
+                Future(Left(err.toString))
+              case Right(auditBulk)=>
+                LightboxHelper.addToBulkFromSearch(indexName, userProfile, userAvatarUrl, searchReq, lbBulkEntry, auditBulk)
+                  .map(_=>Right(lbBulkEntry,auditBulk))
+                  .recover({
+                    case err:Throwable=>
+                      logger.error(s"Could not add individual entries to bulk", err)
+                      Left(err.toString)
+                  })
+            })
           case Left(err)=>
-            logger.error(s"Could not create audit record: $err")
-            Left(err.toString)
-          case Right(auditBulk)=>
-            LightboxHelper.addToBulkFromSearch(indexName, userProfile, userAvatarUrl, searchReq, lbBulkEntry, auditBulk)
-            Right(lbBulkEntry)
+            Future(Left(err.toString))
         })
     })
   }
@@ -202,7 +212,6 @@ class LightboxController @Inject() (override val config:Configuration,
             logger.error(s"Session is corrupted: ${err.toString}")
             Future(InternalServerError(GenericErrorResponse("session_error", "session is corrupted, log out and log in again").asJson))
           case Some(Right(userProfile)) =>
-
             if(searchReq.reasonGiven.isEmpty) {
               Future(BadRequest(GenericErrorResponse("error","reasonGiven can't be blank").asJson))
             } else {
@@ -211,14 +220,14 @@ class LightboxController @Inject() (override val config:Configuration,
 //                  Future(new Status(413)(resp.asJson))
 //                case Right(restoreSize) =>
 //                  doBulkRestore(searchReq, userProfile, request.user.avatarUrl)
-              newStyleBulkRestoreRequest(searchReq, searchReq.reasonGiven.get, userProfile, request.user.avatarUrl)
+              createBulkEntries(searchReq, searchReq.reasonGiven.get, userProfile, request.user.avatarUrl)
                 .map({
                   case Left(err)=>
                     //we assume that a log message has already been output earlier
                     InternalServerError(GenericErrorResponse("error", err).asJson)
-                  case Right(bulkEntry)=>
+                  case Right((bulkEntry, auditBulk))=>
                     //send to the automated approval actor
-                  InternalServerError(GenericErrorResponse("not_implemented","not implemented").asJson)
+                    InternalServerError(GenericErrorResponse("not_implemented","not implemented").asJson)
                 })
               .recover({
                 case err: Throwable =>

@@ -181,12 +181,11 @@ object LightboxHelper {
     val archiveEntryConverter = new SearchHitToArchiveEntryFlow
 
     val dynamoSaveFlow = new SaveLightboxEntryFlow(bulk.id, userProfile)
-    val maybeRestoreSink = injector.getInstance(classOf[InitiateRestoreSink])
     val esSaveSink = new UpdateLightboxIndexInfoSink(bulk.id, userProfile, userAvatarUrl)
 
     logger.info(s"Starting add of $rq to bulk lightbox ${bulk.id}" )
 
-    val flow = RunnableGraph.fromGraph(GraphDSL.create(dynamoSaveFlow,esSaveSink, maybeRestoreSink)((_,_,_)) { implicit b=> (actualDynamoFlow, actualESSink, actualRestoreSink) =>
+    val flow = RunnableGraph.fromGraph(GraphDSL.create(dynamoSaveFlow,esSaveSink)((_,_)) { implicit b=> (actualDynamoFlow, actualESSink) =>
       import akka.stream.scaladsl.GraphDSL.Implicits._
 
       val src = b.add(getElasticSource(indexName, boolQuery().must(rq.toSearchParams)))

@@ -30,6 +30,12 @@ class LightboxBulkEntryDAO @Inject() (config:ArchiveHunterConfiguration, ddbClie
     ScanamoAlpakka.exec(client)(table.put(entry))
   }
 
+  def putSimply(entry:LightboxBulkEntry) = put(entry).map({
+    case None=>Right(entry)
+    case Some(Right(_))=>Right(entry)
+    case Some(Left(err))=>Left(err)
+  })
+
   def entriesForUser(userEmail:String) = ScanamoAlpakka.exec(client)(table.scan).map(_.collect {
     case l @ Left(_) => l
     case r @ Right(entry) if entry.userEmail==userEmail => r
