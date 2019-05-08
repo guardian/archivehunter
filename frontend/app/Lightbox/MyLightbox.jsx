@@ -141,7 +141,7 @@ class MyLightbox extends CommonSearchView {
     }
 
     checkArchiveStatus(){
-        axios.get("/api/archive/status/" + this.state.showingPreview.id).then(response=>{
+        axios.get("/api/archive/status/" + this.state.showingPreview.id + "?user=" + this.state.selectedUser).then(response=>{
             console.info(response.data);
             const itemIndex = this.indexForFileid(response.data.fileId);
             if(itemIndex===-1){
