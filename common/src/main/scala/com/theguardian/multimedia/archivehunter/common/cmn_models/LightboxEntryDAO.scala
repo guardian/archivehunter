@@ -1,7 +1,10 @@
 package com.theguardian.multimedia.archivehunter.common.cmn_models
 
+import akka.NotUsed
 import akka.actor.ActorSystem
-import akka.stream.{ActorMaterializer, Materializer}
+import akka.stream.scaladsl.{GraphDSL, Source}
+import akka.stream.{ActorMaterializer, Materializer, SourceShape}
+import com.amazonaws.services.dynamodbv2.model.{QueryRequest, ScanResult}
 import com.gu.scanamo.error.DynamoReadError
 import com.gu.scanamo.{ScanamoAlpakka, Table}
 import com.theguardian.multimedia.archivehunter.common.{ArchiveHunterConfiguration, ZonedDateTimeEncoder}
@@ -41,4 +44,11 @@ class LightboxEntryDAO @Inject()(config:ArchiveHunterConfiguration, ddbClientMgr
 
   def put(entry:LightboxEntry)(implicit ec:ExecutionContext) =
     ScanamoAlpakka.exec(apClient)(table.put(entry))
+
+//  def sourceForBulk(bulkId:String) = {
+//    GraphDSL.create() { implicit builder=>
+//      val source = apClient.source(new QueryRequest().with)
+//      SourceShape()
+//    }
+//  }
 }

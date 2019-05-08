@@ -9,6 +9,7 @@ class BytesFormatter extends React.Component {
     };
 
     render(){
+        if(!this.props.value) return <span/>;
         const result = BytesFormatterImplementation.getValueAndSuffix(this.props.value);
         return <span>{result[0]} {result[1]}</span>
     }

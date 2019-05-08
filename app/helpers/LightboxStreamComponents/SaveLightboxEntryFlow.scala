@@ -8,6 +8,7 @@ import com.sksamuel.elastic4s.http.HttpClient
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{LightboxEntry, LightboxEntryDAO}
 import helpers.LightboxHelper
+import javax.inject.Singleton
 import models.UserProfile
 import play.api.Logger
 
@@ -24,6 +25,7 @@ import scala.util.{Failure, Success}
   * @param esClient implicitly provided HttpClient for Elastic Search
   * @param indexer implicitly provided Indexer instance
   */
+@Singleton
 class SaveLightboxEntryFlow (bulkId:String,userProfile: UserProfile)
                   (implicit val lightboxEntryDAO:LightboxEntryDAO, system:ActorSystem, esClient:HttpClient, indexer:Indexer)
   extends GraphStageWithMaterializedValue[FlowShape[ArchiveEntry,(ArchiveEntry, LightboxEntry)], Future[Int]]{

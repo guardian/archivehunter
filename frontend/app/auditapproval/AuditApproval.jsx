@@ -2,6 +2,7 @@ import React from 'react';
 import axios from 'axios';
 import RestoreStatsChart from './RestoreStatsChart.jsx';
 import MonthlyOverviewTable from "./MonthlyOverviewTable.jsx";
+import ApprovalsList from "./ApprovalsList.jsx";
 
 class AuditApproval extends React.Component {
     constructor(props){
@@ -31,7 +32,9 @@ class AuditApproval extends React.Component {
             </div>
             <div id="bottom-row" style={{overflow:"hidden", width: "100vw", height: "1200"}}>
                 <MonthlyOverviewTable/>
+                <ApprovalsList/>
             </div>
+
         </div>
     }
 }

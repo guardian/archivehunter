@@ -573,6 +573,7 @@ li.list-grid {
     display: inline;
     margin-right: 1em;
 }
+
 .inline-throbber {
     margin-top: -1em;
     margin-bottom: -0.5em;
@@ -599,4 +600,29 @@ div.chart-container {
     float: left;
     width: 31vw;
     position: relative;
+}
+
+input.radio-spacing {
+    margin-right: 1em;
+}
+
+ul.approvals-list {
+    list-style-type: none;
+}
+
+span.approval-state-icon {
+    margin-left: -2em;
+    margin-right: 1em;
+}
+
+span.code {
+    background-color: #AAAAAA;
+    color: green;
+    font-family: "Courier",serif;
+    font-size: 0.95em;
+    padding: 0.2em;
+    padding-bottom: 0;
+    margin-right: 0.5em;
+    border: 1px solid #666;
+    white-space: nowrap;
 }

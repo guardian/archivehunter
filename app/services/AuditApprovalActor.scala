@@ -1,14 +1,15 @@
 package services
 
-import akka.actor.Actor
+import akka.actor.{Actor, ActorRef}
 import com.gu.scanamo.error.DynamoReadError
 import com.sksamuel.elastic4s.http.RequestFailure
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{LightboxBulkEntry, LightboxEntryDAO}
-import javax.inject.Inject
+import javax.inject.{Inject, Named}
 import models.{ApprovalStatus, AuditApproval, AuditBulk, AuditBulkDAO, AuditEntryClass, AuditEntryDAO, UserProfile, UserProfileDAO}
 import play.api.Logger
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success}
 
 object AuditApprovalActor {
   trait AAMMsg
@@ -16,18 +17,23 @@ object AuditApprovalActor {
   //input messages
   case class AutomatedApprovalCheck(auditBulk:AuditBulk) extends AAMMsg
   case class AdminApprovalOverride(auditBulk:AuditBulk, approver:UserProfile, newStatus:ApprovalStatus.Value, notes:String) extends  AAMMsg
+
   //internal messages
 
   //output messages
   case class ApprovalGranted(message:String) extends AAMMsg
   case class ApprovalRejected(message:String) extends AAMMsg
   case class ApprovalPending(message:String) extends AAMMsg
-
+  case class ApprovalError(message:String) extends AAMMsg
 }
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class AuditApprovalActor @Inject() (auditEntryDAO: AuditEntryDAO, auditBulkDAO: AuditBulkDAO, userProfileDAO: UserProfileDAO,lightboxEntryDAO: LightboxEntryDAO) extends Actor {
+class AuditApprovalActor @Inject() (auditEntryDAO: AuditEntryDAO,
+                                    auditBulkDAO: AuditBulkDAO,
+                                    userProfileDAO: UserProfileDAO,
+                                    lightboxEntryDAO: LightboxEntryDAO,
+                                    @Named("glacierRestoreActor") glacierRestoreActor: ActorRef) extends Actor {
   import AuditApprovalActor._
   private val logger = Logger(getClass)
 
@@ -91,9 +97,42 @@ class AuditApprovalActor @Inject() (auditEntryDAO: AuditEntryDAO, auditBulkDAO: 
       })
 
     /**
-      *
+      * respond to a request for the UI to do an approval
       */
     case AdminApprovalOverride(auditBulk:AuditBulk, approver:UserProfile, newStatus:ApprovalStatus.Value, notes:String)=>
-
+      val originalSender = sender()
+      logger.info(s"in AdminApprovalOverride")
+      if(!approver.isAdmin){
+        originalSender ! ApprovalRejected(s"${approver.userEmail} is not an admin")
+      } else {
+        val updatedAuditBulk = auditBulk.copy(
+          approvalStatus = newStatus,
+          approval = Some(AuditApproval(Some(approver.userEmail), notes))
+        )
+        logger.debug(s"updatedAuditBulk is $updatedAuditBulk")
+        auditBulkDAO.saveSingle(updatedAuditBulk).onComplete({
+          case Failure(err) =>
+            logger.error(s"auditBulkDAO.saveSingle crashed", err)
+            originalSender ! ApprovalError(err.toString)
+          case Success(Left(err)) =>
+            logger.error(s"Could not save updated audit bulk: ${err.toString}")
+            originalSender ! ApprovalError(err.toString)
+          case Success(Right(_)) =>
+            logger.info(s"Updated audit bulk: $updatedAuditBulk")
+            newStatus match {
+              case ApprovalStatus.Rejected =>
+                originalSender ! ApprovalRejected(s"$approver rejected")
+              case ApprovalStatus.Pending =>
+                logger.error(s"adminApprovalOverride should not set pending status")
+                originalSender ! ApprovalError(s"admin approval override should not set pending status")
+              case ApprovalStatus.Allowed =>
+                //TODO: feed in an expiry parameter and expose this in the UI
+                glacierRestoreActor ! GlacierRestoreActor.InitiateBulkRestore(auditBulk.lighboxBulkId, None)
+                originalSender ! ApprovalGranted(notes)
+              case ApprovalStatus.Queried =>
+                originalSender ! ApprovalRejected(s"Not granted now, this has been queried")
+            }
+        })
+      }
   }
 }

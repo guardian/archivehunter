@@ -4,24 +4,28 @@ import java.time.temporal.{ChronoField, ChronoUnit, TemporalAdjusters, TemporalF
 import java.time.{Instant, Period, ZoneId, ZonedDateTime}
 
 import akka.actor.{Actor, ActorRef, ActorSystem}
+import akka.stream.{ActorMaterializer, ClosedShape, Materializer}
+import akka.stream.scaladsl.{GraphDSL, RunnableGraph}
 import com.amazonaws.services.s3.model.RestoreObjectRequest
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{ESClientManager, S3ClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models._
-import javax.inject.Inject
+import helpers.LightboxHelper
+import helpers.LightboxStreamComponents.{InitiateRestoreSink, LookupLightboxEntryFlow}
+import javax.inject.{Inject, Singleton}
 import play.api.{Configuration, Logger}
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Promise}
+import scala.util.{Failure, Success}
 
 object GlacierRestoreActor {
   trait GRMsg
 
-  /**
-    * public messages to send
-    * @param bucket
-    * @param filePath
+  /*
+    * public messages that can be sent to this Actor
     */
   case class InitiateRestore(entry:ArchiveEntry, lbEntry:LightboxEntry, expiration:Option[Int]) extends GRMsg
+  case class InitiateBulkRestore(lightboxBulkEntryId:String, expiration:Option[Int]) extends GRMsg
   case class CheckRestoreStatus(lbEntry:LightboxEntry) extends GRMsg
 
   /* private internal messages */
@@ -37,16 +41,21 @@ object GlacierRestoreActor {
   case class RestoreCompleted(entry:ArchiveEntry, expiresAt:ZonedDateTime) extends GRMsg
 }
 
-
-class GlacierRestoreActor @Inject() (config:Configuration, esClientMgr:ESClientManager, s3ClientMgr:S3ClientManager, jobModelDAO: JobModelDAO, lbEntryDAO:LightboxEntryDAO, system:ActorSystem) extends Actor {
+@Singleton
+class GlacierRestoreActor @Inject()(config:Configuration, esClientMgr:ESClientManager, s3ClientMgr:S3ClientManager,
+                                     jobModelDAO: JobModelDAO, lbEntryDAO:LightboxEntryDAO,
+                                     lbBulkDAO:LightboxBulkEntryDAO, initiateRestoreSink:InitiateRestoreSink,
+                                     lookupLBEntryFlow:LookupLightboxEntryFlow)(implicit system:ActorSystem) extends Actor {
   import GlacierRestoreActor._
   private val logger = Logger(getClass)
 
   implicit val ec:ExecutionContext = system.getDispatcher
   val s3client = s3ClientMgr.getClient(config.getOptional[String]("externalData.awsProfile"))
   val defaultExpiry = config.getOptional[Int]("archive.restoresExpireAfter").getOrElse(3)
-  private val indexer = new Indexer(config.get[String]("externalData.indexName"))
+  private val indexName = config.get[String]("externalData.indexName")
+  private val indexer = new Indexer(indexName)
   implicit val esClient = esClientMgr.getClient()
+  implicit val mat:Materializer = ActorMaterializer.create(system)
 
   def updateLightbox(lbEntry:LightboxEntry, availableUntil:Option[ZonedDateTime]=None,error:Option[Throwable]=None) = {
     val newStatus = error match {
@@ -177,5 +186,31 @@ class GlacierRestoreActor @Inject() (config:Configuration, esClientMgr:ESClientM
           })
       })
 
+    case InitiateBulkRestore(lightboxBulkEntryId, maybeExpiration)=>
+      logger.info(s"Initiating bulk restore for $lightboxBulkEntryId")
+      val originalSender = sender()
+      val source = LightboxHelper.lightboxBulkSource(indexName,lightboxBulkEntryId)
+      val completionPromise = Promise[Unit]()
+
+      val graph = RunnableGraph.fromGraph(GraphDSL.create() { implicit builder=>
+        import akka.stream.scaladsl.GraphDSL.Implicits._
+        //remember, this sink dispatches individual InitiateRestore messages back to this actor to pull individual items
+        val sink = builder.add(initiateRestoreSink)
+        val lookup = builder.add(lookupLBEntryFlow)
+
+        source.async ~> lookup  ~> sink
+        ClosedShape
+      })
+
+      val resultFuture = graph.run()
+
+      completionPromise.future.onComplete({
+        case Failure(err)=>
+          logger.error(s"Could not complete restore from lightbox bulk $lightboxBulkEntryId", err)
+          originalSender ! RestoreFailure(err)
+        case Success(_)=>
+          logger.info(s"Initiate restore operation completed for lightbox bulk $lightboxBulkEntryId")
+          originalSender ! RestoreSuccess
+      })
   }
 }

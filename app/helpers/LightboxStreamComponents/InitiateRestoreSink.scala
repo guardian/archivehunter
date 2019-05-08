@@ -6,7 +6,7 @@ import akka.stream.stage.{AbstractInHandler, GraphStage, GraphStageLogic, GraphS
 import com.google.inject.Inject
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, StorageClass}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.LightboxEntry
-import javax.inject.Named
+import javax.inject.{Named, Singleton}
 import play.api.Logger
 import services.GlacierRestoreActor
 
@@ -18,6 +18,7 @@ import scala.concurrent.{Future, Promise}
   * Normally, use DI to get this object - val sink = injector.getInstance(classOf[InitiateRestoreSink])
   * @param glacierRestoreActor ActorRef to send the restore messages to
   */
+@Singleton
 class InitiateRestoreSink @Inject() (@Named("glacierRestoreActor") glacierRestoreActor: ActorRef )
   extends GraphStageWithMaterializedValue[SinkShape[(ArchiveEntry, LightboxEntry)], Future[Int]]{
   private final val in = Inlet[(ArchiveEntry, LightboxEntry)]("InitiateRestoreSink.in")

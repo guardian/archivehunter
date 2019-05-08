@@ -56,8 +56,8 @@ class RestoreStatsChart extends React.Component {
     }
 
     componentDidUpdate(prevProps, prevState, snapshot) {
-        if(prevProps.graphCategory!==this.props.graphCategory) this.updateChart();
-        if(prevProps.graphValues!==this.props.graphValues) this.updateChart();
+        if(prevProps.graphCategory!==this.props.graphCategory) {console.log("graph category changed"); this.updateChart();}
+        if(prevProps.graphValues!==this.props.graphValues) {console.log("graphValues changed"); this.updateChart();}
     }
 
     render(){

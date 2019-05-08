@@ -7,12 +7,13 @@ import com.theguardian.multimedia.archivehunter.common.cmn_models.LightboxEntryD
 import models.{ApprovalStatus, AuditBulk, AuditBulkDAO, AuditEntryDAO, UserProfile, UserProfileDAO}
 import org.specs2.mock.Mockito
 import org.specs2.mutable.Specification
-import services.AuditApprovalActor
+import services.{AuditApprovalActor, GlacierRestoreActor}
 import akka.pattern.ask
+import akka.stream.alpakka.s3.impl.StorageClass.Glacier
 import com.gu.scanamo.error.DynamoReadError
 import com.sksamuel.elastic4s.http.{RequestFailure, RequestSuccess, Shards}
 import com.sksamuel.elastic4s.http.index.IndexResponse
-import services.AuditApprovalActor.{AAMMsg, ApprovalGranted, ApprovalPending, ApprovalRejected, AutomatedApprovalCheck}
+import services.AuditApprovalActor.{AAMMsg, AdminApprovalOverride, ApprovalGranted, ApprovalPending, ApprovalRejected, AutomatedApprovalCheck}
 
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
@@ -27,7 +28,7 @@ class AuditApprovalActorSpec extends Specification with Mockito {
       implicit val ec = system.dispatcher
 
       val bulkid = UUID.fromString("D88073AE-1B13-4679-801D-2EB15BAE0A57")
-      val probe = TestProbe()
+      val mockedGlacierRestoreActor = TestProbe()
       val mockedAuditEntryDAO = mock[AuditEntryDAO]
       val mockedAuditBulkDAO = mock[AuditBulkDAO]
       val mockedUserProfileDAO = mock[UserProfileDAO]
@@ -40,7 +41,7 @@ class AuditApprovalActorSpec extends Specification with Mockito {
 
       val testAuditBulk = AuditBulk(bulkid,"test-lightbox-bulk","some/base/path",ApprovalStatus.Pending,"joe.smith",ZonedDateTime.now(),"some reason",None)
 
-      val actor = system.actorOf(Props(new AuditApprovalActor(mockedAuditEntryDAO, mockedAuditBulkDAO, mockedUserProfileDAO, mockedLightboxEntryDAO)))
+      val actor = system.actorOf(Props(new AuditApprovalActor(mockedAuditEntryDAO, mockedAuditBulkDAO, mockedUserProfileDAO, mockedLightboxEntryDAO, mockedGlacierRestoreActor.ref)))
 
       val result = Await.result((actor ? AutomatedApprovalCheck(testAuditBulk)).mapTo[AAMMsg], 10 seconds)
       there was one(mockedAuditBulkDAO).saveSingle(any)
@@ -52,7 +53,7 @@ class AuditApprovalActorSpec extends Specification with Mockito {
       implicit val ec = system.dispatcher
 
       val bulkid = UUID.fromString("D88073AE-1B13-4679-801D-2EB15BAE0A57")
-      val probe = TestProbe()
+      val mockedGlacierRestoreActor = TestProbe()
       val mockedAuditEntryDAO = mock[AuditEntryDAO]
       val mockedAuditBulkDAO = mock[AuditBulkDAO]
       val mockedUserProfileDAO = mock[UserProfileDAO]
@@ -65,7 +66,7 @@ class AuditApprovalActorSpec extends Specification with Mockito {
 
       val testAuditBulk = AuditBulk(bulkid,"test-lightbox-bulk","some/base/path",ApprovalStatus.Pending,"joe.smith",ZonedDateTime.now(),"some reason",None)
 
-      val actor = system.actorOf(Props(new AuditApprovalActor(mockedAuditEntryDAO, mockedAuditBulkDAO, mockedUserProfileDAO, mockedLightboxEntryDAO)))
+      val actor = system.actorOf(Props(new AuditApprovalActor(mockedAuditEntryDAO, mockedAuditBulkDAO, mockedUserProfileDAO, mockedLightboxEntryDAO, mockedGlacierRestoreActor.ref)))
 
       val result = Await.result((actor ? AutomatedApprovalCheck(testAuditBulk)).mapTo[AAMMsg], 10 seconds)
       there was one(mockedAuditBulkDAO).saveSingle(any)
@@ -77,7 +78,7 @@ class AuditApprovalActorSpec extends Specification with Mockito {
       implicit val ec = system.dispatcher
 
       val bulkid = UUID.fromString("D88073AE-1B13-4679-801D-2EB15BAE0A57")
-      val probe = TestProbe()
+      val mockedGlacierRestoreActor = TestProbe()
       val mockedAuditEntryDAO = mock[AuditEntryDAO]
       val mockedAuditBulkDAO = mock[AuditBulkDAO]
       val mockedUserProfileDAO = mock[UserProfileDAO]
@@ -90,7 +91,7 @@ class AuditApprovalActorSpec extends Specification with Mockito {
 
       val testAuditBulk = AuditBulk(bulkid,"test-lightbox-bulk","some/base/path",ApprovalStatus.Pending,"joe.smith",ZonedDateTime.now(),"some reason",None)
 
-      val actor = system.actorOf(Props(new AuditApprovalActor(mockedAuditEntryDAO, mockedAuditBulkDAO, mockedUserProfileDAO, mockedLightboxEntryDAO)))
+      val actor = system.actorOf(Props(new AuditApprovalActor(mockedAuditEntryDAO, mockedAuditBulkDAO, mockedUserProfileDAO, mockedLightboxEntryDAO, mockedGlacierRestoreActor.ref)))
 
       val result = Await.result((actor ? AutomatedApprovalCheck(testAuditBulk)).mapTo[AAMMsg], 10 seconds)
       there was no(mockedAuditBulkDAO).saveSingle(any)
@@ -102,7 +103,7 @@ class AuditApprovalActorSpec extends Specification with Mockito {
       implicit val ec = system.dispatcher
 
       val bulkid = UUID.fromString("D88073AE-1B13-4679-801D-2EB15BAE0A57")
-      val probe = TestProbe()
+      val mockedGlacierRestoreActor = TestProbe()
       val mockedAuditEntryDAO = mock[AuditEntryDAO]
       val mockedAuditBulkDAO = mock[AuditBulkDAO]
       val mockedUserProfileDAO = mock[UserProfileDAO]
@@ -115,7 +116,7 @@ class AuditApprovalActorSpec extends Specification with Mockito {
 
       val testAuditBulk = AuditBulk(bulkid,"test-lightbox-bulk","some/base/path",ApprovalStatus.Pending,"joe.smith",ZonedDateTime.now(),"some reason",None)
 
-      val actor = system.actorOf(Props(new AuditApprovalActor(mockedAuditEntryDAO, mockedAuditBulkDAO, mockedUserProfileDAO, mockedLightboxEntryDAO)))
+      val actor = system.actorOf(Props(new AuditApprovalActor(mockedAuditEntryDAO, mockedAuditBulkDAO, mockedUserProfileDAO, mockedLightboxEntryDAO, mockedGlacierRestoreActor.ref)))
 
       val result = Await.result((actor ? AutomatedApprovalCheck(testAuditBulk)).mapTo[AAMMsg], 10 seconds)
       there was no(mockedAuditBulkDAO).saveSingle(any)
@@ -127,7 +128,7 @@ class AuditApprovalActorSpec extends Specification with Mockito {
       implicit val ec = system.dispatcher
 
       val bulkid = UUID.fromString("D88073AE-1B13-4679-801D-2EB15BAE0A57")
-      val probe = TestProbe()
+      val mockedGlacierRestoreActor = TestProbe()
       val mockedAuditEntryDAO = mock[AuditEntryDAO]
       val mockedAuditBulkDAO = mock[AuditBulkDAO]
       val mockedUserProfileDAO = mock[UserProfileDAO]
@@ -140,12 +141,83 @@ class AuditApprovalActorSpec extends Specification with Mockito {
 
       val testAuditBulk = AuditBulk(bulkid,"test-lightbox-bulk","some/base/path",ApprovalStatus.Pending,"joe.smith",ZonedDateTime.now(),"some reason",None)
 
-      val actor = system.actorOf(Props(new AuditApprovalActor(mockedAuditEntryDAO, mockedAuditBulkDAO, mockedUserProfileDAO, mockedLightboxEntryDAO)))
+      val actor = system.actorOf(Props(new AuditApprovalActor(mockedAuditEntryDAO, mockedAuditBulkDAO, mockedUserProfileDAO, mockedLightboxEntryDAO, mockedGlacierRestoreActor.ref)))
 
       val result = Await.result((actor ? AutomatedApprovalCheck(testAuditBulk)).mapTo[AAMMsg], 10 seconds)
       there was no(mockedAuditBulkDAO).saveSingle(any)
 
       result must beAnInstanceOf[ApprovalPending]
+    }
+  }
+
+  "AuditApprovalActor ! AdminApprovalOverride" should {
+    "update the given auditbulk and save it, then trigger a bulk restore only if approval status is Allowed" in new AkkaTestkitSpecs2Support {
+      implicit val ec = system.dispatcher
+
+      val bulkid = UUID.fromString("D88073AE-1B13-4679-801D-2EB15BAE0A57")
+      val mockedGlacierRestoreActor = TestProbe()
+      val mockedAuditEntryDAO = mock[AuditEntryDAO]
+      val mockedAuditBulkDAO = mock[AuditBulkDAO]
+      val mockedUserProfileDAO = mock[UserProfileDAO]
+      val mockedLightboxEntryDAO = mock[LightboxEntryDAO]
+
+      mockedAuditBulkDAO.saveSingle(any) returns Future(Right(mock[RequestSuccess[IndexResponse]]))
+
+      val actor = system.actorOf(Props(new AuditApprovalActor(mockedAuditEntryDAO, mockedAuditBulkDAO, mockedUserProfileDAO, mockedLightboxEntryDAO, mockedGlacierRestoreActor.ref)))
+
+      val testAuditBulk = AuditBulk(bulkid,"test-lightbox-bulk","some/base/path",ApprovalStatus.Pending,"joe.smith",ZonedDateTime.now(),"some reason",None)
+      val adminsUserProfile = UserProfile("some-admin@thecompany.org",true,Seq(),false,None)
+
+      val result = Await.result((actor ? AdminApprovalOverride(testAuditBulk,adminsUserProfile,ApprovalStatus.Allowed,"automated testing")).mapTo[AAMMsg], 10 seconds)
+      there was one(mockedAuditBulkDAO).saveSingle(any)
+      mockedGlacierRestoreActor.expectMsg(GlacierRestoreActor.InitiateBulkRestore("test-lightbox-bulk",None))
+      result must beAnInstanceOf[ApprovalGranted]
+    }
+
+    "reject approval attempt if the UserProfile does not identify an admin" in new AkkaTestkitSpecs2Support {
+      implicit val ec = system.dispatcher
+
+      val bulkid = UUID.fromString("D88073AE-1B13-4679-801D-2EB15BAE0A57")
+      val mockedGlacierRestoreActor = TestProbe()
+      val mockedAuditEntryDAO = mock[AuditEntryDAO]
+      val mockedAuditBulkDAO = mock[AuditBulkDAO]
+      val mockedUserProfileDAO = mock[UserProfileDAO]
+      val mockedLightboxEntryDAO = mock[LightboxEntryDAO]
+
+      mockedAuditBulkDAO.saveSingle(any) returns Future(Right(mock[RequestSuccess[IndexResponse]]))
+
+      val actor = system.actorOf(Props(new AuditApprovalActor(mockedAuditEntryDAO, mockedAuditBulkDAO, mockedUserProfileDAO, mockedLightboxEntryDAO, mockedGlacierRestoreActor.ref)))
+
+      val testAuditBulk = AuditBulk(bulkid,"test-lightbox-bulk","some/base/path",ApprovalStatus.Pending,"joe.smith",ZonedDateTime.now(),"some reason",None)
+      val adminsUserProfile = UserProfile("some-admin@thecompany.org",false,Seq(),false,None)
+
+      val result = Await.result((actor ? AdminApprovalOverride(testAuditBulk,adminsUserProfile,ApprovalStatus.Allowed,"automated testing")).mapTo[AAMMsg], 10 seconds)
+      there was no(mockedAuditBulkDAO).saveSingle(any)
+      mockedGlacierRestoreActor.expectNoMessage(3.seconds)
+      result must beAnInstanceOf[ApprovalRejected]
+    }
+
+    "update the given auditbulk and save it but not trigger anything if the approval status is Rejected" in new AkkaTestkitSpecs2Support {
+      implicit val ec = system.dispatcher
+
+      val bulkid = UUID.fromString("D88073AE-1B13-4679-801D-2EB15BAE0A57")
+      val mockedGlacierRestoreActor = TestProbe()
+      val mockedAuditEntryDAO = mock[AuditEntryDAO]
+      val mockedAuditBulkDAO = mock[AuditBulkDAO]
+      val mockedUserProfileDAO = mock[UserProfileDAO]
+      val mockedLightboxEntryDAO = mock[LightboxEntryDAO]
+
+      mockedAuditBulkDAO.saveSingle(any) returns Future(Right(mock[RequestSuccess[IndexResponse]]))
+
+      val actor = system.actorOf(Props(new AuditApprovalActor(mockedAuditEntryDAO, mockedAuditBulkDAO, mockedUserProfileDAO, mockedLightboxEntryDAO, mockedGlacierRestoreActor.ref)))
+
+      val testAuditBulk = AuditBulk(bulkid,"test-lightbox-bulk","some/base/path",ApprovalStatus.Pending,"joe.smith",ZonedDateTime.now(),"some reason",None)
+      val adminsUserProfile = UserProfile("some-admin@thecompany.org",true,Seq(),false,None)
+
+      val result = Await.result((actor ? AdminApprovalOverride(testAuditBulk,adminsUserProfile,ApprovalStatus.Rejected,"automated testing")).mapTo[AAMMsg], 10 seconds)
+      there was one(mockedAuditBulkDAO).saveSingle(any)
+      mockedGlacierRestoreActor.expectNoMessage(3.seconds)
+      result must beAnInstanceOf[ApprovalRejected]
     }
   }
 }

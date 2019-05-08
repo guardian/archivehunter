@@ -68,7 +68,10 @@ object ArchiveEntry extends ((String, String, String, Option[String], Option[Str
     indexer.getByIdFull(makeDocId(bucket, key))
 }
 
-case class ArchiveEntry(id:String, bucket: String, path: String, region:Option[String], file_extension: Option[String], size: scala.Long, last_modified: ZonedDateTime, etag: String, mimeType: MimeType, proxied: Boolean, storageClass:StorageClass, lightboxEntries:Seq[LightboxIndex], beenDeleted:Boolean=false, mediaMetadata:Option[MediaMetadata]) {
+case class ArchiveEntry(id:String, bucket: String, path: String, region:Option[String], file_extension: Option[String],
+                        size: scala.Long, last_modified: ZonedDateTime, etag: String, mimeType: MimeType,
+                        proxied: Boolean, storageClass:StorageClass,
+                        lightboxEntries:Seq[LightboxIndex], beenDeleted:Boolean=false, mediaMetadata:Option[MediaMetadata]) {
   private val logger = LogManager.getLogger(getClass)
   def getProxy(proxyType: ProxyType.Value)(implicit proxyLocationDAO:ProxyLocationDAO, client:DynamoClient) = proxyLocationDAO.getProxy(id,proxyType)
 

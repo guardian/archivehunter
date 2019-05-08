@@ -2,8 +2,9 @@ package helpers
 
 import java.time.ZonedDateTime
 
+import akka.NotUsed
 import akka.actor.{ActorRefFactory, ActorSystem}
-import akka.stream.{ClosedShape, Materializer}
+import akka.stream.{ClosedShape, Materializer, SourceShape}
 import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Keep, Merge, RunnableGraph, Sink, Source}
 import com.google.inject.Injector
 import com.sksamuel.elastic4s.http.{HttpClient, RequestFailure}
@@ -134,6 +135,33 @@ object LightboxHelper {
   }
 
   /**
+    * returns an Akka stream Source that streams each ArchiveEntry associated with the given lightbox bulk
+    * @param indexName index that contains ArchiveEntries
+    * @param lightboxBulkId ID of the lightbox bulk to query for
+    * @param esClient implicitly provided Elastic4s client
+    * @param system implicitly provided actor system
+    * @return a Source that generates ArchiveEntry objects
+    */
+  def lightboxBulkSource(indexName:String, lightboxBulkId:String)(implicit esClient:HttpClient, system:ActorSystem):Source[ArchiveEntry,NotUsed] = {
+    val archiveEntryConverter = new SearchHitToArchiveEntryFlow
+
+    Source.fromGraph(GraphDSL.create() { implicit builder=>
+      import akka.stream.scaladsl.GraphDSL.Implicits._
+
+      val queryDef = nestedQuery(path="lightboxEntries", query = {
+        matchQuery("lightboxEntries.memberOfBulk", lightboxBulkId)
+      })
+
+      val src = builder.add(getElasticSource(indexName, queryDef))
+      val entryConverter = builder.add(new SearchHitToArchiveEntryFlow)
+
+      src ~> entryConverter
+
+      SourceShape(entryConverter.out)
+    })
+  }
+
+  /**
     * run the provided SearchRequest and add the result to the given LightboxBulkEntry.
     * if any elements require restore from Glacier, this will be initated
     * @param indexName index name to query
@@ -251,15 +279,10 @@ object LightboxHelper {
     val flow = RunnableGraph.fromGraph(GraphDSL.create(dynamoSaveSink, esSaveSink)((_,_)) { implicit b => (actualDynamoSink, actualESSink) =>
       import akka.stream.scaladsl.GraphDSL.Implicits._
 
-      val queryDef = nestedQuery(path="lightboxEntries", query = {
-        matchQuery("lightboxEntries.memberOfBulk", bulk.id)
-      })
-
-      val src = b.add(getElasticSource(indexName, queryDef))
-      val entryConverter = b.add(new SearchHitToArchiveEntryFlow)
+      val src = lightboxBulkSource(indexName, bulk.id)
       val bcast = b.add(new Broadcast[ArchiveEntry](2, eagerCancel = false))
 
-      src ~> entryConverter ~> bcast ~> actualESSink
+      src ~> bcast ~> actualESSink
       bcast ~> actualDynamoSink
       ClosedShape
     })

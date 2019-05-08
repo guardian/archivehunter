@@ -103,6 +103,7 @@
 
     <logger name="services.AuditApprovalActor" level="DEBUG"/>
     <logger name="services.AuditApprovalController" level="DEBUG"/>
+    <logger name="services.GlacierRestoreActor" level="DEBUG"/>
 
     <root level="WARN">
         <appender-ref ref="STDOUT" />

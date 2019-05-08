@@ -4,6 +4,7 @@ import java.util.UUID
 
 import akka.actor.ActorSystem
 import akka.stream.{ActorMaterializer, Materializer}
+import com.sksamuel.elastic4s.RefreshPolicy
 import com.theguardian.multimedia.archivehunter.common.ZonedDateTimeEncoder
 import com.theguardian.multimedia.archivehunter.common.clientManagers.ESClientManager
 import javax.inject.Inject
@@ -19,14 +20,13 @@ class AuditBulkDAO @Inject() (config:Configuration, esClientMgr:ESClientManager)
   import com.sksamuel.elastic4s.streams.ReactiveElastic._
 
   private val logger=Logger(getClass)
-  val indexName = config.getOptional[String]("externalData.indexName").getOrElse("archivehunter")
+  val indexName = config.getOptional[String]("externalData.auditBulkIndexName").getOrElse("auditbulk")
 
   private implicit val esClient = esClientMgr.getClient()
 
-  //implicit val mat:Materializer = ActorMaterializer.create(actorSystem)
-
   def saveSingle(auditBulk: AuditBulk) = esClient.execute {
-    indexInto(indexName) doc auditBulk
+    //indexInto(indexName, "auditbulk") doc auditBulk id auditBulk.bulkId.toString refresh RefreshPolicy.WAIT_UNTIL
+    update(auditBulk.bulkId.toString).in(s"$indexName/auditbulk") docAsUpsert auditBulk refresh RefreshPolicy.WAIT_UNTIL
   }
 
   def lookupForLightboxBulk(lbBulkId:String) = esClient.execute {
@@ -34,17 +34,16 @@ class AuditBulkDAO @Inject() (config:Configuration, esClientMgr:ESClientManager)
   }
 
   def lookupByUuid(uuid:UUID) = esClient.execute {
-    search(indexName) matchQuery("bulkId.keyword", uuid.toString)
-  }.map({
-    case Left(err)=>Left(err)
-    case Right(success)=>Right(success.result.to[AuditBulk].headOption)
-  })
+    //search(indexName) matchQuery("bulkId.keyword", uuid.toString)
+    get(indexName, "auditbulk", uuid.toString)
+  }.map(_.map(success=>{
+      if(success.result.found)
+        Some(success.result.to[AuditBulk])
+      else
+        None
+  }))
 
   def searchForStatus(status:ApprovalStatus.Value) = esClient.execute {
     search(indexName) matchQuery("approvalStatus.keyword", status.toString)
-  }.map({
-    //case l @ Left(_)=>l
-    case Left(err)=>Left(err)
-    case Right(success)=>Right(success.result.to[AuditBulk])
-  })
+  }.map(_.map(_.result.to[AuditBulk]))
 }

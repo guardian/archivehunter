@@ -12,16 +12,16 @@ import play.api.{Configuration, Logger}
 import play.api.libs.circe.Circe
 import play.api.libs.ws.WSClient
 import play.api.mvc.{AbstractController, ControllerComponents}
-import responses.{ChartDataResponse, GenericErrorResponse, ObjectListResponse}
+import responses.{ChartDataResponse, GenericErrorResponse, ObjectListResponse, ObjectListResponseWithSize}
 import io.circe.generic.auto._
 import io.circe.syntax._
-import models.{ApprovalStatus, AuditBulkDAO, AuditEntry, AuditEntryClass, UserProfileDAO}
+import models.{ApprovalStatus, AuditBulk, AuditBulkDAO, AuditEntry, AuditEntryClass, AuditEntryDAO, UserProfileDAO}
 import requests.ManualApprovalRequest
 import services.AuditApprovalActor
 import services.AuditApprovalActor.{AAMMsg, ApprovalGranted}
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
+import scala.concurrent.{Await, Future}
 import scala.util.{Failure, Success, Try}
 import scala.concurrent.duration._
 
@@ -32,6 +32,7 @@ class AuditApprovalController @Inject()  (override val config:Configuration,
                                           override val wsClient:WSClient,
                                           override val refresher:InjectableRefresher,
                                           auditBulkDAO:AuditBulkDAO,
+                                          auditEntryDAO:AuditEntryDAO,
                                           userProfileDAO:UserProfileDAO,
                                           @Named("auditApprovalActor") auditApprovalActor:ActorRef)
   extends AbstractController(controllerComponents) with PanDomainAuthActions with Circe with AuditEntryRequestBuilder with AdminsOnly {
@@ -42,6 +43,7 @@ class AuditApprovalController @Inject()  (override val config:Configuration,
   private val esClient = esClientMgr.getClient()
   private val logger=Logger(getClass)
   val indexName = config.get[String]("externalData.auditIndexName")
+  val bulksIndexName = config.get[String]("externalData.auditBulkIndexName")
 
   implicit val actorTimeout:akka.util.Timeout = 30.seconds
 
@@ -160,45 +162,60 @@ var myChart = new Chart(ctx, {
     })
   }
 
-  def addDummyData = APIAuthAction.async {
+  def addDummyData = APIAuthAction {
     val testDataSeq = Seq(
       AuditEntry("fileid-1",2048000,"here","test1",ZonedDateTime.parse("2019-01-01T00:00:00Z"),"some-collection",AuditEntryClass.Restore,Some("5f4d9eb3-7605-4e90-9b81-598641b0f0cb")),
       AuditEntry("fileid-1",2048000,"here","test1",ZonedDateTime.parse("2019-02-02T00:00:00Z"),"some-collection",AuditEntryClass.Restore,Some("5f4d9eb3-7605-4e90-9b81-598641b0f0cb")),
-      AuditEntry("fileid-1",2048000,"here","test2",ZonedDateTime.parse("2019-02-04T00:00:00Z"),"some-collection",AuditEntryClass.Restore,Some("5f4d9eb3-7605-4e90-9b81-598641b0f0cb")),
+      AuditEntry("fileid-1",2048000,"here","test2",ZonedDateTime.parse("2019-02-04T00:00:00Z"),"some-collection",AuditEntryClass.Restore,Some("0a870b02-e723-41b1-88df-923eff4d6881")),
       AuditEntry("fileid-1",2048000,"here","test1",ZonedDateTime.parse("2019-03-03T00:00:00Z"),"some-collection",AuditEntryClass.Restore,Some("5f4d9eb3-7605-4e90-9b81-598641b0f0cb")),
-      AuditEntry("fileid-1",2048000,"here","test3",ZonedDateTime.parse("2019-03-03T00:00:00Z"),"some-collection",AuditEntryClass.Restore,Some("5f4d9eb3-7605-4e90-9b81-598641b0f0cb")),
-      AuditEntry("fileid-1",2048000,"here","test3",ZonedDateTime.parse("2019-03-05T00:00:00Z"),"some-collection",AuditEntryClass.Restore,Some("5f4d9eb3-7605-4e90-9b81-598641b0f0cb")),
+      AuditEntry("fileid-1",2048000,"here","test3",ZonedDateTime.parse("2019-03-03T00:00:00Z"),"some-collection",AuditEntryClass.Restore,Some("74831e54-9cc1-48b9-9fe4-de74eed5c6dc")),
+      AuditEntry("fileid-1",2048000,"here","test3",ZonedDateTime.parse("2019-03-05T00:00:00Z"),"some-collection",AuditEntryClass.Restore,Some("74831e54-9cc1-48b9-9fe4-de74eed5c6dc")),
       AuditEntry("fileid-1",2048000,"here","test1",ZonedDateTime.parse("2019-03-01T00:00:00Z"),"some-collection",AuditEntryClass.Download,Some("5f4d9eb3-7605-4e90-9b81-598641b0f0cb")),
       AuditEntry("fileid-1",2048000,"here","test1",ZonedDateTime.parse("2019-02-02T00:00:00Z"),"some-collection",AuditEntryClass.Download,Some("5f4d9eb3-7605-4e90-9b81-598641b0f0cb")),
-      AuditEntry("fileid-1",2048000,"here","test2",ZonedDateTime.parse("2019-02-04T00:00:00Z"),"some-collection",AuditEntryClass.Download,Some("5f4d9eb3-7605-4e90-9b81-598641b0f0cb")),
+      AuditEntry("fileid-1",2048000,"here","test2",ZonedDateTime.parse("2019-02-04T00:00:00Z"),"some-collection",AuditEntryClass.Download,Some("0a870b02-e723-41b1-88df-923eff4d6881")),
       AuditEntry("fileid-1",2048000,"here","test1",ZonedDateTime.parse("2019-01-03T00:00:00Z"),"some-collection",AuditEntryClass.Download,Some("5f4d9eb3-7605-4e90-9b81-598641b0f0cb")),
-      AuditEntry("fileid-1",2048000,"here","test3",ZonedDateTime.parse("2019-01-03T00:00:00Z"),"some-collection",AuditEntryClass.Download,Some("5f4d9eb3-7605-4e90-9b81-598641b0f0cb")),
-      AuditEntry("fileid-1",2048000,"here","test3",ZonedDateTime.parse("2019-01-05T00:00:00Z"),"some-collection",AuditEntryClass.Download,Some("5f4d9eb3-7605-4e90-9b81-598641b0f0cb")),
+      AuditEntry("fileid-1",2048000,"here","test3",ZonedDateTime.parse("2019-01-03T00:00:00Z"),"some-collection",AuditEntryClass.Download,Some("74831e54-9cc1-48b9-9fe4-de74eed5c6dc")),
+      AuditEntry("fileid-1",2048000,"here","test3",ZonedDateTime.parse("2019-01-05T00:00:00Z"),"some-collection",AuditEntryClass.Download,Some("74831e54-9cc1-48b9-9fe4-de74eed5c6dc")),
     )
 
-    val futureList = Future.sequence(testDataSeq.map(entry => esClient.execute {
-      index(indexName,"auditentry") doc entry refresh(RefreshPolicy.Immediate)
-    }))
+    val testBulksSeq = Seq(
+      AuditBulk(UUID.fromString("5f4d9eb3-7605-4e90-9b81-598641b0f0cb"),"lightbox-id-1","first/item/path",ApprovalStatus.Pending,"test1",ZonedDateTime.parse("2019-02-03T04:05:06Z"),"First test",None),
+    )
 
-    futureList.map(results=>{
-      val failures = results.collect({case Left(err)=>err})
-      if(failures.nonEmpty){
-        InternalServerError(GenericErrorResponse("error",failures.map(_.toString).mkString("; ")).asJson)
-      } else {
-        Ok(GenericErrorResponse("ok","dummy data added to index").asJson)
-      }
-    })
+    //yeah this sucks but it's only for adding test data
+    val results = testDataSeq.map(entry => Await.result(esClient.execute {
+      index(indexName,"auditentry") doc entry refresh RefreshPolicy.WAIT_UNTIL
+    }, 10 seconds))
+
+    val futureBulkResults = testBulksSeq.map(entry=>Await.result(esClient.execute {
+      index(bulksIndexName, "auditbulk") doc entry id entry.bulkId.toString refresh RefreshPolicy.WAIT_UNTIL
+    }, 10 seconds))
+
+    val failures = (results ++ futureBulkResults).collect({case Left(err)=>err})
+    if(failures.nonEmpty){
+      InternalServerError(GenericErrorResponse("db_error", failures.map(_.toString).mkString(";")).asJson)
+    } else {
+      Ok(GenericErrorResponse("ok", "test data added").asJson)
+    }
   }
 
   def approvalsByStatus(statusString:String) = APIAuthAction.async {
     Try { ApprovalStatus.withName(statusString) } match {
       case Success(statusValue)=>
-        auditBulkDAO.searchForStatus(statusValue).map({
+        auditBulkDAO.searchForStatus(statusValue).flatMap({
           case Left(err)=>
             logger.error(s"Could not get approvals by status: $err")
-            InternalServerError(GenericErrorResponse("error",err.toString).asJson)
+            Future(InternalServerError(GenericErrorResponse("error",err.toString).asJson))
           case Right(result)=>
-            Ok(ObjectListResponse("ok","approvalbulk",result,result.length).asJson)
+            Future.sequence(result.map(bulkRecord=>auditEntryDAO.totalSizeForBulk(bulkRecord.bulkId, AuditEntryClass.Restore))).map(sizeResults=>{
+              val failures = sizeResults.collect({case Left(err)=>err})
+              if(failures.nonEmpty){
+                logger.error(s"Could not look up total size for bulks: ${failures.map(_.toString).mkString("; ")}")
+                InternalServerError(GenericErrorResponse("db_error", failures.map(_.toString).mkString("; ")).asJson)
+              } else {
+                Ok(ObjectListResponseWithSize("ok","approvalbulk",result,result.length, sizeResults.collect({case Right(size)=>size})).asJson)
+              }
+            })
         })
       case Failure(err:NoSuchElementException)=>
         Future(BadRequest(GenericErrorResponse("invalid_input", s"$statusString is not a valid status").asJson))

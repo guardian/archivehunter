@@ -4,13 +4,14 @@ import akka.stream.{Attributes, Inlet, SinkShape}
 import akka.stream.stage.{AbstractInHandler, GraphStageLogic, GraphStageWithMaterializedValue}
 import com.sksamuel.elastic4s.http.HttpClient
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer}
+import javax.inject.Singleton
 import play.api.Logger
 
 import scala.concurrent.{Await, Future, Promise}
 import scala.util.{Failure, Success}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-
+@Singleton
 class RemoveLightboxIndexInfoSink (userEmail:String)(implicit esClient:HttpClient, indexer:Indexer) extends GraphStageWithMaterializedValue[SinkShape[ArchiveEntry], Future[Int]]{
   private final val in = Inlet[ArchiveEntry]("RemoveLightboxIndexInfoSink.in")
 

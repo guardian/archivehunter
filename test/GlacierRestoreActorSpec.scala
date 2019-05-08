@@ -1,7 +1,7 @@
 import akka.actor.Props
 import com.amazonaws.services.s3.AmazonS3
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{ESClientManager, S3ClientManager}
-import com.theguardian.multimedia.archivehunter.common.cmn_models.{JobModel, JobModelDAO, LightboxEntry, LightboxEntryDAO}
+import com.theguardian.multimedia.archivehunter.common.cmn_models.{JobModel, JobModelDAO, LightboxBulkEntryDAO, LightboxEntry, LightboxEntryDAO}
 import org.specs2.mock.Mockito
 import org.specs2.mutable.Specification
 import play.api.Configuration
@@ -10,6 +10,7 @@ import akka.pattern.ask
 import akka.util.Timeout
 import com.amazonaws.services.s3.model.RestoreObjectRequest
 import com.theguardian.multimedia.archivehunter.common.ArchiveEntry
+import helpers.LightboxStreamComponents.{InitiateRestoreSink, LookupLightboxEntryFlow}
 
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration._
@@ -31,13 +32,19 @@ class GlacierRestoreActorSpec extends Specification with Mockito {
       val mockedLightboxEntryDAO = mock[LightboxEntryDAO]
       mockedLightboxEntryDAO.put(any[LightboxEntry])(any) returns Future(None)
 
+      val mockedLightboxBulkEntryDAO = mock[LightboxBulkEntryDAO]
       val mockedEntry = mock[ArchiveEntry]
+
       mockedEntry.id returns "mock-entry-id"
       mockedEntry.bucket returns "testbucket"
       mockedEntry.path returns "testpath"
       val mockedLbEntry = mock[LightboxEntry]
 
-      val toTest = system.actorOf(Props(new GlacierRestoreActor(mockedConfig, mockedEsClientMgr, mockedS3ClientManager, mockedJobModelDAO, mockedLightboxEntryDAO, system)))
+      val mockedInitiateRestoreSink = mock[InitiateRestoreSink]
+      val mockedLookupLightboxEntryFlow = mock[LookupLightboxEntryFlow]
+
+      val toTest = system.actorOf(Props(new GlacierRestoreActor(mockedConfig, mockedEsClientMgr, mockedS3ClientManager,
+        mockedJobModelDAO, mockedLightboxEntryDAO, mockedLightboxBulkEntryDAO, mockedInitiateRestoreSink, mockedLookupLightboxEntryFlow)(system)))
 
       val result = Await.result(toTest ? GlacierRestoreActor.InitiateRestore(mockedEntry, mockedLbEntry, None), 30 seconds)
       result mustEqual GlacierRestoreActor.RestoreSuccess

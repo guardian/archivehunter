@@ -4,6 +4,7 @@ import akka.stream.{Attributes, Inlet, SinkShape}
 import akka.stream.stage.{AbstractInHandler, GraphStage, GraphStageLogic, GraphStageWithMaterializedValue}
 import com.theguardian.multimedia.archivehunter.common.ArchiveEntry
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{LightboxEntry, LightboxEntryDAO}
+import javax.inject.Singleton
 import play.api.Logger
 
 import scala.concurrent.{Await, Future, Promise}
@@ -11,6 +12,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}
 import scala.concurrent.duration._
 
+@Singleton
 class RemoveLightboxEntrySink (userEmail:String)(implicit lightboxEntryDAO:LightboxEntryDAO)
   extends GraphStageWithMaterializedValue[SinkShape[ArchiveEntry], Future[Int]]{
 
