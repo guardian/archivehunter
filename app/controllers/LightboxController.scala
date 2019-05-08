@@ -319,7 +319,8 @@ class LightboxController @Inject() (override val config:Configuration,
   def deleteBulk(entryId:String) = APIAuthAction.async { request=>
     implicit val lightboxEntryDAOImpl = lightboxEntryDAO
     userProfileFromSession(request.session) match {
-      case None=>Future(BadRequest(GenericErrorResponse("session_error","no session present").asJson))
+      case None=>
+        Future(BadRequest(GenericErrorResponse("session_error","no session present").asJson))
       case Some(Left(err))=>
         logger.error(s"Session is corrupted: ${err.toString}")
         Future(InternalServerError(GenericErrorResponse("session_error","session is corrupted, log out and log in again").asJson))
