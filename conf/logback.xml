@@ -96,6 +96,8 @@
     <logger name="com.theguardian.multimedia.archivehunter.cmn_services.ProxyGenerators" level="INFO"/>
     <logger name="com.theguardian.multimedia.archivehunter.common.ProxyLocation$" level="INFO"/>
 
+    <logger name="services.GlacierRestoreActor" level="DEBUG"/>
+
     <logger name="helpers.LightboxHelper$" level="INFO"/>
     <logger name="helpers.LightboxHelper" level="INFO"/>
     <root level="WARN">

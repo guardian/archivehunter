@@ -34,6 +34,7 @@ object GlacierRestoreActor {
   case class NotInArchive(entry:ArchiveEntry) extends GRMsg
   case class RestoreNotRequested(entry:ArchiveEntry) extends GRMsg
   case class RestoreInProgress(entry:ArchiveEntry) extends GRMsg
+  case class RestoreExpired(entry:ArchiveEntry) extends GRMsg
   case class RestoreCompleted(entry:ArchiveEntry, expiresAt:ZonedDateTime) extends GRMsg
 }
 
@@ -45,6 +46,7 @@ class GlacierRestoreActor @Inject() (config:Configuration, esClientMgr:ESClientM
   implicit val ec:ExecutionContext = system.getDispatcher
   val s3client = s3ClientMgr.getClient(config.getOptional[String]("externalData.awsProfile"))
   val defaultExpiry = config.getOptional[Int]("archive.restoresExpireAfter").getOrElse(3)
+  logger.info(s"Glacier restores will expire after $defaultExpiry days")
   private val indexer = new Indexer(config.get[String]("externalData.indexName"))
   implicit val esClient = esClientMgr.getClient()
 
