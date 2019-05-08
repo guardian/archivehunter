@@ -7,6 +7,7 @@ import CommonSearchView from "../common/CommonSearchView.jsx";
 import LightboxInfoInsert from "./LightboxInfoInsert.jsx";
 import AvailabilityInsert from "./AvailabilityInsert.jsx";
 import BulkSelectionsScroll from "./BulkSelectionsScroll.jsx";
+import UserSelector from "../common/UserSelector.jsx";
 
 class MyLightbox extends CommonSearchView {
     constructor(props){
@@ -21,22 +22,27 @@ class MyLightbox extends CommonSearchView {
             extraInfo: "",
             bulkSelections: [],
             bulkSelectionsCount: 0,
-            bulkSelectionSelected: null
+            bulkSelectionSelected: null,
+            selectedUser: "my"
         };
 
         this.checkArchiveStatus = this.checkArchiveStatus.bind(this);
         this.bulkSelectionChanged = this.bulkSelectionChanged.bind(this);
         this.reloadSearch = this.reloadSearch.bind(this);
         this.bulkSearchDeleteRequested = this.bulkSearchDeleteRequested.bind(this);
-
+        this.userChanged = this.userChanged.bind(this);
     }
 
     performLoad(){
-        const detailsRequest = axios.get("/api/lightbox/my/details");
-        const summaryRequest = axios.get("/api/search/myLightBox");
+        const detailsRequest = axios.get("/api/lightbox/" + this.state.selectedUser+"/details");
+        const summaryRequest = axios.get("/api/search/myLightBox?user=" + this.state.selectedUser);
         const loginDetailsRequest = axios.get("/api/loginStatus");
-        const bulkSelectionsRequest = axios.get("/api/lightbox/my/bulks");
+        const bulkSelectionsRequest = axios.get("/api/lightbox/" + this.state.selectedUser+"/bulks");
         return Promise.all([detailsRequest, summaryRequest, loginDetailsRequest, bulkSelectionsRequest]);
+    }
+
+    userChanged(evt){
+        this.setState({selectedUser: evt.target.value}, ()=>this.refreshData());
     }
 
     refreshData(){
@@ -64,8 +70,8 @@ class MyLightbox extends CommonSearchView {
     }
 
     reloadSearch(){
-        const detailsRequest = axios.get("/api/lightbox/my/details");
-        const searchUrl = this.state.bulkSelectionSelected ? "/api/search/myLightBox?bulkId=" + this.state.bulkSelectionSelected : "/api/search/myLightbox";
+        const detailsRequest = axios.get("/api/lightbox/" + this.state.selectedUser+"/details");
+        const searchUrl = this.state.bulkSelectionSelected ? "/api/search/myLightBox?bulkId=" + this.state.bulkSelectionSelected : "/api/search/myLightBox?user="+ this.state.selectedUser;
         const searchRequest = axios.get(searchUrl);
 
         const loadingPromise = Promise.all([detailsRequest, searchRequest]);
@@ -186,6 +192,13 @@ class MyLightbox extends CommonSearchView {
                     } Lightbox
                 </h1>
             </div>
+
+            {
+                this.state.userDetails && this.state.userDetails.isAdmin ? <div style={{float: "right"}}>
+                    <UserSelector onChange={this.userChanged} selectedUser={this.state.selectedUser}/>
+                </div> : ""
+            }
+
             <BulkSelectionsScroll entries={this.state.bulkSelections}
                                   onSelected={this.bulkSelectionChanged}
                                   onDeleteClicked={this.bulkSearchDeleteRequested}

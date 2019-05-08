@@ -9,6 +9,7 @@ import akka.stream.{ActorMaterializer, Materializer}
 import com.amazonaws.HttpMethod
 import com.amazonaws.services.s3.model.{GeneratePresignedUrlRequest, ResponseHeaderOverrides}
 import com.google.inject.Injector
+import com.gu.pandomainauth.action.UserRequest
 import com.theguardian.multimedia.archivehunter.common.{Indexer, LightboxIndex, StorageClass, ZonedDateTimeEncoder}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{ESClientManager, S3ClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models._
@@ -21,8 +22,9 @@ import play.api.mvc.{AbstractController, ControllerComponents}
 import responses._
 import io.circe.syntax._
 import io.circe.generic.auto._
-import models.{ServerTokenDAO, ServerTokenEntry}
+import models.{ServerTokenDAO, ServerTokenEntry, UserProfileDAO}
 import play.api.libs.ws.WSClient
+import play.mvc.Http.RequestHeader
 import requests.SearchRequest
 import services.GlacierRestoreActor
 
@@ -40,7 +42,8 @@ class LightboxController @Inject() (override val config:Configuration,
                                     s3ClientMgr:S3ClientManager,
                                     @Named("glacierRestoreActor") glacierRestoreActor:ActorRef,
                                     lightboxBulkEntryDAO: LightboxBulkEntryDAO,
-                                    serverTokenDAO: ServerTokenDAO)
+                                    serverTokenDAO: ServerTokenDAO,
+                                    userProfileDAO: UserProfileDAO)
                                    (implicit val system:ActorSystem, injector:Injector)
   extends AbstractController(controllerComponents) with PanDomainAuthActions with Circe with ZonedDateTimeEncoder with RestoreStatusEncoder {
   private val logger=Logger(getClass)
@@ -54,8 +57,29 @@ class LightboxController @Inject() (override val config:Configuration,
 
   val tokenShortDuration = config.getOptional[Int]("serverToken.shortLivedDuration").getOrElse(10)  //default value is 2 hours
 
-  def removeFromLightbox(fileId:String) = APIAuthAction.async { request=>
-    userProfileFromSession(request.session) match {
+  def targetUserProfile[T](request:UserRequest[T], targetUser:String) = {
+    val actualUserProfile = userProfileFromSession(request.session)
+    if(targetUser=="my"){
+      Future(actualUserProfile)
+    } else {
+      actualUserProfile match {
+        case Some(Left(err))=>
+          Future(Some(Left(err)))
+        case Some(Right(someUserProfile))=>
+          if(!someUserProfile.isAdmin){
+            logger.error(s"Non-admin user is trying to access lightbox of $targetUser")
+            Future(None)
+          } else {
+            userProfileDAO.userProfileForEmail(targetUser)
+          }
+        case None=>
+          Future(None)
+      }
+    }
+  }
+
+  def removeFromLightbox(user:String, fileId:String) = APIAuthAction.async { request=>
+    targetUserProfile(request, user).flatMap({
       case None => Future(BadRequest(GenericErrorResponse("session_error", "no session present").asJson))
       case Some(Left(err)) =>
         logger.error(s"Session is corrupted: ${err.toString}")
@@ -81,14 +105,14 @@ class LightboxController @Inject() (override val config:Configuration,
             Ok(GenericErrorResponse("ok","removed").asJson)
           }
         })
-    }
+    })
   }
 
-  def addFromSearch = APIAuthAction.async(circe.json(2048)) { request=>
+  def addFromSearch(user:String) = APIAuthAction.async(circe.json(2048)) { request=>
     request.body.as[SearchRequest].fold(
       err=> Future(BadRequest(GenericErrorResponse("bad_request", err.toString).asJson)),
       searchReq=>
-        userProfileFromSession(request.session) match {
+        targetUserProfile(request, user).flatMap({
           case None => Future(BadRequest(GenericErrorResponse("session_error", "no session present").asJson))
           case Some(Left(err)) =>
             logger.error(s"Session is corrupted: ${err.toString}")
@@ -150,12 +174,12 @@ class LightboxController @Inject() (override val config:Configuration,
                 logger.error("Could not test bulk add size: ", err)
                 InternalServerError(GenericErrorResponse("error",err.toString).asJson)
             })
-        }
+        })
     )
   }
 
-  def addToLightbox(fileId:String) = APIAuthAction.async { request=>
-    userProfileFromSession(request.session) match {
+  def addToLightbox(user:String, fileId:String) = APIAuthAction.async { request=>
+    targetUserProfile(request, user).flatMap({
       case None=>Future(BadRequest(GenericErrorResponse("session_error","no session present").asJson))
       case Some(Left(err))=>
         logger.error(s"Session is corrupted: ${err.toString}")
@@ -180,20 +204,27 @@ class LightboxController @Inject() (override val config:Configuration,
             }
           })
         )
-    }
+    })
   }
 
-  def lightboxDetails = APIAuthAction.async { request=>
-    lightboxEntryDAO.allForUser(request.user.email).map(results=>{
-      val errors = results.collect({case Left(err)=>err})
-      if(errors.nonEmpty){
-        errors.foreach(err=>logger.error(s"Could not retrieve lightbox details: ${err.toString}"))
-        InternalServerError(ObjectListResponse("db_error","error",errors.map(_.toString), errors.length).asJson)
-      } else {
-        //it's easier for the frontend to consume this if we convert to a mapping here
-        val finalResult = results.collect({case Right(entry)=>entry}).map(entry=>Tuple2(entry.fileId,entry)).toMap
-        Ok(ObjectListResponse("ok","lightboxEntry", finalResult, results.length).asJson)
-      }
+  def lightboxDetails(user:String) = APIAuthAction.async { request=>
+    targetUserProfile(request, user).flatMap({
+      case None => Future(BadRequest(GenericErrorResponse("session_error", "no session present").asJson))
+      case Some(Left(err)) =>
+        logger.error(s"Session is corrupted: ${err.toString}")
+        Future(InternalServerError(GenericErrorResponse("session_error", "session is corrupted, log out and log in again").asJson))
+      case Some(Right(userProfile)) =>
+        lightboxEntryDAO.allForUser(userProfile.userEmail).map(results => {
+          val errors = results.collect({ case Left(err) => err })
+          if (errors.nonEmpty) {
+            errors.foreach(err => logger.error(s"Could not retrieve lightbox details: ${err.toString}"))
+            InternalServerError(ObjectListResponse("db_error", "error", errors.map(_.toString), errors.length).asJson)
+          } else {
+            //it's easier for the frontend to consume this if we convert to a mapping here
+            val finalResult = results.collect({ case Right(entry) => entry }).map(entry => Tuple2(entry.fileId, entry)).toMap
+            Ok(ObjectListResponse("ok", "lightboxEntry", finalResult, results.length).asJson)
+          }
+        })
     })
   }
 
@@ -223,10 +254,10 @@ class LightboxController @Inject() (override val config:Configuration,
     }
   }
 
-  def checkRestoreStatus(fileId:String) = APIAuthAction.async { request=>
+  def checkRestoreStatus(user:String, fileId:String) = APIAuthAction.async { request=>
     implicit val timeout:akka.util.Timeout = 60 seconds
 
-    userProfileFromSession(request.session) match {
+    targetUserProfile(request, user).flatMap({
       case None=>Future(BadRequest(GenericErrorResponse("session_error","no session present").asJson))
       case Some(Left(err))=>
         logger.error(s"Session is corrupted: ${err.toString}")
@@ -251,15 +282,15 @@ class LightboxController @Inject() (override val config:Configuration,
             })
 
         })
-    }
+    })
   }
 
   /**
     * returns bulk entries for the current user
     * @return
     */
-  def myBulks = APIAuthAction.async { request=>
-    userProfileFromSession(request.session) match {
+  def myBulks(user:String) = APIAuthAction.async { request=>
+    targetUserProfile(request, user).flatMap({
       case None=>Future(BadRequest(GenericErrorResponse("session_error","no session present").asJson))
       case Some(Left(err))=>
         logger.error(s"Session is corrupted: ${err.toString}")
@@ -282,7 +313,7 @@ class LightboxController @Inject() (override val config:Configuration,
 
           }
         })
-    }
+    })
   }
 
   def deleteBulk(entryId:String) = APIAuthAction.async { request=>

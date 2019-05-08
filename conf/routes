@@ -28,7 +28,7 @@ GET     /api/search/basic      @controllers.SearchController.simpleStringSearch(
 GET     /api/entry/:id                  @controllers.SearchController.getEntry(id)
 PUT     /api/search/suggestions         @controllers.SearchController.suggestions
 POST    /api/search/browser             @controllers.SearchController.browserSearch(start:Int ?= 0, size:Int ?=100)
-GET     /api/search/myLightBox          @controllers.SearchController.lightboxSearch(start:Int ?= 0, size:Int ?=100, bulkId:Option[String])
+GET     /api/search/myLightBox          @controllers.SearchController.lightboxSearch(start:Int ?= 0, size:Int ?=100, bulkId:Option[String] ?= None, user:String ?= "my")
 
 GET     /api/search/proxyStats          @controllers.SearchController.getProxyFacets
 
@@ -68,18 +68,18 @@ GET     /api/user                       @controllers.UserController.allUsers
 PUT     /api/user/update                @controllers.UserController.updateUserProfileField
 GET     /api/user/myProfile             @controllers.UserController.myProfile
 
-PUT     /api/lightbox/my/addFromSearch  @controllers.LightboxController.addFromSearch
-GET     /api/lightbox/my/details        @controllers.LightboxController.lightboxDetails
-PUT     /api/lightbox/my/:fileId        @controllers.LightboxController.addToLightbox(fileId)
-DELETE  /api/lightbox/my/:fileId        @controllers.LightboxController.removeFromLightbox(fileId)
-GET     /api/lightbox/my/bulks          @controllers.LightboxController.myBulks
+PUT     /api/lightbox/:user/addFromSearch  @controllers.LightboxController.addFromSearch(user)
+GET     /api/lightbox/:user/details        @controllers.LightboxController.lightboxDetails(user)
+PUT     /api/lightbox/:user/:fileId        @controllers.LightboxController.addToLightbox(user, fileId)
+DELETE  /api/lightbox/:user/:fileId        @controllers.LightboxController.removeFromLightbox(user, fileId)
+GET     /api/lightbox/:user/bulks          @controllers.LightboxController.myBulks(user)
 DELETE  /api/lightbox/bulk/:bulkId      @controllers.LightboxController.deleteBulk(bulkId)
 PUT     /api/lightbox/bulk/query        @controllers.LightboxController.haveBulkEntryFor
 GET     /api/lightbox/bulk/appDownload/:bulkId  @controllers.LightboxController.bulkDownloadInApp(bulkId)
 
 GET     /api/download/:fileId           @controllers.LightboxController.getDownloadLink(fileId)
 
-GET     /api/archive/status/:fileId     @controllers.LightboxController.checkRestoreStatus(fileId)
+GET     /api/archive/status/:fileId     @controllers.LightboxController.checkRestoreStatus(user:String ?= "my", fileId)
 
 GET     /api/version                    @controllers.VersionController.getInfo
 
