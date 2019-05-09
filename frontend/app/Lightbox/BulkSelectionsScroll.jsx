@@ -11,7 +11,8 @@ class BulkSelectionsScroll extends React.Component {
         currentSelection: PropTypes.string,
         onSelected: PropTypes.func,
         onDeleteClicked: PropTypes.func,
-        forUser: PropTypes.string.isRequired
+        forUser: PropTypes.string.isRequired,
+        isAdmin: PropTypes.boolean
     };
 
     static nameExtractor = /^([^:]+):(.*)$/;
@@ -79,7 +80,16 @@ class BulkSelectionsScroll extends React.Component {
                                 return false;
                             }} className="bulk-download-link">Download in app</a>
 
-                            <a onClick={()=>{this.initiateRedoBulk(entry.id); return false}} className="redo-restore-link"><LoadingThrobber show={this.state.showRestoreSpinner} small={true} inline={true}/>Redo restore of folder</a>
+                            {this.props.isAdmin ?
+                                <a onClick={() => {
+                                    this.initiateRedoBulk(entry.id);
+                                    return false
+                                }} className="redo-restore-link">
+                                    <LoadingThrobber show={this.state.showRestoreSpinner} small={true} inline={true}/>
+                                    Redo restore of folder
+                                </a> : ""
+                            }
+
                         </div>
                         <FontAwesomeIcon icon="trash-alt" className="clickable" style={{color: "red", float: "right"}} onClick={evt=>{
                             evt.stopPropagation();

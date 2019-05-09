@@ -231,7 +231,9 @@ class MyLightbox extends CommonSearchView {
                                   onSelected={this.bulkSelectionChanged}
                                   onDeleteClicked={this.bulkSearchDeleteRequested}
                                   currentSelection={this.state.bulkSelectionSelected}
-                                  forUser={this.state.selectedUser}/>
+                                  forUser={this.state.selectedUser}
+                                  isAdmin={this.state.userDetails && this.state.userDetails.isAdmin}
+            />
 
             <EntryDetails entry={this.state.showingPreview}
                           autoPlay={this.state.autoPlay}

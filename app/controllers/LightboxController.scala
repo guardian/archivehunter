@@ -48,7 +48,7 @@ class LightboxController @Inject() (override val config:Configuration,
                                     serverTokenDAO: ServerTokenDAO,
                                     userProfileDAO: UserProfileDAO)
                                    (implicit val system:ActorSystem, injector:Injector, lightboxEntryDAO: LightboxEntryDAO)
-  extends AbstractController(controllerComponents) with PanDomainAuthActions with Circe with ZonedDateTimeEncoder with RestoreStatusEncoder {
+  extends AbstractController(controllerComponents) with PanDomainAuthActions with Circe with ZonedDateTimeEncoder with RestoreStatusEncoder with AdminsOnly {
   private val logger=Logger(getClass)
   private implicit val indexer = new Indexer(config.get[String]("externalData.indexName"))
   private val awsProfile = config.getOptional[String]("externalData.awsProfile")
@@ -454,38 +454,39 @@ class LightboxController @Inject() (override val config:Configuration,
   }
 
   //this is temporary and will be replaced in the update that brings in the new approval workflow
-  def redoBulk(user:String, bulkId:String) = APIAuthAction.async { request=>
-    import com.sksamuel.elastic4s.http.ElasticDsl._
+  def redoBulk(user:String, bulkId:String) = APIAuthAction.async { request =>
 
-    logger.info("in redoBulk")
-    targetUserProfile(request, user).flatMap({
-      case None => Future(BadRequest(GenericErrorResponse("session_error", "no session present").asJson))
-      case Some(Left(err)) =>
-        logger.error(s"Session is corrupted: ${err.toString}")
-        Future(InternalServerError(GenericErrorResponse("session_error", "session is corrupted, log out and log in again").asJson))
-      case Some(Right(profile)) =>
-        logger.info(s"running with user profile $profile")
-        val sink = injector.getInstance(classOf[InitiateRestoreSink])
+    adminsOnlyAsync(request, allowHmac = true) {
+      logger.info("in redoBulk")
+      targetUserProfile(request, user).flatMap({
+        case None => Future(BadRequest(GenericErrorResponse("session_error", "no session present").asJson))
+        case Some(Left(err)) =>
+          logger.error(s"Session is corrupted: ${err.toString}")
+          Future(InternalServerError(GenericErrorResponse("session_error", "session is corrupted, log out and log in again").asJson))
+        case Some(Right(profile)) =>
+          logger.info(s"running with user profile $profile")
+          val sink = injector.getInstance(classOf[InitiateRestoreSink])
 
-        val graph = RunnableGraph.fromGraph(GraphDSL.create(sink) { implicit builder=> resultSink=>
-          import akka.stream.scaladsl.GraphDSL.Implicits._
+          val graph = RunnableGraph.fromGraph(GraphDSL.create(sink) { implicit builder =>
+            resultSink =>
+              import akka.stream.scaladsl.GraphDSL.Implicits._
 
-          //the LightboxHelper methods call here also handle the special case of "loose" items
-          val source = LightboxHelper.getElasticSource(LightboxHelper.lightboxSearch(indexName, Some(bulkId), profile.userEmail))
+              //the LightboxHelper methods call here also handle the special case of "loose" items
+              val source = LightboxHelper.getElasticSource(LightboxHelper.lightboxSearch(indexName, Some(bulkId), profile.userEmail))
 
+              val actualSource = builder.add(source)
+              val converter = builder.add(new SearchHitToArchiveEntryFlow)
+              val lbLookup = builder.add(new LookupLightboxEntryFlow(profile.userEmail))
+              actualSource ~> converter ~> lbLookup ~> resultSink
+              ClosedShape
+          })
 
-          val actualSource = builder.add(source)
-          val converter = builder.add(new SearchHitToArchiveEntryFlow)
-          val lbLookup = builder.add(new LookupLightboxEntryFlow(profile.userEmail))
-          actualSource ~> converter ~> lbLookup ~> resultSink
-          ClosedShape
-        })
-
-        val streamResult = graph.run()
-        streamResult.map(processedCount=>{
-          logger.info(s"bulk redo completed, processsed $processedCount items")
-          Ok(CountResponse("ok","triggered re-restore of items",processedCount).asJson)
-        })
-    })
+          val streamResult = graph.run()
+          streamResult.map(processedCount => {
+            logger.info(s"bulk redo completed, processsed $processedCount items")
+            Ok(CountResponse("ok", "triggered re-restore of items", processedCount).asJson)
+          })
+      })
+    }
   }
 }
