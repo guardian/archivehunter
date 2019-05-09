@@ -68,8 +68,8 @@ GET     /api/user                       @controllers.UserController.allUsers
 PUT     /api/user/update                @controllers.UserController.updateUserProfileField
 GET     /api/user/myProfile             @controllers.UserController.myProfile
 
-DELETE  /api/lightbox/bulk/:bulkId              @controllers.LightboxController.deleteBulk(bulkId)
-PUT     /api/lightbox/bulk/query                @controllers.LightboxController.haveBulkEntryFor
+DELETE  /api/lightbox/:user/bulk/:bulkId              @controllers.LightboxController.deleteBulk(user, bulkId)
+PUT     /api/lightbox/:user/bulk/query                @controllers.LightboxController.haveBulkEntryFor(user)
 PUT     /api/lightbox/:user/addFromSearch       @controllers.LightboxController.addFromSearch(user)
 GET     /api/lightbox/:user/details             @controllers.LightboxController.lightboxDetails(user)
 PUT     /api/lightbox/:user/:fileId             @controllers.LightboxController.addToLightbox(user, fileId)

@@ -103,7 +103,7 @@ class MyLightbox extends CommonSearchView {
     }
 
     bulkSearchDeleteRequested(entryId){
-        axios.delete("/api/lightbox/bulk/" + entryId).then(response=>{
+        axios.delete("/api/lightbox/"+this.state.selectedUser+"/bulk/" + entryId).then(response=>{
             console.log("lightbox entry " + entryId + " deleted.");
             const updatedSelected = this.state.bulkSelectionSelected===entryId ? null : this.state.bulkSelectionSelected;
 
@@ -187,6 +187,12 @@ class MyLightbox extends CommonSearchView {
         })
     }
 
+    userDisplayName(){
+        if(this.state.selectedUser!=="my") return this.state.selectedUser;
+        if(this.state.userDetails) return this.state.userDetails.firstName + " " + this.state.userDetails.lastName;
+        return ""
+    }
+
     render(){
         /**
          * this describes an "insert" into the standard entry details view, to provide lightbox-specific data
@@ -215,10 +221,7 @@ class MyLightbox extends CommonSearchView {
 
         return <div>
             <div className="centered">
-                <h1>{this.state.userDetails ?
-                            this.state.userDetails.firstName + " " + this.state.userDetails.lastName +"'s " : ""
-                    } Lightbox
-                </h1>
+                <h1>{this.userDisplayName() +"'s "} Lightbox</h1>
             </div>
 
             {
