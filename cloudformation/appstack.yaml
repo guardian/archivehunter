@@ -940,6 +940,7 @@ Resources:
             problemItemsIndex="proxy-issues"
             problemSummaryIndex="proxy-issues-summary"
             auditIndexName="auditindex"
+            auditBulkIndexName="auditbulk"
           }
 
           scanner {
