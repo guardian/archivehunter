@@ -431,7 +431,7 @@ class LightboxController @Inject() (override val config:Configuration,
 
           lbEntryResponse match {
             case Some(Right(lbEntry)) =>
-              if (profile.perRestoreQuota.isDefined && (archiveEntry.size/1024^2) < profile.perRestoreQuota.get)
+              if (profile.perRestoreQuota.isDefined && (archiveEntry.size/1048576L) < profile.perRestoreQuota.get)
                 (glacierRestoreActor ? GlacierRestoreActor.InitiateRestore(archiveEntry, lbEntry, None)).mapTo[GRMsg].map({
                   case GlacierRestoreActor.RestoreSuccess =>
                     Ok(GenericErrorResponse("ok", "restore initiaited").asJson)
@@ -439,8 +439,13 @@ class LightboxController @Inject() (override val config:Configuration,
                     logger.error(s"Could not redo restore for $archiveEntry", err)
                     InternalServerError(GenericErrorResponse("error", err.toString).asJson)
                 })
-              else
+              else {
+                profile.perRestoreQuota match {
+                  case Some(userQuota)=>logger.warn(s"Can't restore $fileId: user's quota of $userQuota Mb is less than file size of ${archiveEntry.size/1048576L}Mb")
+                  case None=>logger.warn(s"Can't restore $fileId: user has no quota")
+                }
                 Future(Forbidden(GenericErrorResponse("quota_exceeded", "This restore would exceed your quota").asJson))
+              }
             case Some(Left(error)) =>
               Future(InternalServerError(GenericErrorResponse("db_error", error.toString).asJson))
             case None =>

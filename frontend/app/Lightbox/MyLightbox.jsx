@@ -164,7 +164,8 @@ class MyLightbox extends CommonSearchView {
             console.info(response.data);
             const itemIndex = this.indexForFileid(response.data.fileId);
             if(itemIndex===-1){
-                console.error("Could not find file ID " + response.data.fileId + " in the component's data??")
+                console.error("Could not find file ID " + response.data.fileId + " in the component's data??");
+                this.setState({showingArchiveSpinner: false});
             } else {
                 const updatedDetails = Object.assign({}, this.state.searchResults[itemIndex].details, {
                     restoreStatus: response.data.restoreStatus,
@@ -182,6 +183,7 @@ class MyLightbox extends CommonSearchView {
             }
         }).catch(err=>{
             console.error(err);
+            this.setState({showingArchiveSpinner: false, selectedRestoreStatus: err.response.data && err.response.data.detail ? err.response.data.detail : ""});
         })
     }
 
