@@ -29,13 +29,14 @@ class ClockSingleton @Inject() (@Named("dynamoCapacityActor") dynamoCapacityActo
                                 @Named("jobPurgerActor") jobPurgerActor: ActorRef,
                                 @Named("ingestProxyQueue") ingestProxyQueue: ActorRef,
                                 @Named("proxyFrameworkQueue") proxyFrameworkQueue:ActorRef,
+                                @Named("glacierRestoreActor") glacierRestoreActor:ActorRef,
                                 config:ArchiveHunterConfiguration,
                                ) extends Actor with Timers with ExtValueConverters{
   import ClockSingleton._
   private val logger=Logger(getClass)
 
   timers.startPeriodicTimer(RapidClockTick, RapidClockTick, 30.seconds)
-  timers.startPeriodicTimer(SlowClockTick, SlowClockTick, 2.minutes)
+  timers.startPeriodicTimer(SlowClockTick, SlowClockTick, 10.minutes)
   timers.startPeriodicTimer(VerySlowClockTick, VerySlowClockTick, 1.hours)
 
   timers.startPeriodicTimer(ScanTick, ScanTick, Duration(config.get[Long]("scanner.masterSchedule"),SECONDS))

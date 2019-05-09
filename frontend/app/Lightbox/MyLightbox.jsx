@@ -8,6 +8,7 @@ import LightboxInfoInsert from "./LightboxInfoInsert.jsx";
 import AvailabilityInsert from "./AvailabilityInsert.jsx";
 import BulkSelectionsScroll from "./BulkSelectionsScroll.jsx";
 import UserSelector from "../common/UserSelector.jsx";
+import LoadingThrobber from "../common/LoadingThrobber.jsx";
 
 class MyLightbox extends CommonSearchView {
     constructor(props){
@@ -23,7 +24,9 @@ class MyLightbox extends CommonSearchView {
             bulkSelections: [],
             bulkSelectionsCount: 0,
             bulkSelectionSelected: null,
-            selectedUser: "my"
+            selectedUser: "my",
+            showingArchiveSpinner: false,
+            selectedRestoreStatus: null
         };
 
         this.checkArchiveStatus = this.checkArchiveStatus.bind(this);
@@ -31,6 +34,7 @@ class MyLightbox extends CommonSearchView {
         this.reloadSearch = this.reloadSearch.bind(this);
         this.bulkSearchDeleteRequested = this.bulkSearchDeleteRequested.bind(this);
         this.userChanged = this.userChanged.bind(this);
+        this.redoRestore = this.redoRestore.bind(this);
     }
 
     performLoad(){
@@ -117,8 +121,12 @@ class MyLightbox extends CommonSearchView {
         this.refreshData();
     }
 
+    componentDidUpdate(prevProps, prevState, snapshot) {
+        if(prevState.showingPreview!==this.state.showingPreview) this.setState({selectedRestoreStatus: null});
+    }
+
     bulkSelectionChanged(newValue){
-        this.setState({bulkSelectionSelected: newValue}, this.reloadSearch);
+        this.setState({bulkSelectionSelected: newValue, selectedRestoreStatus: null}, this.reloadSearch);
     }
 
     shouldHideAvailability(entry){
@@ -140,6 +148,17 @@ class MyLightbox extends CommonSearchView {
         return "unknown";
     }
 
+    redoRestore() {
+        const url = "/api/lightbox/" + this.state.selectedUser + "/redoRestore/" + this.state.showingPreview.id;
+        this.setState({showingArchiveSpinner: true}, ()=>axios.put(url).then(response=>{
+            console.info(response.data);
+            window.setTimeout(this.checkArchiveStatus, 3000);
+        }).catch(err=>{
+            console.error(err);
+            this.setState({showingArchiveSpinner: false, selectedRestoreStatus: err.response.data && err.response.data.detail ? err.response.data.detail : ""});
+        }));
+    }
+
     checkArchiveStatus(){
         axios.get("/api/archive/status/" + this.state.showingPreview.id + "?user=" + this.state.selectedUser).then(response=>{
             console.info(response.data);
@@ -155,9 +174,9 @@ class MyLightbox extends CommonSearchView {
 
                 this.updateSearchResults(updatedEntry, itemIndex, this.state.showingPreview.id).then(()=>{
                     if(response.data.restoreStatus==="RS_UNNEEDED"){
-                        this.setState({extraInfo: "Not in archive"})
+                        this.setState({showingArchiveSpinner: false, selectedRestoreStatus: response.data.restoreStatus, extraInfo: "Not in deep-freeze"})
                     } else if(this.state.extraInfo!==""){
-                        this.setState({extraInfo: ""})
+                        this.setState({showingArchiveSpinner: false, selectedRestoreStatus: response.data.restoreStatus, extraInfo: ""})
                     }
                 })
             }
@@ -178,6 +197,10 @@ class MyLightbox extends CommonSearchView {
                 extraInfo={this.state.extraInfo}
             />
             <p className="centered small"><a style={{cursor: "pointer"}} onClick={this.checkArchiveStatus}>Re-check</a></p>
+            <p className="centered small"><a style={{cursor: "pointer"}} onClick={this.redoRestore}>Redo restore</a><LoadingThrobber show={this.state.showingArchiveSpinner} small={true}/> </p>
+            <p className="centered small information" style={{display: this.state.selectedRestoreStatus ? "block": "none"}}>
+                {this.state.selectedRestoreStatus}
+            </p>
             <hr/>
             <AvailabilityInsert status={this.state.showingPreview ? this.state.showingPreview.details.restoreStatus : ""}
                                 availableUntil={this.state.showingPreview ? this.state.showingPreview.details.availableUntil : ""}

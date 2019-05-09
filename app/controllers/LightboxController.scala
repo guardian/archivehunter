@@ -10,7 +10,8 @@ import com.amazonaws.HttpMethod
 import com.amazonaws.services.s3.model.{GeneratePresignedUrlRequest, ResponseHeaderOverrides}
 import com.google.inject.Injector
 import com.gu.pandomainauth.action.UserRequest
-import com.theguardian.multimedia.archivehunter.common.{Indexer, LightboxIndex, StorageClass, ZonedDateTimeEncoder}
+import com.gu.scanamo.error.DynamoReadError
+import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer, LightboxIndex, StorageClass, ZonedDateTimeEncoder}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{ESClientManager, S3ClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models._
 import helpers.LightboxHelper.logger
@@ -27,6 +28,7 @@ import play.api.libs.ws.WSClient
 import play.mvc.Http.RequestHeader
 import requests.SearchRequest
 import services.GlacierRestoreActor
+import services.GlacierRestoreActor.GRMsg
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
@@ -54,6 +56,8 @@ class LightboxController @Inject() (override val config:Configuration,
   private implicit val ec:ExecutionContext  = controllerComponents.executionContext
   private val indexName = config.get[String]("externalData.indexName")
   private implicit val mat:Materializer = ActorMaterializer.create(system)
+
+  implicit val timeout:akka.util.Timeout = 30 seconds
 
   val tokenShortDuration = config.getOptional[Int]("serverToken.shortLivedDuration").getOrElse(10)  //default value is 2 hours
 
@@ -410,5 +414,39 @@ class LightboxController @Inject() (override val config:Configuration,
           })
         }
     }
+  }
+
+  def redoRestore(user:String, fileId:String) = APIAuthAction.async { request=>
+    targetUserProfile(request, user).flatMap({
+      case None=>Future(BadRequest(GenericErrorResponse("session_error","no session present").asJson))
+      case Some(Left(err))=>
+        logger.error(s"Session is corrupted: ${err.toString}")
+        Future(InternalServerError(GenericErrorResponse("session_error","session is corrupted, log out and log in again").asJson))
+      case Some(Right(profile))=>
+        Future.sequence(Seq(
+          lightboxEntryDAO.get(profile.userEmail, fileId),
+          indexer.getById(fileId))).flatMap(results=>{
+          val archiveEntry = results(1).asInstanceOf[ArchiveEntry]
+          val lbEntryResponse = results.head.asInstanceOf[Option[Either[DynamoReadError, LightboxEntry]]]
+
+          lbEntryResponse match {
+            case Some(Right(lbEntry)) =>
+              if (profile.perRestoreQuota.isDefined && (archiveEntry.size/1024^2) < profile.perRestoreQuota.get)
+                (glacierRestoreActor ? GlacierRestoreActor.InitiateRestore(archiveEntry, lbEntry, None)).mapTo[GRMsg].map({
+                  case GlacierRestoreActor.RestoreSuccess =>
+                    Ok(GenericErrorResponse("ok", "restore initiaited").asJson)
+                  case GlacierRestoreActor.RestoreFailure(err) =>
+                    logger.error(s"Could not redo restore for $archiveEntry", err)
+                    InternalServerError(GenericErrorResponse("error", err.toString).asJson)
+                })
+              else
+                Future(Forbidden(GenericErrorResponse("quota_exceeded", "This restore would exceed your quota").asJson))
+            case Some(Left(error)) =>
+              Future(InternalServerError(GenericErrorResponse("db_error", error.toString).asJson))
+            case None =>
+              Future(InternalServerError(GenericErrorResponse("integrity_error", s"No lightbox entry available for file $fileId").asJson))
+          }
+        })
+    })
   }
 }
