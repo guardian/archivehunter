@@ -5,7 +5,8 @@ import java.util.UUID
 
 import akka.pattern.ask
 import akka.actor.{ActorRef, ActorSystem}
-import akka.stream.{ActorMaterializer, Materializer}
+import akka.stream.scaladsl.{GraphDSL, RunnableGraph}
+import akka.stream.{ActorMaterializer, ClosedShape, Materializer}
 import com.amazonaws.HttpMethod
 import com.amazonaws.services.s3.model.{GeneratePresignedUrlRequest, ResponseHeaderOverrides}
 import com.google.inject.Injector
@@ -15,7 +16,8 @@ import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer, L
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{ESClientManager, S3ClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models._
 import helpers.LightboxHelper.logger
-import helpers.{InjectableRefresher, LightboxHelper}
+import helpers.LightboxStreamComponents.{InitiateRestoreSink, LookupLightboxEntryFlow}
+import helpers.{InjectableRefresher, LightboxHelper, SearchHitToArchiveEntryFlow}
 import javax.inject.{Inject, Named, Singleton}
 import play.api.{Configuration, Logger}
 import play.api.libs.circe.Circe
@@ -36,7 +38,6 @@ import scala.util.{Failure, Success, Try}
 
 @Singleton
 class LightboxController @Inject() (override val config:Configuration,
-                                    lightboxEntryDAO: LightboxEntryDAO,
                                     override val controllerComponents:ControllerComponents,
                                     override val wsClient:WSClient,
                                     override val refresher:InjectableRefresher,
@@ -46,7 +47,7 @@ class LightboxController @Inject() (override val config:Configuration,
                                     lightboxBulkEntryDAO: LightboxBulkEntryDAO,
                                     serverTokenDAO: ServerTokenDAO,
                                     userProfileDAO: UserProfileDAO)
-                                   (implicit val system:ActorSystem, injector:Injector)
+                                   (implicit val system:ActorSystem, injector:Injector, lightboxEntryDAO: LightboxEntryDAO)
   extends AbstractController(controllerComponents) with PanDomainAuthActions with Circe with ZonedDateTimeEncoder with RestoreStatusEncoder {
   private val logger=Logger(getClass)
   private implicit val indexer = new Indexer(config.get[String]("externalData.indexName"))
@@ -122,7 +123,6 @@ class LightboxController @Inject() (override val config:Configuration,
             logger.error(s"Session is corrupted: ${err.toString}")
             Future(InternalServerError(GenericErrorResponse("session_error", "session is corrupted, log out and log in again").asJson))
           case Some(Right(userProfile)) =>
-            implicit val implLBEntryDAO = lightboxEntryDAO
             LightboxHelper.testBulkAddSize(indexName ,userProfile, searchReq).flatMap({
               case Left(resp:QuotaExceededResponse)=>
                 Future(new Status(413)(resp.asJson))
@@ -189,7 +189,6 @@ class LightboxController @Inject() (override val config:Configuration,
         logger.error(s"Session is corrupted: ${err.toString}")
         Future(InternalServerError(GenericErrorResponse("session_error","session is corrupted, log out and log in again").asJson))
       case Some(Right(userProfile)) =>
-        implicit val lbEntryDAOImplicit = lightboxEntryDAO
         indexer.getById(fileId).flatMap(indexEntry =>
           Future.sequence(Seq(
             LightboxHelper.saveLightboxEntry(userProfile, indexEntry, None),
@@ -321,7 +320,6 @@ class LightboxController @Inject() (override val config:Configuration,
   }
 
   def deleteBulk(entryId:String) = APIAuthAction.async { request=>
-    implicit val lightboxEntryDAOImpl = lightboxEntryDAO
     userProfileFromSession(request.session) match {
       case None=>
         Future(BadRequest(GenericErrorResponse("session_error","no session present").asJson))
@@ -451,6 +449,42 @@ class LightboxController @Inject() (override val config:Configuration,
             case None =>
               Future(InternalServerError(GenericErrorResponse("integrity_error", s"No lightbox entry available for file $fileId").asJson))
           }
+        })
+    })
+  }
+
+  //this is temporary and will be replaced in the update that brings in the new approval workflow
+  def redoBulk(user:String, bulkId:String) = APIAuthAction.async { request=>
+    import com.sksamuel.elastic4s.http.ElasticDsl._
+
+    logger.info("in redoBulk")
+    targetUserProfile(request, user).flatMap({
+      case None => Future(BadRequest(GenericErrorResponse("session_error", "no session present").asJson))
+      case Some(Left(err)) =>
+        logger.error(s"Session is corrupted: ${err.toString}")
+        Future(InternalServerError(GenericErrorResponse("session_error", "session is corrupted, log out and log in again").asJson))
+      case Some(Right(profile)) =>
+        logger.info(s"running with user profile $profile")
+        val sink = injector.getInstance(classOf[InitiateRestoreSink])
+
+        val graph = RunnableGraph.fromGraph(GraphDSL.create(sink) { implicit builder=> resultSink=>
+          import akka.stream.scaladsl.GraphDSL.Implicits._
+
+          //the LightboxHelper methods call here also handle the special case of "loose" items
+          val source = LightboxHelper.getElasticSource(LightboxHelper.lightboxSearch(indexName, Some(bulkId), profile.userEmail))
+
+
+          val actualSource = builder.add(source)
+          val converter = builder.add(new SearchHitToArchiveEntryFlow)
+          val lbLookup = builder.add(new LookupLightboxEntryFlow(profile.userEmail))
+          actualSource ~> converter ~> lbLookup ~> resultSink
+          ClosedShape
+        })
+
+        val streamResult = graph.run()
+        streamResult.map(processedCount=>{
+          logger.info(s"bulk redo completed, processsed $processedCount items")
+          Ok(CountResponse("ok","triggered re-restore of items",processedCount).asJson)
         })
     })
   }

@@ -169,7 +169,15 @@ div.bulk-selection-view {
 .bulk-download-link {
     font-size: 0.8em;
     z-index: 999;
+    float: left;
 }
+
+.redo-restore-link {
+    font-size: 0.8em;
+    z-index: 999;
+    float: right;
+}
+
 .black {
     color: black;
     background-color: inherit;

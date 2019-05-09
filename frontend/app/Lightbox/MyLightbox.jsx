@@ -230,7 +230,9 @@ class MyLightbox extends CommonSearchView {
             <BulkSelectionsScroll entries={this.state.bulkSelections}
                                   onSelected={this.bulkSelectionChanged}
                                   onDeleteClicked={this.bulkSearchDeleteRequested}
-                                  currentSelection={this.state.bulkSelectionSelected}/>
+                                  currentSelection={this.state.bulkSelectionSelected}
+                                  forUser={this.state.selectedUser}/>
+
             <EntryDetails entry={this.state.showingPreview}
                           autoPlay={this.state.autoPlay}
                           showJobs={true}

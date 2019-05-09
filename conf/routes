@@ -32,19 +32,19 @@ GET     /api/search/myLightBox          @controllers.SearchController.lightboxSe
 
 GET     /api/search/proxyStats          @controllers.SearchController.getProxyFacets
 
-GET     /api/proxy/searchForFile        @controllers.ProxiesController.searchFor(id:String)
-GET     /api/proxy/:id/associate        @controllers.ProxiesController.associate(fileId:Option[String],id)
-GET     /api/proxy/:id/playable         @controllers.ProxiesController.getPlayable(id, proxyType:Option[String])
-GET     /api/proxy/:id/all              @controllers.ProxiesController.getAllProxyRefs(id)
-GET     /api/proxy/:id                  @controllers.ProxiesController.proxyForId(id, proxyType:Option[String])
-POST    /api/proxy/relink/global        @controllers.ProxiesController.relinkAllProxies
-POST    /api/proxy/relink/:scanTargetName @controllers.ProxiesController.relinkProxiesForTarget(scanTargetName)
-POST    /api/proxy                      @controllers.ProxiesController.manualSet
+GET     /api/proxy/searchForFile            @controllers.ProxiesController.searchFor(id:String)
+GET     /api/proxy/:id/associate            @controllers.ProxiesController.associate(fileId:Option[String],id)
+GET     /api/proxy/:id/playable             @controllers.ProxiesController.getPlayable(id, proxyType:Option[String])
+GET     /api/proxy/:id/all                  @controllers.ProxiesController.getAllProxyRefs(id)
+GET     /api/proxy/:id                      @controllers.ProxiesController.proxyForId(id, proxyType:Option[String])
+POST    /api/proxy/relink/global             @controllers.ProxiesController.relinkAllProxies
+POST    /api/proxy/relink/:scanTargetName    @controllers.ProxiesController.relinkProxiesForTarget(scanTargetName)
+POST    /api/proxy                           @controllers.ProxiesController.manualSet
 DELETE  /api/proxy/:fileId/:inputProxyType   @controllers.ProxiesController.manualDelete(fileId, inputProxyType)
 
-POST    /api/proxy/generate/:id/thumbnail   @controllers.ProxiesController.generateThumbnail(id)
+POST    /api/proxy/generate/:id/thumbnail    @controllers.ProxiesController.generateThumbnail(id)
 POST    /api/proxy/generate/:id/:typeStr     @controllers.ProxiesController.generateProxy(id, typeStr)
-POST    /api/proxy/analyse/:id          @controllers.ProxiesController.analyseMetadata(id)
+POST    /api/proxy/analyse/:id               @controllers.ProxiesController.analyseMetadata(id)
 
 GET     /api/proxyhealth/mostrecent                         @controllers.ProxyHealthController.mostRecentStats
 GET     /api/proxyhealth/problemitems                       @controllers.ProxyHealthController.itemsList(collection:Option[String], pathRegex:Option[String], start:Int ?=0, size:Int ?=100)
@@ -76,6 +76,7 @@ PUT     /api/lightbox/:user/:fileId             @controllers.LightboxController.
 DELETE  /api/lightbox/:user/:fileId             @controllers.LightboxController.removeFromLightbox(user, fileId)
 GET     /api/lightbox/:user/bulks               @controllers.LightboxController.myBulks(user)
 PUT     /api/lightbox/:user/redoRestore/:fileId @controllers.LightboxController.redoRestore(user, fileId)
+PUT     /api/lightbox/:user/bulk/redoRestore/:bulkId @controllers.LightboxController.redoBulk(user:String, bulkId:String)
 GET     /api/lightbox/bulk/appDownload/:bulkId  @controllers.LightboxController.bulkDownloadInApp(bulkId)
 
 GET     /api/download/:fileId           @controllers.LightboxController.getDownloadLink(fileId)
@@ -89,7 +90,7 @@ GET     /api/proxyFramework/deploymentScan          @controllers.ProxyFrameworkA
 POST    /api/proxyFramework/deployments             @controllers.ProxyFrameworkAdminController.addDeployment
 POST    /api/proxyFramework/deploymentDirect        @controllers.ProxyFrameworkAdminController.addDeploymentDirect
 DELETE  /api/proxyFramework/deployments/:forRegion  @controllers.ProxyFrameworkAdminController.removeDeployment(forRegion)
-GET     /api/regions                    @controllers.ProxyFrameworkAdminController.getRegions
+GET     /api/regions                                @controllers.ProxyFrameworkAdminController.getRegions
 
 GET     /api/bulk/:codeValue                @controllers.BulkDownloadsController.initiateWithOnetimeCode(codeValue)
 GET     /api/bulk/:tokenValue/get/:fileId   @controllers.BulkDownloadsController.getDownloadIdWithToken(tokenValue, fileId)
