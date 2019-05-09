@@ -171,7 +171,7 @@ class AuditApprovalActorSpec extends Specification with Mockito {
 
       val result = Await.result((actor ? AdminApprovalOverride(testAuditBulk,adminsUserProfile,ApprovalStatus.Allowed,"automated testing")).mapTo[AAMMsg], 10 seconds)
       there was one(mockedAuditBulkDAO).saveSingle(any)
-      mockedGlacierRestoreActor.expectMsg(GlacierRestoreActor.InitiateBulkRestore("test-lightbox-bulk",mockedUserProfile, None))
+      mockedGlacierRestoreActor.expectMsg(GlacierRestoreActor.InitiateBulkRestore("test-lightbox-bulk",adminsUserProfile, None))
       result must beAnInstanceOf[ApprovalGranted]
     }
 
