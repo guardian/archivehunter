@@ -12,7 +12,7 @@ import akka.pattern.ask
 import akka.stream.alpakka.s3.impl.StorageClass.Glacier
 import com.gu.scanamo.error.DynamoReadError
 import com.sksamuel.elastic4s.http.{RequestFailure, RequestSuccess, Shards}
-import com.sksamuel.elastic4s.http.index.IndexResponse
+import com.sksamuel.elastic4s.http.update.UpdateResponse
 import services.AuditApprovalActor.{AAMMsg, AdminApprovalOverride, ApprovalGranted, ApprovalPending, ApprovalRejected, AutomatedApprovalCheck}
 
 import scala.concurrent.{Await, Future}
@@ -37,7 +37,7 @@ class AuditApprovalActorSpec extends Specification with Mockito {
       mockedAuditEntryDAO.totalSizeForBulk(any, any) returns Future(Right(1234))
       mockedUserProfileDAO.userProfileForEmail(any) returns Future(Some(Right(UserProfile("test@test.com",false,Seq(),true,Some(12345)))))
 
-      mockedAuditBulkDAO.saveSingle(any) returns Future(Right(mock[RequestSuccess[IndexResponse]]))
+      mockedAuditBulkDAO.saveSingle(any) returns Future(Right(mock[RequestSuccess[UpdateResponse]]))
 
       val testAuditBulk = AuditBulk(bulkid,"test-lightbox-bulk","some/base/path",ApprovalStatus.Pending,"joe.smith",ZonedDateTime.now(),"some reason",None)
 
@@ -62,7 +62,7 @@ class AuditApprovalActorSpec extends Specification with Mockito {
       mockedAuditEntryDAO.totalSizeForBulk(any, any) returns Future(Right(123456))
       mockedUserProfileDAO.userProfileForEmail(any) returns Future(Some(Right(UserProfile("test@test.com",false,Seq(),true,Some(12345)))))
 
-      mockedAuditBulkDAO.saveSingle(any) returns Future(Right(mock[RequestSuccess[IndexResponse]]))
+      mockedAuditBulkDAO.saveSingle(any) returns Future(Right(mock[RequestSuccess[UpdateResponse]]))
 
       val testAuditBulk = AuditBulk(bulkid,"test-lightbox-bulk","some/base/path",ApprovalStatus.Pending,"joe.smith",ZonedDateTime.now(),"some reason",None)
 
@@ -87,7 +87,7 @@ class AuditApprovalActorSpec extends Specification with Mockito {
       mockedAuditEntryDAO.totalSizeForBulk(any, any) returns Future(Right(123456))
       mockedUserProfileDAO.userProfileForEmail(any) returns Future(Some(Right(UserProfile("test@test.com",false,Seq(),true,None))))
 
-      mockedAuditBulkDAO.saveSingle(any) returns Future(Right(mock[RequestSuccess[IndexResponse]]))
+      mockedAuditBulkDAO.saveSingle(any) returns Future(Right(mock[RequestSuccess[UpdateResponse]]))
 
       val testAuditBulk = AuditBulk(bulkid,"test-lightbox-bulk","some/base/path",ApprovalStatus.Pending,"joe.smith",ZonedDateTime.now(),"some reason",None)
 
@@ -112,7 +112,7 @@ class AuditApprovalActorSpec extends Specification with Mockito {
       mockedAuditEntryDAO.totalSizeForBulk(any, any) returns Future(Left(mock[RequestFailure]))
       mockedUserProfileDAO.userProfileForEmail(any) returns Future(Some(Right(UserProfile("test@test.com",false,Seq(),true,None))))
 
-      mockedAuditBulkDAO.saveSingle(any) returns Future(Right(mock[RequestSuccess[IndexResponse]]))
+      mockedAuditBulkDAO.saveSingle(any) returns Future(Right(mock[RequestSuccess[UpdateResponse]]))
 
       val testAuditBulk = AuditBulk(bulkid,"test-lightbox-bulk","some/base/path",ApprovalStatus.Pending,"joe.smith",ZonedDateTime.now(),"some reason",None)
 
@@ -137,7 +137,7 @@ class AuditApprovalActorSpec extends Specification with Mockito {
       mockedAuditEntryDAO.totalSizeForBulk(any, any) returns Future(Right(123456))
       mockedUserProfileDAO.userProfileForEmail(any) returns Future(Some(Left(mock[DynamoReadError])))
 
-      mockedAuditBulkDAO.saveSingle(any) returns Future(Right(mock[RequestSuccess[IndexResponse]]))
+      mockedAuditBulkDAO.saveSingle(any) returns Future(Right(mock[RequestSuccess[UpdateResponse]]))
 
       val testAuditBulk = AuditBulk(bulkid,"test-lightbox-bulk","some/base/path",ApprovalStatus.Pending,"joe.smith",ZonedDateTime.now(),"some reason",None)
 
@@ -161,7 +161,7 @@ class AuditApprovalActorSpec extends Specification with Mockito {
       val mockedUserProfileDAO = mock[UserProfileDAO]
       val mockedLightboxEntryDAO = mock[LightboxEntryDAO]
 
-      mockedAuditBulkDAO.saveSingle(any) returns Future(Right(mock[RequestSuccess[IndexResponse]]))
+      mockedAuditBulkDAO.saveSingle(any) returns Future(Right(mock[RequestSuccess[UpdateResponse]]))
 
       val actor = system.actorOf(Props(new AuditApprovalActor(mockedAuditEntryDAO, mockedAuditBulkDAO, mockedUserProfileDAO, mockedLightboxEntryDAO, mockedGlacierRestoreActor.ref)))
 
@@ -184,7 +184,7 @@ class AuditApprovalActorSpec extends Specification with Mockito {
       val mockedUserProfileDAO = mock[UserProfileDAO]
       val mockedLightboxEntryDAO = mock[LightboxEntryDAO]
 
-      mockedAuditBulkDAO.saveSingle(any) returns Future(Right(mock[RequestSuccess[IndexResponse]]))
+      mockedAuditBulkDAO.saveSingle(any) returns Future(Right(mock[RequestSuccess[UpdateResponse]]))
 
       val actor = system.actorOf(Props(new AuditApprovalActor(mockedAuditEntryDAO, mockedAuditBulkDAO, mockedUserProfileDAO, mockedLightboxEntryDAO, mockedGlacierRestoreActor.ref)))
 
@@ -207,7 +207,7 @@ class AuditApprovalActorSpec extends Specification with Mockito {
       val mockedUserProfileDAO = mock[UserProfileDAO]
       val mockedLightboxEntryDAO = mock[LightboxEntryDAO]
 
-      mockedAuditBulkDAO.saveSingle(any) returns Future(Right(mock[RequestSuccess[IndexResponse]]))
+      mockedAuditBulkDAO.saveSingle(any) returns Future(Right(mock[RequestSuccess[UpdateResponse]]))
 
       val actor = system.actorOf(Props(new AuditApprovalActor(mockedAuditEntryDAO, mockedAuditBulkDAO, mockedUserProfileDAO, mockedLightboxEntryDAO, mockedGlacierRestoreActor.ref)))
 
