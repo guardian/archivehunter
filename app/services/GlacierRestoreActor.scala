@@ -13,6 +13,7 @@ import com.theguardian.multimedia.archivehunter.common.cmn_models._
 import helpers.LightboxHelper
 import helpers.LightboxStreamComponents.{InitiateRestoreSink, LookupLightboxEntryFlow}
 import javax.inject.{Inject, Singleton}
+import models.UserProfile
 import play.api.{Configuration, Logger}
 
 import scala.concurrent.{ExecutionContext, Promise}
@@ -25,7 +26,7 @@ object GlacierRestoreActor {
     * public messages that can be sent to this Actor
     */
   case class InitiateRestore(entry:ArchiveEntry, lbEntry:LightboxEntry, expiration:Option[Int]) extends GRMsg
-  case class InitiateBulkRestore(lightboxBulkEntryId:String, expiration:Option[Int]) extends GRMsg
+  case class InitiateBulkRestore(lightboxBulkEntryId:String, userProfile:UserProfile, expiration:Option[Int]) extends GRMsg
   case class CheckRestoreStatus(lbEntry:LightboxEntry) extends GRMsg
 
   /* private internal messages */
@@ -43,9 +44,10 @@ object GlacierRestoreActor {
 
 @Singleton
 class GlacierRestoreActor @Inject()(config:Configuration, esClientMgr:ESClientManager, s3ClientMgr:S3ClientManager,
-                                     jobModelDAO: JobModelDAO, lbEntryDAO:LightboxEntryDAO,
-                                     lbBulkDAO:LightboxBulkEntryDAO, initiateRestoreSink:InitiateRestoreSink,
-                                     lookupLBEntryFlow:LookupLightboxEntryFlow)(implicit system:ActorSystem) extends Actor {
+                                     jobModelDAO: JobModelDAO, lbBulkDAO:LightboxBulkEntryDAO, initiateRestoreSink:InitiateRestoreSink)
+                                   (implicit system:ActorSystem, lbEntryDAO:LightboxEntryDAO)
+  extends Actor
+{
   import GlacierRestoreActor._
   private val logger = Logger(getClass)
 
@@ -53,7 +55,7 @@ class GlacierRestoreActor @Inject()(config:Configuration, esClientMgr:ESClientMa
   val s3client = s3ClientMgr.getClient(config.getOptional[String]("externalData.awsProfile"))
   val defaultExpiry = config.getOptional[Int]("archive.restoresExpireAfter").getOrElse(3)
   private val indexName = config.get[String]("externalData.indexName")
-  private val indexer = new Indexer(indexName)
+  private implicit val indexer = new Indexer(indexName)
   implicit val esClient = esClientMgr.getClient()
   implicit val mat:Materializer = ActorMaterializer.create(system)
 
@@ -186,12 +188,13 @@ class GlacierRestoreActor @Inject()(config:Configuration, esClientMgr:ESClientMa
           })
       })
 
-    case InitiateBulkRestore(lightboxBulkEntryId, maybeExpiration)=>
+    case InitiateBulkRestore(lightboxBulkEntryId, userProfile, maybeExpiration)=>
       logger.info(s"Initiating bulk restore for $lightboxBulkEntryId")
       val originalSender = sender()
       val source = LightboxHelper.lightboxBulkSource(indexName,lightboxBulkEntryId)
       val completionPromise = Promise[Unit]()
 
+      val lookupLBEntryFlow = new LookupLightboxEntryFlow(userProfile.userEmail)
       val graph = RunnableGraph.fromGraph(GraphDSL.create() { implicit builder=>
         import akka.stream.scaladsl.GraphDSL.Implicits._
         //remember, this sink dispatches individual InitiateRestore messages back to this actor to pull individual items

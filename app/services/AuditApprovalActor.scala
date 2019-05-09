@@ -127,7 +127,7 @@ class AuditApprovalActor @Inject() (auditEntryDAO: AuditEntryDAO,
                 originalSender ! ApprovalError(s"admin approval override should not set pending status")
               case ApprovalStatus.Allowed =>
                 //TODO: feed in an expiry parameter and expose this in the UI
-                glacierRestoreActor ! GlacierRestoreActor.InitiateBulkRestore(auditBulk.lighboxBulkId, None)
+                glacierRestoreActor ! GlacierRestoreActor.InitiateBulkRestore(auditBulk.lighboxBulkId, approver, None)
                 originalSender ! ApprovalGranted(notes)
               case ApprovalStatus.Queried =>
                 originalSender ! ApprovalRejected(s"Not granted now, this has been queried")

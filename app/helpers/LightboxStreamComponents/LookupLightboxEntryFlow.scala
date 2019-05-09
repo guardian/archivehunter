@@ -18,7 +18,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
   * Similar to SaveLightboxEntryFlow, this flow looks up an existing lgihtbox entry for the given ArchiveEntry and outputs
   * the pair as a tuple
   */
-class LookupLightboxEntryFlow (userProfile: UserProfile)(implicit val lightboxEntryDAO:LightboxEntryDAO, system:ActorSystem, esClient:HttpClient, indexer:Indexer)
+class LookupLightboxEntryFlow (username:String)(implicit val lightboxEntryDAO:LightboxEntryDAO, system:ActorSystem, esClient:HttpClient, indexer:Indexer)
   extends GraphStage[FlowShape[ArchiveEntry, (ArchiveEntry, LightboxEntry)]] {
 
   private val in:Inlet[ArchiveEntry] = Inlet.create("LookupLightboxEntryFlow.in")
@@ -30,7 +30,7 @@ class LookupLightboxEntryFlow (userProfile: UserProfile)(implicit val lightboxEn
     private val logger = Logger(getClass)
 
     def retryGetEntry(elem:ArchiveEntry, retryCount:Int=0):Option[Either[DynamoReadError, LightboxEntry]] =
-      Await.result(lightboxEntryDAO.get(userProfile.userEmail, elem.id), 60 seconds) match {
+      Await.result(lightboxEntryDAO.get(username, elem.id), 60 seconds) match {
         case None=>
           logger.error(s"No lightbox entry found for archive entry ${elem.id}, but the archive entry has a lightbox bulk associated")
           None
