@@ -44,7 +44,7 @@ class GlacierRestoreActorSpec extends Specification with Mockito {
       val mockedLookupLightboxEntryFlow = mock[LookupLightboxEntryFlow]
 
       val toTest = system.actorOf(Props(new GlacierRestoreActor(mockedConfig, mockedEsClientMgr, mockedS3ClientManager,
-        mockedJobModelDAO, mockedLightboxEntryDAO, mockedLightboxBulkEntryDAO, mockedInitiateRestoreSink, mockedLookupLightboxEntryFlow)(system)))
+        mockedJobModelDAO, mockedLightboxBulkEntryDAO, mockedInitiateRestoreSink)(system, mockedLightboxEntryDAO)))
 
       val result = Await.result(toTest ? GlacierRestoreActor.InitiateRestore(mockedEntry, mockedLbEntry, None), 30 seconds)
       result mustEqual GlacierRestoreActor.RestoreSuccess
