@@ -8,7 +8,7 @@ class SizeInput extends React.Component {
     static propTypes = {
         sizeInBytes:PropTypes.number.isRequired,
         didUpdate:PropTypes.func.isRequired,
-        minumumMultiplier: PropTypes.number
+        minimumMultiplier: PropTypes.number
     };
 
     static multipliers = [
@@ -24,7 +24,7 @@ class SizeInput extends React.Component {
 
         this.state = {
             value: 0,
-            multiplier: 0
+            multiplier: props.minimumMultiplier ? props.minimumMultiplier : 0
         };
 
         this.numberUpdated = this.numberUpdated.bind(this);
@@ -44,13 +44,25 @@ class SizeInput extends React.Component {
         return value/multiplier.value;
     }
 
+    multiplierIndexForValue(value){
+        for(var i=0;i<SizeInput.multipliers.length; ++i){
+            if(SizeInput.multipliers[i].value>=value) return i;
+        }
+        return 0;
+    }
+
     setInternalValues(){
+        if(this.props.sizeInBytes===null) {
+            this.setState({value: 0, multiplier: this.props.minimumMultiplier ? this.multiplierIndexForValue(this.props.minimumMultiplier) : 0});
+            return;
+        }
         let updatedValue;
+        const minimumMultiplierIdx = this.multiplierIndexForValue(this.props.minimumMultiplier);
+
         for(let c=0;c<SizeInput.multipliers.length;++c){
             updatedValue = this.checkNextMultiplier(this.props.sizeInBytes, SizeInput.multipliers[c]);
-            console.log(this.props.sizeInBytes, updatedValue, c);
             if(updatedValue<1024){
-                this.setState({value: updatedValue, multiplier: c});
+                this.setState({value: updatedValue, multiplier: c<minimumMultiplierIdx ? minimumMultiplierIdx : c });
                 break;
             }
         }
@@ -60,7 +72,6 @@ class SizeInput extends React.Component {
     }
 
     updateParent(){
-        //console.log("update parent, value ", this.state.value, " multiplier index ", this.state.multiplier);
         this.props.didUpdate(this.state.value * SizeInput.multipliers[this.state.multiplier].value);
     }
 
@@ -74,10 +85,11 @@ class SizeInput extends React.Component {
 
     render() {
         return <span>
-            <input type="number" onChange={this.numberUpdated} value={this.state.value}/>
+            <input type="number" onChange={this.numberUpdated} value={this.state.value} style={{width: "50px", marginRight: "1em"}}/>
             <select onChange={this.multiplierUpdated} value={this.state.multiplier}>
                 {
-                    SizeInput.multipliers.map((mul,idx)=><option key={idx} value={idx}>{mul.label}</option>)
+                    SizeInput.multipliers
+                        .map((mul,idx)=><option key={idx} value={idx}>{mul.label}</option>)
                 }
             </select>
         </span>

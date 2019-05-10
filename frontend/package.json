@@ -63,6 +63,7 @@
     "panda-session": "^0.1.6",
     "raven-js": "^3.24.1",
     "react": "^16.6.1",
+    "react-autocomplete": "^1.8.1",
     "react-chartjs-2": "^2.7.5",
     "react-dialog": "^1.0.2",
     "react-dom": "^16.6.1",
