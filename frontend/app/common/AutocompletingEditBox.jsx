@@ -18,7 +18,7 @@ class AutocompletingEditBox extends React.Component {
         super(props);
 
         this.state = {
-            currentValue: props.initialValue,
+            currentValue: props.initialValue ? props.initialValue : "",
             showButtons: false
         };
 
