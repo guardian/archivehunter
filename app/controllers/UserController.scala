@@ -41,7 +41,7 @@ class UserController @Inject()(override val controllerComponents:ControllerCompo
       userProfileDAO.allUsers().map(resultList=>{
         val errors = resultList.collect({case Left(err)=>err})
         if(errors.nonEmpty){
-          InternalServerError(GenericErrorResponse("db_error", errors.map(_.toString).mkString(",")).asJson)
+          InternalServerError(ErrorListResponse("db_error", "Could not look up users", errors.map(_.toString)).asJson)
         } else {
           Ok(ObjectListResponse("ok","user",resultList.collect({case Right(up)=>up}), resultList.length).asJson)
         }
@@ -78,6 +78,12 @@ class UserController @Inject()(override val controllerComponents:ControllerCompo
     }
   }
 
+  protected def getSingleStringValue(rq:UserProfileFieldUpdate):Either[String,String] =
+    rq.stringValue match {
+      case Some(value)=>Right(value)
+      case None=>Left("No value was provided")
+    }
+
   /**
     * updates an existing list with the listValue field in the request, based on the `operation` field of the request
     * (overwrite, add, remove)
@@ -108,7 +114,7 @@ class UserController @Inject()(override val controllerComponents:ControllerCompo
     * @param rq [[UserProfileFieldUpdate]] object containing instructions for what to update
     * @return either an error string or the updated UserProfile (unsaved)
     */
-  def performUpdate(originalProfile:UserProfile, rq:UserProfileFieldUpdate):Either[String, UserProfile] = {
+  def performUpdate(originalProfile:UserProfile, rq:UserProfileFieldUpdate):Either[String, UserProfile] =
     rq.fieldName match {
       case UserProfileField.IS_ADMIN=>
         getSingleBoolValue(rq).map(newValue=>originalProfile.copy(isAdmin = newValue))
@@ -118,8 +124,20 @@ class UserController @Inject()(override val controllerComponents:ControllerCompo
         updateStringList(rq, originalProfile.visibleCollections).map(newValue=>originalProfile.copy(visibleCollections = newValue))
       case UserProfileField.PER_RESTORE_QUOTA=>
         getSingleLongValue(rq).map(newValue=>originalProfile.copy(perRestoreQuota = Some(newValue)))
+      case UserProfileField.ROLLING_QUOTA=>
+        getSingleLongValue(rq).map(newValue=>originalProfile.copy(rollingRestoreQuota = Some(newValue)))
+      case UserProfileField.ADMIN_APPROVAL_QUOTA=>
+        getSingleLongValue(rq).map(newValue=>originalProfile.copy(adminAuthQuota = Some(newValue)))
+      case UserProfileField.ADMIN_ROLLING_APPROVAL_QUOTA=>
+        getSingleLongValue(rq).map(newValue=>originalProfile.copy(adminRollingAuthQuota = Some(newValue)))
+      case UserProfileField.DEPARTMENT=>
+        getSingleStringValue(rq).map(newValue=>originalProfile.copy(department = Some(newValue)))
+      case UserProfileField.PRODUCTION_OFFICE=>
+        getSingleStringValue(rq).map(newValue=>originalProfile.copy(productionOffice = Some(newValue)))
+      case _=>
+        Left(s"Did not recognise field ${rq.fieldName}")
     }
-  }
+
 
   /**
     * handle a frontend request to update a user profile

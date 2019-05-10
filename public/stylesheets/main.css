@@ -608,3 +608,7 @@ div.chart-container {
     width: 31vw;
     position: relative;
 }
+
+p.list-control-label {
+    margin-bottom: 0;
+}

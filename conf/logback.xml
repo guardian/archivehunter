@@ -61,7 +61,7 @@
 
     <logger name="controllers.ProxyFrameworkAdminController" level="INFO"/>
 
-    <logger name="controllers.Auth" level="INFO"/>
+    <logger name="controllers.Auth" level="DEBUG"/>
     <logger name="controllers.BulkDownloadsController" level="DEBUG"/>
 
     <logger name="com.gu.pandomainauth.action.AuthActions" level="INFO"/>
