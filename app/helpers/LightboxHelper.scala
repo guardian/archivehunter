@@ -16,8 +16,6 @@ import models.UserProfile
 import play.api.Logger
 import requests.SearchRequest
 import responses.{GenericErrorResponse, ObjectListResponse, QuotaExceededResponse}
-import services.GlacierRestoreActor
-
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success}
 
@@ -82,8 +80,13 @@ object LightboxHelper {
     * @param actorRefFactory implicitly provided ActorRefFactory, get this from an ActorSystem
     * @return a Source that yields SearchHit entries.  Connect this to SearchHitToArchiveEntryFlow to convert to domain objects.
     */
-  protected def getElasticSource(indexName:String, queryParams:QueryDefinition)(implicit esClient:HttpClient, actorRefFactory:ActorRefFactory) = {
-    val publisher = esClient.publisher(search(indexName) query queryParams scroll "1m")
+  def getElasticSource(indexName:String, queryParams:QueryDefinition)(implicit esClient:HttpClient, actorRefFactory:ActorRefFactory) = {
+    val publisher = esClient.publisher(search(indexName) query queryParams scroll "5m")
+    Source.fromPublisher(publisher)
+  }
+
+  def getElasticSource(searchDefinition: SearchDefinition)(implicit esClient:HttpClient, actorRefFactory:ActorRefFactory) = {
+    val publisher = esClient.publisher(searchDefinition scroll "5m")
     Source.fromPublisher(publisher)
   }
 

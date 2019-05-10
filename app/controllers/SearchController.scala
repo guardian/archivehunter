@@ -1,5 +1,6 @@
 package controllers
 
+import com.gu.pandomainauth.action.UserRequest
 import com.theguardian.multimedia.archivehunter.common.clientManagers.ESClientManager
 import javax.inject.{Inject, Singleton}
 import play.api.{Configuration, Logger}
@@ -14,7 +15,7 @@ import com.sksamuel.elastic4s.http.search.Aggregations
 import com.sksamuel.elastic4s.searches.sort.SortOrder
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ArchiveEntryHitReader, StorageClassEncoder, ZonedDateTimeEncoder}
 import helpers.{InjectableRefresher, LightboxHelper}
-import models.{ChartFacet, ChartFacetData}
+import models.{ChartFacet, ChartFacetData, UserProfileDAO}
 import play.api.libs.circe.Circe
 import requests.SearchRequest
 import play.api.libs.ws.WSClient
@@ -27,7 +28,8 @@ class SearchController @Inject()(override val config:Configuration,
                                  override val controllerComponents:ControllerComponents,
                                  esClientManager:ESClientManager,
                                  override val wsClient:WSClient,
-                                 override val refresher:InjectableRefresher)
+                                 override val refresher:InjectableRefresher,
+                                 userProfileDAO:UserProfileDAO)
   extends AbstractController(controllerComponents) with ArchiveEntryHitReader with ZonedDateTimeEncoder with StorageClassEncoder with Circe
 with PanDomainAuthActions {
 
@@ -130,20 +132,48 @@ with PanDomainAuthActions {
     })
   }
 
-  def lightboxSearch(startAt:Int, pageSize:Int, bulkId:Option[String]) = APIAuthAction.async {request=>
-    esClient.execute {
-      LightboxHelper.lightboxSearch(indexName, bulkId, request.user.email) from startAt size pageSize sortBy fieldSort("path.keyword")
-    }.map({
-      case Left(err)=>
-        logger.error(s"Could not perform lightbox query: $err")
-        InternalServerError(GenericErrorResponse("search_error", err.toString).asJson)
-      case Right(results)=>
-        results.result.to[ArchiveEntry].foreach(x=>logger.debug(x.toString))
-        Ok(ObjectListResponse("ok","entry", results.result.to[ArchiveEntry], results.result.totalHits.toInt).asJson)
-    }).recover({
-      case err:Throwable=>
-        logger.error("Could not do browse search: ", err)
-        InternalServerError(GenericErrorResponse("error", err.toString).asJson)
+  def targetUserProfile[T](request:UserRequest[T], targetUser:String) = {
+    val actualUserProfile = userProfileFromSession(request.session)
+    if(targetUser=="my"){
+      Future(actualUserProfile)
+    } else {
+      actualUserProfile match {
+        case Some(Left(err))=>
+          Future(Some(Left(err)))
+        case Some(Right(someUserProfile))=>
+          if(!someUserProfile.isAdmin){
+            logger.error(s"Non-admin user is trying to access lightbox of $targetUser")
+            Future(None)
+          } else {
+            userProfileDAO.userProfileForEmail(targetUser)
+          }
+        case None=>
+          Future(None)
+      }
+    }
+  }
+
+  def lightboxSearch(startAt:Int, pageSize:Int, bulkId:Option[String], user:String) = APIAuthAction.async {request=>
+    targetUserProfile(request,user).flatMap({
+      case None => Future(BadRequest(GenericErrorResponse("session_error", "no session present").asJson))
+      case Some(Left(err)) =>
+        logger.error(s"Session is corrupted: ${err.toString}")
+        Future(InternalServerError(GenericErrorResponse("session_error", "session is corrupted, log out and log in again").asJson))
+      case Some(Right(profile)) =>
+        esClient.execute {
+          LightboxHelper.lightboxSearch(indexName, bulkId, profile.userEmail) from startAt size pageSize sortBy fieldSort("path.keyword")
+        }.map({
+          case Left(err) =>
+            logger.error(s"Could not perform lightbox query: $err")
+            InternalServerError(GenericErrorResponse("search_error", err.toString).asJson)
+          case Right(results) =>
+            results.result.to[ArchiveEntry].foreach(x => logger.debug(x.toString))
+            Ok(ObjectListResponse("ok", "entry", results.result.to[ArchiveEntry], results.result.totalHits.toInt).asJson)
+        }).recover({
+          case err: Throwable =>
+            logger.error("Could not do browse search: ", err)
+            InternalServerError(GenericErrorResponse("error", err.toString).asJson)
+        })
     })
   }
 

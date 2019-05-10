@@ -999,6 +999,10 @@ Resources:
             sharedSecret = "${ServerSharedSecret}"
           }
 
+          archive {
+            restoresExpireAfter = 10
+          }
+
           akka.actor {
             provider = "cluster"
 
