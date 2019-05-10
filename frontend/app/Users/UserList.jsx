@@ -105,10 +105,6 @@ class UserList extends React.Component {
                 <th className="dashboardheader">Visible collections</th>
                 <th className="dashboardheader">Allow all collections</th>
                 <th className="dashboardheader">Quota limits</th>
-                {/*<th className="dashboardheader">Per restore size limit</th>
-                <th className="dashboardheader">Rolling 30 day restore limit</th>
-                <th className="dashboardheader">Admin's approval limit</th>
-                <th className="dashboardheader">Admin's 30 day approval limit</th>*/}
             </tr>
             </thead>
             <tbody>

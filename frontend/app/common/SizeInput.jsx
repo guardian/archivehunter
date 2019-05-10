@@ -45,8 +45,6 @@ class SizeInput extends React.Component {
     }
 
     multiplierIndexForValue(value){
-        // const largerMultipliersList = SizeInput.multipliers.filter(entry=>entry.value>=value);
-        // if(largerMultipliersList.length>0) return largerMultipliersList[0];
         for(var i=0;i<SizeInput.multipliers.length; ++i){
             if(SizeInput.multipliers[i].value>=value) return i;
         }
@@ -74,7 +72,6 @@ class SizeInput extends React.Component {
     }
 
     updateParent(){
-        //console.log("update parent, value ", this.state.value, " multiplier index ", this.state.multiplier);
         this.props.didUpdate(this.state.value * SizeInput.multipliers[this.state.multiplier].value);
     }
 
@@ -92,7 +89,6 @@ class SizeInput extends React.Component {
             <select onChange={this.multiplierUpdated} value={this.state.multiplier}>
                 {
                     SizeInput.multipliers
-                        //.filter(mul=>this.props.minimumMultiplier ? mul.value>=this.props.minimumMultiplier : true)
                         .map((mul,idx)=><option key={idx} value={idx}>{mul.label}</option>)
                 }
             </select>
