@@ -5,6 +5,7 @@ import java.time.ZonedDateTime
 import akka.actor.{ActorRef, ActorSystem}
 import akka.stream.{ActorMaterializer, Materializer}
 import com.amazonaws.services.sqs.model.{DeleteMessageRequest, ReceiveMessageRequest}
+import com.sksamuel.elastic4s.http.HttpClient
 import com.theguardian.multimedia.archivehunter.common._
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager, SQSClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models._
@@ -35,10 +36,40 @@ object ProxyFrameworkQueue extends GenericSqsActorMessages {
 }
 
 trait ProxyFrameworkQueueFunctions extends ProxyTypeEncoder with JobReportStatusEncoder with MediaMetadataEncoder {
+  protected val indexer:Indexer
+  protected val logger:Logger
+  protected implicit val esClient:HttpClient
+
   def convertMessageBody(body: String) =
     AwsSqsMsg.fromJsonString(body).flatMap(snsMsg=>{
       io.circe.parser.parse(snsMsg.Message).flatMap(_.as[JobReportNew]).map(_.copy(timestamp = Some(ZonedDateTime.parse(snsMsg.Timestamp))))
     })
+
+  /**
+    * sets the "proxied" flag on the given item, retrying in case of a version conflict
+    * @param sourceId archive entry ID to update
+    * @return a Future with either a Left with an error string or a Right with the item ID string
+    */
+  def setProxiedWithRetry(sourceId:String)(implicit ec:ExecutionContext):Future[Either[String,String]] = indexer.getById(sourceId).flatMap(entry=>{
+    println(s"setProxiedWithEntry: sourceId is $sourceId entry is $entry")
+    val updatedEntry = entry.copy(proxied = true)
+    MDC.put("entry", updatedEntry.toString)
+    indexer.indexSingleItem(updatedEntry)
+  }).flatMap({
+    case Left(err)=>
+      println(s"error was $err")
+      if(err.error.`type`=="version_conflict_engine_exception"){
+        logger.warn(s"Elasticsearch version conflict detected for update of $sourceId, retrying...")
+        setProxiedWithRetry(sourceId)
+      } else {
+        MDC.put("error", err.toString)
+        logger.error(s"Could not set proxied flag for $sourceId: ${err.toString}")
+        Future(Left(err.toString))
+      }
+    case Right(value)=>
+      println(s"success returned $value")
+      Future(Right(value))
+  })
 }
 /**
   * Actor that handles messages returned via SQS from the Proxy Framework.  Successful processing ends with the message being
@@ -72,7 +103,7 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
   import ProxyFrameworkQueue._
   import GenericSqsActor._
 
-  private val logger = Logger(getClass)
+  protected val logger = Logger(getClass)
 
   override protected val sqsClient = sqsClientManager.getClient(config.getOptional[String]("externalData.awsProfile"))
 
@@ -88,36 +119,13 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
 
   private implicit val ddbClient = dynamoClientMgr.getNewAlpakkaDynamoClient(config.getOptional[String]("externalData.awsProfile"))
 
-  private implicit val esClient = esClientMgr.getClient()
+  protected implicit val esClient = esClientMgr.getClient()
   protected implicit val indexer = new Indexer(config.get[String]("externalData.indexName"))
 
   lazy val defaultRegion = config.getOptional[String]("externalData.awsRegion").getOrElse("eu-west-1")
 
   protected val problemItemIndexName = config.get[String]("externalData.problemItemsIndex")
   protected val problemItemIndexer = new ProblemItemIndexer(problemItemIndexName)
-
-  /**
-    * sets the "proxied" flag on the given item, retrying in case of a version conflict
-    * @param sourceId archive entry ID to update
-    * @return a Future with either a Left with an error string or a Right with the item ID string
-    */
-  def setProxiedWithRetry(sourceId:String):Future[Either[String,String]] = indexer.getById(sourceId).flatMap(entry=>{
-    val updatedEntry = entry.copy(proxied = true)
-    MDC.put("entry", updatedEntry.toString)
-    indexer.indexSingleItem(updatedEntry)
-  }).flatMap({
-    case Left(err)=>
-      if(err.error.`type`=="version_conflict_engine_exception"){
-        logger.warn(s"Elasticsearch version conflict detected for update of $sourceId, retrying...")
-        setProxiedWithRetry(sourceId)
-      } else {
-        MDC.put("error", err.toString)
-        logger.error(s"Could not set proxied flag for $sourceId: ${err.toString}")
-        Future(Left(err.toString))
-      }
-    case Right(value)=>
-      Future(Right(value.result.id))
-  })
 
   /**
     * looks up the ArchiveEntry for the original media associated with the given JobModel

@@ -35,7 +35,7 @@ class Indexer(indexName:String) extends ZonedDateTimeEncoder with StorageClassEn
 
     client.execute {
       update(idToUse).in(s"$indexName/entry").docAsUpsert(entry)
-    }
+    }.map(_.map(response=>response.result.id))
   }
 
   /**

@@ -6,17 +6,19 @@ import com.amazonaws.services.dynamodbv2.model.AttributeValue
 import com.amazonaws.services.sqs.AmazonSQS
 import com.amazonaws.services.sqs.model.{DeleteMessageRequest, DeleteMessageResult, ReceiveMessageRequest}
 import com.gu.scanamo.error.{DynamoReadError, NoPropertyOfType}
+import com.sksamuel.elastic4s.http.update.UpdateResponse
+import com.sksamuel.elastic4s.http.{ElasticError, HttpClient, RequestFailure, RequestSuccess, Shards}
 import com.theguardian.multimedia.archivehunter.common.{ProxyType, _}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager, SQSClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models._
 import models.{JobReportNew, JobReportStatus}
 import org.specs2.mock.Mockito
 import org.specs2.mutable.Specification
-import play.api.Configuration
+import play.api.{Configuration, Logger}
 import services.ProxyFrameworkQueue.{HandleRunning, UpdateProblemsIndexSuccess}
 import services.{GenericSqsActor, ProxyFrameworkQueue, ProxyFrameworkQueueFunctions}
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration._
 import scala.util.Success
 
@@ -50,7 +52,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
 
       val mockedIndexer = mock[Indexer]
       mockedIndexer.getById(any)(any) returns Future(mockedEntry)
-      mockedIndexer.indexSingleItem(any,any,any)(any) returns Future(Success("fake-id"))
+      mockedIndexer.indexSingleItem(any,any,any)(any) returns Future(Right("fake-id"))
 
       val toTest = system.actorOf(Props(new ProxyFrameworkQueue(
         Configuration.from(Map("proxyFramework.notificationsQueue" -> "someQueue", "externalData.indexName" -> "someIndex", "externalData.problemItemsIndex" -> "problem-items")),
@@ -106,7 +108,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
       mockedEntry.copy(any,any,any,any,any,any,any,any,any,any,any,any,any,any) returns mockedUpdatedEntry
       val mockedIndexer = mock[Indexer]
       mockedIndexer.getById(any)(any) returns Future(mockedEntry)
-      mockedIndexer.indexSingleItem(any,any,any)(any) returns Future(Success("fake-id"))
+      mockedIndexer.indexSingleItem(any,any,any)(any) returns Future(Right("fake-id"))
 
 
       val toTest = system.actorOf(Props(new ProxyFrameworkQueue(
@@ -310,6 +312,133 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
     }
   }
 
+  "ProxyFrameworkQueue.setProxiedWithRetry" should {
+    "retry the index operation if a version conflict error occurs" in {
+      import scala.concurrent.ExecutionContext.Implicits.global
+      val fakeEntry = ArchiveEntry(
+        "some-item-id",
+        "some-bucket",
+        "path/to/item",
+        None,
+        None,
+        1234L,
+        ZonedDateTime.now(),
+        "some-etag",
+        MimeType("video","mp4"),
+        false,
+        StorageClass.STANDARD,
+        Seq(),
+        beenDeleted = false,
+        mediaMetadata = None
+      )
+
+      val initialError = RequestFailure(409,None,Map(),ElasticError("version_conflict_engine_exception","something went splat",None,None,None,Seq()))
+
+      val mockIndexer = mock[Indexer]
+      mockIndexer.indexSingleItem(any,any,any)(any) returns Future(Left(initialError)) thenReturns Future(Left(initialError)) thenReturns Future(Right("someid"))
+      mockIndexer.getById(any)(any) returns Future(fakeEntry)
+
+      val mockLogger = Logger("test")
+
+      val mockEsClient = mock[HttpClient]
+
+      class TestClass extends ProxyFrameworkQueueFunctions {
+        override protected val indexer = mockIndexer
+        override protected val logger = mockLogger
+
+        override protected val esClient = mock[HttpClient]
+      }
+
+      val toTest = new TestClass
+      val result = Await.result(toTest.setProxiedWithRetry("some-source-id"), 30 seconds)
+      result must beRight("someid")
+      there were three(mockIndexer).indexSingleItem(any, any, any)(any)
+      there were three(mockIndexer).getById(any)(any)
+    }
+
+    "just return the value if the operation succeeds" in {
+      import scala.concurrent.ExecutionContext.Implicits.global
+      val fakeEntry = ArchiveEntry(
+        "some-item-id",
+        "some-bucket",
+        "path/to/item",
+        None,
+        None,
+        1234L,
+        ZonedDateTime.now(),
+        "some-etag",
+        MimeType("video","mp4"),
+        false,
+        StorageClass.STANDARD,
+        Seq(),
+        beenDeleted = false,
+        mediaMetadata = None
+      )
+
+      val mockIndexer = mock[Indexer]
+      mockIndexer.indexSingleItem(any,any,any)(any) returns Future(Right("someid"))
+      mockIndexer.getById(any)(any) returns Future(fakeEntry)
+
+      val mockLogger = Logger("test")
+
+      class TestClass extends ProxyFrameworkQueueFunctions {
+        override protected val indexer = mockIndexer
+        override protected val logger = mockLogger
+
+        override protected val esClient = mock[HttpClient]
+      }
+
+      val toTest = new TestClass
+      val result = Await.result(toTest.setProxiedWithRetry("some-source-id"), 30 seconds)
+      result must beRight("someid")
+      there was one(mockIndexer).indexSingleItem(any, any, any)(any)
+      there was one(mockIndexer).getById(any)(any)
+    }
+
+    "pass back an error that is not a conflict error" in {
+      import scala.concurrent.ExecutionContext.Implicits.global
+      val fakeEntry = ArchiveEntry(
+        "some-item-id",
+        "some-bucket",
+        "path/to/item",
+        None,
+        None,
+        1234L,
+        ZonedDateTime.now(),
+        "some-etag",
+        MimeType("video","mp4"),
+        false,
+        StorageClass.STANDARD,
+        Seq(),
+        beenDeleted = false,
+        mediaMetadata = None
+      )
+
+      val initialError = RequestFailure(500,None,Map(),ElasticError("some_other_error","something went splat",None,None,None,Seq()))
+
+      val mockIndexer = mock[Indexer]
+      mockIndexer.indexSingleItem(any,any,any)(any) returns Future(Left(initialError))
+      mockIndexer.getById(any)(any) returns Future(fakeEntry)
+
+      val mockLogger = Logger("test")
+
+      val mockEsClient = mock[HttpClient]
+
+      class TestClass extends ProxyFrameworkQueueFunctions {
+        override protected val indexer = mockIndexer
+        override protected val logger = mockLogger
+
+        override protected val esClient = mock[HttpClient]
+      }
+
+      val toTest = new TestClass
+      val result = Await.result(toTest.setProxiedWithRetry("some-source-id"), 30 seconds)
+      result must beLeft
+      there was one(mockIndexer).indexSingleItem(any, any, any)(any)
+      there was one(mockIndexer).getById(any)(any)
+    }
+  }
+
   "ProxyFrameworkQueue.convertMessageBody" should {
     "parse the message body and return a domain object, including the message timestamp" in new AkkaTestkitSpecs2Support {
       val msgContent =
@@ -326,7 +455,11 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
           |}
         """.stripMargin
 
-      class TestClass extends ProxyFrameworkQueueFunctions
+      class TestClass extends ProxyFrameworkQueueFunctions {
+        override protected val indexer = mock[Indexer]
+        override protected val logger = mock[Logger]
+        override protected val esClient = mock[HttpClient]
+      }
 
       val toTest = new TestClass
 
@@ -484,7 +617,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
       mockedEntry.copy(any,any,any,any,any,any,any,any,any,any,any,any,any,any) returns mockedUpdatedEntry
       val mockedIndexer = mock[Indexer]
       mockedIndexer.getById(any)(any) returns Future(mockedEntry)
-      mockedIndexer.indexSingleItem(any,any,any)(any) returns Future(Success("fake-id"))
+      mockedIndexer.indexSingleItem(any,any,any)(any) returns Future(Right("fake-id"))
 
       val mockedEsClient = mock[com.sksamuel.elastic4s.http.HttpClient]
       val mockedEsClientManager = mock[ESClientManager]
@@ -554,7 +687,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
       mockedEntry.copy(any,any,any,any,any,any,any,any,any,any,any,any,any,any) returns mockedUpdatedEntry
       val mockedIndexer = mock[Indexer]
       mockedIndexer.getById(any)(any) throws new RuntimeException("nothing existed")
-      mockedIndexer.indexSingleItem(any,any,any)(any) returns Future(Success("fake-id"))
+      mockedIndexer.indexSingleItem(any,any,any)(any) returns Future(Right("fake-id"))
 
       val mockedEsClient = mock[com.sksamuel.elastic4s.http.HttpClient]
       val mockedEsClientManager = mock[ESClientManager]
