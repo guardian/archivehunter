@@ -11,7 +11,7 @@ import com.gu.scanamo.DynamoFormat
 import com.amazonaws.services.dynamodbv2.model.{AttributeValue, ScanRequest}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.DynamoClientManager
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{JobModel, JobModelDAO, JobStatus, SourceType}
-import javax.inject.Inject
+import javax.inject.{Inject, Singleton}
 import play.api.{Configuration, Logger}
 
 import scala.collection.JavaConverters._
@@ -35,6 +35,7 @@ object JobPurgerActor {
   case class CheckMaybePurge(entry: Map[String,AttributeValue], maybePurgeTime:Option[ZonedDateTime]=None) extends JPMsg
 }
 
+@Singleton
 class JobPurgerActor @Inject() (config:Configuration, ddbClientMgr:DynamoClientManager, jobModelDAO: JobModelDAO)(implicit system:ActorSystem) extends Actor{
   import JobPurgerActor._
   import akka.stream.alpakka.dynamodb.scaladsl.DynamoImplicits._

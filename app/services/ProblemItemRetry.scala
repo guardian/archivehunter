@@ -10,7 +10,7 @@ import com.theguardian.multimedia.archivehunter.common.clientManagers.ESClientMa
 import com.theguardian.multimedia.archivehunter.common.cmn_models._
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ProblemItemHitReader, ProblemItemIndexer, ProxyLocationDAO}
 import helpers.{CreateProxySink, EOSDetect, ProblemItemReproxySink}
-import javax.inject.Inject
+import javax.inject.{Inject, Singleton}
 import play.api.{Configuration, Logger}
 
 import scala.concurrent.Promise
@@ -29,6 +29,7 @@ object ProblemItemRetry {
   * @param actorSystem
   * @param proxyLocationDAO
   */
+@Singleton
 class ProblemItemRetry @Inject()(config:Configuration, proxyGenerators:ProxyGenerators,
                                  esClientManager:ESClientManager, jobModelDAO:JobModelDAO,
                                  problemItemReproxySink: ProblemItemReproxySink)

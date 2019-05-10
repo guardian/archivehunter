@@ -6,7 +6,7 @@ import java.util.Properties
 
 import com.theguardian.multimedia.archivehunter.common.ZonedDateTimeEncoder
 import helpers.InjectableRefresher
-import javax.inject.Inject
+import javax.inject.{Inject, Singleton}
 import play.api.Configuration
 import play.api.libs.circe.Circe
 import play.api.libs.ws.WSClient
@@ -15,6 +15,7 @@ import io.circe.syntax._
 import io.circe.generic.auto._
 import responses.{GenericErrorResponse, VersionInfoResponse}
 
+@Singleton
 class VersionController @Inject() (override val controllerComponents:ControllerComponents,
                                    override val config:Configuration,
                                    override val wsClient:WSClient,

@@ -8,7 +8,7 @@ import akka.stream.scaladsl.{Keep, Sink, Source}
 import com.amazonaws.HttpMethod
 import com.amazonaws.services.s3.model.{GeneratePresignedUrlRequest, ResponseHeaderOverrides}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{LightboxBulkEntry, LightboxBulkEntryDAO, LightboxEntryDAO}
-import javax.inject.Inject
+import javax.inject.{Inject, Singleton}
 import models.{ArchiveEntryDownloadSynopsis, ServerTokenDAO, ServerTokenEntry}
 import play.api.{Configuration, Logger}
 import play.api.libs.circe.Circe
@@ -24,6 +24,7 @@ import helpers.{LightboxHelper, SearchHitToArchiveEntryFlow}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
+@Singleton
 class BulkDownloadsController @Inject()(config:Configuration,serverTokenDAO: ServerTokenDAO,
                                         lightboxBulkEntryDAO: LightboxBulkEntryDAO,
                                         lightboxEntryDAO: LightboxEntryDAO,

@@ -10,7 +10,7 @@ import com.theguardian.multimedia.archivehunter.common.{cmn_models, _}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, S3ClientManager, SQSClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{IngestMessage, ScanTargetDAO}
 import helpers.ProxyLocator
-import javax.inject.{Inject, Named}
+import javax.inject.{Inject, Named, Singleton}
 import models.AwsSqsMsg
 import play.api.{Configuration, Logger}
 
@@ -32,7 +32,7 @@ object IngestProxyQueue extends GenericSqsActorMessages {
 
 }
 
-
+@Singleton
 class IngestProxyQueue @Inject()(config: Configuration,
                                  system: ActorSystem,
                                  sqsClientManager: SQSClientManager,

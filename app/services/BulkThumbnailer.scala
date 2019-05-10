@@ -8,7 +8,7 @@ import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ArchiveHun
 import com.theguardian.multimedia.archivehunter.common.clientManagers.ESClientManager
 import com.theguardian.multimedia.archivehunter.common.cmn_models.ScanTarget
 import helpers._
-import javax.inject.{Inject, Named}
+import javax.inject.{Inject, Named, Singleton}
 import play.api.Logger
 import services.BulkThumbnailer.{CapacityDidUpdate, CapacityOkDoThumbnails, DoThumbnails, JobDoneCapacityReset}
 
@@ -31,6 +31,7 @@ object BulkThumbnailer {
   * @param config
   * @param system
   */
+@Singleton
 class BulkThumbnailer @Inject() (@Named("dynamoCapacityActor") dynamoCapacityActor: ActorRef,
                                   ESClientManager: ESClientManager, hasThumbnailFilter: HasThumbnailFilter,
                                  createProxySink: CreateProxySink, config:ArchiveHunterConfiguration, system:ActorSystem)

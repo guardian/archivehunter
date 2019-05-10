@@ -7,7 +7,7 @@ import com.amazonaws.services.dynamodbv2.document.Table
 import com.amazonaws.services.dynamodbv2.model._
 import com.theguardian.multimedia.archivehunter.common.ArchiveHunterConfiguration
 import com.theguardian.multimedia.archivehunter.common.clientManagers.DynamoClientManager
-import javax.inject.Inject
+import javax.inject.{Inject, Singleton}
 import play.api.Logger
 
 import scala.collection.JavaConverters._
@@ -70,6 +70,7 @@ object DynamoCapacityActor {
   case class TestCheckListResponse(entries:Seq[DCAMsg])
 }
 
+@Singleton
 class DynamoCapacityActor @Inject() (ddbClientMgr:DynamoClientManager, config:ArchiveHunterConfiguration) extends Actor {
   import DynamoCapacityActor._
   private val logger = Logger(getClass)

@@ -9,8 +9,9 @@ import com.theguardian.multimedia.archivehunter.common._
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager, SQSClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models._
 import io.circe.generic.auto._
-import javax.inject.Inject
+import javax.inject.{Inject, Singleton}
 import models.{AwsSqsMsg, JobReportNew, JobReportStatus, JobReportStatusEncoder}
+import org.slf4j.MDC
 import play.api.{Configuration, Logger}
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -57,6 +58,7 @@ trait ProxyFrameworkQueueFunctions extends ProxyTypeEncoder with JobReportStatus
   * @param esClientMgr client manager class instance for Elastic Search
   * @param proxyLocationDAO Data Access Object for proxy locations
   */
+@Singleton
 class ProxyFrameworkQueue @Inject() (config: Configuration,
                                      system: ActorSystem,
                                      sqsClientManager: SQSClientManager,
@@ -93,6 +95,29 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
 
   protected val problemItemIndexName = config.get[String]("externalData.problemItemsIndex")
   protected val problemItemIndexer = new ProblemItemIndexer(problemItemIndexName)
+
+  /**
+    * sets the "proxied" flag on the given item, retrying in case of a version conflict
+    * @param sourceId archive entry ID to update
+    * @return a Future with either a Left with an error string or a Right with the item ID string
+    */
+  def setProxiedWithRetry(sourceId:String):Future[Either[String,String]] = indexer.getById(sourceId).flatMap(entry=>{
+    val updatedEntry = entry.copy(proxied = true)
+    MDC.put("entry", updatedEntry.toString)
+    indexer.indexSingleItem(updatedEntry)
+  }).flatMap({
+    case Left(err)=>
+      if(err.error.`type`=="version_conflict_engine_exception"){
+        logger.warn(s"Elasticsearch version conflict detected for update of $sourceId, retrying...")
+        setProxiedWithRetry(sourceId)
+      } else {
+        MDC.put("error", err.toString)
+        logger.error(s"Could not set proxied flag for $sourceId: ${err.toString}")
+        Future(Left(err.toString))
+      }
+    case Right(value)=>
+      Future(Right(value.result.id))
+  })
 
   /**
     * looks up the ArchiveEntry for the original media associated with the given JobModel
@@ -286,16 +311,7 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
           case Right(archiveEntry) => updateProxyRef(msg.output.get, archiveEntry, proxyType)
         })
 
-        val indexUpdateFuture = indexer.getById(jobDesc.sourceId).flatMap(entry=>{
-          val updatedEntry = entry.copy(proxied = true)
-          indexer.indexSingleItem(updatedEntry)
-        }).map({
-          case Failure(err)=>
-            logger.error("Could not update index: ", err)
-            Left(err.toString)
-          case Success(value)=>
-            Right(value)
-        })
+        val indexUpdateFuture = setProxiedWithRetry(jobDesc.sourceId)
 
         //set up a future to complete when both of the update jobs have run. this marshals a single success/failure flag
         val overallCompletionFuture = Future.sequence(Seq(proxyUpdateFuture, indexUpdateFuture)).map(results=>{
@@ -379,8 +395,10 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
         logger.info(s"Received updated metadata ${msg.metadata} for ${entry.id}")
         val updatedEntry = entry.copy(mediaMetadata = msg.metadata)
         indexer.indexSingleItem(updatedEntry).map({
-          case Failure(err)=>
-            logger.error("Could not update index: ", err)
+          case Left(err)=>
+            MDC.put("entry",updatedEntry.toString)
+            MDC.put("error", err.toString)
+            logger.error(s"Could not update index: $err")
             val updatedLog = jobDesc.log match {
               case Some(existingLog) => existingLog + "\n" + s"Could not update index: ${err.toString}"
               case None => s"Could not update index: ${err.toString}"
@@ -388,8 +406,8 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
             val updatedJobDesc = jobDesc.copy(jobStatus = JobStatus.ST_ERROR, log = Some(updatedLog))
             jobModelDAO.putJob(updatedJobDesc)
             ownRef ! HandleFailure(msg, jobDesc, rq, receiptHandle, originalSender)
-            originalSender ! akka.actor.Status.Failure(err)
-          case Success(newId)=>
+            originalSender ! akka.actor.Status.Failure(new RuntimeException(err.toString))
+          case Right(newId)=>
             logger.info(s"Updated media metadata for $newId")
             ownRef ! HandleGenericSuccess(msg, jobDesc, rq, receiptHandle, originalSender)
         })

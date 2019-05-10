@@ -12,6 +12,7 @@ import com.sksamuel.elastic4s.mappings.FieldType._
 import com.theguardian.multimedia.archivehunter.common.cmn_models._
 import io.circe.generic.auto._
 import io.circe.syntax._
+import org.slf4j.MDC
 
 import scala.annotation.switch
 
@@ -26,18 +27,15 @@ class Indexer(indexName:String) extends ZonedDateTimeEncoder with StorageClassEn
     * @param client implicitly provided elastic4s HttpClient object
     * @return a Future containing a Try with either the ID of the new item or a RuntimeException containing the failure
     */
-  def indexSingleItem(entry:ArchiveEntry, entryId: Option[String]=None, refreshPolicy: RefreshPolicy=RefreshPolicy.WAIT_UNTIL)(implicit client:HttpClient):Future[Try[String]] = {
+  def indexSingleItem(entry:ArchiveEntry, entryId: Option[String]=None, refreshPolicy: RefreshPolicy=RefreshPolicy.WAIT_UNTIL)(implicit client:HttpClient) = {
     val idToUse = entryId match {
       case None => entry.id
-      case Some(userSpecifiedId)=> userSpecifiedId
+      case Some(userSpecifiedId) => userSpecifiedId
     }
 
     client.execute {
       update(idToUse).in(s"$indexName/entry").docAsUpsert(entry)
-    }.map({
-      case Left(failure) => Failure(new RuntimeException(failure.error.toString))
-      case Right(success) => Success(success.result.id)
-    })
+    }
   }
 
   /**

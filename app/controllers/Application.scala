@@ -2,11 +2,12 @@ package controllers
 
 import com.gu.pandomainauth.PanDomainAuthSettingsRefresher
 import helpers.InjectableRefresher
-import javax.inject.Inject
+import javax.inject.{Inject, Singleton}
 import play.api._
 import play.api.libs.ws.WSClient
 import play.api.mvc._
 
+@Singleton
 class Application @Inject() (override val controllerComponents:ControllerComponents,
                              override val wsClient: WSClient,
                              override val config: Configuration,

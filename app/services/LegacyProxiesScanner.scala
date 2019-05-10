@@ -8,7 +8,7 @@ import com.amazonaws.services.dynamodbv2.model._
 import com.google.inject.Injector
 import com.theguardian.multimedia.archivehunter.common.ProxyLocation
 import helpers._
-import javax.inject.Inject
+import javax.inject.{Inject, Singleton}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{ScanTarget, ScanTargetDAO}
 import play.api.{Configuration, Logger}
 
@@ -27,6 +27,7 @@ object LegacyProxiesScanner {
   case class ProviderError(err:Throwable) extends LPSError
 }
 
+@Singleton
 class LegacyProxiesScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientManager, s3ClientMgr:S3ClientManager,
                                      esClientMgr:ESClientManager, scanTargetDAO: ScanTargetDAO, injector:Injector)(implicit system:ActorSystem)extends Actor {
   import LegacyProxiesScanner._

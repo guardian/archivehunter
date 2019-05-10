@@ -15,7 +15,7 @@ import com.gu.scanamo.{ScanamoAlpakka, Table}
 import com.sksamuel.elastic4s.http.HttpClient
 import com.sksamuel.elastic4s.http.bulk.BulkResponseItem
 import helpers._
-import javax.inject.Inject
+import javax.inject.{Inject, Singleton}
 import com.theguardian.multimedia.archivehunter.common.cmn_models._
 import play.api.{Configuration, Logger}
 import com.sksamuel.elastic4s.streams.ReactiveElastic._
@@ -38,7 +38,7 @@ object BucketScanner {
   case object RegularScanTrigger extends BSMsg
 }
 
-
+@Singleton
 class BucketScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientManager, s3ClientMgr:S3ClientManager,
                               esClientMgr:ESClientManager, scanTargetDAO: ScanTargetDAO, jobModelDAO:JobModelDAO,
                               injector:Injector)(implicit system:ActorSystem)

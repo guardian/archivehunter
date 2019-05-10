@@ -5,7 +5,7 @@ import com.theguardian.multimedia.archivehunter.common.{ProblemItemHitReader, Pr
 import com.theguardian.multimedia.archivehunter.common.clientManagers.ESClientManager
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{JobModel, JobModelDAO, ProblemItem, ProxyHealthEncoder}
 import helpers.InjectableRefresher
-import javax.inject.{Inject, Named}
+import javax.inject.{Inject, Named, Singleton}
 import org.slf4j.MDC
 import play.api.{Configuration, Logger}
 import play.api.libs.circe.Circe
@@ -28,6 +28,7 @@ import scala.concurrent.duration._
   * @param wsClient
   * @param refresher
   */
+@Singleton
 class ProxyHealthController @Inject()(override val config:Configuration,
                                      override val controllerComponents:ControllerComponents,
                                      esClientMgr:ESClientManager,
