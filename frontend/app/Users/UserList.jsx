@@ -145,19 +145,26 @@ class UserList extends React.Component {
                                 <p className="information">This is the amount of data that a user can request from Glacier without requiring administrator approval. Set to zero to always require admin approval.</p>
 
                             </li>
-                            <li><p className="list-control-label">Rolling 30-day restore limit</p>
+                            <li style={{display: "none"}}><p className="list-control-label">Rolling 30-day restore limit</p>
                                 <SizeInput sizeInBytes={entry.rollingRestoreQuota ? (entry.rollingRestoreQuota*1048576) : 0}
                                            didUpdate={newValue=>this.quotaChanged(entry,"ROLLING_QUOTA", newValue)}
                                            minimumMultiplier={1048576}
                                            />
                             </li>
-                            <li style={{display: entry.isAdmin ? "list-item" : "none"}}><p className="list-control-label">Admin's one-off authorisation limit:</p>
+                            <li style={
+                                //{display: entry.isAdmin ? "list-item" : "none"}
+                                {display: "none"}
+                            }><p className="list-control-label">Admin's one-off authorisation limit:</p>
+                            }
                                 <SizeInput sizeInBytes={entry.adminAuthQuota ? (entry.adminAuthQuota*1048576) : 0}
                                            didUpdate={newValue=>this.quotaChanged(entry,"ADMIN_APPROVAL_QUOTA", newValue)}
                                            minimumMultiplier={1048576}
                                            />
                             </li>
-                            <li style={{display: entry.isAdmin ? "list-item" : "none"}}><p className="list-control-label">Admin's rolling 30-day authorisation limit:</p>
+                            <li style={
+                                //{display: entry.isAdmin ? "list-item" : "none"}
+                                {display: "none"}
+                            }><p className="list-control-label">Admin's rolling 30-day authorisation limit:</p>
                                 <SizeInput sizeInBytes={entry.adminRollingAuthQuota ? (entry.adminRollingAuthQuota*1048576) : 0}
                                            didUpdate={newValue=>this.quotaChanged(entry,"ADMIN_ROLLING_APPROVAL_QUOTA", newValue)}
                                            minimumMultiplier={1048576}
