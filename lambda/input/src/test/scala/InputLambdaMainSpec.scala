@@ -46,7 +46,7 @@ class InputLambdaMainSpec extends Specification with Mockito with ZonedDateTimeE
       val mockIndexer = mock[Indexer]
       val mockSendIngestedMessage = mock[Function1[ArchiveEntry, Unit]]
 
-      mockIndexer.indexSingleItem(any,any,any)(any).returns(Future(Success("fake-entry-id")))
+      mockIndexer.indexSingleItem(any,any,any)(any).returns(Future(Right("fake-entry-id")))
       val test = new InputLambdaMain {
         override protected def getElasticClient(clusterEndpoint: String): HttpClient = {
           val m = mock[HttpClient]
@@ -100,7 +100,7 @@ class InputLambdaMainSpec extends Specification with Mockito with ZonedDateTimeE
       val mockIndexer = mock[Indexer]
       val mockSendIngestedMessage = mock[Function1[ArchiveEntry, Unit]]
 
-      mockIndexer.indexSingleItem(any,any,any)(any).returns(Future(Success("fake-entry-id")))
+      mockIndexer.indexSingleItem(any,any,any)(any).returns(Future(Right("fake-entry-id")))
       val test = new InputLambdaMain {
         override protected def getElasticClient(clusterEndpoint: String): HttpClient = {
           val m = mock[HttpClient]
