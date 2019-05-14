@@ -41,10 +41,10 @@ Parameters:
     Type: String
     Description: What type of instance to launch
     AllowedValues:
-    - t2.nano
-    - t2.micro
-    - t2.small
-    Default: t2.nano
+    - t3.nano
+    - t3.micro
+    - t3.small
+    Default: t3.nano
   KeyPair:
     Type: AWS::EC2::KeyPair::KeyName
     Description: Root access keypair
