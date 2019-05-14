@@ -42,7 +42,7 @@ class BulkLightboxAdd extends React.Component {
      */
     checkBulkRecord() {
         this.setState({loading: true},
-            ()=>axios.put("/api/lightbox/bulk/query", this.makeSearchJson(), {headers: {"Content-Type": "application/json"}})
+            ()=>axios.put("/api/lightbox/my/bulk/query", this.makeSearchJson(), {headers: {"Content-Type": "application/json"}})
                 .then(response=>{
                     this.setState({loading: false, bulkRecord: response.data.entry, lastERror: null});
                 }).catch(err=>{
