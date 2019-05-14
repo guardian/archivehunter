@@ -12,6 +12,7 @@ class AdminFront extends React.Component {
                 <li><Link to="/admin/users">Users</Link></li>
                 <li><Link to="/admin/proxyFramework">Proxying Framework</Link></li>
                 <li><Link to="/admin/proxyHealth">Proxying Health Indicator</Link></li>
+                <li><Link to="/admin/emailtemplates">Email templates</Link></li>
                 <hr style={{width: "100px", marginLeft: 0, marginRight: "auto"}}/>
                 <li><Link to="/admin/about">About</Link></li>
             </ul>

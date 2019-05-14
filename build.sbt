@@ -17,6 +17,7 @@ lazy val commonSettings = Seq(
     "com.amazonaws" % "aws-java-sdk-s3" % awsSdkVersion,
     "com.amazonaws" % "aws-java-sdk-elastictranscoder"% awsSdkVersion,
     "com.amazonaws" % "aws-java-sdk-sqs"% awsSdkVersion,
+    "com.amazonaws" % "aws-java-sdk-ses" % awsSdkVersion,
     "com.dripower" %% "play-circe" % "2610.0",
     "com.sksamuel.elastic4s" %% "elastic4s-http" % elastic4sVersion,
     "com.sksamuel.elastic4s" %% "elastic4s-circe" % elastic4sVersion,

@@ -35,6 +35,9 @@ import ProxyHealthDash from "./ProxyHealth/ProxyHealthDash.jsx";
 
 import Test419Component from "./testing/test419.jsx";
 
+import EmailTemplateList from "./EmailTemplateAdmin/EmailTemplateList.jsx";
+import EmailTemplateEdit from "./EmailTemplateAdmin/EmailTemplateEdit.jsx";
+
 library.add(faStroopwafel, faCheckCircle, faCheck, faTimes, faTimesCircle, faRoad,faSearch,faThList,faWrench, faLightbulb, faChevronCircleDown, faChevronCircleRight, faTrashAlt, faFolderPlus, faFolderMinus, faFolder);
 library.add(faFilm, faVolumeUp, faImage, faFile, faClock, faRunning, faExclamationTriangle, faHdd, faBalanceScale, faSyncAlt, faBookReader, faBug, faCompressArrowsAlt, faIndustry, faRedoAlt, faHome, faListOl,);
 library.add(faExclamation, faUnlink);
@@ -96,6 +99,8 @@ class App extends React.Component {
                 <Route path="/admin/jobs" component={JobsList}/>
                 <Route path="/admin/scanTargets/:id" component={ScanTargetEdit}/> /*this also handles "new" */
                 <Route path="/admin/scanTargets" component={ScanTargetsList}/>
+                <Route path="/admin/emailtemplates/:templateName" component={EmailTemplateEdit}/>
+                <Route path="/admin/emailtemplates" component={EmailTemplateList}/>
                 <Route path="/admin" exact={true} component={AdminFront}/>
                 <Route path="/lightbox" exact={true} component={MyLightbox}/>
                 <Route path="/browse" exact={true} component={BrowseComponent}/>
