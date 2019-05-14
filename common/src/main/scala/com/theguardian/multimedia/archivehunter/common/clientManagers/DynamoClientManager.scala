@@ -24,7 +24,7 @@ class DynamoClientManager @Inject() (config:ArchiveHunterConfiguration) extends 
         config.get[String]("externalData.awsRegion"),
         config.get[String]("externalData.ddbHost"),
         443,
-        8,
+        32,
         credentialsProvider(profileName)
       )
     )
