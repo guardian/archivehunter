@@ -4,6 +4,7 @@ import ErrorViewComponent from "../common/ErrorViewComponent.jsx";
 import LoadingThrobber from "../common/LoadingThrobber.jsx";
 import ReactTable, {ReactTableDefaults} from "react-table";
 import {Link} from 'react-router-dom';
+import ClickableIcon from "../common/ClickableIcon.jsx";
 
 class EmailTemplateList extends React.Component {
     constructor(props){
@@ -24,6 +25,11 @@ class EmailTemplateList extends React.Component {
             {
                 Header: "Timestamp",
                 accessor: "timestamp"
+            },
+            {
+                Header: "",
+                accessor: "name",
+                Cell: props=><ClickableIcon style={{width: "2em"}} onClick={evt=>this.requestDelete(props.value)} icon="trash-alt"/>
             }
         ];
 
@@ -38,6 +44,17 @@ class EmailTemplateList extends React.Component {
             paddingLeft: '5px',
             paddingRight: '5px'
         };
+
+        this.requestDelete = this.requestDelete.bind(this);
+    }
+
+    requestDelete(templateName){
+        this.setState({loading: true, lastError:null},()=>axios.delete("/api/emailtemplate/" + templateName).then(response=>{
+            this.setState({loading: false, lastError:null, templatesList: this.state.templatesList.filter(tpl=>tpl.name!==templateName)});
+        }).catch(err=>{
+            console.error(err);
+            this.setState({loading: false, lastError: err});
+        }))
     }
 
     componentWillMount() {

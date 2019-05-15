@@ -4,6 +4,11 @@ import BreadcrumbComponent from "../common/BreadcrumbComponent.jsx";
 import ErrorViewComponent from "../common/ErrorViewComponent.jsx";
 import LoadingThrobber from "../common/LoadingThrobber.jsx";
 import {Redirect} from "react-router-dom";
+import {Controlled as CodeMirror} from 'react-codemirror2';
+import 'codemirror/lib/codemirror.css';
+//import 'codemirror/theme/material.css';
+
+require('codemirror/mode/htmlembedded/htmlembedded');
 
 class EmailTemplateEdit extends React.Component {
     constructor(props){
@@ -102,7 +107,17 @@ class EmailTemplateEdit extends React.Component {
                     </tr>
                     <tr>
                         <td className="right">Email template HTML</td>
-                        <td><textarea className="large-textarea" value={this.state.htmlPart} onChange={evt=>this.setState({htmlPart: evt.target.value})}/></td>
+                        <td>
+                            {/*<textarea className="large-textarea" value={this.state.htmlPart} onChange={evt=>this.setState({htmlPart: evt.target.value})}/>*/}
+                            <CodeMirror
+                                value={this.state.htmlPart}
+                                options={{
+                                    mode: 'htmlembedded', lineNumbers: true
+                                }}
+                                onBeforeChange={(editor, data, value)=>{this.setState({htmlPart: value})}}
+                                onChange={(editor, data, value)=> {}}
+                            />
+                        </td>
                     </tr>
                     </tbody>
                 </table>

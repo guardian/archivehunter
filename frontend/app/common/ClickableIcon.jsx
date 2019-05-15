@@ -27,6 +27,7 @@ class ClickableIcon extends React.Component {
                                 className={this.state.hovered ? hoveredClass : unHoveredClass}
                                 onMouseOver={evt=>this.setState({hovered: true})}
                                 onMouseOut={evt=>this.setState({hovered: false})}
+                                style={this.props.style}
         />
     }
 }
