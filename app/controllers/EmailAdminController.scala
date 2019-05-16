@@ -9,26 +9,31 @@ import com.theguardian.multimedia.archivehunter.common.ProxyTranscodeFramework.P
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager, SESClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.JobModelDAO
 import helpers.{InjectableRefresher, SESHelper}
-import javax.inject.Inject
+import javax.inject.{Inject, Singleton}
 import play.api.{Configuration, Logger}
 import play.api.libs.circe.Circe
 import play.api.libs.ws.WSClient
 import play.api.mvc.{AbstractController, ControllerComponents}
-import responses.{GenericErrorResponse, ObjectGetResponse, ObjectListResponse}
+import responses.{ErrorListResponse, GenericErrorResponse, ObjectGetResponse, ObjectListResponse}
 
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success, Try}
 import io.circe.generic.auto._
 import io.circe.syntax._
+import models.{EmailTemplateAssociation, EmailTemplateAssociationDAO, EmailableActions}
 import org.slf4j.MDC
 import requests.UpdateEmailTemplate
 
+import scala.concurrent.Future
+
+@Singleton
 class EmailAdminController @Inject() (override val config:Configuration,
                                       override val controllerComponents:ControllerComponents,
                                       override val refresher:InjectableRefresher,
                                       override val wsClient:WSClient,
-                                      sesClientManager:SESClientManager)
+                                      sesClientManager:SESClientManager,
+                                      emailTemplateAssociationTableDAO:EmailTemplateAssociationDAO)
                                      (implicit actorSystem:ActorSystem)
   extends AbstractController(controllerComponents) with Circe with PanDomainAuthActions with AdminsOnly {
 
@@ -37,12 +42,14 @@ class EmailAdminController @Inject() (override val config:Configuration,
 
   private val logger = Logger(getClass)
 
+  def matchAssociation(allAssociations:List[EmailTemplateAssociation], templateName:String):Option[EmailTemplateAssociation] = allAssociations.find(_.templateName==templateName)
+
   /**
     * list out the available email templates
     * @return
     */
-  def listEmailTemplates = APIAuthAction { request=>
-    adminsOnlySync(request) {
+  def listEmailTemplates = APIAuthAction.async { request=>
+    adminsOnlyAsync(request) {
       def getNextPage(nextPageToken:Option[String], currentSequence:Seq[TemplateMetadata]):Seq[TemplateMetadata] = {
         val rq = new ListTemplatesRequest()
         val finalRq = nextPageToken match {
@@ -57,19 +64,28 @@ class EmailAdminController @Inject() (override val config:Configuration,
         }
       }
 
+      val associationScanFuture = emailTemplateAssociationTableDAO.scanAll
+
       val templateDataListResult = Try { getNextPage(None, Seq()) }
 
-      templateDataListResult match {
-        case Success(resultList)=>
-          val resultsToSend = resultList.map(templateMetadataEntry=>Map(
-            "name"->templateMetadataEntry.getName,
-            "timestamp"->templateMetadataEntry.getCreatedTimestamp.toString
-          ))
-          Ok(ObjectListResponse("ok","emailTemplate", resultsToSend, resultsToSend.length).asJson)
-        case Failure(exception)=>
-          logger.error("Could not list email templates: ", exception)
-          InternalServerError(GenericErrorResponse("error",exception.toString).asJson)
-      }
+      associationScanFuture.map({
+        case Left(err)=>
+          logger.error(s"Could not retrieve template associations: ${err.toString}")
+          InternalServerError(GenericErrorResponse("db_error", err.toString).asJson)
+        case Right(associationList)=>
+          templateDataListResult match {
+            case Success(resultList)=>
+              val resultsToSend = resultList.map(templateMetadataEntry=>Map(
+                "name"->Some(templateMetadataEntry.getName),
+                "timestamp"->Some(templateMetadataEntry.getCreatedTimestamp.toString),
+                "association"->matchAssociation(associationList,templateMetadataEntry.getName).map(_.emailableAction.toString)
+              ))
+              Ok(ObjectListResponse("ok","emailTemplate", resultsToSend, resultsToSend.length).asJson)
+            case Failure(exception)=>
+              logger.error("Could not list email templates: ", exception)
+              InternalServerError(GenericErrorResponse("error",exception.toString).asJson)
+          }
+      })
     }
   }
 
@@ -135,6 +151,40 @@ class EmailAdminController @Inject() (override val config:Configuration,
           MDC.put("templateName", templateName)
           logger.error("Could not delete email template: ", err)
           InternalServerError(GenericErrorResponse("error", err.toString).asJson)
+      }
+    }
+  }
+
+  def makeAssociation(forAction:String, templateName:String) = APIAuthAction.async { request=>
+    adminsOnlyAsync(request) {
+      Try {
+        emailTemplateAssociationTableDAO.removeExistingForTemplate(templateName).flatMap({
+          case Left(errList)=>
+            errList.foreach(err=>logger.error(s"Could not remove existing association for $forAction on $templateName: ${err.toString}"))
+            Future(InternalServerError(ErrorListResponse("db_error","Could not remove existing association", errList.map(_.toString)).asJson))
+          case Right(_)=>
+            val record = EmailTemplateAssociation(EmailableActions.withName(forAction), templateName, request.user.email)
+            emailTemplateAssociationTableDAO.put(record).map({
+              case Left(err) => InternalServerError(GenericErrorResponse("db_error", err.toString).asJson)
+              case Right(_) => Ok(GenericErrorResponse("ok", "association updated").asJson)
+            })
+          })
+      } match {
+        case Success(result)=>result
+        case Failure(err)=> Future(BadRequest(GenericErrorResponse("invalid_request",err.toString).asJson))
+      }
+    }
+  }
+
+  def removeAssociation(forTemplate:String) = APIAuthAction.async { request=>
+    adminsOnlyAsync(request) {
+      Try {
+        emailTemplateAssociationTableDAO.removeExistingForTemplate(forTemplate).map(deleteItemResult => {
+          Ok(GenericErrorResponse("ok", "association removed").asJson)
+        })
+      } match {
+        case Success(result)=>result
+        case Failure(err)=>Future(BadRequest(GenericErrorResponse("invalid_request", err.toString).asJson))
       }
     }
   }

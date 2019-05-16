@@ -161,6 +161,26 @@ Resources:
         SubnetIds:
           - !Ref ESSubnet
 
+  EmailTemplateAssociationTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: emailableAction
+          AttributeType: S
+      KeySchema:
+        - AttributeName: emailableAction
+          KeyType: HASH
+      ProvisionedThroughput:
+        WriteCapacityUnits: 1
+        ReadCapacityUnits: 2
+      Tags:
+        - Key: App
+          Value: !Sub ${App}-webapp
+        - Key: Stack
+          Value: !Ref Stack
+        - Key: Stage
+          Value: !Ref Stage
+
   ScanTargetsTable:
     Type: AWS::DynamoDB::Table
     Properties:

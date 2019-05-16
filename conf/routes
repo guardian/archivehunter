@@ -100,6 +100,9 @@ GET     /api/emailtemplate                  @controllers.EmailAdminController.li
 POST    /api/emailtemplate                  @controllers.EmailAdminController.setEmailTemplate
 DELETE  /api/emailtemplate/:templateName    @controllers.EmailAdminController.removeEmailTemplate(templateName)
 
+PUT     /api/emailtemplate/:templateName/association/:forAction     @controllers.EmailAdminController.makeAssociation(forAction, templateName)
+DELETE  /api/emailtemplate/:templateName/association                @controllers.EmailAdminController.removeAssociation(templateName)
+
 # Map static resources from the /public folder to the /assets URL path
 GET     /assets/*file               controllers.Assets.at(path="/public", file)
 GET     /*tail                      @controllers.Application.index(tail)

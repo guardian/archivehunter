@@ -5,6 +5,7 @@ import LoadingThrobber from "../common/LoadingThrobber.jsx";
 import ReactTable, {ReactTableDefaults} from "react-table";
 import {Link} from 'react-router-dom';
 import ClickableIcon from "../common/ClickableIcon.jsx";
+import AssociationSelector from "./AssociationSelector.jsx";
 
 class EmailTemplateList extends React.Component {
     constructor(props){
@@ -27,6 +28,11 @@ class EmailTemplateList extends React.Component {
                 accessor: "timestamp"
             },
             {
+                Header: "Used for",
+                accessor: "association",
+                Cell: props=><AssociationSelector onChange={this.associationUpdated} value={props.value} forTemplate={props.row.name}/>
+            },
+            {
                 Header: "",
                 accessor: "name",
                 Cell: props=><ClickableIcon style={{width: "2em"}} onClick={evt=>this.requestDelete(props.value)} icon="trash-alt"/>
@@ -46,6 +52,25 @@ class EmailTemplateList extends React.Component {
         };
 
         this.requestDelete = this.requestDelete.bind(this);
+        this.associationUpdated = this.associationUpdated.bind(this);
+    }
+
+    associationUpdated(newValue, forTemplate) {
+        if(!newValue){
+            this.setState({loading: true},()=>axios.delete("/api/emailtemplate/" + forTemplate + "/association").then(response=>{
+                window.setTimeout(()=>this.reloadData(), 500);
+            }).catch(err=>{
+                console.error(err);
+                this.setState({loading: false, lastError: err});
+            }))
+        } else {
+            this.setState({loading: true}, ()=>axios.put("/api/emailtemplate/" + forTemplate + "/association/" + newValue).then(response=>{
+                window.setTimeout(()=>this.reloadData(), 500);
+            }).catch(err=>{
+                console.error(err);
+                this.setState({loading: false, lastError: err});
+            }))
+        }
     }
 
     requestDelete(templateName){
@@ -57,16 +82,22 @@ class EmailTemplateList extends React.Component {
         }))
     }
 
+    reloadData() {
+        return new Promise((resolve, reject)=>{
+            this.setState({loading: true}, ()=>axios.get("/api/emailtemplate").then(response=>{
+                this.setState({
+                    loading: false,
+                    templatesList: response.data.entries
+                }, ()=>resolve());
+            }).catch(err=>{
+                console.error(err);
+                this.setState({loading: false, lastError: err}, ()=>reject(err));
+            }))
+        })
+    }
+
     componentWillMount() {
-        this.setState({loading: true}, ()=>axios.get("/api/emailtemplate").then(response=>{
-            this.setState({
-                loading: false,
-                templatesList: response.data.entries
-            })
-        }).catch(err=>{
-            console.error(err);
-            this.setState({loading: false, lastError: err});
-        }))
+        this.reloadData();
     }
 
     render(){
