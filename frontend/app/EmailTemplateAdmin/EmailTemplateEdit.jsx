@@ -22,7 +22,8 @@ class EmailTemplateEdit extends React.Component {
             subjectPart: "",
             textPart: "",
             htmlPart: "",
-            redirect_return: false
+            redirect_return: false,
+            nameValidationError: null
         };
 
         this.copyTextToHtml = this.copyTextToHtml.bind(this);
@@ -67,6 +68,16 @@ class EmailTemplateEdit extends React.Component {
         this.setState({htmlPart: this.state.textPart})
     }
 
+    static nameValidationExpression = /^[\w\d\-_]+$/;
+
+    validateTemplateName(){
+        if(EmailTemplateEdit.nameValidationExpression.test(this.state.templateName)){
+            if(this.state.nameValidationError) this.setState({nameValidationError: null})
+        } else {
+            if(!this.state.nameValidationError) this.setState({nameValidationError: "Template name must have at least one character and only include alphanumeric characters, - and _"});
+        }
+    }
+
     submitCompletedForm(evt) {
         evt.preventDefault();
         const requestToSend = {
@@ -95,7 +106,10 @@ class EmailTemplateEdit extends React.Component {
                     <tbody>
                     <tr>
                         <td className="right">Template name</td>
-                        <td><input className="full-width" value={this.state.templateName} onChange={evt=>this.setState({templateName: evt.target.value})}/> </td>
+                        <td>
+                            <input className="full-width" value={this.state.templateName} onChange={evt=>this.setState({templateName: evt.target.value}, ()=>this.validateTemplateName())}/><br/>
+                            <p className="error-text" style={{display: this.state.nameValidationError ? "block":"none"}}>{this.state.nameValidationError}</p>
+                        </td>
                     </tr>
                     <tr>
                         <td className="right">Subject part</td>
