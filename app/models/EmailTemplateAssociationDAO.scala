@@ -13,14 +13,9 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.Success
 
 @Singleton
-class EmailTemplateAssociationDAO @Inject() (config:Configuration, dynamoClientManager: DynamoClientManager)(implicit system:ActorSystem){
+class EmailTemplateAssociationDAO @Inject() (config:Configuration, dynamoClientManager: DynamoClientManager)(implicit system:ActorSystem) extends EmailableActionsEncoder {
   import com.gu.scanamo.syntax._
 
-  implicit val storageClassFormat = DynamoFormat.coercedXmap[EmailableActions, String, IllegalArgumentException](
-    input=>EmailableActions.withName(input)
-  )(
-    ac=>ac.toString
-  )
 
   protected val awsProfile = config.getOptional[String]("externalData.awsProfile")
   implicit val mat:Materializer = ActorMaterializer.create(system)

@@ -15,6 +15,18 @@ trait AdminsOnly extends Circe {
   def userProfileFromSession(session: Session):Option[Either[io.circe.Error, UserProfile]]
 
   /**
+    * legacy compatible version of adminsOnlyAsync that discards the loaded user profile
+    * @param request
+    * @param allowHmac
+    * @param block
+    * @param ec
+    * @tparam A
+    * @return
+    */
+  def adminsOnlyAsync[A](request: UserRequest[A], allowHmac:Boolean=false)(block: => Future[Result])(implicit ec:ExecutionContext) =
+    adminsOnlyAsyncWithProfile(request, allowHmac) { _=>block }
+
+  /**
     * filter your response through this to only be called if the logged in user is an admin.
     * example:
     * def myAction = APIAuthAction.async { request=>
@@ -28,11 +40,12 @@ trait AdminsOnly extends Circe {
     * @tparam A type of request body, implicit
     * @return a Play Response object.
     */
-  def adminsOnlyAsync[A](request: UserRequest[A], allowHmac:Boolean=false)(block: => Future[Result])(implicit ec:ExecutionContext) = {
+  def adminsOnlyAsyncWithProfile[A](request: UserRequest[A], allowHmac:Boolean=false)(block: UserProfile=> Future[Result])(implicit ec:ExecutionContext) = {
     userProfileFromSession(request.session) match {
       case None=>
         if(allowHmac && request.user.firstName=="hmac-authed-service"){ //panda-hmac sets this value for the user when auth succeeds. If auth fails we don't get here.
-          block
+          val mockedUserProfile = UserProfile("hmac-authed-service", true, Seq(),true, None, None,None, None, None, None)
+          block(mockedUserProfile)
         } else {
           Future(Forbidden(GenericErrorResponse("error", "Not logged in").asJson))
         }
@@ -40,7 +53,7 @@ trait AdminsOnly extends Circe {
         Future(InternalServerError(GenericErrorResponse("error","Session is corrupted. Please log out and log in again").asJson))
       case Some(Right(profile))=>
         if(profile.isAdmin){
-          block
+          block(profile)
         } else {
           Future(Forbidden(GenericErrorResponse("not_allowed","Only admins are allowed to perform this action").asJson))
         }

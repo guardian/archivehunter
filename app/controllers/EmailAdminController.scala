@@ -2,14 +2,14 @@ package controllers
 
 import java.time.{ZoneId, ZoneOffset, ZonedDateTime}
 
-import akka.actor.ActorSystem
+import akka.actor.{ActorRef, ActorSystem}
 import com.amazonaws.services.simpleemail.model.{DeleteTemplateRequest, ListTemplatesRequest, TemplateMetadata}
 import com.theguardian.multimedia.archivehunter.common.ProxyLocationDAO
 import com.theguardian.multimedia.archivehunter.common.ProxyTranscodeFramework.ProxyGenerators
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager, SESClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.JobModelDAO
 import helpers.{InjectableRefresher, SESHelper}
-import javax.inject.{Inject, Singleton}
+import javax.inject.{Inject, Named, Singleton}
 import play.api.{Configuration, Logger}
 import play.api.libs.circe.Circe
 import play.api.libs.ws.WSClient
@@ -21,26 +21,32 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success, Try}
 import io.circe.generic.auto._
 import io.circe.syntax._
-import models.{EmailTemplateAssociation, EmailTemplateAssociationDAO, EmailableActions}
+import models.{EmailTemplateAssociation, EmailTemplateAssociationDAO, EmailableActions, EmailableActionsEncoder}
 import org.slf4j.MDC
-import requests.UpdateEmailTemplate
+import requests.{SendTestEmailRequest, UpdateEmailTemplate}
+import akka.pattern.ask
+import services.SendEmailActor
+import services.SendEmailActor.EventSent
 
 import scala.concurrent.Future
-
+import scala.concurrent.duration._
 @Singleton
 class EmailAdminController @Inject() (override val config:Configuration,
                                       override val controllerComponents:ControllerComponents,
                                       override val refresher:InjectableRefresher,
                                       override val wsClient:WSClient,
                                       sesClientManager:SESClientManager,
-                                      emailTemplateAssociationTableDAO:EmailTemplateAssociationDAO)
+                                      emailTemplateAssociationTableDAO:EmailTemplateAssociationDAO,
+                                      @Named("sendEmailActor") sendEmailActor:ActorRef)
                                      (implicit actorSystem:ActorSystem)
-  extends AbstractController(controllerComponents) with Circe with PanDomainAuthActions with AdminsOnly {
+  extends AbstractController(controllerComponents) with Circe with PanDomainAuthActions with AdminsOnly with EmailableActionsEncoder{
 
   protected val sesClient = sesClientManager.getClient(config.getOptional[String]("externalData.awsProfile"))
   private val sesHelper = new SESHelper(sesClient)
 
   private val logger = Logger(getClass)
+
+  private implicit val actorTimeout:akka.util.Timeout = 30 seconds
 
   def matchAssociation(allAssociations:List[EmailTemplateAssociation], templateName:String):Option[EmailTemplateAssociation] = allAssociations.find(_.templateName==templateName)
 
@@ -186,6 +192,32 @@ class EmailAdminController @Inject() (override val config:Configuration,
         case Success(result)=>result
         case Failure(err)=>Future(BadRequest(GenericErrorResponse("invalid_request", err.toString).asJson))
       }
+    }
+  }
+
+  def sendTestEmail(templateName:String) = APIAuthAction.async(circe.json(2048)) { request=>
+    adminsOnlyAsyncWithProfile(request) { userProfile=>
+      request.body.as[SendTestEmailRequest] match {
+        case Left(err)=>
+          Future(BadRequest(GenericErrorResponse("bad_request", err.toString).asJson))
+        case Right(testRequest)=>
+          val resultFuture =
+            (sendEmailActor ? SendEmailActor.NotifiableEvent(testRequest.mockedAction,testRequest.templateParameters,userProfile, Some(templateName))).mapTo[SendEmailActor.SEMsg]
+
+          resultFuture.map({
+            case SendEmailActor.NoEventAssociation=>
+              BadRequest(GenericErrorResponse("bad_request", s"No event association for ${testRequest.mockedAction}").asJson)
+            case SendEmailActor.DBError(errMsg:String)=>
+              InternalServerError(GenericErrorResponse("db_error", errMsg).asJson)
+            case SendEmailActor.SESError(errMsg:String)=>
+              InternalServerError(GenericErrorResponse("ses_error", errMsg).asJson)
+            case SendEmailActor.GeneralError(errMsg:String)=>
+              InternalServerError(GenericErrorResponse("general_error", errMsg).asJson)
+            case SendEmailActor.EventSent=>
+              Ok(GenericErrorResponse("ok","Event sent to admin user").asJson)
+          })
+      }
+
     }
   }
 }

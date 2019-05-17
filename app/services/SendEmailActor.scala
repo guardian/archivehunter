@@ -13,13 +13,14 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import io.circe.generic.auto._
 import io.circe.syntax._
 
+import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
 
 object SendEmailActor {
   trait SEMsg
 
   //public messages to send to the actor
-  case class NotifiableEvent(eventType:EmailableActions, messageParameters:Map[String,String], intiatingUser:UserProfile) extends SEMsg
+  case class NotifiableEvent(eventType:EmailableActions, messageParameters:Map[String,String], intiatingUser:UserProfile, overrideTemplate:Option[String]) extends SEMsg
 
   //public reply messages to handle
   case object NoEventAssociation extends SEMsg
@@ -38,20 +39,30 @@ class SendEmailActor @Inject() (config:Configuration, SESClientManager: SESClien
 
   import SendEmailActor._
 
+  def getRightTemplateName(eventType:EmailableActions, maybeTemplateOverride:Option[String]) = maybeTemplateOverride match {
+    case Some(templateOverride)=>Future(Right(templateOverride))
+    case None=>
+      emailTemplateAssociationDAO.getByAction(eventType).map({
+        case None =>
+          logger.error(s"Trying to send an email for event $eventType that has no association to an email template")
+          Left(NoEventAssociation)
+        case Some(Left(err)) =>
+          logger.error(s"Could not look up event type->email template mapping in Dynamo: ${err.toString}")
+          Left(DBError(err.toString))
+        case Some(Right(templateAssociation)) =>
+          Right(templateAssociation.templateName)
+      })
+  }
   override def receive: Receive = {
-    case NotifiableEvent(eventType, messageParameters, initiatingUser)=>
+    case NotifiableEvent(eventType, messageParameters, initiatingUser, maybeOverrideTemplate)=>
       val originalSender = sender()
 
-      emailTemplateAssociationDAO.getByAction(eventType).map({
-        case None=>
-          logger.error(s"Trying to send an email for event $eventType that has no association to an email template")
-          originalSender ! NoEventAssociation
-        case Some(Left(err))=>
-          logger.error(s"Could not look up event type->email template mapping in Dynamo: ${err.toString}")
-          originalSender ! DBError(err.toString)
-        case Some(Right(templateAssociation))=>
+      getRightTemplateName(eventType, maybeOverrideTemplate).map({
+        case Left(errMsg)=>
+          originalSender ! errMsg
+        case Right(templateName)=>
           val rq = new SendTemplatedEmailRequest()
-            .withTemplate(templateAssociation.templateName)
+            .withTemplate(templateName)
             .withTemplateData(messageParameters.asJson.toString())
             .withDestination(new Destination().withToAddresses(initiatingUser.userEmail))
             .withReplyToAddresses(config.get[String]("email.replyToAddress"))
@@ -64,7 +75,7 @@ class SendEmailActor @Inject() (config:Configuration, SESClientManager: SESClien
               //TODO: should probably retry here
               originalSender ! SESError(err.toString)
             case Failure(err:TemplateDoesNotExistException)=>
-              logger.error(s"Template ${templateAssociation.templateName} did not exist")
+              logger.error(s"Template ${templateName} did not exist")
               //TODO: should probably delete association to prevent this happening again
               originalSender ! SESError(err.toString)
             case Failure(err:AccountSendingPausedException)=>
