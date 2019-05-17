@@ -70,6 +70,13 @@ class SendEmailActor @Inject() (config:Configuration, SESClientManager: SESClien
               .withSource(config.get[String]("email.sourceAddress"))
           }
 
+          logger.info(s"Sending email with template $templateName")
+          logger.info(s"Sending with parameters ${messageParameters.asJson.toString()}")
+          logger.info(s"Sendingg to ${initiatingUser.userEmail}")
+          logger.info(s"Reply to is ${config.get[String]("email.replyToAddress")}")
+          logger.info(s"Source email is ${config.get[String]("email.sourceAddress")}")
+          logger.info(s"Request is $maybeRequest")
+
           maybeRequest match {
             case Success(rq) =>
               val result = Try {

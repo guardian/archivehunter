@@ -103,6 +103,12 @@ Parameters:
     Description: Shared secret for script->server communication
     Type: String
     NoEcho: true
+  ReplyToEmail:
+    Description: Email address that users can reply to in response to automated emails
+    Type: String
+  SourceEmail:
+    Description: Email address that automated emails apparently come from. This should be verified by SES
+    Type: String
 Resources:
   AccessorSG: #this group is exported and used by bucketmonitor yaml. defined here so that it can be marked for access to ES
     Type: AWS::EC2::SecurityGroup
@@ -167,9 +173,21 @@ Resources:
       AttributeDefinitions:
         - AttributeName: emailableAction
           AttributeType: S
+        - AttributeName: templateName
+          AttributeType: S
       KeySchema:
         - AttributeName: emailableAction
           KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: templateNameIndex
+          KeySchema:
+            - AttributeName: templateName
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+          ProvisionedThroughput:
+            WriteCapacityUnits: 1
+            ReadCapacityUnits: 1
       ProvisionedThroughput:
         WriteCapacityUnits: 1
         ReadCapacityUnits: 2
@@ -734,6 +752,8 @@ Resources:
             - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${LightboxBulkEntryTable}/index/*
             - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ServerTokensTable}
             - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ServerTokensTable}/index/*
+            - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${EmailTemplateAssociationTable}
+            - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${EmailTemplateAssociationTable}/index/*
       - PolicyName: TranscoderAccess
         PolicyDocument:
           Version: 2012-10-17
@@ -860,6 +880,26 @@ Resources:
               - cloudformation:ListStacks
               - cloudformation:DescribeStacks
               Resource: "*"
+      - PolicyName: SendSESEmail
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+            - Effect: Allow
+              Action:
+                - ses:ListTemplates
+                - ses:GetAccountSendingEnabled
+                - ses:DeleteTemplate
+                - ses:TestRenderTemplate
+                - ses:UpdateTemplate
+                - ses:GetIdentityPolicies
+                - ses:CreateTemplate
+                - ses:GetSendQuota
+                - ses:GetTemplate
+              Resource: "*"
+            - Effect: Allow
+              Action:
+                - ses:SendTemplatedEmail
+              Resource: !Sub arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/*
 
   InstanceProfile:
     Type: AWS::IAM::InstanceProfile
@@ -1021,6 +1061,12 @@ Resources:
 
           archive {
             restoresExpireAfter = 10
+          }
+
+          email {
+            templateAssociationTableName = "${EmailTemplateAssociationTable}"
+            replyToAddress = "${ReplyToEmail}"
+            sourceAddress = "${SourceEmail}"
           }
 
           akka.actor {
