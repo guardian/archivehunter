@@ -2,7 +2,7 @@ package services
 
 
 import com.theguardian.multimedia.archivehunter.common.clientManagers.ESClientManager
-import javax.inject.Inject
+import javax.inject.{Inject, Singleton}
 import play.api.Configuration
 import com.sksamuel.elastic4s.http.ElasticDsl
 import com.sksamuel.elastic4s.http.index.mappings.IndexMappings
@@ -11,6 +11,7 @@ import com.sksamuel.elastic4s.mappings.{BasicFieldDefinition, _}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
+@Singleton
 class IndexManagement @Inject() (config:Configuration, esClientMgr:ESClientManager) extends ElasticDsl {
 
   import com.sksamuel.elastic4s.mappings.FieldType._

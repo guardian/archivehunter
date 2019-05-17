@@ -6,7 +6,7 @@ import com.sksamuel.elastic4s.http.search.TermsAggResult
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{ESClientManager, S3ClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{ScanTarget, ScanTargetDAO}
 import helpers.InjectableRefresher
-import javax.inject.Inject
+import javax.inject.{Inject, Singleton}
 import play.api.libs.circe.Circe
 import play.api.{Configuration, Logger}
 import play.api.mvc.{AbstractController, ControllerComponents}
@@ -21,7 +21,7 @@ import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.Try
-
+@Singleton
 class BrowseCollectionController @Inject() (override val config:Configuration,
                                             s3ClientMgr:S3ClientManager,
                                             scanTargetDAO:ScanTargetDAO,

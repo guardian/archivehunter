@@ -12,7 +12,7 @@ import com.amazonaws.services.cloudformation.model._
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{ProxyFrameworkInstance, ProxyFrameworkInstanceDAO}
 import com.typesafe.config.ConfigException.Generic
 import helpers.InjectableRefresher
-import javax.inject.{Inject, Named}
+import javax.inject.{Inject, Named, Singleton}
 import play.api.{Configuration, Logger}
 import play.api.libs.circe.Circe
 import play.api.libs.ws.WSClient
@@ -26,6 +26,7 @@ import scala.collection.JavaConverters._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
+@Singleton
 class ProxyFrameworkAdminController @Inject() (override val config:Configuration,
                                                override val controllerComponents:ControllerComponents,
                                                override val refresher:InjectableRefresher,

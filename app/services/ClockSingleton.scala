@@ -2,7 +2,7 @@ package services
 
 import akka.actor.{Actor, ActorRef, Timers}
 import com.theguardian.multimedia.archivehunter.common.{ArchiveHunterConfiguration, ExtValueConverters}
-import javax.inject.{Inject, Named}
+import javax.inject.{Inject, Named, Singleton}
 import play.api.Logger
 import services.BucketScanner.{RegularScanTrigger, TickKey}
 import services.ClockSingleton.RapidClockTick
@@ -24,6 +24,7 @@ object ClockSingleton {
   * the idea of isolating the timers in this way is to ensure that there is only one actor in the cluster sending timing pulses,
   * but the actors doing the work can fan-out and run in parallel.
   */
+@Singleton
 class ClockSingleton @Inject() (@Named("dynamoCapacityActor") dynamoCapacityActor:ActorRef,
                                 @Named("bucketScannerActor") bucketScanner:ActorRef,
                                 @Named("jobPurgerActor") jobPurgerActor: ActorRef,

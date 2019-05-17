@@ -106,14 +106,13 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
     ArchiveEntry.fromS3(rec.getS3.getBucket.getName, path, s3Client.getRegionName).flatMap(entry => {
       println(s"Going to index $entry")
       i.indexSingleItem(entry).map({
-        case Success(indexid) =>
+        case Right(indexid) =>
           println(s"Document indexed with ID $indexid")
           sendIngestedMessage(entry)
           indexid
-        case Failure(exception) =>
-          println(s"Could not index document: ${exception.toString}")
-          exception.printStackTrace()
-          throw exception //fail this future so we enter the recover block below
+        case Left(err) =>
+          println(s"Could not index document: ${err.toString}")
+          throw new RuntimeException(err.toString) //fail this future so we enter the recover block below
       })
     })
   }
@@ -131,8 +130,8 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
       case Right(entry)=>
         println(s"$entry has been removed, updating record to tombstone")
         i.indexSingleItem(entry.copy(beenDeleted = true),Some(entry.id)).map({
-          case Success(result)=>result
-          case Failure(err)=> throw err
+          case Right(result)=>result
+          case Left(err)=> throw new RuntimeException(err.toString)
         })
       case Left(ItemNotFound(docId))=>
         val msg = s"$docId did not exist in the index, returning"

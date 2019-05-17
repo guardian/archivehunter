@@ -8,7 +8,7 @@ import akka.stream.{ActorMaterializer, Materializer}
 import com.sksamuel.elastic4s.http.bulk.BulkResponseItem
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager}
 import com.theguardian.multimedia.archivehunter.common._
-import javax.inject.Inject
+import javax.inject.{Inject,Singleton}
 import play.api.{Configuration, Logger}
 import com.sksamuel.elastic4s.streams.ReactiveElastic._
 import com.sksamuel.elastic4s.streams.{RequestBuilder, ResponseListener, SubscriberConfig}
@@ -35,6 +35,7 @@ object ProxiesRelinker {
   case class RelinkError(err:Throwable) extends RelinkReply
 }
 
+@Singleton
 class ProxiesRelinker @Inject() (config:Configuration,
                                  esClientMgr:ESClientManager, ddbClientMgr:DynamoClientManager, system:ActorSystem,
                                  proxyVerifyFlow: ProxyVerifyFlow, jobModelDAO:JobModelDAO, scanTargetDAO:ScanTargetDAO)

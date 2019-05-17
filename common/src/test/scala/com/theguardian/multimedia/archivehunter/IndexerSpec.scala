@@ -52,7 +52,7 @@ class IndexerSpec extends Specification with AfterAll {
 
       val i = new Indexer("testindex")
       val result = Await.result(i.indexSingleItem(entry), 5 seconds)
-      result must beSuccessfulTry("sfdfsdjfsdhjfsd")
+      result must beRight("sfdfsdjfsdhjfsd")
 
     }
   }

@@ -4,6 +4,7 @@ import akka.stream.{Attributes, Inlet, SinkShape}
 import akka.stream.stage.{AbstractInHandler, GraphStageLogic, GraphStageWithMaterializedValue}
 import com.sksamuel.elastic4s.http.HttpClient
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer}
+import org.slf4j.MDC
 import play.api.Logger
 
 import scala.concurrent.{Await, Future, Promise}
@@ -30,12 +31,14 @@ class RemoveLightboxIndexInfoSink (userEmail:String)(implicit esClient:HttpClien
           val updatedElem = elem.copy(lightboxEntries = elem.lightboxEntries.filter(_.owner!=userEmail))
           //TODO: this could be improved by converting this to a Flow and then using an existing Elastic4s bulk consumer to write the index in bulk.
           Await.ready(indexer.indexSingleItem(updatedElem).map({
-            case Success(result)=>
+            case Right(result)=>
               logger.info(s"Removed lightbox entry data from $result")
               ctr+=1
-            case Failure(err)=>
-              logger.error(s"Could not remove lightbox entry data: ", err)
-              throw err
+            case Left(err)=>
+              MDC.put("error",err.toString)
+              MDC.put("entry",elem.toString)
+              logger.error(s"Could not remove lightbox entry data: ${err.toString}")
+              throw new RuntimeException(err.toString)
           }), 30 seconds)
           pull(in)
         }

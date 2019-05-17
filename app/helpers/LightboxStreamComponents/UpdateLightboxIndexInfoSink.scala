@@ -9,6 +9,7 @@ import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.LightboxEntryDAO
 import helpers.LightboxHelper
 import models.UserProfile
+import org.slf4j.MDC
 import play.api.Logger
 
 import scala.concurrent.{Await, ExecutionContext, Future, Promise}
@@ -46,14 +47,16 @@ class UpdateLightboxIndexInfoSink (bulkId:String,userProfile: UserProfile, userA
           val elem = grab(in)
 
           Await.result(LightboxHelper.updateIndexLightboxed(userProfile, userAvatarUrl, elem, Some(bulkId)), 30 seconds) match {
-            case Success(result)=>
+            case Right(result)=>
               logger.info("Saved lightbox entry")
               ctr+=1
               pull(in)
-            case Failure(err)=>
-              logger.error("Could not update lightbox info: ", err)
-              promise.failure(err)
-              throw err
+            case Left(err)=>
+              MDC.put("error",err.toString)
+              logger.error(s"Could not update lightbox info: ${err.toString}")
+              val excep = new RuntimeException(err.toString)
+              promise.failure(excep)
+              throw excep
           }
         }
       })
