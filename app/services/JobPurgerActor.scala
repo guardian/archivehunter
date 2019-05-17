@@ -78,7 +78,12 @@ class JobPurgerActor @Inject() (config:Configuration, ddbClientMgr:DynamoClientM
               case Success(result)=>
                 originalSender ! Status.Success
                  try {
-                  logger.info(s"Deleted job ${job.jobId}, consumed ${result.getConsumedCapacity.getCapacityUnits} capacity units")
+                   Option(result.getConsumedCapacity) match {
+                     case Some(capUnits)=>
+                      logger.info(s"Deleted job ${job.jobId}, consumed ${capUnits.getCapacityUnits} capacity units")
+                     case None=>
+                      logger.info(s"Deleted job ${job.jobId}")
+                   }
                  } catch {
                   case err:Throwable =>
                     logger.warn("Caught exception while logging job: ", err)
