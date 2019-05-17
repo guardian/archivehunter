@@ -167,6 +167,7 @@ class EmailTemplateEdit extends React.Component {
 
         return <div>
             <BreadcrumbComponent path={this.props.location.pathname}/>
+            <h3>Edit template</h3>
             <form onSubmit={this.submitCompletedForm}>
                 <table className="centered-table" style={{marginLeft: "inherit"}}>
                     <tbody>
@@ -190,6 +191,7 @@ class EmailTemplateEdit extends React.Component {
                         <td>
                             {/*<textarea className="large-textarea" value={this.state.htmlPart} onChange={evt=>this.setState({htmlPart: evt.target.value})}/>*/}
                             <CodeMirror
+                                style={{width: "60vw"}}
                                 value={this.state.htmlPart}
                                 options={{
                                     mode: 'htmlembedded', lineNumbers: true
@@ -209,6 +211,7 @@ class EmailTemplateEdit extends React.Component {
             <ErrorViewComponent error={this.state.lastError}/>
             <ErrorViewComponent error={this.state.testError}/>
 
+            <h3>Test parameters</h3>
             <TestParametersForm paramList={this.state.parametersList}
                                 onChange={newValues=>this.setState({testParametersValues: newValues})}
                                 forEvent={this.state.testEvent}
