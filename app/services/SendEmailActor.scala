@@ -61,28 +61,39 @@ class SendEmailActor @Inject() (config:Configuration, SESClientManager: SESClien
         case Left(errMsg)=>
           originalSender ! errMsg
         case Right(templateName)=>
-          val rq = new SendTemplatedEmailRequest()
-            .withTemplate(templateName)
-            .withTemplateData(messageParameters.asJson.toString())
-            .withDestination(new Destination().withToAddresses(initiatingUser.userEmail))
-            .withReplyToAddresses(config.get[String]("email.replyToAddress"))
+          val maybeRequest = Try {
+            new SendTemplatedEmailRequest()
+              .withTemplate(templateName)
+              .withTemplateData(messageParameters.asJson.toString())
+              .withDestination(new Destination().withToAddresses(initiatingUser.userEmail))
+              .withReplyToAddresses(config.get[String]("email.replyToAddress"))
+              .withSource(config.get[String]("email.sourceAddress"))
+          }
 
-          val result = Try { sesClient.sendTemplatedEmail(rq) }
-          result match {
-            case Success(_)=>originalSender ! EventSent
-            case Failure(err:MessageRejectedException)=>
-              logger.error(s"Message send was rejected: ", err)
-              //TODO: should probably retry here
-              originalSender ! SESError(err.toString)
-            case Failure(err:TemplateDoesNotExistException)=>
-              logger.error(s"Template ${templateName} did not exist")
-              //TODO: should probably delete association to prevent this happening again
-              originalSender ! SESError(err.toString)
-            case Failure(err:AccountSendingPausedException)=>
-              logger.error(s"Email sending is disabled for this AWS account, please investigate")
-              originalSender ! SESError(err.toString)
-            case Failure(err:Throwable)=>
-              logger.error(s"Could not send email: ${err.toString}")
+          maybeRequest match {
+            case Success(rq) =>
+              val result = Try {
+                sesClient.sendTemplatedEmail(rq)
+              }
+              result match {
+                case Success(_) => originalSender ! EventSent
+                case Failure(err: MessageRejectedException) =>
+                  logger.error(s"Message send was rejected: ", err)
+                  //TODO: should probably retry here
+                  originalSender ! SESError(err.toString)
+                case Failure(err: TemplateDoesNotExistException) =>
+                  logger.error(s"Template $templateName did not exist")
+                  //TODO: should probably delete association to prevent this happening again
+                  originalSender ! SESError(err.toString)
+                case Failure(err: AccountSendingPausedException) =>
+                  logger.error(s"Email sending is disabled for this AWS account, please investigate")
+                  originalSender ! SESError(err.toString)
+                case Failure(err: Throwable) =>
+                  logger.error(s"Could not send email: ", err)
+                  originalSender ! GeneralError(err.toString)
+              }
+            case Failure(err) =>
+              logger.error(s"Could not build SES request: ", err)
               originalSender ! GeneralError(err.toString)
           }
       })
