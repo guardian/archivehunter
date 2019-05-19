@@ -44,7 +44,7 @@ trait AdminsOnly extends Circe {
     userProfileFromSession(request.session) match {
       case None=>
         if(allowHmac && request.user.firstName=="hmac-authed-service"){ //panda-hmac sets this value for the user when auth succeeds. If auth fails we don't get here.
-          val mockedUserProfile = UserProfile("hmac-authed-service", true, Seq(),true, None, None,None, None, None, None)
+          val mockedUserProfile = UserProfile("hmac-authed-service", true, Seq(),true, None, None,None, None, None, None, None)
           block(mockedUserProfile)
         } else {
           Future(Forbidden(GenericErrorResponse("error", "Not logged in").asJson))

@@ -17,4 +17,4 @@ case class UserProfile (userEmail:String, isAdmin:Boolean,
                         visibleCollections:Seq[String], allCollectionsVisible: Boolean,
                         productionOffice: Option[String], department:Option[String],
                         perRestoreQuota:Option[Long], rollingRestoreQuota:Option[Long],
-                        adminAuthQuota:Option[Long], adminRollingAuthQuota:Option[Long])
+                        adminAuthQuota:Option[Long], adminRollingAuthQuota:Option[Long], emailBounceCount:Option[Int])

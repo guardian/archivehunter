@@ -1067,6 +1067,8 @@ Resources:
             templateAssociationTableName = "${EmailTemplateAssociationTable}"
             replyToAddress = "${ReplyToEmail}"
             sourceAddress = "${SourceEmail}"
+            configurationSetName = "${SESConfigurationSet}"
+            sesNotificationsQueue = "${SendEmailProblemsQueue.QueueName}"
           }
 
           akka.actor {
@@ -1209,6 +1211,38 @@ Resources:
         Value: !Sub ${Stack}-${App}-${Stage}
         PropagateAtLaunch: true
       VPCZoneIdentifier: !Ref DeploySubnets
+
+  #email handling
+  SendEmailProblemsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      Subscription:
+        - Endpoint: !GetAtt SendEmailProblemsQueue.Arn
+          Protocol: sqs
+
+  SendEmailProblemsQueue:
+    Type: AWS::SQS::Queue
+
+  SendEmailProblemsSubs:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      PolicyDocument:
+        Version: '2012-10-17'
+        Id: MyQueuePolicy
+        Statement:
+          - Sid: Allow-SendMessage-From-SNS-Topic
+            Effect: Allow
+            Principal: "*"
+            Action:
+              - sqs:SendMessage
+            Resource: *
+      Queues:
+        - !GetAtt SendEmailProblemsQueue.QueueName
+
+  #for some bizarre reason, you can't put SNS topics onto an SES configuration set in Cloudformation, you've got to do it
+  #in the console....
+  SESConfigurationSet:
+    Type: AWS::SES::ConfigurationSet
 
 Outputs:
   ElasticSearchEndpoint:

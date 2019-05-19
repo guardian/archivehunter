@@ -7,6 +7,7 @@ import {Redirect} from "react-router-dom";
 import {Controlled as CodeMirror} from 'react-codemirror2';
 import 'codemirror/lib/codemirror.css';
 import TestParametersForm from "./TestParametersForm.jsx";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 //import 'codemirror/theme/material.css';
 
 require('codemirror/mode/htmlembedded/htmlembedded');
@@ -210,6 +211,15 @@ class EmailTemplateEdit extends React.Component {
             <p className="information">To cancel edits, reload the page (command-R, F5 or click the reload button in your browser).  To abort editing completely, click Back in your browser or hit Backspace</p>
             <ErrorViewComponent error={this.state.lastError}/>
             <ErrorViewComponent error={this.state.testError}/>
+
+            <p className="information" style={{display: this.state.testSuccess ? "block" : "none"}}>
+                <FontAwesomeIcon icon="check-circle" style={{height: "32px", color: "green"}}/>
+                    Test email request has been sent to your email address.  If you don't see anything
+                after a while, and it's not in the spam, then it may have bounced or the template may be invalid.<br/>
+                Check the server logs under the class "services.SendEmailActor" and look for warning notifications of render errors or bounces, or
+                check your user profile for bounces.
+                If you don't see anything in the logs, check that the server's logback.xml config file has "services.SendEmailActor" enabled and set to INFO or DEBUG.
+            </p>
 
             <h3>Test parameters</h3>
             <TestParametersForm paramList={this.state.parametersList}
