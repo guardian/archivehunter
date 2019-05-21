@@ -6,9 +6,10 @@ import akka.stream.{Attributes, FlowShape, Inlet, Outlet}
 import akka.stream.alpakka.s3.scaladsl._
 import akka.stream.scaladsl._
 import akka.stream.stage.{AbstractInHandler, AbstractOutHandler, GraphStage, GraphStageLogic}
-import com.theguardian.multimedia.archivehunter.common.clientManagers.S3ClientManager
+import com.theguardian.multimedia.archivehunter.common.clientManagers.{ESClientManager, S3ClientManager}
 import com.amazonaws.services.s3.{AmazonS3, AmazonS3Client}
-import com.theguardian.multimedia.archivehunter.common.ArchiveEntry
+import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer}
+import com.theguardian.multimedia.archivehunter.common.cmn_models.ItemNotFound
 import javax.inject.Inject
 import play.api.{Configuration, Logger}
 
@@ -16,7 +17,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
-class S3ToArchiveEntryFlow @Inject() (s3ClientMgr: S3ClientManager, config:Configuration) extends GraphStage[FlowShape[ListBucketResultContents, ArchiveEntry]] {
+class S3ToArchiveEntryFlow @Inject() (s3ClientMgr: S3ClientManager, config:Configuration, esClientManager:ESClientManager) extends GraphStage[FlowShape[ListBucketResultContents, ArchiveEntry]] {
   final val in:Inlet[ListBucketResultContents] = Inlet.create("S3ToArchiveEntry.in")
   final val out:Outlet[ArchiveEntry] = Outlet.create("S3ToArchiveEntry.out")
 
@@ -30,9 +31,49 @@ class S3ToArchiveEntryFlow @Inject() (s3ClientMgr: S3ClientManager, config:Confi
       val region = inheritedAttributes.nameOrDefault(config.getOptional[String]("externalData.awsRegion").getOrElse("eu-west-1"))
 
       implicit val s3Client:AmazonS3 = s3ClientMgr.getS3Client(config.getOptional[String]("externalData.awsProfile"),Some(region))
+      private implicit val indexer = new Indexer(config.get[String]("externalData.indexName"))
+      private implicit val esClient = esClientManager.getClient()
       private val logger=Logger(getClass)
 
       logger.debug("initialised new instance")
+
+      /**
+        * returns an updated entry if there are significant differences
+        * @param existingEntry
+        * @param newEntry
+        * @return
+        */
+      def updateIfNecessary(existingEntry:ArchiveEntry, newEntry:ArchiveEntry):Option[ArchiveEntry] = {
+        val firstUpdate = if(existingEntry.last_modified.toLocalDateTime!=newEntry.last_modified.toLocalDateTime){
+          logger.info(s"last_modified time updated on ${existingEntry.path} from ${existingEntry.last_modified.toLocalDateTime} to ${newEntry.last_modified.toLocalDateTime}")
+          existingEntry.copy(last_modified = newEntry.last_modified)
+        } else {
+          existingEntry
+        }
+
+        val secondUpdate = if(existingEntry.etag!=newEntry.etag){
+          logger.info(s"etag updated on ${existingEntry.id}")
+          firstUpdate.copy(etag = newEntry.etag)
+        } else {
+          firstUpdate
+        }
+
+        val thirdUpdate = if(existingEntry.storageClass!=newEntry.storageClass){
+          logger.info(s"storage class updated on ${existingEntry.id}")
+          secondUpdate.copy(storageClass = newEntry.storageClass)
+        } else {
+          secondUpdate
+        }
+
+        if(thirdUpdate==existingEntry){
+          logger.info(s"No differences on ${existingEntry.id}")
+          None
+        } else {
+          logger.info(s"Updates detected on ${existingEntry.id}")
+          Some(thirdUpdate)
+        }
+      }
+
       setHandler(in, new AbstractInHandler {
         override def onPush(): Unit = {
           val elem = grab(in)
@@ -44,16 +85,32 @@ class S3ToArchiveEntryFlow @Inject() (s3ClientMgr: S3ClientManager, config:Confi
             val mappedElem = ArchiveEntry.fromS3Sync(elem.bucketName, elem.key, region)
             logger.debug(s"Mapped $elem to $mappedElem")
 
-            while (!isAvailable(out)) {
-              logger.debug("waiting for output port to be available")
-              Thread.sleep(500L)
+            val maybeExistingEntry = ArchiveEntry.fromIndexFull(elem.bucketName, elem.key)
+            val toUpdateFuture = maybeExistingEntry.map({
+              case Right(existingEntry)=>
+                logger.info(s"Found existing entry for s3://${elem.bucketName}/${elem.key} at ${existingEntry.id}")
+                updateIfNecessary(existingEntry, mappedElem)
+              case Left(ItemNotFound(itemId))=>
+                logger.info(s"No existing item found for $itemId")
+                Some(mappedElem)
+              case Left(err)=>
+                logger.error(s"Could not check existing archive entry: $err")
+                None
+            })
+
+            Await.result(toUpdateFuture, 30 seconds) match {
+              case Some(elemToUpdate)=>
+                push(out, elemToUpdate)
+              case None=>
+                logger.info(s"Nothing to update on ${mappedElem.id}, grabbing next item")
+                pull(in)
             }
-            push(out, mappedElem)
+
           } catch {
             case ex:Throwable=>
               logger.error(s"Could not create ArchiveEntry: ", ex)
-              //failStage(ex) //temp for debugging
-              pull(in)
+              failStage(ex) //temp for debugging
+              //pull(in)
           }
         }
       })
