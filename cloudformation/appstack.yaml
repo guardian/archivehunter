@@ -211,6 +211,8 @@ Resources:
           AttributeType: S
         - AttributeName: restoreStatus
           AttributeType: S
+        - AttributeName: memberOfBulk
+          AttributeType: S
       KeySchema:
         - AttributeName: userEmail
           KeyType: HASH
@@ -225,6 +227,17 @@ Resources:
             - AttributeName: restoreStatus
               KeyType: HASH
             - AttributeName: fileId
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+          ProvisionedThroughput:
+            WriteCapacityUnits: 1
+            ReadCapacityUnits: 4
+        - IndexName: memberOfBulkIndex
+          KeySchema:
+            - AttributeName: memberOfBulk
+              KeyType: HASH
+            - AttributeName: userEmail
               KeyType: RANGE
           Projection:
             ProjectionType: ALL
