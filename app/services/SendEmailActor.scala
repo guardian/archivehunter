@@ -156,8 +156,9 @@ class SendEmailActor @Inject() (config:Configuration, SESClientManager: SESClien
               MDC.put("sesMessage", sesMessage.toString)
               logger.warn(s"Received email bounce notification with no explicit information?")
           }
-        case _=>
 
+        case _=>
+          logger.warn(s"Received unknown event type ${sesMessage.eventType}")
       }
       sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle(receiptHandle))
 
