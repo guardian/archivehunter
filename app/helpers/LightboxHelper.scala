@@ -200,7 +200,7 @@ object LightboxHelper {
 
   def lightboxSearch(indexName:String, bulkId:Option[String], userEmail:String) =  {
     val queryTerms = Seq(
-      Some(matchQuery("owner", userEmail)),
+      Some(matchQuery("lightboxEntries.owner", userEmail)),
       bulkId.map(actualBulkId=>lightboxQuery(actualBulkId))
     ).collect({case Some(term)=>term})
 
