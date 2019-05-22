@@ -13,6 +13,7 @@ import play.api.{Configuration, Logger}
 
 import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success, Try}
+import scala.concurrent.duration._
 
 object GlacierRestoreActor {
   trait GRMsg
@@ -173,6 +174,10 @@ class GlacierRestoreActor @Inject() (config:Configuration, esClientMgr:ESClientM
             case _=>originalSender ! RestoreFailure(ex)
           })
       }).recover({
+        case ex:akka.stream.BufferOverflowException=>
+          logger.debug(ex.toString)
+          logger.warn(s"Caught buffer overflow exception, retrying operation in 5s")
+          system.scheduler.scheduleOnce(5.seconds,self,InitiateRestore(entry,lbEntry,maybeExpiry))
         case ex:Throwable=>
           logger.error(s"Unexpected exception while initiating restore of ${entry.location}: ", ex)
       })
