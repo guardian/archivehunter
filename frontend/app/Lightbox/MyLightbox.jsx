@@ -77,8 +77,8 @@ class MyLightbox extends CommonSearchView {
     reloadSearch(){
         const detailsRequest = axios.get("/api/lightbox/" + this.state.selectedUser + "/details");
         const searchUrl = this.state.bulkSelectionSelected ?
-            "/api/search/myLightBox?bulkId=" + this.state.bulkSelectionSelected + "&user=" + this.state.selectedUser :
-            "/api/search/myLightBox?user="+ this.state.selectedUser;
+            "/api/search/myLightBox?bulkId=" + this.state.bulkSelectionSelected + "&user=" + this.state.selectedUser + "&size=" + this.state.pageSize :
+            "/api/search/myLightBox?user="+ this.state.selectedUser + "&size=" + this.state.pageSize ;
 
         const searchRequest = axios.get(searchUrl);
 
