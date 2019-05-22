@@ -12,6 +12,7 @@ import javax.inject.{Inject, Singleton}
 import play.api.{Configuration, Logger}
 
 import scala.concurrent.ExecutionContext
+import scala.util.{Failure, Success, Try}
 
 object GlacierRestoreActor {
   trait GRMsg
@@ -150,34 +151,30 @@ class GlacierRestoreActor @Inject() (config:Configuration, esClientMgr:ESClientM
       //completion is detected by the inputLambda, and the job status will be updated there.
       jobModelDAO.putJob(newJob).map({
         case None=>
-          try {
-            val result = s3client.restoreObjectV2(rq)
-            updateLightbox(lbEntry, availableUntil=Some(willExpire)).andThen({ case _ =>
-              originalSender ! RestoreSuccess
-            })
-          } catch {
-            case ex:Throwable=>
-              updateLightbox(lbEntry, error=Some(ex)).andThen({
-                case _=>originalSender ! RestoreFailure(ex)
-              })
-          }
+          logger.debug(s"${entry.location}: initiating restore")
+          Try { s3client.restoreObjectV2(rq) }
         case Some(Right(record))=>
-          try {
-            val result = s3client.restoreObjectV2(rq)
-            updateLightbox(lbEntry, availableUntil=Some(willExpire)).andThen({ case _ =>
-              originalSender ! RestoreSuccess
-            })
-          } catch {
-            case ex:Throwable=>
-              updateLightbox(lbEntry, error=Some(ex)).andThen({
-                case _=>originalSender ! RestoreFailure(ex)
-              })
-          }
+          logger.debug(s"${entry.location}: initiating restore")
+          Try { s3client.restoreObjectV2(rq) }
         case Some(Left(error))=>
+          logger.error(s"Could not update job info for ${newJob.jobId} on ${entry.location}: $error")
           val err = new RuntimeException(error.toString)
-          updateLightbox(lbEntry, error=Some(err)).andThen({
-            case _=>originalSender ! RestoreFailure(err)
+          Failure(err)
+      }).map({
+        case Success(restoreObjectResult)=>
+          logger.info(s"Restore started for ${entry.location}, requestor charged? ${restoreObjectResult.isRequesterCharged}, output path ${restoreObjectResult.getRestoreOutputPath}")
+          updateLightbox(lbEntry, availableUntil=Some(willExpire)).andThen({ case _ =>
+            originalSender ! RestoreSuccess
           })
+
+        case Failure(ex)=>
+          logger.error(s"Could not restore ${entry.location}", ex)
+          updateLightbox(lbEntry, error=Some(ex)).andThen({
+            case _=>originalSender ! RestoreFailure(ex)
+          })
+      }).recover({
+        case ex:Throwable=>
+          logger.error(s"Unexpected exception while initiating restore of ${entry.location}: ", ex)
       })
 
   }
