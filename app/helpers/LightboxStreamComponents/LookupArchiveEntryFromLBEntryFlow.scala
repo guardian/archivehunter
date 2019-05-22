@@ -6,10 +6,11 @@ import com.theguardian.multimedia.archivehunter.common.clientManagers.ESClientMa
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.LightboxEntry
 import javax.inject.{Inject, Singleton}
-import play.api.Configuration
+import play.api.{Configuration, Logger}
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
+import scala.util.{Failure, Success, Try}
 
 /**
   * injectable filter stage that looks up the ArchiveEntry (from the index) associated with the given LightboxEntry and
@@ -40,6 +41,7 @@ class LookupArchiveEntryFromLBEntryFlow @Inject()(config:Configuration, esClient
   override def shape: FlowShape[LightboxEntry, (ArchiveEntry, LightboxEntry)] = FlowShape.of(in,out)
 
   override def createLogic(inheritedAttributes: Attributes): GraphStageLogic = new GraphStageLogic(shape) {
+    private val logger = Logger(getClass)
     val indexer = new Indexer(config.get[String]("externalData.indexName"))
     implicit val esClient = esClientManager.getClient()
 
@@ -47,8 +49,17 @@ class LookupArchiveEntryFromLBEntryFlow @Inject()(config:Configuration, esClient
       override def onPush(): Unit = {
         val lbEntry = grab(in)
 
-        val archiveEntry = Await.result(indexer.getById(lbEntry.fileId), 30 seconds)
-        push(out, (archiveEntry, lbEntry))
+        Try { Await.result(indexer.getByIdFull(lbEntry.fileId), 30 seconds) } match {
+          case Success(Right(archiveEntry))=>
+            push(out, (archiveEntry, lbEntry))
+          case Success(Left(err))=>
+            logger.error(s"Could not look up entry ID from $lbEntry: ${err.toString}")
+            failStage(new RuntimeException(err.toString))
+          case Failure(err)=>
+            logger.error(s"Could not look up entry ID from $lbEntry: ", err)
+            failStage(new RuntimeException(err.toString))
+        }
+
       }
     })
 
