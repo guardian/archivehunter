@@ -26,7 +26,8 @@ class MyLightbox extends CommonSearchView {
             bulkSelectionSelected: null,
             selectedUser: "my",
             showingArchiveSpinner: false,
-            selectedRestoreStatus: null
+            selectedRestoreStatus: null,
+            pageSize: 500
         };
 
         this.checkArchiveStatus = this.checkArchiveStatus.bind(this);
@@ -39,7 +40,7 @@ class MyLightbox extends CommonSearchView {
 
     performLoad(){
         const detailsRequest = axios.get("/api/lightbox/" + this.state.selectedUser+"/details");
-        const summaryRequest = axios.get("/api/search/myLightBox?user=" + this.state.selectedUser);
+        const summaryRequest = axios.get("/api/search/myLightBox?user=" + this.state.selectedUser + "&size=" + this.state.pageSize);
         const loginDetailsRequest = axios.get("/api/loginStatus");
         const bulkSelectionsRequest = axios.get("/api/lightbox/" + this.state.selectedUser+"/bulks");
         return Promise.all([detailsRequest, summaryRequest, loginDetailsRequest, bulkSelectionsRequest]);
