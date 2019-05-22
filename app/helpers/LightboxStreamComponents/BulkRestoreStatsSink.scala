@@ -14,6 +14,13 @@ import scala.concurrent.{Await, Future, Promise}
 import scala.util.{Failure, Success, Try}
 import scala.concurrent.duration._
 
+/**
+  * an Akka streams sink that takes in a stream of LightboxEntries, checks the archive status on them and at the end
+  * materializes an object of [[BulkRestoreStats]] showing what state they are in.
+  * you should get hold of this using an injector, i.e. val sinkFactory = injector.getInstance(classOf[BulkRestoreStatsSink])
+  *
+  * @param glacierRestoreActor actorRef pointing to GlacierRestoreActor. Get this using an injector.
+  */
 class BulkRestoreStatsSink @Inject() (@Named("glacierRestoreActor") glacierRestoreActor:ActorRef) extends GraphStageWithMaterializedValue[SinkShape[LightboxEntry], Future[BulkRestoreStats]]{
   private final val in:Inlet[LightboxEntry] = Inlet("BulkRestoreStatsSink.in")
   implicit val actorTimeout:akka.util.Timeout = 60 seconds

@@ -287,7 +287,6 @@ class LightboxController @Inject() (override val config:Configuration,
 
 
         val actualSrc = builder.add(src)
-        //val actualSink = builder.add(sink)
 
         actualSrc ~> sink
         ClosedShape
