@@ -12,12 +12,11 @@ import com.amazonaws.services.s3.model.{GeneratePresignedUrlRequest, ResponseHea
 import com.google.inject.Injector
 import com.gu.pandomainauth.action.UserRequest
 import com.gu.scanamo.error.DynamoReadError
-import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer, LightboxIndex, StorageClass, ZonedDateTimeEncoder}
+import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer, StorageClass, ZonedDateTimeEncoder}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models._
-import helpers.LightboxHelper.logger
 import helpers.LightboxStreamComponents.{ExtractArchiveEntry, InitiateRestoreSink, LightboxDynamoSource, LookupArchiveEntryFromLBEntryFlow, LookupLightboxEntryFlow, UpdateLightboxIndexInfoSink}
-import helpers.{InjectableRefresher, LightboxHelper, SearchHitToArchiveEntryFlow}
+import helpers.{InjectableRefresher, LightboxHelper}
 import javax.inject.{Inject, Named, Singleton}
 import play.api.{Configuration, Logger}
 import play.api.libs.circe.Circe
@@ -27,7 +26,6 @@ import io.circe.syntax._
 import io.circe.generic.auto._
 import models.{ServerTokenDAO, ServerTokenEntry, UserProfile, UserProfileDAO}
 import play.api.libs.ws.WSClient
-import play.mvc.Http.RequestHeader
 import requests.SearchRequest
 import services.GlacierRestoreActor
 import services.GlacierRestoreActor.GRMsg
@@ -475,14 +473,11 @@ class LightboxController @Inject() (override val config:Configuration,
             resultSink =>
               import akka.stream.scaladsl.GraphDSL.Implicits._
 
-              //the LightboxHelper methods call here also handle the special case of "loose" items
-              //val source = LightboxHelper.getElasticSource(LightboxHelper.lightboxSearch(indexName, Some(bulkId), profile.userEmail))
               val source = new LightboxDynamoSource(bulkId,config, dynamoClientManager)
               val lookup = injector.getInstance(classOf[LookupArchiveEntryFromLBEntryFlow])
               val actualSource = builder.add(source)
               val actualLookup = builder.add(lookup)
 
-              //val lbLookup = builder.add(new LookupLightboxEntryFlow(profile.userEmail))
               actualSource ~> actualLookup ~> resultSink
               ClosedShape
           })

@@ -38,7 +38,7 @@ class RemoveLightboxIndexInfoSink (userEmail:String)(implicit esClient:HttpClien
               MDC.put("error",err.toString)
               MDC.put("entry",elem.toString)
               logger.error(s"Could not remove lightbox entry data: ${err.toString}")
-              throw new RuntimeException(err.toString)
+              failStage(new RuntimeException(err.toString))
           }), 30 seconds)
           pull(in)
         }

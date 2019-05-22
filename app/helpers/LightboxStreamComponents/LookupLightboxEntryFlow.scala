@@ -35,7 +35,7 @@ class LookupLightboxEntryFlow (username:String)(implicit val lightboxEntryDAO:Li
           None
         case Some(Left(err))=>
           logger.error(s"Could not look up lightbox entry for ${elem.id} on attempt $retryCount: $err")
-          if(retryCount>100) throw new RuntimeException(s"Could not look up lightbox entry: $err")
+          if(retryCount>100) failStage(new RuntimeException(s"Could not look up lightbox entry: $err"))
           retryGetEntry(elem, retryCount+1)
         case success @ Some(Right(_))=>success
       }

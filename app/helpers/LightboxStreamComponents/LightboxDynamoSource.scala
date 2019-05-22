@@ -14,6 +14,15 @@ import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
 
+/**
+  * this is an Akka source that yields LightboxEntries belonging to a specific bulk from a DynamoDB query.
+  * It's not injectable or singleton because you need to pass it the bulk ID to query when constructing; this means that
+  * you must also manually pass in the configuration and DynamoClientManager objects. Get these by injecting them into the caller.
+  *
+  * @param memberOfBulk the bulk entry ID to query
+  * @param config app configuration as a Lightbend Configuration object. Get this from an injector.
+  * @param dynamoClientManager DynamoClientManager object. Get this from an injector
+  */
 class LightboxDynamoSource(memberOfBulk:String, config:Configuration, dynamoClientManager: DynamoClientManager) extends GraphStage[SourceShape[LightboxEntry]] {
   private final val out:Outlet[LightboxEntry] = Outlet("LightboxDynamoSource.out")
   val pageSize = 100
@@ -28,6 +37,13 @@ class LightboxDynamoSource(memberOfBulk:String, config:Configuration, dynamoClie
     private var resultCache:Seq[mutable.Map[String,AttributeValue]] = Seq()
     private var lastPage = false
 
+    /**
+      * retrieve next page of results from DynamoDB
+      * @param limit maximum number of items to return
+      * @param exclusiveStartKey key to start at. If more than `limit` items match, then the value for this is present in the previous
+      *                          page's result as `Option(scanResult.getLastEvaluatedKey.asScala)`
+      * @return a Try with either an AWS QueryResult object or an error
+      */
     def getNextPage(limit:Int,exclusiveStartKey:Option[mutable.Map[String, AttributeValue]]) = {
       logger.info(s"getNextPage: memberOfBulk is $memberOfBulk")
       val baseRq = new QueryRequest()
@@ -45,10 +61,21 @@ class LightboxDynamoSource(memberOfBulk:String, config:Configuration, dynamoClie
       Try { client.query(rqWithStart) }
     }
 
+    /**
+      * helper method to safely return an Option[String] for the given key if it may not be present
+      * @param sourceData source data as returned by DynamoDB
+      * @param key key to check
+      * @return an Option that contains the value of the key, if one is present
+      */
     def optionalString(sourceData:mutable.Map[String, AttributeValue], key:String):Option[String] = {
       sourceData.get(key).flatMap(attributeValue=>Option(attributeValue.getS))
     }
 
+    /**
+      * marshals the provided data from DynamoDB into a LightboxEntry
+      * @param sourceData data as returned from DynamoDB
+      * @return a Try that either contains the LightboxEntry or an error that occurred while marshalling
+      */
     def buildLightboxEntry(sourceData: mutable.Map[String,AttributeValue]):Try[LightboxEntry] = Try {
       LightboxEntry(
         sourceData("userEmail").getS,
@@ -78,7 +105,7 @@ class LightboxDynamoSource(memberOfBulk:String, config:Configuration, dynamoClie
               }
             case Failure(err)=>
               logger.error(s"Could not scan Dynamodb table: ", err)
-              throw err
+              failStage(err)
           }
         }
 
@@ -92,7 +119,7 @@ class LightboxDynamoSource(memberOfBulk:String, config:Configuration, dynamoClie
               resultCache = resultCache.tail
             case Failure(err) =>
               logger.error(s"Could not marshal lightbox entry data into domain object", err)
-              throw err
+              failStage(err)
           } //match
         } //if(resultCache.isEmpty)
       } //onPull
