@@ -36,7 +36,7 @@ class LightboxDynamoSource(memberOfBulk:String, config:Configuration, dynamoClie
 
     private var resultCache:Seq[mutable.Map[String,AttributeValue]] = Seq()
     private var lastPage = false
-
+    private var ctr = 0
     /**
       * retrieve next page of results from DynamoDB
       * @param limit maximum number of items to return
@@ -99,10 +99,13 @@ class LightboxDynamoSource(memberOfBulk:String, config:Configuration, dynamoClie
               logger.info(s"Got scan result with ${scanResult.getCount} items")
               lastEvaluatedKey = Option(scanResult.getLastEvaluatedKey.asScala)
               resultCache = scanResult.getItems.asScala.map(_.asScala)
+              ctr+=scanResult.getCount
+              logger.info(s"Scan returned ${scanResult.getCount} items, running total is now $ctr items total")
               if(scanResult.getCount<pageSize) {
                 logger.info(s"${scanResult.getCount} items is less than page size of 100, assuming that all items have been returned")
                 lastPage = true
               }
+
             case Failure(err)=>
               logger.error(s"Could not scan Dynamodb table: ", err)
               failStage(err)
