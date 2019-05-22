@@ -9,6 +9,7 @@ import AvailabilityInsert from "./AvailabilityInsert.jsx";
 import BulkSelectionsScroll from "./BulkSelectionsScroll.jsx";
 import UserSelector from "../common/UserSelector.jsx";
 import LoadingThrobber from "../common/LoadingThrobber.jsx";
+import BulkSelectionStats from "./BulkSelectionStats.jsx";
 
 class MyLightbox extends CommonSearchView {
     constructor(props){
@@ -238,6 +239,7 @@ class MyLightbox extends CommonSearchView {
                                   forUser={this.state.selectedUser}
                                   isAdmin={this.state.userDetails && this.state.userDetails.isAdmin}
             />
+            <BulkSelectionStats user={this.state.selectedUser} bulkId={this.state.bulkSelectionSelected}/>
 
             <EntryDetails entry={this.state.showingPreview}
                           autoPlay={this.state.autoPlay}

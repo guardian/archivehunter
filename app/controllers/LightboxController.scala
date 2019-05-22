@@ -15,7 +15,7 @@ import com.gu.scanamo.error.DynamoReadError
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer, StorageClass, ZonedDateTimeEncoder}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models._
-import helpers.LightboxStreamComponents.{ExtractArchiveEntry, InitiateRestoreSink, LightboxDynamoSource, LookupArchiveEntryFromLBEntryFlow, LookupLightboxEntryFlow, UpdateLightboxIndexInfoSink}
+import helpers.LightboxStreamComponents.{BulkRestoreStatsSink, ExtractArchiveEntry, InitiateRestoreSink, LightboxDynamoSource, LookupArchiveEntryFromLBEntryFlow, LookupLightboxEntryFlow, UpdateLightboxIndexInfoSink}
 import helpers.{InjectableRefresher, LightboxHelper}
 import javax.inject.{Inject, Named, Singleton}
 import play.api.{Configuration, Logger}
@@ -268,6 +268,39 @@ class LightboxController @Inject() (override val config:Configuration,
               Ok(RestoreStatusResponse("not_requested", entry.id, RestoreStatus.RS_ERROR, None).asJson)
           })
       })
+    }
+  }
+
+  /**
+    * checks the restore status of everything in the given bulk and returns a set of stats
+    * @param user user whose lightbox we are checking
+    * @param bulkId bulk ID we are checking
+    * @return
+    */
+  def bulkCheckRestoreStatus(user:String, bulkId:String) = APIAuthAction.async { request=>
+    withTargetUserProfile(request, user) { userProfile=>
+      import akka.stream.scaladsl.GraphDSL.Implicits._
+      val sinkFactory = injector.getInstance(classOf[BulkRestoreStatsSink])
+
+      val graph = RunnableGraph.fromGraph(GraphDSL.create(sinkFactory) { implicit builder => sink=>
+        val src = new LightboxDynamoSource(bulkId, config, dynamoClientManager)
+
+
+        val actualSrc = builder.add(src)
+        //val actualSink = builder.add(sink)
+
+        actualSrc ~> sink
+        ClosedShape
+      })
+
+      graph.run().map(stats=>{
+        Ok(ObjectGetResponse("ok","restore_stats", stats).asJson)
+      }).recover({
+        case ex:Throwable=>
+          logger.error(s"Could not run stream to check bulk restore status: ", ex)
+          InternalServerError(GenericErrorResponse("error", ex.toString).asJson)
+      })
+
     }
   }
 

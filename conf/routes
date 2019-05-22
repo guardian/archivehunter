@@ -83,6 +83,7 @@ GET     /api/lightbox/bulk/appDownload/:bulkId  @controllers.LightboxController.
 GET     /api/download/:fileId           @controllers.LightboxController.getDownloadLink(fileId)
 
 GET     /api/archive/status/:fileId     @controllers.LightboxController.checkRestoreStatus(user:String ?= "my", fileId)
+GET     /api/archive/bulkStatus/:user/:bulkId   @controllers.LightboxController.bulkCheckRestoreStatus(user:String, bulkId:String)
 
 GET     /api/version                    @controllers.VersionController.getInfo
 
