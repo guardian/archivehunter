@@ -52,24 +52,24 @@ class S3ToArchiveEntryFlow @Inject() (s3ClientMgr: S3ClientManager, config:Confi
         }
 
         val secondUpdate = if(existingEntry.etag!=newEntry.etag){
-          logger.info(s"etag updated on ${existingEntry.id}")
+          logger.info(s"etag updated on ${existingEntry.location}")
           firstUpdate.copy(etag = newEntry.etag)
         } else {
           firstUpdate
         }
 
         val thirdUpdate = if(existingEntry.storageClass!=newEntry.storageClass){
-          logger.info(s"storage class updated on ${existingEntry.id}")
+          logger.info(s"storage class updated on ${existingEntry.location}")
           secondUpdate.copy(storageClass = newEntry.storageClass)
         } else {
           secondUpdate
         }
 
         if(thirdUpdate==existingEntry){
-          logger.info(s"No differences on ${existingEntry.id}")
+          logger.info(s"No differences on ${existingEntry.location}")
           None
         } else {
-          logger.info(s"Updates detected on ${existingEntry.id}")
+          logger.info(s"Updates detected on ${existingEntry.location}")
           Some(thirdUpdate)
         }
       }
@@ -102,7 +102,8 @@ class S3ToArchiveEntryFlow @Inject() (s3ClientMgr: S3ClientManager, config:Confi
               case Some(elemToUpdate)=>
                 push(out, elemToUpdate)
               case None=>
-                logger.info(s"Nothing to update on ${mappedElem.id}, grabbing next item")
+                logger.info(s"Nothing to update on ${mappedElem.location
+                }, grabbing next item")
                 pull(in)
             }
 
