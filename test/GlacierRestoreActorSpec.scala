@@ -8,7 +8,7 @@ import play.api.Configuration
 import services.GlacierRestoreActor
 import akka.pattern.ask
 import akka.util.Timeout
-import com.amazonaws.services.s3.model.RestoreObjectRequest
+import com.amazonaws.services.s3.model.{RestoreObjectRequest, RestoreObjectResult}
 import com.theguardian.multimedia.archivehunter.common.ArchiveEntry
 
 import scala.concurrent.{Await, ExecutionContext, Future}
@@ -25,6 +25,10 @@ class GlacierRestoreActorSpec extends Specification with Mockito {
       mockedConfig.getOptional[Int]("archive.restoresExpireAfter") returns Some(3)
       val mockedS3ClientManager = mock[S3ClientManager]
       val mockedS3Client = mock[AmazonS3]
+      val mockedRestoreResult = new RestoreObjectResult()
+      mockedRestoreResult.setRequesterCharged(true)
+      mockedRestoreResult.setRestoreOutputPath("/some/test/path")
+      mockedS3Client.restoreObjectV2(any) returns mockedRestoreResult
       mockedS3ClientManager.getClient(any) returns mockedS3Client
       val mockedJobModelDAO = mock[JobModelDAO]
       mockedJobModelDAO.putJob(any[JobModel]) returns Future(None)

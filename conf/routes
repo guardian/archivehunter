@@ -76,12 +76,14 @@ PUT     /api/lightbox/:user/:fileId             @controllers.LightboxController.
 DELETE  /api/lightbox/:user/:fileId             @controllers.LightboxController.removeFromLightbox(user, fileId)
 GET     /api/lightbox/:user/bulks               @controllers.LightboxController.myBulks(user)
 PUT     /api/lightbox/:user/redoRestore/:fileId @controllers.LightboxController.redoRestore(user, fileId)
+PUT     /api/lightbox/:user/bulk/verifiy/:bulkId     @controllers.LightboxController.verifyBulkLightbox(user, bulkId)
 PUT     /api/lightbox/:user/bulk/redoRestore/:bulkId @controllers.LightboxController.redoBulk(user:String, bulkId:String)
 GET     /api/lightbox/bulk/appDownload/:bulkId  @controllers.LightboxController.bulkDownloadInApp(bulkId)
 
 GET     /api/download/:fileId           @controllers.LightboxController.getDownloadLink(fileId)
 
 GET     /api/archive/status/:fileId     @controllers.LightboxController.checkRestoreStatus(user:String ?= "my", fileId)
+GET     /api/archive/bulkStatus/:user/:bulkId   @controllers.LightboxController.bulkCheckRestoreStatus(user:String, bulkId:String)
 
 GET     /api/version                    @controllers.VersionController.getInfo
 

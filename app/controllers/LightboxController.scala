@@ -5,19 +5,18 @@ import java.util.UUID
 
 import akka.pattern.ask
 import akka.actor.{ActorRef, ActorSystem}
-import akka.stream.scaladsl.{GraphDSL, RunnableGraph}
+import akka.stream.scaladsl.{Flow, GraphDSL, RunnableGraph}
 import akka.stream.{ActorMaterializer, ClosedShape, Materializer}
 import com.amazonaws.HttpMethod
 import com.amazonaws.services.s3.model.{GeneratePresignedUrlRequest, ResponseHeaderOverrides}
 import com.google.inject.Injector
 import com.gu.pandomainauth.action.UserRequest
 import com.gu.scanamo.error.DynamoReadError
-import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer, LightboxIndex, StorageClass, ZonedDateTimeEncoder}
-import com.theguardian.multimedia.archivehunter.common.clientManagers.{ESClientManager, S3ClientManager}
+import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer, StorageClass, ZonedDateTimeEncoder}
+import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models._
-import helpers.LightboxHelper.logger
-import helpers.LightboxStreamComponents.{InitiateRestoreSink, LookupLightboxEntryFlow}
-import helpers.{InjectableRefresher, LightboxHelper, SearchHitToArchiveEntryFlow}
+import helpers.LightboxStreamComponents.{BulkRestoreStatsSink, ExtractArchiveEntry, InitiateRestoreSink, LightboxDynamoSource, LookupArchiveEntryFromLBEntryFlow, LookupLightboxEntryFlow, UpdateLightboxIndexInfoSink}
+import helpers.{InjectableRefresher, LightboxHelper}
 import javax.inject.{Inject, Named, Singleton}
 import play.api.{Configuration, Logger}
 import play.api.libs.circe.Circe
@@ -27,7 +26,6 @@ import io.circe.syntax._
 import io.circe.generic.auto._
 import models.{ServerTokenDAO, ServerTokenEntry, UserProfile, UserProfileDAO}
 import play.api.libs.ws.WSClient
-import play.mvc.Http.RequestHeader
 import requests.SearchRequest
 import services.GlacierRestoreActor
 import services.GlacierRestoreActor.GRMsg
@@ -46,7 +44,8 @@ class LightboxController @Inject() (override val config:Configuration,
                                     @Named("glacierRestoreActor") glacierRestoreActor:ActorRef,
                                     lightboxBulkEntryDAO: LightboxBulkEntryDAO,
                                     serverTokenDAO: ServerTokenDAO,
-                                    userProfileDAO: UserProfileDAO)
+                                    userProfileDAO: UserProfileDAO,
+                                    dynamoClientManager:DynamoClientManager)
                                    (implicit val system:ActorSystem, injector:Injector, lightboxEntryDAO: LightboxEntryDAO)
   extends AbstractController(controllerComponents) with PanDomainAuthActions with Circe with ZonedDateTimeEncoder with RestoreStatusEncoder with AdminsOnly {
   private val logger=Logger(getClass)
@@ -273,6 +272,38 @@ class LightboxController @Inject() (override val config:Configuration,
   }
 
   /**
+    * checks the restore status of everything in the given bulk and returns a set of stats
+    * @param user user whose lightbox we are checking
+    * @param bulkId bulk ID we are checking
+    * @return
+    */
+  def bulkCheckRestoreStatus(user:String, bulkId:String) = APIAuthAction.async { request=>
+    withTargetUserProfile(request, user) { userProfile=>
+      import akka.stream.scaladsl.GraphDSL.Implicits._
+      val sinkFactory = injector.getInstance(classOf[BulkRestoreStatsSink])
+
+      val graph = RunnableGraph.fromGraph(GraphDSL.create(sinkFactory) { implicit builder => sink=>
+        val src = new LightboxDynamoSource(bulkId, config, dynamoClientManager)
+
+
+        val actualSrc = builder.add(src)
+
+        actualSrc ~> sink
+        ClosedShape
+      })
+
+      graph.run().map(stats=>{
+        Ok(ObjectGetResponse("ok","restore_stats", stats).asJson)
+      }).recover({
+        case ex:Throwable=>
+          logger.error(s"Could not run stream to check bulk restore status: ", ex)
+          InternalServerError(GenericErrorResponse("error", ex.toString).asJson)
+      })
+
+    }
+  }
+
+  /**
     * returns bulk entries for the current user
     * @return
     */
@@ -426,6 +457,36 @@ class LightboxController @Inject() (override val config:Configuration,
     })
   }
 
+  def verifyBulkLightbox(user:String, bulkId:String) = APIAuthAction.async { request=>
+    withTargetUserProfile(request, user) { userProfile =>
+      val sinkFactory = new UpdateLightboxIndexInfoSink(bulkId, userProfile, request.user.avatarUrl)
+
+      val graph = RunnableGraph.fromGraph(GraphDSL.create(sinkFactory) { implicit builder=> sink=>
+        import akka.stream.scaladsl.GraphDSL.Implicits._
+
+        val src = new LightboxDynamoSource(bulkId, config, dynamoClientManager)
+        val lbConverter = injector.getInstance(classOf[LookupArchiveEntryFromLBEntryFlow])
+
+        val actualSource = builder.add(src)
+        val actualConverter = builder.add(lbConverter)
+        val actualExtractor = builder.add(new ExtractArchiveEntry)
+
+        actualSource ~> actualConverter ~> actualExtractor ~> sink.in
+        ClosedShape
+      })
+
+      val streamResult = graph.run()
+
+      streamResult.map(foundItemCount=>{
+        Ok(CountResponse("ok","updated items", foundItemCount).asJson)
+      }).recover({
+        case err:Throwable=>
+          logger.error("Could not run stream to fix lightbox entries: ", err)
+          InternalServerError(GenericErrorResponse("error",err.toString).asJson)
+      })
+    }
+  }
+
   //this is temporary and will be replaced in the update that brings in the new approval workflow
   def redoBulk(user:String, bulkId:String) = APIAuthAction.async { request =>
 
@@ -444,13 +505,12 @@ class LightboxController @Inject() (override val config:Configuration,
             resultSink =>
               import akka.stream.scaladsl.GraphDSL.Implicits._
 
-              //the LightboxHelper methods call here also handle the special case of "loose" items
-              val source = LightboxHelper.getElasticSource(LightboxHelper.lightboxSearch(indexName, Some(bulkId), profile.userEmail))
-
+              val source = new LightboxDynamoSource(bulkId,config, dynamoClientManager)
+              val lookup = injector.getInstance(classOf[LookupArchiveEntryFromLBEntryFlow])
               val actualSource = builder.add(source)
-              val converter = builder.add(new SearchHitToArchiveEntryFlow)
-              val lbLookup = builder.add(new LookupLightboxEntryFlow(profile.userEmail))
-              actualSource ~> converter ~> lbLookup ~> resultSink
+              val actualLookup = builder.add(lookup)
+
+              actualSource ~> actualLookup ~> resultSink
               ClosedShape
           })
 

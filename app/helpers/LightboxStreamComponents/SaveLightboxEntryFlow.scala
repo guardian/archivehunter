@@ -58,7 +58,7 @@ class SaveLightboxEntryFlow (bulkId:String,userProfile: UserProfile)
               logger.error("Could not save lightbox entry", err)
               //fail the output immediately, this should get seen by the stream's user
               promise.failure(err)
-              throw err
+              failStage(err)
           }
         }
       })

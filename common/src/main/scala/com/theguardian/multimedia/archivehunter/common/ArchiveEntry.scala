@@ -98,4 +98,6 @@ case class ArchiveEntry(id:String, bucket: String, path: String, region:Option[S
         case Some(Left(err))=>throw new RuntimeException(err.toString)
       })
   }
+
+  def location:String = s"s3://$bucket/$path"
 }

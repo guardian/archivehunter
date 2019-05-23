@@ -56,7 +56,7 @@ class UpdateLightboxIndexInfoSink (bulkId:String,userProfile: UserProfile, userA
               logger.error(s"Could not update lightbox info: ${err.toString}")
               val excep = new RuntimeException(err.toString)
               promise.failure(excep)
-              throw excep
+              failStage(excep)
           }
         }
       })
