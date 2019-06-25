@@ -25,9 +25,10 @@ object GlacierRestoreActor {
     */
   case class InitiateRestore(entry:ArchiveEntry, lbEntry:LightboxEntry, expiration:Option[Int]) extends GRMsg
   case class CheckRestoreStatus(lbEntry:LightboxEntry) extends GRMsg
+  case class CheckRestoreStatusBasic(archiveEntry: ArchiveEntry) extends GRMsg
 
   /* private internal messages */
-  case class InternalCheckRestoreStatus(lbEntry:LightboxEntry, entry:ArchiveEntry, jobsList:List[JobModel], originalSender:ActorRef)
+  case class InternalCheckRestoreStatus(lbEntry:Option[LightboxEntry], entry:ArchiveEntry, jobsList:Option[List[JobModel]], originalSender:ActorRef)
 
   /* reply messages to expect */
   case object RestoreSuccess extends GRMsg
@@ -97,29 +98,34 @@ class GlacierRestoreActor @Inject() (config:Configuration, esClientMgr:ESClientM
           if(result.getStorageClass!="GLACIER"){
             originalSender ! NotInArchive(entry)
           } else {
-            jobs.foreach(job=>updateJob(job, JobStatus.ST_ERROR,Some("No restore record in S3")))
-            updateLightbox(lbEntry,None,error=Some(new RuntimeException("No restore record in S3")))
+            if(jobs.isDefined) jobs.get.foreach(job=>updateJob(job, JobStatus.ST_ERROR,Some("No restore record in S3")))
+            if(lbEntry.isDefined) updateLightbox(lbEntry.get,None,error=Some(new RuntimeException("No restore record in S3")))
             originalSender ! RestoreNotRequested(entry)
           }
         case Some(true) => //restore is in progress
           logger.info(s"s3://${entry.bucket}/${entry.path} is currently under restore")
-          jobs.foreach(job=>updateJob(job, JobStatus.ST_RUNNING, None))
-          updateLightboxFull(lbEntry,RestoreStatus.RS_UNDERWAY,None)
+          if(jobs.isDefined) jobs.get.foreach(job=>updateJob(job, JobStatus.ST_RUNNING, None))
+          if(lbEntry.isDefined) updateLightboxFull(lbEntry.get,RestoreStatus.RS_UNDERWAY,None)
           originalSender ! RestoreInProgress(entry)
         case Some(false) => //restore not in progress, may be completed
           Option(result.getRestoreExpirationTime)
             .map(date => ZonedDateTime.ofInstant(date.toInstant, ZoneId.systemDefault())) match {
             case None => //no restore time, so it's gone back again
-              if(lbEntry.restoreStatus!=RestoreStatus.RS_ERROR && lbEntry.restoreStatus!=RestoreStatus.RS_SUCCESS){
-                updateLightbox(lbEntry,None, Some(new RuntimeException("Item has already expired")))
+              if(lbEntry.isDefined) {
+                if (lbEntry.get.restoreStatus != RestoreStatus.RS_ERROR && lbEntry.get.restoreStatus != RestoreStatus.RS_SUCCESS) {
+                  updateLightbox(lbEntry.get, None, Some(new RuntimeException("Item has already expired")))
+                }
               }
               originalSender ! RestoreNotRequested(entry)
             case Some(expiry) =>
-              jobs.foreach(job=>updateJob(job,JobStatus.ST_SUCCESS,None))
-              updateLightboxFull(lbEntry, RestoreStatus.RS_SUCCESS, Some(expiry))
+              if(jobs.isDefined) jobs.get.foreach(job=>updateJob(job,JobStatus.ST_SUCCESS,None))
+              if(lbEntry.isDefined) updateLightboxFull(lbEntry.get, RestoreStatus.RS_SUCCESS, Some(expiry))
               originalSender ! RestoreCompleted(entry, expiry)
           }
       }
+
+    case CheckRestoreStatusBasic(archiveEntry)=>
+      self ! InternalCheckRestoreStatus(None, archiveEntry, None, sender())
 
     case CheckRestoreStatus(lbEntry)=>
       val originalSender = sender()
@@ -135,7 +141,7 @@ class GlacierRestoreActor @Inject() (config:Configuration, esClientMgr:ESClientM
               .filter(_.jobType == "RESTORE")
               .filter(_.jobStatus != JobStatus.ST_ERROR)
               .filter(_.jobStatus != JobStatus.ST_SUCCESS)
-            self ! InternalCheckRestoreStatus(lbEntry, entry, jobs, originalSender)
+            self ! InternalCheckRestoreStatus(Some(lbEntry), entry, Some(jobs), originalSender)
           }
         })
       })

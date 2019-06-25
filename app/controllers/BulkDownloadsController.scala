@@ -2,27 +2,33 @@ package controllers
 
 import java.util.UUID
 
-import akka.actor.ActorSystem
+import akka.actor.{ActorRef, ActorSystem}
 import akka.stream.{ActorMaterializer, Materializer}
 import akka.stream.scaladsl.{Keep, Sink, Source}
 import com.amazonaws.HttpMethod
 import com.amazonaws.services.s3.model.{GeneratePresignedUrlRequest, ResponseHeaderOverrides}
-import com.theguardian.multimedia.archivehunter.common.cmn_models.{LightboxBulkEntry, LightboxBulkEntryDAO, LightboxEntryDAO}
-import javax.inject.{Inject, Singleton}
+import com.theguardian.multimedia.archivehunter.common.cmn_models.{LightboxBulkEntry, LightboxBulkEntryDAO, LightboxEntryDAO, RestoreStatus, RestoreStatusEncoder}
+import javax.inject.{Inject, Named, Singleton}
 import models.{ArchiveEntryDownloadSynopsis, ServerTokenDAO, ServerTokenEntry}
 import play.api.{Configuration, Logger}
 import play.api.libs.circe.Circe
 import play.api.mvc.{AbstractController, ControllerComponents}
-import responses.{BulkDownloadInitiateResponse, GenericErrorResponse, ObjectGetResponse}
+import responses.{BulkDownloadInitiateResponse, GenericErrorResponse, ObjectGetResponse, RestoreStatusResponse}
 import io.circe.generic.auto._
 import io.circe.syntax._
 import com.sksamuel.elastic4s.circe._
-import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ArchiveEntryHitReader, Indexer}
+import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ArchiveEntryHitReader, Indexer, ZonedDateTimeEncoder}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{ESClientManager, S3ClientManager}
+import helpers.S3Helper.getPresignedURL
 import helpers.{LightboxHelper, SearchHitToArchiveEntryFlow}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
+import scala.util.{Failure, Success}
+import akka.pattern.ask
+import services.GlacierRestoreActor
+
+import scala.concurrent.duration._
 
 @Singleton
 class BulkDownloadsController @Inject()(config:Configuration,serverTokenDAO: ServerTokenDAO,
@@ -30,8 +36,10 @@ class BulkDownloadsController @Inject()(config:Configuration,serverTokenDAO: Ser
                                         lightboxEntryDAO: LightboxEntryDAO,
                                         esClientManager: ESClientManager,
                                         s3ClientManager: S3ClientManager,
-                                        cc:ControllerComponents)(implicit system:ActorSystem)
-  extends AbstractController(cc) with Circe with ArchiveEntryHitReader {
+                                        cc:ControllerComponents,
+                                        @Named("glacierRestoreActor") glacierRestoreActor:ActorRef,
+                                       )(implicit system:ActorSystem)
+  extends AbstractController(cc) with Circe with ArchiveEntryHitReader with ZonedDateTimeEncoder with RestoreStatusEncoder {
 
   private val logger = Logger(getClass)
 
@@ -97,6 +105,7 @@ class BulkDownloadsController @Inject()(config:Configuration,serverTokenDAO: Ser
           Future(Forbidden(GenericErrorResponse("forbidden", "invalid or expired token").asJson))
       })
     })
+
   /**
     * take a one-time code generated in LightboxController, validate and expire it, then return the information of the
     * associated LightboxBulkEntry
@@ -139,24 +148,35 @@ class BulkDownloadsController @Inject()(config:Configuration,serverTokenDAO: Ser
   }
 
   def getDownloadIdWithToken(tokenValue:String, fileId:String) = Action.async {
+    implicit val timeout:akka.util.Timeout = 30 seconds
+
     serverTokenDAO.get(tokenValue).flatMap({
       case None=>
         Future(Forbidden(GenericErrorResponse("forbidden", "invalid or expired token").asJson))
       case Some(Left(err))=>
         Future(Forbidden(GenericErrorResponse("forbidden", "invalid or expired token").asJson))
-      case Some(Right(serverToken))=>
-        indexer.getById(fileId).map(archiveEntry=>{
+      case Some(Right(_))=>
+        indexer.getById(fileId).flatMap(archiveEntry=>{
           val s3Client = s3ClientManager.getS3Client(profileName,archiveEntry.region)
-            try {
-              val rq = new GeneratePresignedUrlRequest(archiveEntry.bucket, archiveEntry.path, HttpMethod.GET)
-                .withResponseHeaders(new ResponseHeaderOverrides().withContentDisposition("attachment"))
-              val response = s3Client.generatePresignedUrl(rq)
-              Ok(ObjectGetResponse("ok","link",response.toString).asJson)
-            } catch {
-              case ex:Throwable=>
-                logger.error("Could not generate presigned s3 url: ", ex)
-                InternalServerError(GenericErrorResponse("error",ex.toString).asJson)
-            }
+          val response = (glacierRestoreActor ? GlacierRestoreActor.CheckRestoreStatusBasic(archiveEntry)).mapTo[GlacierRestoreActor.GRMsg]
+
+          response.map({
+            case GlacierRestoreActor.NotInArchive(entry)=>
+              getPresignedURL(archiveEntry)(s3Client)
+                .map(url=>Ok(RestoreStatusResponse("ok",entry.id, RestoreStatus.RS_UNNEEDED, None, Some(url.toString)).asJson))
+            case GlacierRestoreActor.RestoreCompleted(entry, expiry)=>
+              getPresignedURL(archiveEntry)(s3Client)
+                .map(url=>Ok(RestoreStatusResponse("ok", entry.id, RestoreStatus.RS_SUCCESS, Some(expiry), Some(url.toString)).asJson))
+            case GlacierRestoreActor.RestoreInProgress(entry)=>
+              Success(Ok(RestoreStatusResponse("ok", entry.id, RestoreStatus.RS_UNDERWAY, None, None).asJson))
+            case GlacierRestoreActor.RestoreNotRequested(entry)=>
+              Success(Ok(RestoreStatusResponse("not_requested", entry.id, RestoreStatus.RS_ERROR, None, None).asJson))
+          }).map({
+            case Success(response)=>response
+            case Failure(err)=>
+              logger.error(s"Could not get download for $fileId with token $tokenValue", err)
+              InternalServerError(GenericErrorResponse("error",err.toString).asJson)
+          })
         })
     })
   }
