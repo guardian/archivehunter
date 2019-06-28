@@ -36,16 +36,16 @@ object BucketScanner {
 }
 
 @Singleton
-class BucketScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientManager, s3ClientMgr:S3ClientManager,
+class BucketScanner @Inject()(override val config:Configuration, ddbClientMgr:DynamoClientManager, s3ClientMgr:S3ClientManager,
                               esClientMgr:ESClientManager, scanTargetDAO: ScanTargetDAO, jobModelDAO:JobModelDAO,
                               injector:Injector)(implicit system:ActorSystem)
-  extends Actor with ZonedTimeFormat with ArchiveEntryRequestBuilder{
+  extends Actor with BucketScannerFunctions with ZonedTimeFormat with ArchiveEntryRequestBuilder{
   import BucketScanner._
 
   import com.sksamuel.elastic4s.http.ElasticDsl._
   import com.sksamuel.elastic4s.streams.ReactiveElastic._
 
-  private val logger=Logger(getClass)
+  protected val logger=Logger(getClass)
 
   implicit val mat = ActorMaterializer.create(system)
   implicit val ec:ExecutionContext = system.dispatcher
@@ -66,51 +66,6 @@ class BucketScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientMan
         throw new RuntimeException(errors.map(_.toString).mkString(","))
       }
     })
-
-
-  /**
-    * returns a boolean indicating whether the given target is due a scan, i.e. last_scan + scan_interval < now OR
-    * not scanned at all
-    * @param target [[ScanTarget]] instance to check
-    * @return boolean flag
-    */
-  def scanIsScheduled(target: ScanTarget) = {
-    target.lastScanned match {
-      case None=>true
-      case Some(lastScanned)=>
-        logger.info(s"${target.bucketName}: Next scan is due at ${lastScanned.plus(target.scanInterval,ChronoUnit.SECONDS)}")
-        lastScanned.plus(target.scanInterval,ChronoUnit.SECONDS).isBefore(ZonedDateTime.now())
-    }
-  }
-
-  /**
-    * returns a boolean indicating whether we should consider that a scan is in progress.
-    * if there is a scan in progress but it's onlder than "scanner.staleAge" in the config then we run anyway
-    * @param scanTarget
-    * @return boolean indicating if a scan is in progress. True if so (i.e. don't rescan) or False.
-    */
-  def scanIsInProgress(scanTarget:ScanTarget) =
-    if (scanTarget.scanInProgress) {
-      scanTarget.lastScanned match {
-        case Some(lastScanTime) =>
-          val oneDay = 86400  //1 day in seconds
-          val oldest = config.getOptional[Int]("scanner.staleAge").getOrElse(2) * oneDay
-
-          val interval = ZonedDateTime.now().toInstant.getEpochSecond - lastScanTime.toInstant.getEpochSecond
-
-          if (interval > oldest) {
-            logger.warn(s"Current scan is ${interval/oneDay} days old, assuming that it is stale. Rescanning anyway.")
-            false
-          } else {
-            true
-          }
-        case None=>
-          true
-      }
-    } else {
-      false
-    }
-
 
   /**
     * trigger a scan, if one is due, by messaging ourself
