@@ -5,20 +5,17 @@ import java.time.temporal.{ChronoUnit, IsoFields, TemporalUnit}
 
 import akka.NotUsed
 import akka.actor.{Actor, ActorSystem, Timers}
-import akka.http.scaladsl.Http
 import akka.stream.scaladsl.{GraphDSL, Keep, RunnableGraph, Sink, Source}
 import akka.stream._
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager}
 import com.amazonaws.regions.{Region, Regions}
 import com.google.inject.Injector
-import com.gu.scanamo.{ScanamoAlpakka, Table}
 import com.sksamuel.elastic4s.http.HttpClient
 import com.sksamuel.elastic4s.http.bulk.BulkResponseItem
 import helpers._
 import javax.inject.{Inject, Singleton}
 import com.theguardian.multimedia.archivehunter.common.cmn_models._
 import play.api.{Configuration, Logger}
-import com.sksamuel.elastic4s.streams.ReactiveElastic._
 import com.sksamuel.elastic4s.streams.{RequestBuilder, ResponseListener, SubscriberConfig}
 import com.theguardian.multimedia.archivehunter.common.cmn_helpers.ZonedTimeFormat
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ArchiveEntryRequestBuilder}
@@ -87,6 +84,35 @@ class BucketScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientMan
   }
 
   /**
+    * returns a boolean indicating whether we should consider that a scan is in progress.
+    * if there is a scan in progress but it's onlder than "scanner.staleAge" in the config then we run anyway
+    * @param scanTarget
+    * @return boolean indicating if a scan is in progress. True if so (i.e. don't rescan) or False.
+    */
+  def scanIsInProgress(scanTarget:ScanTarget) =
+    if (scanTarget.scanInProgress) {
+      scanTarget.lastScanned match {
+        case Some(lastScanTime) =>
+          val oneDay = 86400  //1 day in seconds
+          val oldest = config.getOptional[Int]("scanner.staleAge").getOrElse(2) * oneDay
+
+          val interval = ZonedDateTime.now().toInstant.getEpochSecond - lastScanTime.toInstant.getEpochSecond
+
+          if (interval > oldest) {
+            logger.warn(s"Current scan is ${interval/oneDay} days old, assuming that it is stale. Rescanning anyway.")
+            false
+          } else {
+            true
+          }
+        case None=>
+          true
+      }
+    } else {
+      false
+    }
+
+
+  /**
     * trigger a scan, if one is due, by messaging ourself
     * @param scanTarget [[ScanTarget]] instance to check
     * @return boolean indicating whether a scan was triggered
@@ -95,7 +121,7 @@ class BucketScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientMan
     if(!scanTarget.enabled){
       logger.info(s"Not scanning ${scanTarget.bucketName} as it is disabled")
       false
-    } else if(scanTarget.scanInProgress){
+    } else if(scanIsInProgress(scanTarget)){
       logger.info(s"Not scanning ${scanTarget.bucketName} as it is already in progress")
       false
     } else {
