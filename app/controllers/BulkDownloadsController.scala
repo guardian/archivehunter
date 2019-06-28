@@ -17,7 +17,7 @@ import responses.{BulkDownloadInitiateResponse, GenericErrorResponse, ObjectGetR
 import io.circe.generic.auto._
 import io.circe.syntax._
 import com.sksamuel.elastic4s.circe._
-import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ArchiveEntryHitReader, Indexer, ZonedDateTimeEncoder}
+import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ArchiveEntryHitReader, Indexer, StorageClass, ZonedDateTimeEncoder}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{ESClientManager, S3ClientManager}
 import helpers.S3Helper.getPresignedURL
 import helpers.{LightboxHelper, SearchHitToArchiveEntryFlow}
@@ -170,6 +170,16 @@ class BulkDownloadsController @Inject()(config:Configuration,serverTokenDAO: Ser
             case GlacierRestoreActor.RestoreInProgress(entry)=>
               Success(Ok(RestoreStatusResponse("ok", entry.id, RestoreStatus.RS_UNDERWAY, None, None).asJson))
             case GlacierRestoreActor.RestoreNotRequested(entry)=>
+              if(entry.storageClass!=StorageClass.GLACIER){ //if the file is not registered as in Glacier, then update it.
+                val updatedEntry = entry.copy(storageClass=StorageClass.GLACIER)
+                indexer.indexSingleItem(updatedEntry, Some(updatedEntry.id)).map({
+                  case Left(err)=>
+                    logger.error(s"Could not update storage class for incorrect item $entry: $err")
+                  case Right(_)=>
+                    logger.info(s"Updated $entry as it had invalid storage class. Now requesting restore")
+                    glacierRestoreActor ! GlacierRestoreActor.InitiateRestoreBasic(updatedEntry,None)
+                })
+              }
               Success(Ok(RestoreStatusResponse("not_requested", entry.id, RestoreStatus.RS_ERROR, None, None).asJson))
           }).map({
             case Success(response)=>response

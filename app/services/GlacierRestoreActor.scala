@@ -24,6 +24,7 @@ object GlacierRestoreActor {
     * @param filePath
     */
   case class InitiateRestore(entry:ArchiveEntry, lbEntry:LightboxEntry, expiration:Option[Int]) extends GRMsg
+  case class InitiateRestoreBasic(entry:ArchiveEntry, expiration:Option[Int]) extends GRMsg
   case class CheckRestoreStatus(lbEntry:LightboxEntry) extends GRMsg
   case class CheckRestoreStatusBasic(archiveEntry: ArchiveEntry) extends GRMsg
 
@@ -144,6 +145,41 @@ class GlacierRestoreActor @Inject() (config:Configuration, esClientMgr:ESClientM
             self ! InternalCheckRestoreStatus(Some(lbEntry), entry, Some(jobs), originalSender)
           }
         })
+      })
+
+    case InitiateRestoreBasic(entry, maybeExpiry)=>
+      val rq = new RestoreObjectRequest(entry.bucket, entry.path, maybeExpiry.getOrElse(defaultExpiry))
+      val inst = Instant.now().plus(maybeExpiry.getOrElse(defaultExpiry).toLong, ChronoUnit.DAYS)
+      val willExpire = ZonedDateTime.ofInstant(inst,ZoneId.systemDefault())
+
+      val newJob = JobModel.newJob("RESTORE",entry.id,SourceType.SRC_MEDIA)
+
+      val originalSender = sender()
+
+      //completion is detected by the inputLambda, and the job status will be updated there.
+      jobModelDAO.putJob(newJob).onComplete({
+        case Success(None)=>
+          logger.debug(s"${entry.location}: initiating restore")
+          Try { s3client.restoreObjectV2(rq) } match {
+            case Success(_)=>originalSender ! RestoreInProgress
+            case Failure(err)=>
+              logger.error("S3 restore request failed: ", err)
+              originalSender ! RestoreFailure(err)
+          }
+        case Success(Some(Right(record)))=>
+          logger.debug(s"${entry.location}: initiating restore")
+          Try { s3client.restoreObjectV2(rq) } match {
+            case Success(_)=>originalSender ! RestoreInProgress
+            case Failure(err)=>
+              logger.error("S3 restore request failed: ", err)
+              originalSender ! RestoreFailure(err)
+          }
+        case Success(Some(Left(error)))=>
+          logger.error(s"Could not update job info for ${newJob.jobId} on ${entry.location}: $error")
+          originalSender ! RestoreFailure(new RuntimeException("Could not update job"))
+        case Failure(err)=>
+          logger.error(s"pubJob crashed", err)
+          originalSender ! RestoreFailure(err)
       })
 
     case InitiateRestore(entry, lbEntry, maybeExpiry)=>
