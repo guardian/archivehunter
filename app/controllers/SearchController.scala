@@ -1,5 +1,6 @@
 package controllers
 
+import com.gu.pandahmac.HMACAuthActions
 import com.gu.pandomainauth.action.UserRequest
 import com.theguardian.multimedia.archivehunter.common.clientManagers.ESClientManager
 import javax.inject.{Inject, Singleton}
@@ -30,11 +31,13 @@ class SearchController @Inject()(override val config:Configuration,
                                  override val wsClient:WSClient,
                                  override val refresher:InjectableRefresher,
                                  userProfileDAO:UserProfileDAO)
-  extends AbstractController(controllerComponents) with ArchiveEntryHitReader with ZonedDateTimeEncoder with StorageClassEncoder with Circe
+  extends AbstractController(controllerComponents) with ArchiveEntryHitReader with ZonedDateTimeEncoder with StorageClassEncoder with Circe with HMACAuthActions
 with PanDomainAuthActions {
 
   private val logger=Logger(getClass)
   val indexName = config.getOptional[String]("externalData.indexName").getOrElse("archivehunter")
+
+  override def secret:String = config.get[String]("serverAuth.sharedSecret")
 
   private val esClient = esClientManager.getClient()
   import com.sksamuel.elastic4s.http.ElasticDsl._
@@ -228,4 +231,20 @@ with PanDomainAuthActions {
         }
     })
   }
+
+  def getByFilename(collectionName:String,filePath:String) = HMACAuthAction.async { request=>
+    esClient.execute {
+      search(indexName) query boolQuery().withMust(Seq(
+        matchQuery("bucket.keyword",collectionName),
+        matchQuery("path.keyword", filePath)
+      ))
+    }.map({
+      case Left(failure)=>
+        InternalServerError(GenericErrorResponse("search failure", failure.toString).asJson)
+      case Right(results)=>
+        logger.info(s"Got $results")
+        Ok(ObjectGetResponse("ok","archiveentry", results.result.to[ArchiveEntry]).asJson)
+    })
+  }
+
 }
