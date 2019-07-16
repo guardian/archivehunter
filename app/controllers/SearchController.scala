@@ -232,6 +232,13 @@ with PanDomainAuthActions {
     })
   }
 
+  /**
+    * endpoint to return data about a specific file, given the collection name and the file path. Both must exactly
+    * match in order to be returned
+    * @param collectionName
+    * @param filePath
+    * @return
+    */
   def getByFilename(collectionName:String,filePath:String) = HMACAuthAction.async { request=>
     esClient.execute {
       search(indexName) query boolQuery().withMust(Seq(
@@ -247,4 +254,19 @@ with PanDomainAuthActions {
     })
   }
 
+  /**
+    * endpoint to search for an exact match on the given filepath, in any collection
+    * @param filePath
+    * @return
+    */
+  def searchByFilename(filePath:String) = HMACAuthAction.async { request=>
+    esClient.execute {
+      search(indexName) query matchQuery("path.keyword", filePath)
+    }.map({
+      case Left(failure)=>
+        InternalServerError(GenericErrorResponse("search failure", failure.toString).asJson)
+      case Right(results)=>
+        Ok(ObjectListResponse("ok","archiveentry", results.result.to[ArchiveEntry], results.result.hits.total.toInt).asJson)
+    })
+  }
 }

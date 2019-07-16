@@ -30,6 +30,7 @@ PUT     /api/search/suggestions         @controllers.SearchController.suggestion
 POST    /api/search/browser             @controllers.SearchController.browserSearch(start:Int ?= 0, size:Int ?=100)
 GET     /api/search/myLightBox          @controllers.SearchController.lightboxSearch(start:Int ?= 0, size:Int ?=100, bulkId:Option[String] ?= None, user:String ?= "my")
 GET     /api/search/specific/:collectionName    @controllers.SearchController.getByFilename(collectionName, filePath:String)
+GET     /api/searchpath                 @controllers.SearchController.searchByFilename(filePath:String)
 
 GET     /api/search/proxyStats          @controllers.SearchController.getProxyFacets
 
