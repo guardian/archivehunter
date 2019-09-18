@@ -266,7 +266,11 @@ with PanDomainAuthActions {
       case Left(failure)=>
         InternalServerError(GenericErrorResponse("search failure", failure.toString).asJson)
       case Right(results)=>
-        Ok(ObjectListResponse("ok","archiveentry", results.result.to[ArchiveEntry], results.result.hits.total.toInt).asJson)
+        if(results.result.hits.total>0) {
+          Ok(ObjectListResponse("ok", "archiveentry", results.result.to[ArchiveEntry], results.result.hits.total.toInt).asJson)
+        } else {
+          NotFound(GenericErrorResponse("not_found", s"Nothing found at path $filePath").asJson)
+        }
     })
   }
 }
