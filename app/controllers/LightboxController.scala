@@ -284,8 +284,6 @@ class LightboxController @Inject() (override val config:Configuration,
 
       val graph = RunnableGraph.fromGraph(GraphDSL.create(sinkFactory) { implicit builder => sink=>
         val src = new LightboxDynamoSource(bulkId, config, dynamoClientManager)
-
-
         val actualSrc = builder.add(src)
 
         actualSrc ~> sink
