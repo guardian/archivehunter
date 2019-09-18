@@ -1,5 +1,6 @@
 package controllers
 
+import com.gu.pandahmac.HMACAuthActions
 import com.gu.pandomainauth.action.UserRequest
 import com.theguardian.multimedia.archivehunter.common.clientManagers.ESClientManager
 import javax.inject.{Inject, Singleton}
@@ -30,11 +31,13 @@ class SearchController @Inject()(override val config:Configuration,
                                  override val wsClient:WSClient,
                                  override val refresher:InjectableRefresher,
                                  userProfileDAO:UserProfileDAO)
-  extends AbstractController(controllerComponents) with ArchiveEntryHitReader with ZonedDateTimeEncoder with StorageClassEncoder with Circe
+  extends AbstractController(controllerComponents) with ArchiveEntryHitReader with ZonedDateTimeEncoder with StorageClassEncoder with Circe with HMACAuthActions
 with PanDomainAuthActions {
 
   private val logger=Logger(getClass)
   val indexName = config.getOptional[String]("externalData.indexName").getOrElse("archivehunter")
+
+  override def secret:String = config.get[String]("serverAuth.sharedSecret")
 
   private val esClient = esClientManager.getClient()
   import com.sksamuel.elastic4s.http.ElasticDsl._
@@ -225,6 +228,48 @@ with PanDomainAuthActions {
           InternalServerError(ErrorListResponse("render_error","could not process aggregations data", errors.toList).asJson)
         } else {
           Ok(ChartDataListResponse("ok",finalContent.collect({case Right(data)=>data}).flatten).asJson)
+        }
+    })
+  }
+
+  /**
+    * endpoint to return data about a specific file, given the collection name and the file path. Both must exactly
+    * match in order to be returned
+    * @param collectionName
+    * @param filePath
+    * @return
+    */
+  def getByFilename(collectionName:String,filePath:String) = HMACAuthAction.async { request=>
+    esClient.execute {
+      search(indexName) query boolQuery().withMust(Seq(
+        matchQuery("bucket.keyword",collectionName),
+        matchQuery("path.keyword", filePath)
+      ))
+    }.map({
+      case Left(failure)=>
+        InternalServerError(GenericErrorResponse("search failure", failure.toString).asJson)
+      case Right(results)=>
+        logger.info(s"Got $results")
+        Ok(ObjectGetResponse("ok","archiveentry", results.result.to[ArchiveEntry]).asJson)
+    })
+  }
+
+  /**
+    * endpoint to search for an exact match on the given filepath, in any collection
+    * @param filePath
+    * @return
+    */
+  def searchByFilename(filePath:String) = HMACAuthAction.async { request=>
+    esClient.execute {
+      search(indexName) query matchQuery("path.keyword", filePath)
+    }.map({
+      case Left(failure)=>
+        InternalServerError(GenericErrorResponse("search failure", failure.toString).asJson)
+      case Right(results)=>
+        if(results.result.hits.total>0) {
+          Ok(ObjectListResponse("ok", "archiveentry", results.result.to[ArchiveEntry], results.result.hits.total.toInt).asJson)
+        } else {
+          NotFound(GenericErrorResponse("not_found", s"Nothing found at path $filePath").asJson)
         }
     })
   }

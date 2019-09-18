@@ -33,6 +33,7 @@ parser.add_option("-t", "--proxy-type", dest="proxy_type", help="Type of proxy t
 parser.add_option("-r", "--region", dest="region", help="Region of the proxy bucket")
 parser.add_option("--rm", dest="remove", help="Remove the given proxy as opposed to adding. You only need to specify --proxy-type and --id for this.", action="store_true")
 parser.add_option("-q", "--query", dest="query", help="Query what proxies are available for the given item", action="store_true")
+parser.add_option("--raw",dest="raw",help="Call the provided url and display the result")
 (options, args) = parser.parse_args()
 
 if options.secret is None:
@@ -43,6 +44,8 @@ if options.remove:
     uri = "https://{host}/api/proxy/{fileid}/{proxytype}".format(host=options.host,fileid=options.entry_id, proxytype=options.proxy_type)
 elif options.query:
     uri = "https://{host}/api/proxy/{fileid}/all".format(host=options.host, fileid=options.entry_id)
+elif options.raw:
+    uri = options.raw
 else:
     uri = "https://{host}/api/proxy".format(host=options.host)
 
@@ -63,6 +66,8 @@ if options.sslnoverify:
 if options.remove:
     response = requests.delete(uri, headers=headers, **extra_kwargs)
 elif options.query:
+    response = requests.get(uri, headers=headers, **extra_kwargs)
+elif options.raw:
     response = requests.get(uri, headers=headers, **extra_kwargs)
 else:
     requestbody = json.dumps({
