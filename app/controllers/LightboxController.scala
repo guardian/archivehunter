@@ -33,7 +33,7 @@ import services.GlacierRestoreActor.GRMsg
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
-
+import helpers.S3Helper.getPresignedURL
 @Singleton
 class LightboxController @Inject() (override val config:Configuration,
                                     override val controllerComponents:ControllerComponents,
@@ -220,6 +220,11 @@ class LightboxController @Inject() (override val config:Configuration,
     }
   }
 
+  /**
+    * returns a presigned URL to download the requested media file. You must be logged in for this to work (obviously!)
+    * @param fileId
+    * @return
+    */
   def getDownloadLink(fileId:String) = APIAuthAction.async { request=>
     userProfileFromSession(request.session) match {
       case None=>Future(BadRequest(GenericErrorResponse("session_error","no session present").asJson))
@@ -229,13 +234,10 @@ class LightboxController @Inject() (override val config:Configuration,
       case Some(Right(userProfile))=>
         indexer.getById(fileId).map(archiveEntry=>{
           if(userProfile.allCollectionsVisible || userProfile.visibleCollections.contains(archiveEntry.bucket)){
-            try {
-              val rq = new GeneratePresignedUrlRequest(archiveEntry.bucket, archiveEntry.path, HttpMethod.GET)
-                .withResponseHeaders(new ResponseHeaderOverrides().withContentDisposition("attachment"))
-              val response = s3Client.generatePresignedUrl(rq)
-              Ok(ObjectGetResponse("ok","link",response.toString).asJson)
-            } catch {
-              case ex:Throwable=>
+            getPresignedURL(archiveEntry)(s3Client) match {
+              case Success(url)=>
+                Ok(ObjectGetResponse("ok","link",url.toString).asJson)
+              case Failure(ex)=>
                 logger.error("Could not generate presigned s3 url: ", ex)
                 InternalServerError(GenericErrorResponse("error",ex.toString).asJson)
             }
@@ -259,13 +261,13 @@ class LightboxController @Inject() (override val config:Configuration,
           val response = (glacierRestoreActor ? GlacierRestoreActor.CheckRestoreStatus(lbEntry)).mapTo[GlacierRestoreActor.GRMsg]
           response.map({
             case GlacierRestoreActor.NotInArchive(entry)=>
-              Ok(RestoreStatusResponse("ok",entry.id, RestoreStatus.RS_UNNEEDED, None).asJson)
+              Ok(RestoreStatusResponse("ok",entry.id, RestoreStatus.RS_UNNEEDED, None, None).asJson)
             case GlacierRestoreActor.RestoreCompleted(entry, expiry)=>
-              Ok(RestoreStatusResponse("ok", entry.id, RestoreStatus.RS_SUCCESS, Some(expiry)).asJson)
+              Ok(RestoreStatusResponse("ok", entry.id, RestoreStatus.RS_SUCCESS, Some(expiry), None).asJson)
             case GlacierRestoreActor.RestoreInProgress(entry)=>
-              Ok(RestoreStatusResponse("ok", entry.id, RestoreStatus.RS_UNDERWAY, None).asJson)
+              Ok(RestoreStatusResponse("ok", entry.id, RestoreStatus.RS_UNDERWAY, None, None).asJson)
             case GlacierRestoreActor.RestoreNotRequested(entry)=>
-              Ok(RestoreStatusResponse("not_requested", entry.id, RestoreStatus.RS_ERROR, None).asJson)
+              Ok(RestoreStatusResponse("not_requested", entry.id, RestoreStatus.RS_ERROR, None, None).asJson)
           })
       })
     }
