@@ -178,7 +178,7 @@ class GlacierRestoreActor @Inject() (config:Configuration, esClientMgr:ESClientM
           logger.error(s"Could not update job info for ${newJob.jobId} on ${entry.location}: $error")
           originalSender ! RestoreFailure(new RuntimeException("Could not update job"))
         case Failure(err)=>
-          logger.error(s"pubJob crashed", err)
+          logger.error(s"putJob crashed", err)
           originalSender ! RestoreFailure(err)
       })
 

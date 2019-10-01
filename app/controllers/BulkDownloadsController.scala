@@ -182,11 +182,15 @@ class BulkDownloadsController @Inject()(config:Configuration,serverTokenDAO: Ser
               }
               Success(Ok(RestoreStatusResponse("not_requested", entry.id, RestoreStatus.RS_ERROR, None, None).asJson))
           }).map({
-            case Success(response)=>response
+            case Success(httpResponse)=>httpResponse
             case Failure(err)=>
               logger.error(s"Could not get download for $fileId with token $tokenValue", err)
               InternalServerError(GenericErrorResponse("error",err.toString).asJson)
           })
+        }).recover({
+          case err:Throwable=>
+            logger.error(s"Could not ascertain glacier restore status for $fileId: ", err)
+            InternalServerError(GenericErrorResponse("error", err.toString).asJson)
         })
     })
   }
