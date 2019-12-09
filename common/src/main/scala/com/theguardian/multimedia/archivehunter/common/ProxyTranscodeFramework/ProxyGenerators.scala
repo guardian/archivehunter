@@ -170,10 +170,17 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration,
       case RequestType.ANALYSE=>"analyse"
     }
 
-    val jobDesc = JobModel(jobUuid.toString,jobTypeString,Some(ZonedDateTime.now()),None,JobStatus.ST_PENDING,None,entry.id,None,SourceType.SRC_MEDIA,None)
-    val uriToProxyFuture = getUriToProxy(entry)
+    targetFuture.flatMap(target=> {
+      if(target.proxyEnabled.isDefined && target.proxyEnabled.get) {
+        val jobDesc = JobModel(jobUuid.toString, jobTypeString, Some(ZonedDateTime.now()), None, JobStatus.ST_PENDING, None, entry.id, None, SourceType.SRC_MEDIA, None)
+        val uriToProxyFuture = getUriToProxy(entry)
 
-    internalDoProxy(jobDesc, requestType, proxyType, targetFuture, uriToProxyFuture)
+        internalDoProxy(jobDesc, requestType, proxyType, target, uriToProxyFuture)
+      } else {
+        logger.info(s"Proxy creation is disabled on the scan target")
+        Future(Success("disabled"))
+      }
+    })
   }
 
   /**
@@ -181,18 +188,16 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration,
     * @param jobDesc [[JobModel]] describing the job that's going to be done
     * @param requestType is this a proxy, thumbnail, etc.
     * @param proxyType is the proxy a video, audio, etc.
-    * @param targetFuture Future that resolves to the [[ScanTarget]] of the source media
+    * @param target [[ScanTarget]] of the source media
     * @param uriToProxyFuture Future that resolves to the URI of the media to proxy
     * @return
     */
-  private def internalDoProxy(jobDesc:JobModel, requestType:RequestType.Value, proxyType: Option[ProxyType.Value], targetFuture:Future[ScanTarget],uriToProxyFuture:Future[Option[String]]) =
-    Future.sequence(Seq(targetFuture, uriToProxyFuture)).map(results=> {
+  private def internalDoProxy(jobDesc:JobModel, requestType:RequestType.Value, proxyType: Option[ProxyType.Value], target:ScanTarget,uriToProxyFuture:Future[Option[String]]) =
+    uriToProxyFuture.map(uriToProxy=> {
       logger.debug("Saving job description...")
-      val target = results.head.asInstanceOf[ScanTarget]
       val updatedJobDesc = jobDesc.copy(transcodeInfo = Some(TranscodeInfo(target.proxyBucket, target.region, proxyType, requestType)))
-      results ++ Seq(jobModelDAO.putJob(updatedJobDesc))
+      Seq(uriToProxy, jobModelDAO.putJob(updatedJobDesc))
     }).flatMap(results=>{
-      val target = results.head.asInstanceOf[ScanTarget]
       val targetProxyBucket = target.proxyBucket
       logger.info(s"Target proxy bucket is $targetProxyBucket")
       logger.info(s"Source media is $uriToProxyFuture")
@@ -213,9 +218,7 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration,
 
   /**
     * tries to kick off a "stuck in pending" job again by resubmitting
-    * @param jobUuid UUId of the job to redo
-    * @param proxyType the ProxyType is not stored, so we have to request it again here. if None, the default for the type of media
-    *                  referenced by the job will be used
+    * @param jobUuid UUID of the job to redo
     * @return a Future with either an error string or the job ID as a string.
     */
   def rerunProxyJob(jobUuid:UUID) = {
@@ -242,12 +245,14 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration,
 
         jobModel.transcodeInfo match {
           case Some(transcodeInfo)=>
-            internalDoProxy(jobModel, transcodeInfo.requestType, transcodeInfo.proxyType, targetFuture, uriToProxyFuture).map({
-              case Success(result)=>Right(result)
-              case Failure(err)=>
-                logger.error("Could not run proxying: ", err)
-                Left(err.toString)
-            })
+            targetFuture.flatMap(target=>
+              internalDoProxy(jobModel, transcodeInfo.requestType, transcodeInfo.proxyType, target, uriToProxyFuture).map({
+                case Success(result)=>Right(result)
+                case Failure(err)=>
+                  logger.error("Could not run proxying: ", err)
+                  Left(err.toString)
+              })
+            )
           case None=>
             Future(Left("No transcode info on this job"))
         }
