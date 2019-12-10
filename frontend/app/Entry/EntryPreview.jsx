@@ -76,8 +76,9 @@ class EntryPreview extends React.Component {
 
     initiateCreateProxy(){
         axios.post("/api/proxy/generate/" + this.props.entryId + "/" + this.state.selectedType.toLowerCase()).then(result=>{
-            this.setState({processMessage: "Proxy generation started"}, ()=>{
-                if(this.props.triggeredProxyGeneration) this.props.triggeredProxyGeneration();
+            const msg = result.data.entry==="disabled" ? "Proxy generation disabled for this storage" : "Proxy generation started";
+            this.setState({processMessage: msg}, ()=>{
+                if(this.props.triggeredProxyGeneration && result.data.entry!=="disabled") this.props.triggeredProxyGeneration();
             })
         }).catch(err=>{
             console.log(err);
