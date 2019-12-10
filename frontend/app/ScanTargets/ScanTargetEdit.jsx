@@ -26,7 +26,8 @@ class ScanTargetEdit extends React.Component {
             scanInProgress: false,
             lastError: "",
             pendingJobIds: [],
-            paranoid: false
+            paranoid: false,
+            proxyEnabled: false
         };
 
         this.state = {
@@ -44,6 +45,7 @@ class ScanTargetEdit extends React.Component {
         this.toggleEnabled = this.toggleEnabled.bind(this);
         this.timeIntervalUpdate = this.timeIntervalUpdate.bind(this);
         this.toggleParanoid = this.toggleParanoid.bind(this);
+        this.toggleProxyEnabled = this.toggleProxyEnabled.bind(this);
 
         this.formSubmit = this.formSubmit.bind(this);
 
@@ -116,6 +118,11 @@ class ScanTargetEdit extends React.Component {
 
     toggleParanoid(evt){
         const newEntry = Object.assign({}, this.state.entry, {paranoid: !this.state.entry.paranoid});
+        this.setState({entry: newEntry});
+    }
+
+    toggleProxyEnabled(evt){
+        const newEntry = Object.assign({}, this.state.entry, {proxyEnabled: !this.state.entry.proxyEnabled});
         this.setState({entry: newEntry});
     }
 
@@ -288,6 +295,14 @@ class ScanTargetEdit extends React.Component {
                 <tr>
                     <td>Transcode Setup</td>
                     <td>
+                        <span style={{display: "block"}}>
+                            <input type="checkbox" checked={this.state.entry.proxyEnabled}
+                                   onChange={this.toggleProxyEnabled}
+                                   style={{marginRight: "0.2em"}}
+                                   data-tip="Clearing this will prevent any proxies from being generated"
+                            />
+                            Enable proxying
+                        </span>
                         <span data-tip="Validate transcode config"><FontAwesomeIcon icon="bug" className="clickable button-row" onClick={()=>this.triggerValidateConfig()}/></span>
                         <FontAwesomeIcon icon="industry" className="clickable button-row" data-tip="(Redo) Transcode Setup" onClick={()=>this.triggerTranscodeSetup()}/>
                         {

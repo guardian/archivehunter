@@ -9,6 +9,7 @@ import com.sksamuel.elastic4s.http.HttpClient
 import com.theguardian.multimedia.archivehunter.common._
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager, SQSClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models._
+import helpers.ProxyLocator
 import io.circe.generic.auto._
 import javax.inject.{Inject, Singleton}
 import models.{AwsSqsMsg, JobReportNew, JobReportStatus, JobReportStatusEncoder}
@@ -44,32 +45,6 @@ trait ProxyFrameworkQueueFunctions extends ProxyTypeEncoder with JobReportStatus
     AwsSqsMsg.fromJsonString(body).flatMap(snsMsg=>{
       io.circe.parser.parse(snsMsg.Message).flatMap(_.as[JobReportNew]).map(_.copy(timestamp = Some(ZonedDateTime.parse(snsMsg.Timestamp))))
     })
-
-  /**
-    * sets the "proxied" flag on the given item, retrying in case of a version conflict
-    * @param sourceId archive entry ID to update
-    * @return a Future with either a Left with an error string or a Right with the item ID string
-    */
-  def setProxiedWithRetry(sourceId:String)(implicit ec:ExecutionContext):Future[Either[String,String]] = indexer.getById(sourceId).flatMap(entry=>{
-    println(s"setProxiedWithEntry: sourceId is $sourceId entry is $entry")
-    val updatedEntry = entry.copy(proxied = true)
-    MDC.put("entry", updatedEntry.toString)
-    indexer.indexSingleItem(updatedEntry)
-  }).flatMap({
-    case Left(err)=>
-      println(s"error was $err")
-      if(err.error.`type`=="version_conflict_engine_exception"){
-        logger.warn(s"Elasticsearch version conflict detected for update of $sourceId, retrying...")
-        setProxiedWithRetry(sourceId)
-      } else {
-        MDC.put("error", err.toString)
-        logger.error(s"Could not set proxied flag for $sourceId: ${err.toString}")
-        Future(Left(err.toString))
-      }
-    case Right(value)=>
-      println(s"success returned $value")
-      Future(Right(value))
-  })
 }
 /**
   * Actor that handles messages returned via SQS from the Proxy Framework.  Successful processing ends with the message being
@@ -319,7 +294,7 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
           case Right(archiveEntry) => updateProxyRef(msg.output.get, archiveEntry, proxyType)
         })
 
-        val indexUpdateFuture = setProxiedWithRetry(jobDesc.sourceId)
+        val indexUpdateFuture = ProxyLocator.setProxiedWithRetry(jobDesc.sourceId)
 
         //set up a future to complete when both of the update jobs have run. this marshals a single success/failure flag
         val overallCompletionFuture = Future.sequence(Seq(proxyUpdateFuture, indexUpdateFuture)).map(results=>{
