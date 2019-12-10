@@ -103,7 +103,9 @@ class EntryPreview extends React.Component {
             </div>;
         }
 
-        switch(this.state.previewData.mimeType.major){
+        const mimeTypeMajor = this.state.previewData.mimeType ? this.state.previewData.mimeType.major : "application";
+
+        switch(mimeTypeMajor){
             case "video":
                 return <video className="video-preview" src={this.state.previewData.uri} controls={true} autoPlay={this.props.autoPlay}/>;
             case "audio":
