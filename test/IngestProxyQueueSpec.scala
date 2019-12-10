@@ -27,6 +27,9 @@ import scala.util.{Failure, Success}
 class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTimeEncoder with StorageClassEncoder {
   sequential
 
+  val fakeMessageContent = mock[ReceiveMessageResult]
+  fakeMessageContent.getMessages returns List().asJava
+
   "IngestProxyQueue!CheckRegisteredThumb" should {
     "request location from proxyLocationDAO and return Success with no further action if a thumb exists" in new AkkaTestkitSpecs2Support {
       implicit val ec=system.dispatcher
@@ -39,7 +42,7 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       val mockDDBlientMgr = mock[DynamoClientManager]
       val mockDDBClient = mock[DynamoClient]
       val mockESClientMgr = mock[ESClientManager]
-      implicit val mockIndexer = mock[Indexer]
+
       mockDDBlientMgr.getNewAlpakkaDynamoClient(any)(any, any) returns mockDDBClient
       val mockEtsProxyActor = TestProbe()
       implicit val mockScanTargetDAO = mock[ScanTargetDAO]
@@ -48,6 +51,9 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
         mockDDBlientMgr, mockESClientMgr) {
         override protected val ownRef = mockedSelf.ref
+        override lazy protected implicit val indexer = mock[Indexer]
+        override lazy protected val sqsClient = mock[AmazonSQS]
+        sqsClient.receiveMessage(anyString) returns fakeMessageContent
       }))
 
       val mockProxyLocation = mock[ProxyLocation]
@@ -75,7 +81,6 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       val mockDDBClient = mock[DynamoClient]
       mockDDBlientMgr.getNewAlpakkaDynamoClient(any)(any, any) returns mockDDBClient
       val mockESClientMgr = mock[ESClientManager]
-      implicit val mockIndexer = mock[Indexer]
       val mockEtsProxyActor = TestProbe()
       implicit val mockScanTargetDAO = mock[ScanTargetDAO]
       val mockedSelf = TestProbe()
@@ -83,6 +88,9 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
         mockDDBlientMgr, mockESClientMgr) {
         override protected val ownRef = mockedSelf.ref
+        override lazy protected implicit val indexer = mock[Indexer]
+        override lazy protected val sqsClient = mock[AmazonSQS]
+        sqsClient.receiveMessage(anyString) returns fakeMessageContent
       }))
 
       val mockProxyLocation = mock[ProxyLocation]
@@ -110,13 +118,15 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       mockDDBlientMgr.getNewAlpakkaDynamoClient(any)(any, any) returns mockDDBClient
       val mockEtsProxyActor = TestProbe()
       val mockESClientMgr = mock[ESClientManager]
-      implicit val mockIndexer = mock[Indexer]
       implicit val mockScanTargetDAO = mock[ScanTargetDAO]
       val mockedSelf = TestProbe()
 
       val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
         mockDDBlientMgr, mockESClientMgr) {
         override protected val ownRef = mockedSelf.ref
+        override lazy protected implicit val indexer = mock[Indexer]
+        override lazy protected val sqsClient = mock[AmazonSQS]
+        sqsClient.receiveMessage(anyString) returns fakeMessageContent
       }))
 
       val mockProxyLocation = mock[ProxyLocation]
@@ -154,11 +164,13 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       implicit val mockScanTargetDAO = mock[ScanTargetDAO]
       val mockedSelf = TestProbe()
       val mockESClientMgr = mock[ESClientManager]
-      implicit val mockIndexer = mock[Indexer]
 
       val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
         mockDDBlientMgr, mockESClientMgr) {
         override protected val ownRef = mockedSelf.ref
+        override lazy protected implicit val indexer = mock[Indexer]
+        override lazy protected val sqsClient = mock[AmazonSQS]
+        sqsClient.receiveMessage(anyString) returns fakeMessageContent
       }))
 
       val mockProxyLocation = mock[ProxyLocation]
@@ -190,11 +202,13 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       implicit val mockScanTargetDAO = mock[ScanTargetDAO]
       val mockedSelf = TestProbe()
       val mockESClientMgr = mock[ESClientManager]
-      implicit val mockIndexer = mock[Indexer]
 
       val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
         mockDDBlientMgr,mockESClientMgr) {
         override protected val ownRef = mockedSelf.ref
+        override lazy protected implicit val indexer = mock[Indexer]
+        override lazy protected val sqsClient = mock[AmazonSQS]
+        sqsClient.receiveMessage(anyString) returns fakeMessageContent
       }))
 
       val mockProxyLocation = mock[ProxyLocation]
@@ -226,11 +240,13 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       implicit val mockScanTargetDAO = mock[ScanTargetDAO]
       val mockedSelf = TestProbe()
       val mockESClientMgr = mock[ESClientManager]
-      implicit val mockIndexer = mock[Indexer]
 
       val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
         mockDDBlientMgr, mockESClientMgr) {
         override protected val ownRef = mockedSelf.ref
+        override lazy protected implicit val indexer = mock[Indexer]
+        override lazy protected val sqsClient = mock[AmazonSQS]
+        sqsClient.receiveMessage(anyString) returns fakeMessageContent
       }))
 
       val mockProxyLocation = mock[ProxyLocation]
@@ -264,11 +280,13 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       implicit val mockScanTargetDAO = mock[ScanTargetDAO]
       val mockedSelf = TestProbe()
       val mockESClientMgr = mock[ESClientManager]
-      implicit val mockIndexer = mock[Indexer]
 
       val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
         mockDDBlientMgr, mockESClientMgr) {
         override protected val ownRef = mockedSelf.ref
+        override lazy protected implicit val indexer = mock[Indexer]
+        override lazy protected val sqsClient = mock[AmazonSQS]
+        sqsClient.receiveMessage(anyString) returns fakeMessageContent
       }))
 
       val mockProxyLocation = mock[ProxyLocation]
@@ -298,11 +316,13 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       implicit val mockScanTargetDAO = mock[ScanTargetDAO]
       val mockedSelf = TestProbe()
       val mockESClientMgr = mock[ESClientManager]
-      implicit val mockIndexer = mock[Indexer]
 
       val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
         mockDDBlientMgr, mockESClientMgr) {
         override protected val ownRef = mockedSelf.ref
+        override lazy protected implicit val indexer = mock[Indexer]
+        override lazy protected val sqsClient = mock[AmazonSQS]
+        sqsClient.receiveMessage(anyString) returns fakeMessageContent
       }))
 
       val mockProxyLocation = mock[ProxyLocation]
@@ -335,11 +355,13 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       implicit val mockScanTargetDAO = mock[ScanTargetDAO]
       val mockedSelf = TestProbe()
       val mockESClientMgr = mock[ESClientManager]
-      implicit val mockIndexer = mock[Indexer]
 
       val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
         mockDDBlientMgr, mockESClientMgr) {
         override protected val ownRef = mockedSelf.ref
+        override lazy protected implicit val indexer = mock[Indexer]
+        override lazy protected val sqsClient = mock[AmazonSQS]
+        sqsClient.receiveMessage(anyString) returns fakeMessageContent
       }))
 
       val mockProxyLocation = mock[ProxyLocation]
@@ -375,11 +397,12 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       implicit val mockScanTargetDAO = mock[ScanTargetDAO]
       val mockedSelf = TestProbe()
       val mockESClientMgr = mock[ESClientManager]
-      implicit val mockIndexer = mock[Indexer]
 
       val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
         mockDDBlientMgr, mockESClientMgr) {
         override protected val ownRef = mockedSelf.ref
+        override lazy protected implicit val indexer = mock[Indexer]
+        override lazy protected val sqsClient = mockSqsClient
       }))
 
       val rq = new ReceiveMessageRequest()
@@ -410,11 +433,13 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       implicit val mockScanTargetDAO = mock[ScanTargetDAO]
       val mockedSelf = TestProbe()
       val mockESClientMgr = mock[ESClientManager]
-      implicit val mockIndexer = mock[Indexer]
 
       val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
         mockDDBlientMgr, mockESClientMgr) {
         override protected val ownRef = mockedSelf.ref
+        override lazy protected implicit val indexer = mock[Indexer]
+        override lazy protected val sqsClient = mock[AmazonSQS]
+        sqsClient.receiveMessage(anyString) returns fakeMessageContent
       }))
 
       //the match fails if you don't use withFixedOffsetZone as somewhere in the marshalling/unmarshalling the zone info is changed
@@ -467,11 +492,13 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       implicit val mockScanTargetDAO = mock[ScanTargetDAO]
       val mockedSelf = TestProbe()
       val mockESClientMgr = mock[ESClientManager]
-      implicit val mockIndexer = mock[Indexer]
 
       val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
         mockDDBlientMgr, mockESClientMgr) {
         override protected val ownRef = mockedSelf.ref
+        override lazy protected implicit val indexer = mock[Indexer]
+        override lazy protected val sqsClient = mock[AmazonSQS]
+        sqsClient.receiveMessage(anyString) returns fakeMessageContent
       }))
 
       toTest ! GenericSqsActor.CheckForNotifications
@@ -497,11 +524,13 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       implicit val mockScanTargetDAO = mock[ScanTargetDAO]
       val mockedSelf = TestProbe()
       val mockESClientMgr = mock[ESClientManager]
-      implicit val mockIndexer = mock[Indexer]
 
       val toTest = system.actorOf(Props(new IngestProxyQueue(testConfig, system, mockSqsClientMgr, mockProxyGenerators, mockS3ClientMgr,
         mockDDBlientMgr, mockESClientMgr) {
         override protected val ownRef = mockedSelf.ref
+        override lazy protected implicit val indexer = mock[Indexer]
+        override lazy protected val sqsClient = mock[AmazonSQS]
+        sqsClient.receiveMessage(anyString) returns fakeMessageContent
       }))
 
       val result = Await.result(toTest ? GenericSqsActor.CheckForNotifications, 10 seconds)
