@@ -21,7 +21,8 @@ import com.gu.scanamo.DynamoFormat
   */
 case class ScanTarget (bucketName:String, enabled:Boolean, lastScanned:Option[ZonedDateTime], scanInterval:Long,
                        scanInProgress:Boolean, lastError:Option[String], proxyBucket:String, region:String,
-                       pendingJobIds: Option[Seq[String]], transcoderCheck:Option[TranscoderCheck], paranoid:Option[Boolean]) {
+                       pendingJobIds: Option[Seq[String]], transcoderCheck:Option[TranscoderCheck],
+                       paranoid:Option[Boolean], proxyEnabled:Option[Boolean]) {
   /**
     * returns a new ScanTarget with the pendingJobIds updated to include the provided jobId
     * @param jobId

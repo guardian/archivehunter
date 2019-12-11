@@ -2,12 +2,14 @@ package helpers
 
 import com.amazonaws.services.s3.AmazonS3
 import com.amazonaws.services.s3.model.ListObjectsV2Request
+import com.sksamuel.elastic4s.http.HttpClient
 import com.theguardian.multimedia.archivehunter.common.cmn_models.ScanTargetDAO
-import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ProxyLocation}
+import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer, ProxyLocation, ProxyType}
+import org.slf4j.MDC
 import play.api.Logger
 
 import collection.JavaConverters._
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.ExecutionContext.Implicits.global
 
 object ProxyLocator {
@@ -16,35 +18,30 @@ object ProxyLocator {
     Tuple2(bucket, s3Client.doesObjectExist(bucket,key))
   }
 
-  /**
-    * searches a list of potential media buckets for a matching media file.  For every valid one found (should be one!)
-    * return a ProxyLocation object
-    * @param proxyKey Key for the proxy that we are looking for
-    * @param proxyBucket bucket that the proxy lives in
-    * @param potentialMediaBuckets sequence of names for buckets to search
-    * @param s3Client implicitly provided s3 client object
-    * @return a Future, containing a sequence of [[ProxyLocation]] objects, one for each valid entry from potentialMediaBuckets
-    */
-//  def findMediaLocations(proxyKey:String, proxyBucket:String, potentialMediaBuckets:Seq[String])(implicit s3Client:AmazonS3) = {
-//    val results = Future.sequence(potentialMediaBuckets.map(bucket=>checkBucketLocation(bucket, proxyKey)))
-//
-//    val existingEntries = results.map(_.filter(_._2))
-//    existingEntries.flatMap(
-//      validLocations=>Future.sequence(
-//        validLocations.map(result=>ProxyLocation.fromS3(proxyBucket, proxyKey, result._1))
-//      )
-//    )
-//  }
+  private val fileEndingRegex = "^(.*)\\.(.*)$".r
 
-  private val fileEndingRegex = "^(.*)\\..*$".r
+  //list of any likely proxy extensions
+  private val knownVideoExtensions = Seq("avi","mp4","mxf","mov","m4v","mpg","mp2","ts","m2ts")
+  private val knownAudioExtensions = Seq("wav","aif","aiff","mp3","m2a")
+  private val knownImageExtensions = Seq("jpg","jpe","png","tga","tif","tiff","gif")
 
   def stripFileEnding(filepath:String) = {
     try {
-      val fileEndingRegex(stripped) = filepath
+      val fileEndingRegex(stripped,_) = filepath
       stripped
     } catch {
-      case ex:MatchError=>
+      case _:MatchError=>
         filepath  //if there is no file extension, then return the lot.
+    }
+  }
+
+  def getFileEnding(filepath:String) = {
+    try {
+      val fileEndingRegex(_,xtn) = filepath
+      Some(xtn)
+    } catch {
+      case _:MatchError=>
+        None
     }
   }
 
@@ -68,6 +65,48 @@ object ProxyLocator {
           ProxyLocation.fromS3(summary.getBucketName,summary.getKey, entry.bucket, entry.path)
         }))
     })
-
   }
+
+  /**
+    * determine the proxy type for a given filepath
+    * @param filepath
+    * @return
+    */
+  def proxyTypeForExtension(filepath:String) = getFileEnding(filepath).map(_.toLowerCase).map(xtn=>{
+    if(knownVideoExtensions.contains(xtn)){
+      ProxyType.VIDEO
+    } else if(knownAudioExtensions.contains(xtn)){
+      ProxyType.AUDIO
+    } else if(knownImageExtensions.contains(xtn)){
+      ProxyType.THUMBNAIL
+    } else {
+      ProxyType.UNKNOWN
+    }
+  })
+
+  /**
+    * sets the "proxied" flag on the given item, retrying in case of a version conflict
+    * @param sourceId archive entry ID to update
+    * @return a Future with either a Left with an error string or a Right with the item ID string
+    */
+  def setProxiedWithRetry(sourceId:String)(implicit indexer:Indexer, httpClient:HttpClient):Future[Either[String,String]] = indexer.getById(sourceId).flatMap(entry=>{
+    println(s"setProxiedWithEntry: sourceId is $sourceId entry is $entry")
+    val updatedEntry = entry.copy(proxied = true)
+    MDC.put("entry", updatedEntry.toString)
+    indexer.indexSingleItem(updatedEntry)
+  }).flatMap({
+    case Left(err)=>
+      println(s"error was $err")
+      if(err.error.`type`=="version_conflict_engine_exception"){
+        logger.warn(s"Elasticsearch version conflict detected for update of $sourceId, retrying...")
+        setProxiedWithRetry(sourceId)
+      } else {
+        MDC.put("error", err.toString)
+        logger.error(s"Could not set proxied flag for $sourceId: ${err.toString}")
+        Future(Left(err.toString))
+      }
+    case Right(value)=>
+      println(s"success returned $value")
+      Future(Right(value))
+  })
 }

@@ -170,10 +170,18 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration,
       case RequestType.ANALYSE=>"analyse"
     }
 
-    val jobDesc = JobModel(jobUuid.toString,jobTypeString,Some(ZonedDateTime.now()),None,JobStatus.ST_PENDING,None,entry.id,None,SourceType.SRC_MEDIA,None)
-    val uriToProxyFuture = getUriToProxy(entry)
+    targetFuture.flatMap(target=> {
+      if(target.proxyEnabled.isDefined && target.proxyEnabled.get) {
+        val jobDesc = JobModel(jobUuid.toString, jobTypeString, Some(ZonedDateTime.now()), None, JobStatus.ST_PENDING, None, entry.id, None, SourceType.SRC_MEDIA, None)
+        val uriToProxyFuture = getUriToProxy(entry)
 
-    internalDoProxy(jobDesc, requestType, proxyType, targetFuture, uriToProxyFuture)
+        uriToProxyFuture.flatMap(uriToProxy=>internalDoProxy(jobDesc, requestType, proxyType, target, uriToProxy))
+
+      } else {
+        logger.info(s"Proxy creation is disabled on the scan target")
+        Future(Success("disabled"))
+      }
+    })
   }
 
   /**
@@ -181,41 +189,36 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration,
     * @param jobDesc [[JobModel]] describing the job that's going to be done
     * @param requestType is this a proxy, thumbnail, etc.
     * @param proxyType is the proxy a video, audio, etc.
-    * @param targetFuture Future that resolves to the [[ScanTarget]] of the source media
-    * @param uriToProxyFuture Future that resolves to the URI of the media to proxy
-    * @return
+    * @param target [[ScanTarget]] of the source media
+    * @param uriToProxy Option containing a string of the URI of the media to proxy. If this is empty then an error is generated
+    * @return a Future, containing a Try indicating whether the proxy job was started or not
     */
-  private def internalDoProxy(jobDesc:JobModel, requestType:RequestType.Value, proxyType: Option[ProxyType.Value], targetFuture:Future[ScanTarget],uriToProxyFuture:Future[Option[String]]) =
-    Future.sequence(Seq(targetFuture, uriToProxyFuture)).map(results=> {
-      logger.debug("Saving job description...")
-      val target = results.head.asInstanceOf[ScanTarget]
-      val updatedJobDesc = jobDesc.copy(transcodeInfo = Some(TranscodeInfo(target.proxyBucket, target.region, proxyType, requestType)))
-      results ++ Seq(jobModelDAO.putJob(updatedJobDesc))
-    }).flatMap(results=>{
-      val target = results.head.asInstanceOf[ScanTarget]
+  private def internalDoProxy(jobDesc:JobModel, requestType:RequestType.Value, proxyType: Option[ProxyType.Value], target:ScanTarget,uriToProxy:Option[String]):Future[Try[String]] = {
+    logger.debug("Saving job description...")
+    val updatedJobDesc = jobDesc.copy(transcodeInfo = Some(TranscodeInfo(target.proxyBucket, target.region, proxyType, requestType)))
+    jobModelDAO.putJob(updatedJobDesc).flatMap(_ => {
       val targetProxyBucket = target.proxyBucket
       logger.info(s"Target proxy bucket is $targetProxyBucket")
-      logger.info(s"Source media is $uriToProxyFuture")
-      results(1).asInstanceOf[Option[String]] match {
+      logger.info(s"Source media is $uriToProxy")
+      uriToProxy match {
         case None =>
           logger.error("Nothing found to proxy")
-          jobModelDAO.deleteJob(jobDesc.jobId)  //ignore the result, this is non-essential but there to prevent the jobs list getting clogged up
+          jobModelDAO.deleteJob(jobDesc.jobId) //ignore the result, this is non-essential but there to prevent the jobs list getting clogged up
           Future(Failure(NothingFoundError("media", "Nothing found to proxy")))
         case Some(uriString) =>
-          val rq = RequestModel(requestType,uriString,targetProxyBucket,jobDesc.jobId,None,None,proxyType)
+          val rq = RequestModel(requestType, uriString, targetProxyBucket, jobDesc.jobId, None, None, proxyType)
           sendRequest(rq, target.region)
       }
     }).recoverWith({
-      case err:Throwable=>
+      case err: Throwable =>
         logger.error("Could not start proxy job: ", err)
         Future(Failure(ExternalSystemError("archivehunter", err.toString)))
     })
+  }
 
   /**
     * tries to kick off a "stuck in pending" job again by resubmitting
-    * @param jobUuid UUId of the job to redo
-    * @param proxyType the ProxyType is not stored, so we have to request it again here. if None, the default for the type of media
-    *                  referenced by the job will be used
+    * @param jobUuid UUID of the job to redo
     * @return a Future with either an error string or the job ID as a string.
     */
   def rerunProxyJob(jobUuid:UUID) = {
@@ -242,11 +245,15 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration,
 
         jobModel.transcodeInfo match {
           case Some(transcodeInfo)=>
-            internalDoProxy(jobModel, transcodeInfo.requestType, transcodeInfo.proxyType, targetFuture, uriToProxyFuture).map({
-              case Success(result)=>Right(result)
-              case Failure(err)=>
-                logger.error("Could not run proxying: ", err)
-                Left(err.toString)
+            Future.sequence(Seq(targetFuture, uriToProxyFuture)).flatMap(futures=> {
+              val target = futures.head.asInstanceOf[ScanTarget]
+              val uriToProxy = futures(1).asInstanceOf[Option[String]]
+              internalDoProxy(jobModel, transcodeInfo.requestType, transcodeInfo.proxyType, target, uriToProxy).map({
+                case Success(result) => Right(result)
+                case Failure(err) =>
+                  logger.error("Could not run proxying: ", err)
+                  Left(err.toString)
+              })
             })
           case None=>
             Future(Left("No transcode info on this job"))
@@ -339,7 +346,11 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration,
     val jobDesc = JobModel(jobUuid.toString,"Analyse",Some(ZonedDateTime.now()), None, JobStatus.ST_PENDING, None, entry.id, None, SourceType.SRC_MEDIA,None)
     val rq = RequestModel(RequestType.ANALYSE,s"s3://${entry.bucket}/${entry.path}","none",jobUuid.toString,None,None,None)
 
-    saveNSend(jobDesc,rq, entry.region.getOrElse(defaultRegion), jobUuid.toString)
+    if(entry.storageClass==StorageClass.STANDARD || entry.storageClass==StorageClass.REDUCED_REDUNDANCY) {
+      saveNSend(jobDesc, rq, entry.region.getOrElse(defaultRegion), jobUuid.toString)
+    } else {
+      Future(Left(s"Not running analyse as storage class is ${entry.storageClass}"))
+    }
   }
 
 }

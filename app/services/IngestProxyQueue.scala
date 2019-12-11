@@ -7,7 +7,7 @@ import io.circe.generic.auto._
 import com.amazonaws.services.sqs.model.{DeleteMessageRequest, ReceiveMessageRequest}
 import com.theguardian.multimedia.archivehunter.common.ProxyTranscodeFramework.{ProxyGenerators, RequestType}
 import com.theguardian.multimedia.archivehunter.common.{cmn_models, _}
-import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, S3ClientManager, SQSClientManager}
+import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager, SQSClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{IngestMessage, ScanTargetDAO}
 import helpers.ProxyLocator
 import javax.inject.{Inject, Named, Singleton}
@@ -39,6 +39,7 @@ class IngestProxyQueue @Inject()(config: Configuration,
                                  proxyGenerators: ProxyGenerators,
                                  s3ClientMgr: S3ClientManager,
                                  dynamoClientMgr: DynamoClientManager,
+                                 esClientMgr:ESClientManager,
                                 )(implicit scanTargetDAO: ScanTargetDAO, proxyLocationDAO: ProxyLocationDAO)
   extends GenericSqsActor[IngestMessage] with ZonedDateTimeEncoder with StorageClassEncoder {
 
@@ -47,11 +48,13 @@ class IngestProxyQueue @Inject()(config: Configuration,
 
   private val logger = Logger(getClass)
 
-  override protected val sqsClient = sqsClientManager.getClient(config.getOptional[String]("externalData.awsProfile"))
+  lazy override protected val sqsClient = sqsClientManager.getClient(config.getOptional[String]("externalData.awsProfile"))
 
   override protected implicit val implSystem = system
   override protected implicit val mat: Materializer = ActorMaterializer.create(system)
 
+  private implicit val esClient = esClientMgr.getClient()
+  lazy protected implicit val indexer = new Indexer(config.get[String]("externalData.indexName"))
 
   //override this in testing
   protected val ownRef: ActorRef = self
@@ -107,7 +110,13 @@ class IngestProxyQueue @Inject()(config: Configuration,
           ownRef ! CreateNewThumbnail(entry)
         } else {
           logger.info(s"${entry.bucket}:${entry.path}: Found existing potential thumbnails: $foundProxies")
-          //FIXME: should link back to item
+          //add given items to the proxies table for the item and then update the index record to say it's proxied
+          Future
+            .sequence(foundProxies.map(proxyLocationDAO.saveProxy))
+            .map(results => {
+              ProxyLocator.setProxiedWithRetry(entry.id)
+              results
+            })
         }
       }).onComplete({
         case Success(_) => ()
@@ -133,20 +142,25 @@ class IngestProxyQueue @Inject()(config: Configuration,
     case CheckNonRegisteredProxy(entry) =>
       val originalSender = sender()
       implicit val s3Client = s3ClientMgr.getS3Client(config.getOptional[String]("externalData.awsProfile"), entry.region)
-      ProxyLocator.findProxyLocation(entry).map(results => {
+      ProxyLocator.findProxyLocation(entry).flatMap(results => {
         val foundProxies = results.collect({ case Right(loc) => loc }).filter(loc => loc.proxyType != ProxyType.THUMBNAIL)
         if (foundProxies.isEmpty) {
           logger.info(s"${entry.bucket}:${entry.path} has no locatable proxies in expected locations. Generating a new one...")
           proxyGenerators.defaultProxyType(entry) match {
             case Some(proxyType) =>
-              proxyGenerators.requestProxyJob(RequestType.PROXY, entry, Some(proxyType))
+              proxyGenerators.requestProxyJob(RequestType.PROXY, entry, Some(proxyType)).map(result=>Seq(result))
             case None=>
               logger.error(s"No default proxy type available for ${entry.bucket}:${entry.path} (${entry.mimeType.toString})")
               throw new RuntimeException("No default proxy type available")
           }
         } else {
           logger.info(s"${entry.bucket}:${entry.path} has unregistered proxies: $foundProxies")
-          //FIXME: need to register proxies here
+          Future
+            .sequence(foundProxies.map(proxyLocationDAO.saveProxy))
+            .map(results => {
+              ProxyLocator.setProxiedWithRetry(entry.id)
+              results
+            })
         }
       }).onComplete({
         case Success(_) => ()
