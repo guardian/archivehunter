@@ -346,7 +346,11 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration,
     val jobDesc = JobModel(jobUuid.toString,"Analyse",Some(ZonedDateTime.now()), None, JobStatus.ST_PENDING, None, entry.id, None, SourceType.SRC_MEDIA,None)
     val rq = RequestModel(RequestType.ANALYSE,s"s3://${entry.bucket}/${entry.path}","none",jobUuid.toString,None,None,None)
 
-    saveNSend(jobDesc,rq, entry.region.getOrElse(defaultRegion), jobUuid.toString)
+    if(entry.storageClass==StorageClass.STANDARD || entry.storageClass==StorageClass.REDUCED_REDUNDANCY) {
+      saveNSend(jobDesc, rq, entry.region.getOrElse(defaultRegion), jobUuid.toString)
+    } else {
+      Future(Left(s"Not running analyse as storage class is ${entry.storageClass}"))
+    }
   }
 
 }
