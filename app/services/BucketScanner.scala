@@ -1,24 +1,19 @@
 package services
 
 import java.time.ZonedDateTime
-import java.time.temporal.{ChronoUnit, IsoFields, TemporalUnit}
-
 import akka.NotUsed
 import akka.actor.{Actor, ActorSystem, Timers}
-import akka.http.scaladsl.Http
 import akka.stream.scaladsl.{GraphDSL, Keep, RunnableGraph, Sink, Source}
 import akka.stream._
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager}
 import com.amazonaws.regions.{Region, Regions}
 import com.google.inject.Injector
-import com.gu.scanamo.{ScanamoAlpakka, Table}
 import com.sksamuel.elastic4s.http.HttpClient
 import com.sksamuel.elastic4s.http.bulk.BulkResponseItem
 import helpers._
 import javax.inject.{Inject, Singleton}
 import com.theguardian.multimedia.archivehunter.common.cmn_models._
 import play.api.{Configuration, Logger}
-import com.sksamuel.elastic4s.streams.ReactiveElastic._
 import com.sksamuel.elastic4s.streams.{RequestBuilder, ResponseListener, SubscriberConfig}
 import com.theguardian.multimedia.archivehunter.common.cmn_helpers.ZonedTimeFormat
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ArchiveEntryRequestBuilder}
@@ -39,16 +34,16 @@ object BucketScanner {
 }
 
 @Singleton
-class BucketScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientManager, s3ClientMgr:S3ClientManager,
+class BucketScanner @Inject()(override val config:Configuration, ddbClientMgr:DynamoClientManager, s3ClientMgr:S3ClientManager,
                               esClientMgr:ESClientManager, scanTargetDAO: ScanTargetDAO, jobModelDAO:JobModelDAO,
                               injector:Injector)(implicit system:ActorSystem)
-  extends Actor with ZonedTimeFormat with ArchiveEntryRequestBuilder{
+  extends Actor with BucketScannerFunctions with ZonedTimeFormat with ArchiveEntryRequestBuilder{
   import BucketScanner._
 
   import com.sksamuel.elastic4s.http.ElasticDsl._
   import com.sksamuel.elastic4s.streams.ReactiveElastic._
 
-  private val logger=Logger(getClass)
+  protected val logger=Logger(getClass)
 
   implicit val mat = ActorMaterializer.create(system)
   implicit val ec:ExecutionContext = system.dispatcher
@@ -70,22 +65,6 @@ class BucketScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientMan
       }
     })
 
-
-  /**
-    * returns a boolean indicating whether the given target is due a scan, i.e. last_scan + scan_interval < now OR
-    * not scanned at all
-    * @param target [[ScanTarget]] instance to check
-    * @return boolean flag
-    */
-  def scanIsScheduled(target: ScanTarget) = {
-    target.lastScanned match {
-      case None=>true
-      case Some(lastScanned)=>
-        logger.info(s"${target.bucketName}: Next scan is due at ${lastScanned.plus(target.scanInterval,ChronoUnit.SECONDS)}")
-        lastScanned.plus(target.scanInterval,ChronoUnit.SECONDS).isBefore(ZonedDateTime.now())
-    }
-  }
-
   /**
     * trigger a scan, if one is due, by messaging ourself
     * @param scanTarget [[ScanTarget]] instance to check
@@ -95,7 +74,7 @@ class BucketScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientMan
     if(!scanTarget.enabled){
       logger.info(s"Not scanning ${scanTarget.bucketName} as it is disabled")
       false
-    } else if(scanTarget.scanInProgress){
+    } else if(scanIsInProgress(scanTarget)){
       logger.info(s"Not scanning ${scanTarget.bucketName} as it is already in progress")
       false
     } else {
