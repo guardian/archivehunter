@@ -15,7 +15,7 @@ class BucketScannerFunctionsSpec extends Specification with Mockito {
         override val config: Configuration = Configuration.empty
       }
 
-      val testScanTarget = ScanTarget("testbucket",true,None,1234L, false, None,"proxybucket","region",None,None,None)
+      val testScanTarget = ScanTarget("testbucket",true,None,1234L, false, None,"proxybucket","region",None,None,None, proxyEnabled = Some(false))
       toTest.scanIsInProgress(testScanTarget) mustEqual false
     }
   }
@@ -29,7 +29,7 @@ class BucketScannerFunctionsSpec extends Specification with Mockito {
     }
 
     val lastScanTime = ZonedDateTime.now().minus(5, ChronoUnit.DAYS)
-    val testScanTarget = ScanTarget("testbucket",enabled=true,Some(lastScanTime),1234L, scanInProgress = true, None,"proxybucket","region",None,None,None)
+    val testScanTarget = ScanTarget("testbucket",enabled=true,Some(lastScanTime),1234L, scanInProgress = true, None,"proxybucket","region",None,None,None, proxyEnabled = Some(false))
     toTest.scanIsInProgress(testScanTarget) mustEqual false
 
   }
@@ -43,7 +43,7 @@ class BucketScannerFunctionsSpec extends Specification with Mockito {
     }
 
     val lastScanTime = ZonedDateTime.now().minus(1, ChronoUnit.DAYS)
-    val testScanTarget = ScanTarget("testbucket",enabled=true,Some(lastScanTime),1234L, scanInProgress = true, None,"proxybucket","region",None,None,None)
+    val testScanTarget = ScanTarget("testbucket",enabled=true,Some(lastScanTime),1234L, scanInProgress = true, None,"proxybucket","region",None,None,None, proxyEnabled = Some(false))
     toTest.scanIsInProgress(testScanTarget) mustEqual true
 
   }
