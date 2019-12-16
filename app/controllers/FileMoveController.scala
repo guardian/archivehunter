@@ -39,7 +39,9 @@ class FileMoveController @Inject()(override val config:Configuration,
 
     //step five: copy proxies to new location
 
-    //step six: if all copies succeed,
+    //step six: if all copies succeed, remove the old ones
+
+    //step seven: remove tombstones
 
     Future(Ok(""))
   }
