@@ -74,14 +74,14 @@ class FileMoveActor @Inject() (config:Configuration,
   )
 
   def runNextActorInChain(initialData:FileMoveTransientData, otherSteps:Seq[ActorRef]):Future[Either[StepFailed,StepSucceeded]] = {
-    println(s"runNextActorInChain: remaining chain is $otherSteps")
+    logger.debug(s"runNextActorInChain: remaining chain is $otherSteps")
     if(otherSteps.isEmpty) return Future(Right(StepSucceeded(initialData)))
 
     val nextActor = otherSteps.head
-    println(s"Sending PerformStep to $nextActor")
+    logger.debug(s"Sending PerformStep to $nextActor")
     (nextActor ? GenericMoveActor.PerformStep(initialData) ).mapTo[MoveActorMessage].flatMap({
       case successMsg:StepSucceeded=>
-        println(s"Step succeeded, moving to next")
+        logger.debug(s"Step succeeded, moving to next")
         runNextActorInChain(successMsg.updatedData,otherSteps.tail) flatMap {
           case Left(failedMessage)=>  //if the _next_ step fails, tell _this_ step to roll back
             (nextActor ? GenericMoveActor.RollbackStep(successMsg.updatedData)).map(_=>Left(failedMessage)) //overwrite return value with the original failure
@@ -89,10 +89,10 @@ class FileMoveActor @Inject() (config:Configuration,
             Future(Right(nextActorSuccess))
         }
       case failedMessage:StepFailed=>  //if the step fails, tell it to roll back
-        println(s"StepFailed, sending rollback to $nextActor")
+        logger.error(s"StepFailed, sending rollback to $nextActor")
         (nextActor ? RollbackStep(initialData)).map(_=>Left(failedMessage))
       case other:Any =>
-        println(s"got unexpected message: ${other.getClass}")
+        logger.warn(s"got unexpected message: ${other.getClass}")
         Future(Left(StepFailed(initialData,"got unexpected message")))
     })
   }
@@ -102,7 +102,7 @@ class FileMoveActor @Inject() (config:Configuration,
       val originalSender = sender()
       val setupData = FileMoveTransientData.initialise(sourceFileId, destination.bucketName,destination.proxyBucket)
 
-      println(s"Setting up file move with initial data $setupData")
+      logger.info(s"Setting up file move with initial data $setupData")
       runNextActorInChain(setupData, fileMoveChain).map({
         case Right(_) =>
           logger.info(s"File move for $sourceFileId -> ${destination.bucketName} completed successfully")

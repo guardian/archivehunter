@@ -28,12 +28,12 @@ class UpdateIndexRecords(indexer:Indexer, proxyLocationDAO: ProxyLocationDAO)(im
       if(state.sourceFileProxies.isEmpty || state.destFileProxy.isEmpty || state.destFileId.isEmpty){
         sender() ! StepFailed(state, "Not enough state elements were defined")
       } else {
-        indexer.getById(state.sourceFileId).map(entry => {
+        logger.debug(s"Looking up ${state.sourceFileId}")
+        indexer.getById(state.sourceFileId).flatMap(entry => {
           logger.debug(s"Looked up entry: $entry")
-          val updatedEntry = entry.copy(id = state.destFileId.get)
-          indexer.indexSingleItem(updatedEntry).map({
-            case Success(_) =>
-              logger.debug(s"Saved updated etnry")
+          val updatedEntry = entry.copy(id = state.destFileId.get,bucket=state.destBucket)
+          indexer.indexSingleItem(updatedEntry).flatMap({
+            case Right(_)=>
               val proxyUpdateFutureList = state.destFileProxy.get.map(loc => proxyLocationDAO.saveProxy(loc))
 
               Future.sequence(proxyUpdateFutureList).map(proxyUpdateResults => {
@@ -42,22 +42,36 @@ class UpdateIndexRecords(indexer:Indexer, proxyLocationDAO: ProxyLocationDAO)(im
                   logger.error(s"Could not copy all proxies:")
                   failures.foreach(err => logger.error(err.toString))
 
-                  indexer.deleteById(state.destFileId.get)
-                  deleteCopiedProxies(state.destFileProxy.get)
+                  //don't do the rollback here, we will be requested to rollback by the supervisor and
+                  //handle this in RollbackStep below
                   originalSender ! StepFailed(state, failures.map(_.toString).mkString(","))
                 }
 
                 logger.info("Updated entry and proxies")
                 indexer.deleteById(state.sourceFileId)
-                state.sourceFileProxies.get.map(loc => proxyLocationDAO.deleteProxyRecord(loc.proxyId))
-                originalSender ! StepSucceeded(state)
+                Future.sequence(state.sourceFileProxies.get.map(loc => proxyLocationDAO.deleteProxyRecord(loc.proxyId))).flatMap(results=>{
+                  val failures = results.collect({case Left(err)=>err})
+                  if(failures.nonEmpty){
+                    logger.error(s"${failures.length} proxy copies failed: ")
+                    failures.foreach(errMsg=>logger.error(s"\t$errMsg"))
+                    Future.failed(new RuntimeException(s"${failures.length} proxy copies failed"))
+                  } else {
+                    originalSender ! StepSucceeded(state)
+                    Future( () )
+                  }
+                })
+
               })
+            case Left(dbErr)=>
+              println(dbErr.toString)
+              Future.failed(new RuntimeException(s"Could not update index: ${dbErr.toString}"))
           })
         }).recover({
           case err: Throwable =>
+            println(err.getMessage)
             logger.error("Could not update index records:", err)
-            indexer.deleteById(state.destFileId.get)
-            deleteCopiedProxies(state.destFileProxy.get)
+            //don't do the rollback here, we will be requested to rollback by the supervisor and
+            //handle this in RollbackStep below
             originalSender ! StepFailed(state, err.toString)
         })
       }
@@ -65,30 +79,69 @@ class UpdateIndexRecords(indexer:Indexer, proxyLocationDAO: ProxyLocationDAO)(im
     case RollbackStep(state)=>
       val originalSender = sender()
 
-      val indexDeleteFuture= indexer.deleteById(state.destFileId.get)
-      indexDeleteFuture.onComplete({
-        case Success(Left(err))=>
-          logger.warn(s"Could not rollback updated index record: $err")
-        case Failure(err)=>
-          logger.warn(s"Could not rollback updated index record: ", err)
-        case Success(Right(_))=>
-      })
+      if(state.entry.isEmpty || state.destFileId.isEmpty){
+        sender() ! StepFailed(state, "Not enough state elements were defined")
+      } else {
+        val resaveFuture = indexer.getById(state.destFileId.get).flatMap(destEntry => {
+          val reconstitutedSource = destEntry.copy(id = state.sourceFileId, bucket = state.entry.get.bucket)
+          indexer.indexSingleItem(reconstitutedSource)
+        })
 
-      val proxyDeleteFuture=deleteCopiedProxies(state.destFileProxy.get)
-      proxyDeleteFuture.onComplete({
-        case Success(results)=>
-          val failures = results.collect({case Left(err)=>err})
-          if(failures.nonEmpty){
-            failures.foreach(err=>logger.warn(s"Could not rollback specific proxy copy: $err"))
-          }
-        case Failure(err)=>
-          logger.error("Rollback proxy delete future crashed: ", err)
-      })
+        val indexDeleteFuture = resaveFuture.map({
+          case Right(_) =>
+            indexer.deleteById(state.destFileId.get)
+            Right(())
+          case problem@Left(err) =>
+            logger.error(s"Could not re-create deleted source entry: $err")
+            problem
+        })
 
-      Future.sequence(Seq(indexDeleteFuture, proxyDeleteFuture)).onComplete({
-        case Success(_)=>originalSender ! StepSucceeded(state)
-        case Failure(err)=>originalSender ! StepFailed(state, err.toString)
-      })
+        indexDeleteFuture.onComplete({
+          case Success(Left(err)) =>
+            logger.warn(s"Could not rollback updated index record: $err")
+          case Failure(err) =>
+            logger.warn(s"Could not rollback updated index record: ", err)
+          case Success(Right(_)) =>
+        })
 
+        val resaveProxiesFuture = state.sourceFileProxies
+          .map(proxySeq =>
+            Future.sequence(proxySeq.map(proxyLocationDAO.saveProxy))
+              .map(_.collect({ case Some(result) => result }))
+          )
+          .getOrElse(Future(Seq()))
+          .map(resultSeq => {
+            val failures = resultSeq.collect({ case Left(err) => err })
+            if (failures.nonEmpty) {
+              logger.error(s"${failures.length} proxies failed to restore: ")
+              failures.foreach(err => logger.error(s"\t${err.toString}"))
+              //fail the future if we can't resave. This will prevent the proxy entries being deleted below.
+              throw new RuntimeException(s"${failures.length} proxies failed to restore")
+            } else {
+              resultSeq
+            }
+          })
+
+        val proxyDeleteFuture = resaveProxiesFuture.flatMap(resultSeq =>
+          deleteCopiedProxies(state.destFileProxy.get).map(_ ++ resultSeq)
+        )
+
+        proxyDeleteFuture.onComplete({
+          case Success(results) =>
+            val failures = results.collect({ case Left(err) => err })
+            if (failures.nonEmpty) {
+              failures.foreach(err => logger.warn(s"Could not rollback specific proxy copy: $err"))
+            }
+          case Failure(err) =>
+            logger.error("Rollback proxy delete future crashed: ", err)
+        })
+
+        Future.sequence(Seq(indexDeleteFuture, proxyDeleteFuture)).onComplete({
+          case Success(_) => originalSender ! StepSucceeded(state)
+          case Failure(err) =>
+            logger.error("Could not roll back index records: ", err)
+            originalSender ! StepFailed(state, err.toString)
+        })
+      }
   }
 }

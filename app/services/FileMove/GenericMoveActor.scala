@@ -7,8 +7,19 @@ import play.api.Logger
 object GenericMoveActor {
   trait MoveActorMessage
 
-  case class FileMoveTransientData(sourceFileId:String, entry:Option[ArchiveEntry], destFileId:Option[String], sourceFileProxies:Option[Seq[ProxyLocation]],
-                                   destFileProxy:Option[Seq[ProxyLocation]], destBucket:String, destProxyBucket:String)
+  case class FileMoveTransientData(sourceFileId:String,
+                                   entry:Option[ArchiveEntry],
+                                   destFileId:Option[String],
+                                   sourceFileProxies:Option[Seq[ProxyLocation]],
+                                   destFileProxy:Option[Seq[ProxyLocation]],
+                                   destBucket:String,
+                                   destProxyBucket:String)
+
+  object FileMoveTransientData {
+    def initialise(sourceFileId:String, destBucket:String, destProxyBucket:String) = {
+      new FileMoveTransientData(sourceFileId,None,None,None,None,destBucket,destProxyBucket)
+    }
+  }
 
   case class PerformStep(state:FileMoveTransientData) extends MoveActorMessage
   case class RollbackStep(state:FileMoveTransientData) extends MoveActorMessage

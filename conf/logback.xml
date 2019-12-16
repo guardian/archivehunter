@@ -103,6 +103,10 @@
     <logger name="helpers.LightboxHelper" level="INFO"/>
 
 
+    <logger name="services.FileMoveActor" level="DEBUG"/>
+    <logger name="services.FileMove" level="DEBUG"/>
+    <logger name-="FileMoveActorSpec" level="DEBUG"/>
+
     <root level="WARN">
         <appender-ref ref="STDOUT" />
         <appender-ref ref="ASYNCFILE"/>
