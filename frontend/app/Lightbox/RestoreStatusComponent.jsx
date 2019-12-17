@@ -27,6 +27,8 @@ class RestoreStatusComponent extends React.Component {
                 return <span data-tip="Success" data-for="jobslist-tooltip"><FontAwesomeIcon size="1.5x" icon="check-circle" style={{color:"green"}}/></span>;
             case "RS_ERROR":
                 return <span data-tip="Error" data-for="jobslist-tooltip"><FontAwesomeIcon size="1.5x" icon="exclamation-triangle" style={{color:"red"}}/></span>;
+            case "RS_UNNEEDED":
+                return <span data-tip="Unneeded" data-for="jobslist-tooltip"><FontAwesomeIcon size="1.5x" icon="not-equal" style={{color:"yellow"}}/></span>;
             default:
                 return <span data-tip={this.props.status}>{this.props.status}</span>;
         }
@@ -41,6 +43,8 @@ class RestoreStatusComponent extends React.Component {
             case "RS_ALREADY":
                 return <TimestampFormatter relative={true} value={this.props.completed}/>;
             case "RS_ERROR":
+                return <TimestampFormatter relative={true} value={this.props.completed ? this.props.completed : this.props.startTime}/>;
+            case "RS_UNNEEDED":
                 return <TimestampFormatter relative={true} value={this.props.completed ? this.props.completed : this.props.startTime}/>;
         }
     }
