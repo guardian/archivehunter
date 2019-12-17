@@ -10,18 +10,20 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 /**
   * final step, delete the original files from the disk(s)
-  * @param indexer
+  * @param s3ClientMgr An instance of [[S3ClientManager]] to obtain S3 client objects for the relevant region
+  * @param indexer an instance of [[Indexer]] to access content in the main index
   */
 class DeleteOriginalFiles(s3ClientMgr:S3ClientManager, indexer:Indexer) extends GenericMoveActor with DocId {
   import GenericMoveActor._
 
   /**
-    * verify that the object pointed to by (destBucket, destPath) is indeed an accurate copy of (srcBucket, srcPath)
-    * @param srcBucket
-    * @param srcPath
-    * @param destBucket
-    * @param destPath
-    * @return
+    * verify that the object pointed to by (destBucket, destPath) is indeed an accurate copy of (srcBucket, srcPath).
+    * this is an internal method which is called by `verifyNewMedia` and `verifyProxyFiles`
+    * @param srcBucket bucket containing the source file
+    * @param srcPath path to the source file
+    * @param destBucket bucket containing the destination file
+    * @param destPath path to the destination file
+    * @return either a message explaining why the files don't match (one does not exist, size mistmatch, checksum mismatch) or a Right with no contents if they do
     */
   protected def verifyFile(srcBucket:String, srcPath:String, destBucket:String, destPath:String)(implicit s3Client:AmazonS3):Either[String, Unit] = {
     if(!s3Client.doesObjectExist(destBucket, destPath)){
@@ -60,6 +62,12 @@ class DeleteOriginalFiles(s3ClientMgr:S3ClientManager, indexer:Indexer) extends 
     verifyFile(archiveEntry.bucket, archiveEntry.path, state.destBucket, archiveEntry.path)
   }
 
+  /**
+    * verify that each new proxy file listed in the state is in place and that its size and checksum match the source
+    * @param state [[FileMoveTransientData]] giving the state of the move
+    * @param s3Client implicitly provided s3Client for the correct region
+    * @return either a string indicating why the file is not good or the Unit value
+    */
   def verifyProxyFiles(state:FileMoveTransientData)(implicit s3Client:AmazonS3):Either[String,Unit] = {
     if (state.sourceFileProxies.isEmpty) {
       logger.warn(s"No source file proxies to verify")
@@ -98,8 +106,14 @@ class DeleteOriginalFiles(s3ClientMgr:S3ClientManager, indexer:Indexer) extends 
     recursiveVerify(srcProxies, dstProxies)
   }
 
-  //Delete the files in parallel. Contained in a Try to make it easier to catch _every_ failure not
-  //just one
+  /**
+    * Delete the files in parallel. Contained in a Try to make it easier to catch _every_ failure not
+    * just one
+    * @param bucket bucket to delete from
+    * @param path to the file to delete
+    * @param s3Client implicitly provided S3 Client
+    * @return a Future, containing a Try with either the result of the delete operation or an error
+    */
   def tryToDelete(bucket:String, path:String)(implicit s3Client:AmazonS3) = Future {
     Try { s3Client.deleteObject(bucket, path) }
   }
@@ -128,7 +142,7 @@ class DeleteOriginalFiles(s3ClientMgr:S3ClientManager, indexer:Indexer) extends 
   override def receive: Receive = {
     case PerformStep(state)=>
       //verify new media and proxy files. only if both match do the deletion
-      implicit val s3Client = s3ClientMgr.getS3Client(region=state.entry.flatMap(_.region))
+      implicit val s3Client:AmazonS3 = s3ClientMgr.getS3Client(region=state.entry.flatMap(_.region))
       verifyNewMedia(state).map(_=>verifyProxyFiles(state)) match {
         case Left(problem)=>
           sender() ! StepFailed(state, problem)
