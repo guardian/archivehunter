@@ -126,11 +126,11 @@ class MyLightbox extends CommonSearchView {
     }
 
     componentDidUpdate(prevProps, prevState, snapshot) {
-        if(prevState.showingPreview!==this.state.showingPreview) this.setState({selectedRestoreStatus: null, showRedoButton: true});
+        if(prevState.showingPreview!==this.state.showingPreview) this.setState({selectedRestoreStatus: null, showRedoButton: true, extraInfo: ""});
     }
 
     bulkSelectionChanged(newValue){
-        this.setState({bulkSelectionSelected: newValue, selectedRestoreStatus: null, showRedoButton: true}, this.reloadSearch);
+        this.setState({bulkSelectionSelected: newValue, selectedRestoreStatus: null, showRedoButton: true, extraInfo: ""}, this.reloadSearch);
     }
 
     shouldHideAvailability(entry){
