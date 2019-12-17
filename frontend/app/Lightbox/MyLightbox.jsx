@@ -157,7 +157,7 @@ class MyLightbox extends CommonSearchView {
             window.setTimeout(this.checkArchiveStatus, 3000);
         }).catch(err=>{
             console.error(err);
-            this.setState({showingArchiveSpinner: false, selectedRestoreStatus: err.response.data && err.response.data.detail ? err.response.data.detail : ""});
+            this.setState({showingArchiveSpinner: false});
         }));
     }
 
@@ -177,7 +177,7 @@ class MyLightbox extends CommonSearchView {
 
                 this.updateSearchResults(updatedEntry, itemIndex, this.state.showingPreview.id).then(()=>{
                     if(response.data.restoreStatus==="RS_UNNEEDED"){
-                        this.setState({showingArchiveSpinner: false, selectedRestoreStatus: response.data.restoreStatus, extraInfo: "Not in deep-freeze"})
+                        this.setState({showingArchiveSpinner: false, extraInfo: "Not in deep-freeze"})
                     } else if(this.state.extraInfo!==""){
                         this.setState({showingArchiveSpinner: false, selectedRestoreStatus: response.data.restoreStatus, extraInfo: ""})
                     }
