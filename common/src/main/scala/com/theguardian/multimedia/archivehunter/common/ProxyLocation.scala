@@ -67,7 +67,7 @@ object ProxyLocation extends DocId {
 
   /**
     * Looks up the metadata of a given item in S3 and returns a ProxyLocation
-    * @param bucket bucket that the item resides in
+    * @param proxyBucket bucket that the item resides in
     * @param key path to the item within `bucket`
     * @param client implicitly provided instance of AmazonS3Client to use
     * @return a (blocking) Future, containing a [[ProxyLocation]] if successful

@@ -51,6 +51,7 @@ lazy val `archivehunter` = (project in file("."))
       "com.typesafe.akka" %% "akka-cluster-tools" % akkaVersion,
       "com.lightbend.akka.management" %% "akka-management-cluster-http" % akkaClusterVersion,
       "com.lightbend.akka.management" %% "akka-management-cluster-bootstrap" % akkaClusterVersion,
+      "com.lightbend.akka.discovery" %% "akka-discovery-config" % akkaClusterVersion,
       "com.lightbend.akka.discovery" %% "akka-discovery-dns" % akkaClusterVersion,
       "com.lightbend.akka.discovery" %% "akka-discovery-kubernetes-api" % akkaClusterVersion,
       "com.lightbend.akka.discovery" %% "akka-discovery-aws-api" % akkaClusterVersion,

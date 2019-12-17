@@ -8,6 +8,7 @@ import com.theguardian.multimedia.archivehunter.common.cmn_models.ItemNotFound
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
+//FIXME: should check the "deleted" flag and error if it is set
 /**
   * verify that the source file is registered with us, and collect the IDs of all proxies for it.
   * @param indexer [[Indexer]] DAO providing access to the index data
