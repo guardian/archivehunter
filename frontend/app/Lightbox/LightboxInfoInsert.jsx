@@ -22,7 +22,7 @@ class LightboxInfoInsert extends React.Component {
                 startTime={this.props.entry.restoreStarted}
                 completed={this.props.entry.restoreCompleted}
                 expires={this.props.entry.availableUntil}
-                hidden={this.props.entry.restoreStatus==="RS_UNNEEDED"}/>
+            />
             {
                 this.props.extraInfo ? <p className="centered">{this.props.extraInfo}</p> : ""
             }
