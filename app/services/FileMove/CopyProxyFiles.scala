@@ -36,7 +36,9 @@ class CopyProxyFiles (s3ClientManager:S3ClientManager, config:Configuration) ext
             val updatedProxyList = proxyList.map(loc=>
               loc.copy(fileId=currentState.destFileId.get,
                 proxyId=makeDocId(currentState.destProxyBucket, loc.bucketPath),
-                bucketName = currentState.destProxyBucket)
+                bucketName = currentState.destProxyBucket,
+                region = Some(currentState.destRegion)
+              )
             )
 
             proxyList.map(proxy => {

@@ -71,6 +71,7 @@ class JobsFilterComponent extends React.Component {
                     <option value="Analyse">Analyse</option>
                     <option value="CheckSetup">Check setup</option>
                     <option value="SetupTranscoding">Set up transcoding</option>
+                    <option value="FileMove">File move</option>
                 </select>
             </span>
             <span className="filter-entry">
