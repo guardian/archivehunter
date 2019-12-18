@@ -24,6 +24,7 @@ class ProxyLocatorFlow @Inject() (playConfig:Configuration, s3ClientManager: S3C
   lazy val defaultRegion = playConfig.getOptional[String]("externalData.awsRegion").getOrElse("eu-west-1")
 
   override def createLogic(inheritedAttributes: Attributes): GraphStageLogic = new GraphStageLogic(shape) {
+    private var proxiesToOutput:Seq[ProxyLocation] = Seq()
 
     setHandler(in, new AbstractInHandler {
       override def onPush(): Unit = {
@@ -39,16 +40,23 @@ class ProxyLocatorFlow @Inject() (playConfig:Configuration, s3ClientManager: S3C
           logger.info(s"Could not find any potential proxies for ${elem.bucket}/${elem.path}")
           pull(in)
         } else {
-          if(potentialProxyLocations.length>1) logger.info(s"Found ${potentialProxyLocations.length} potential proxies for ${elem.bucket}/${elem.path}, going with the first")
-          logger.debug(s"Outputting ${potentialProxyLocations.head}")
-          push(out, potentialProxyLocations.head)
+          logger.info(s"Found ${potentialProxyLocations.length} potential proxies for ${elem.bucket}/${elem.path}")
+          proxiesToOutput = proxiesToOutput ++ potentialProxyLocations
+          logger.debug(s"Outputting ${proxiesToOutput.head}")
+          push(out, proxiesToOutput.head)
+          proxiesToOutput = proxiesToOutput.tail
         }
       }
     })
 
     setHandler(out, new AbstractOutHandler {
       override def onPull(): Unit = {
-        pull(in)
+        if(proxiesToOutput.nonEmpty) {
+          push(out, proxiesToOutput.head)
+          proxiesToOutput = proxiesToOutput.tail
+        } else {
+          pull(in)
+        }
       }
     })
   }
