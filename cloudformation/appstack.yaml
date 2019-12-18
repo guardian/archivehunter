@@ -379,7 +379,7 @@ Resources:
           - AttributeName: proxyId
             KeyType: HASH
           Projection:
-            ProjectionType: KEYS_ONLY
+            ProjectionType: ALL
           ProvisionedThroughput:
             WriteCapacityUnits: 1
             ReadCapacityUnits: 1
