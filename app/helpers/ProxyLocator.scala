@@ -45,7 +45,6 @@ object ProxyLocator {
     }
   }
 
-  //FIXME: should cache the scan target for bucket in scanTargetDAO if possible to avoid hammering DDB
   /**
     * see if there is a proxy for the given [[ArchiveEntry]], assuming none exists in the dynamo table
     * @param entry [[ArchiveEntry]] instance

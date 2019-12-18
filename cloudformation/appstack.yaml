@@ -822,6 +822,15 @@ Resources:
               - arn:aws:s3:::*proxies*/*
               - arn:aws:s3:::*proxy*
               - arn:aws:s3:::*proxy*/*
+      - PolicyName: HoldingPenDeletion
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+            Effect: Allow
+            Action:
+              - s3:DeleteObject
+            Resource:
+              - arn:aws:s3:::*holding-pen*
       - PolicyName: DeployablesAccess
         PolicyDocument:
           Version: 2012-10-17

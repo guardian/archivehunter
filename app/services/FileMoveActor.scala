@@ -8,7 +8,7 @@ import akka.stream.{ActorMaterializer, Materializer}
 import com.theguardian.multimedia.archivehunter.common.{Indexer, ProxyLocationDAO}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{JobModel, JobModelDAO, JobStatus, ScanTarget, SourceType}
-import javax.inject.Inject
+import javax.inject.{Inject, Singleton}
 import play.api.Configuration
 import services.FileMove.GenericMoveActor.MoveActorMessage
 import services.FileMove.{CopyMainFile, CopyProxyFiles, DeleteOriginalFiles, GenericMoveActor, UpdateIndexRecords, VerifySource}
@@ -49,6 +49,7 @@ object FileMoveActor {
   * this actor uses the same technique as Project Locker to run a step-function and roll back all successful stages if a
   * stage fails
   */
+@Singleton
 class FileMoveActor @Inject() (config:Configuration,
                                proxyLocationDAO: ProxyLocationDAO,
                                esClientManager:ESClientManager,

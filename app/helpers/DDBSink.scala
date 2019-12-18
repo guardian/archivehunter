@@ -31,6 +31,11 @@ final class DDBSink @Inject()(clientMgr: DynamoClientManager,config:Configuratio
 
       val table = Table[ProxyLocation](tableName)
 
+      /**
+        * if the provided Set of items contains duplicate database primary keys (from the perspective of Dynamo) then it fails.
+        * this function removes any duplicates of these keys so that we know that the update will succeed
+        * @return Iterable of unique ProxyLocation objects
+        */
       def dedupeRecordBuffer:Iterable[ProxyLocation] = {
         val recordBufferMap = recordBuffer.map(loc=>(loc.fileId,loc.proxyType)->loc).toMap
         recordBufferMap.values

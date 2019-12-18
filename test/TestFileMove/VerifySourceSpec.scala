@@ -260,6 +260,47 @@ class VerifySourceSpec extends Specification with Mockito {
       there was one(mockedIndexer).getByIdFull("source-entry-id")
       there was one(mockedProxyDAO).getAllProxiesFor("source-entry-id")
     }
+
+    "reply StepFailed if the entry has the deleted flag set" in new AkkaTestkitSpecs2Support {
+      implicit val mockedHttpClient = mock[HttpClient]
+      implicit val mockedDynamoClient = mock[DynamoClient]
+
+      val mockedEntry = ArchiveEntry(
+        "some-entry-id",
+        "source-bucket",
+        "path/to/source_media.mxf",
+        None,
+        Some("mxf"),
+        1234L,
+        ZonedDateTime.now(),
+        "some-etag",
+        MimeType("application","x-mxf"),
+        proxied=true,
+        StorageClass.STANDARD_IA,
+        Seq(),
+        mediaMetadata=None,
+        beenDeleted=true
+      )
+
+      val mockedIndexer = mock[Indexer]
+      mockedIndexer.getByIdFull(any)(any) returns Future(Right(mockedEntry))
+
+      val mockedProxyDAO = mock[ProxyLocationDAO]
+      mockedProxyDAO.getAllProxiesFor(any)(any) returns Future(List())
+
+      val initialData = FileMoveTransientData.initialise("source-entry-id","dest-bucket","dest-proxy-bucket","dest-region")
+      initialData.sourceFileProxies must beNone
+      initialData.entry must beNone
+
+      val actor = system.actorOf(Props(new VerifySource(mockedIndexer, mockedProxyDAO)))
+      val result = Await.result((actor ? PerformStep(initialData)).mapTo[MoveActorMessage], 5 seconds)
+
+      result must beAnInstanceOf[StepFailed]
+      val s = result.asInstanceOf[StepFailed]
+
+      s.updatedData mustEqual initialData
+      s.err.contains("has been deleted in the storage")
+    }
   }
 
   "VerifySource!RollbackStep" should {

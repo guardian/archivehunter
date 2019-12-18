@@ -8,7 +8,6 @@ import com.theguardian.multimedia.archivehunter.common.cmn_models.ItemNotFound
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
-//FIXME: should check the "deleted" flag and error if it is set
 /**
   * verify that the source file is registered with us, and collect the IDs of all proxies for it.
   * @param indexer [[Indexer]] DAO providing access to the index data
@@ -35,16 +34,21 @@ class VerifySource(indexer:Indexer, proxyLocationDAO:ProxyLocationDAO)(implicit 
           Future( () )
         case Right(entry)=>
           logger.debug(s"Got entry ${entry.bucket}:${entry.path}")
-          proxyLocationDAO.getAllProxiesFor(currentState.sourceFileId).map(results=>{
-            logger.debug(s"Got ${results.length} proxies for ${currentState.sourceFileId}")
-            val failures = results.collect({case Left(err)=>err})
-            if(failures.nonEmpty){
-              originalSender ! StepFailed(currentState, failures.map(_.toString).mkString(","))
-            } else {
-              val proxyList = results.collect({ case Right(proxyLoc) => proxyLoc })
-              originalSender ! StepSucceeded(currentState.copy(entry = Some(entry), sourceFileProxies = Some(proxyList)))
-            }
-          })
+          if(entry.beenDeleted){
+            originalSender ! StepFailed(currentState, s"Requested file ${currentState.sourceFileId} has been deleted in the storage so can't be moved")
+            Future( () )
+          } else {
+            proxyLocationDAO.getAllProxiesFor(currentState.sourceFileId).map(results => {
+              logger.debug(s"Got ${results.length} proxies for ${currentState.sourceFileId}")
+              val failures = results.collect({ case Left(err) => err })
+              if (failures.nonEmpty) {
+                originalSender ! StepFailed(currentState, failures.map(_.toString).mkString(","))
+              } else {
+                val proxyList = results.collect({ case Right(proxyLoc) => proxyLoc })
+                originalSender ! StepSucceeded(currentState.copy(entry = Some(entry), sourceFileProxies = Some(proxyList)))
+              }
+            })
+          }
       }).recover({
         case err:Throwable=>
           logger.error(s"Could not look up media source from id '${currentState.sourceFileId}': ", err)

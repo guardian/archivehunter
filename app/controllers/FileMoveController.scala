@@ -1,9 +1,6 @@
 package controllers
 
 import akka.actor.{ActorRef, ActorSystem}
-import com.theguardian.multimedia.archivehunter.common.ProxyLocationDAO
-import com.theguardian.multimedia.archivehunter.common.ProxyTranscodeFramework.ProxyGenerators
-import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{JobModelDAO, ScanTargetDAO}
 import helpers.InjectableRefresher
 import javax.inject.{Inject, Named}
@@ -25,7 +22,6 @@ import io.circe.syntax._
 
 class FileMoveController @Inject()(override val config:Configuration,
                                    override val controllerComponents:ControllerComponents,
-                                   jobModelDAO: JobModelDAO,
                                    override val refresher:InjectableRefresher,
                                    override val wsClient:WSClient,
                                    scanTargetDAO:ScanTargetDAO,
