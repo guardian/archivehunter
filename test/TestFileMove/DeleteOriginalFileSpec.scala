@@ -9,6 +9,7 @@ import org.specs2.mutable.Specification
 import services.FileMove.{DeleteOriginalFiles, GenericMoveActor}
 import akka.pattern.ask
 import com.amazonaws.services.s3.model.ObjectMetadata
+import play.api.Configuration
 import services.FileMove.GenericMoveActor.{MoveActorMessage, PerformStep, StepFailed, StepSucceeded}
 
 import scala.concurrent.Await
@@ -30,7 +31,7 @@ class DeleteOriginalFileSpec extends Specification with Mockito {
       mockedS3ClientMgr.getS3Client(any,any) returns mockedS3Client
       val mockedIndexer = mock[Indexer]
 
-      val actor = system.actorOf(Props(new DeleteOriginalFiles(mockedS3ClientMgr, mockedIndexer)))
+      val actor = system.actorOf(Props(new DeleteOriginalFiles(mockedS3ClientMgr, mockedIndexer, Configuration.empty)))
 
       val originalSourceEntry = mock[ArchiveEntry]
       originalSourceEntry.bucket returns "source-media-bucket"
@@ -83,7 +84,7 @@ class DeleteOriginalFileSpec extends Specification with Mockito {
       mockedS3ClientMgr.getS3Client(any,any) returns mockedS3Client
       val mockedIndexer = mock[Indexer]
 
-      val actor = system.actorOf(Props(new DeleteOriginalFiles(mockedS3ClientMgr, mockedIndexer)))
+      val actor = system.actorOf(Props(new DeleteOriginalFiles(mockedS3ClientMgr, mockedIndexer, Configuration.empty)))
 
       val originalSourceEntry = mock[ArchiveEntry]
       originalSourceEntry.bucket returns "source-media-bucket"
@@ -138,7 +139,7 @@ class DeleteOriginalFileSpec extends Specification with Mockito {
       mockedS3ClientMgr.getS3Client(any,any) returns mockedS3Client
       val mockedIndexer = mock[Indexer]
 
-      val actor = system.actorOf(Props(new DeleteOriginalFiles(mockedS3ClientMgr, mockedIndexer)))
+      val actor = system.actorOf(Props(new DeleteOriginalFiles(mockedS3ClientMgr, mockedIndexer, Configuration.empty)))
 
       val originalSourceEntry = mock[ArchiveEntry]
       originalSourceEntry.bucket returns "source-media-bucket"

@@ -146,7 +146,7 @@ class UpdateIndexRecordsSpec extends Specification with Mockito {
 
       there was one(mockedIndexer).getById("fake-id")
       there was one(mockedIndexer).indexSingleItem(any,any,any)(any)
-      there was one(mockedIndexer).deleteById("fake-id")    //even though this is deleted here it's reconstituted by the rollback
+      there was no(mockedIndexer).deleteById("fake-id")    //even though this is deleted here it's reconstituted by the rollback
 
       //these are done in parallel so will all get triggered even in failure
       there was one(mockedProxyLocationDAO).saveProxy(destProxyList.head)

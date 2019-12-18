@@ -33,6 +33,8 @@ class FileMoveActorSpec extends Specification with Mockito {
       val mockedESClientMgr = mock[ESClientManager]
       val mockedDynamoClientMgr = mock[DynamoClientManager]
       val mockedS3ClientMgr = mock[S3ClientManager]
+      val mockedJobModelDAO = mock[JobModelDAO]
+      mockedJobModelDAO.putJob(any) returns Future(None)
       val probe1 = TestProbe()
       val probe2 = TestProbe()
       val probe3 = TestProbe()
@@ -43,6 +45,7 @@ class FileMoveActorSpec extends Specification with Mockito {
         mockedProxyLocationDAO,
         mockedESClientMgr,
         mockedDynamoClientMgr,
+        mockedJobModelDAO,
         mockedS3ClientMgr
       ) {
         override protected val fileMoveChain: Seq[ActorRef] = Seq(probe1.ref, probe2.ref, probe3.ref)
@@ -50,8 +53,8 @@ class FileMoveActorSpec extends Specification with Mockito {
 
       val target = ScanTarget("some-bucket", true, None, 1234L, false, None, "some-proxy-bucket", "eu-west-1", None, None, None, None)
 
-      val resultFuture = ac ? MoveFile("somesourcefileId", target)
-      val initialData = FileMoveTransientData.initialise("somesourcefileId", "some-bucket", "some-proxy-bucket","dest-region")
+      val resultFuture = ac ? MoveFile("somesourcefileId", target, async=false)
+      val initialData = FileMoveTransientData.initialise("somesourcefileId", "some-bucket", "some-proxy-bucket", "eu-west-1")
 
       probe1.expectMsg(5.seconds, PerformStep(initialData))
       logger.info(probe1.lastSender.toString)
@@ -73,6 +76,8 @@ class FileMoveActorSpec extends Specification with Mockito {
           val mockedESClientMgr = mock[ESClientManager]
           val mockedDynamoClientMgr = mock[DynamoClientManager]
           val mockedS3ClientMgr = mock[S3ClientManager]
+          val mockedJobModelDAO = mock[JobModelDAO]
+          mockedJobModelDAO.putJob(any) returns Future(None)
           val probe1 = TestProbe()
           val probe2 = TestProbe()
           val probe3 = TestProbe()
@@ -83,6 +88,7 @@ class FileMoveActorSpec extends Specification with Mockito {
             mockedProxyLocationDAO,
             mockedESClientMgr,
             mockedDynamoClientMgr,
+            mockedJobModelDAO,
             mockedS3ClientMgr
           ) {
             override protected val fileMoveChain: Seq[ActorRef] = Seq(probe1.ref, probe2.ref, probe3.ref)
@@ -90,8 +96,8 @@ class FileMoveActorSpec extends Specification with Mockito {
 
           val target = ScanTarget("some-bucket", true, None, 1234L, false, None, "some-proxy-bucket", "eu-west-1", None, None, None, None)
 
-          val resultFuture = ac ? MoveFile("somesourcefileId", target)
-          val initialData = FileMoveTransientData.initialise("somesourcefileId", "some-bucket", "some-proxy-bucket","dest-region")
+          val resultFuture = ac ? MoveFile("somesourcefileId", target, async=false)
+          val initialData = FileMoveTransientData.initialise("somesourcefileId", "some-bucket", "some-proxy-bucket","eu-west-1")
 
           probe1.expectMsg(5.seconds, PerformStep(initialData))
           val updatedStage1 = initialData.copy(destFileId=Some("dest-file-id"))
@@ -117,6 +123,7 @@ class FileMoveActorSpec extends Specification with Mockito {
           val mockedDynamoClientMgr = mock[DynamoClientManager]
           val mockedS3ClientMgr = mock[S3ClientManager]
           val mockedJobModelDAO = mock[JobModelDAO]
+          mockedJobModelDAO.putJob(any) returns Future(None)
           val probe1 = TestProbe()
           val probe2 = TestProbe()
           val probe3 = TestProbe()
@@ -135,8 +142,8 @@ class FileMoveActorSpec extends Specification with Mockito {
 
           val target = ScanTarget("some-bucket", true, None, 1234L, false, None, "some-proxy-bucket", "eu-west-1", None, None, None, None)
 
-          val resultFuture = ac ? MoveFile("somesourcefileId", target)
-          val initialData = FileMoveTransientData.initialise("somesourcefileId", "some-bucket", "some-proxy-bucket","dest-region")
+          val resultFuture = ac ? MoveFile("somesourcefileId", target,async=false)
+          val initialData = FileMoveTransientData.initialise("somesourcefileId", "some-bucket", "some-proxy-bucket","eu-west-1")
 
           probe1.expectMsg(5.seconds, PerformStep(initialData))
           probe1.reply(StepSucceeded(initialData))

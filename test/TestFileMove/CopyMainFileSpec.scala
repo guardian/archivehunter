@@ -36,7 +36,7 @@ class CopyMainFileSpec extends Specification with Mockito with DocId {
 
       val request = FileMoveTransientData("fake-id",Some(testItem),None,None,None,"destBucket","destProxies","dest-region")
 
-      val actor = system.actorOf(Props(new CopyMainFile(mockedClientMgr)))
+      val actor = system.actorOf(Props(new CopyMainFile(mockedClientMgr, Configuration.empty)))
 
       val result = Await.result(actor ? PerformStep(request), 30 seconds).asInstanceOf[MoveActorMessage]
 
@@ -57,7 +57,7 @@ class CopyMainFileSpec extends Specification with Mockito with DocId {
 
       val request = FileMoveTransientData("fake-id",Some(testItem),None,None,None,"destBucket","destProxies", "dest-region")
 
-      val actor = system.actorOf(Props(new CopyMainFile(mockedClientMgr)))
+      val actor = system.actorOf(Props(new CopyMainFile(mockedClientMgr, Configuration.empty)))
 
       val result = Await.result(actor ? PerformStep(request), 30 seconds).asInstanceOf[MoveActorMessage]
 
@@ -76,7 +76,7 @@ class CopyMainFileSpec extends Specification with Mockito with DocId {
       val mockedDeleteResponse = mock[DeleteObjectsResponse]
 
       mockedS3Client.deleteObject(any, any)
-      mockedS3Client.getObjectMetadata(any, any) returns mockedGetResponse
+      mockedS3Client.doesObjectExist(any, any) returns true
 
       val testItem = ArchiveEntry("fake-id","sourcebucket","/path/to/file",None,None,1234L,ZonedDateTime.now(),"fake-etag",
         MimeType.fromString("video/quicktime").right.get,true,StorageClass.STANDARD_IA,Seq(), false,None)
@@ -88,18 +88,19 @@ class CopyMainFileSpec extends Specification with Mockito with DocId {
       val result = Await.result(actor ? RollbackStep(request), 30 seconds).asInstanceOf[MoveActorMessage]
 
       result must beAnInstanceOf[StepSucceeded]
-      there was one(mockedS3Client).getObjectMetadata("sourcebucket","/path/to/file")
+      there were two(mockedClientMgr).getS3Client(any,any)
+      there was one(mockedS3Client).doesObjectExist("sourcebucket","/path/to/file")
       there was one(mockedS3Client).deleteObject("destBucket","/path/to/file")
     }
 
-    "NOT delete the target file if the original file could not be verified" in new AkkaTestkitSpecs2Support {
+    "copy the target file back to the source if it does not exist" in new AkkaTestkitSpecs2Support {
       val mockedClientMgr = mock[S3ClientManager]
       val mockedS3Client = mock[AmazonS3]
       mockedClientMgr.getS3Client(any,any) returns mockedS3Client
       val mockedGetResponse = mock[ObjectMetadata]
       val mockedDeleteResponse = mock[DeleteObjectsResponse]
 
-      mockedS3Client.getObjectMetadata(any, any) throws new RuntimeException("fake exception showing that file exists")
+      mockedS3Client.doesObjectExist(any,any) returns false
 
       val testItem = ArchiveEntry("fake-id","sourcebucket","/path/to/file",None,None,1234L,ZonedDateTime.now(),"fake-etag",
         MimeType.fromString("video/quicktime").right.get,true,StorageClass.STANDARD_IA,Seq(), false,None)
@@ -110,10 +111,12 @@ class CopyMainFileSpec extends Specification with Mockito with DocId {
 
       val result = Await.result(actor ? RollbackStep(request), 30 seconds).asInstanceOf[MoveActorMessage]
 
-      result must beAnInstanceOf[StepFailed]
-      result.asInstanceOf[StepFailed].updatedData.destFileId must beNone
-      there was one(mockedS3Client).getObjectMetadata("sourcebucket","/path/to/file")
-      there was no(mockedS3Client).deleteObject(any, any)
+      result must beAnInstanceOf[StepSucceeded]
+      result.asInstanceOf[StepSucceeded].updatedData.destFileId must beNone
+      there were two(mockedClientMgr).getS3Client(any,any)
+      there was one(mockedS3Client).doesObjectExist("sourcebucket","/path/to/file")
+      there was one(mockedS3Client).copyObject("destBucket","/path/to/file","sourcebucket","/path/to/file")
+      there was one(mockedS3Client).deleteObject(any, any)
     }
   }
 }
