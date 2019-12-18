@@ -267,7 +267,7 @@ class LightboxController @Inject() (override val config:Configuration,
             case GlacierRestoreActor.RestoreInProgress(entry)=>
               Ok(RestoreStatusResponse("ok", entry.id, RestoreStatus.RS_UNDERWAY, None, None).asJson)
             case GlacierRestoreActor.RestoreNotRequested(entry)=>
-              Ok(RestoreStatusResponse("not_requested", entry.id, RestoreStatus.RS_ERROR, None, None).asJson)
+              Ok(RestoreStatusResponse("not_requested", entry.id, RestoreStatus.RS_UNNEEDED, None, None).asJson)
           })
       })
     }

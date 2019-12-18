@@ -2,11 +2,13 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import TimestampFormatter from "../common/TimestampFormatter.jsx";
 import RestoreStatusComponent from "./RestoreStatusComponent.jsx";
+import {FontAwesomeIcon} from "@fortawesome/react-fontawesome";
 
 class LightboxInfoInsert extends React.Component {
     static propTypes = {
         entry: PropTypes.object.isRequired,
-        extraInfo: PropTypes.string
+        extraInfo: PropTypes.string,
+        iconName: PropTypes.string,
     };
 
     render(){
@@ -24,7 +26,7 @@ class LightboxInfoInsert extends React.Component {
                 expires={this.props.entry.availableUntil}
                 hidden={this.props.entry.restoreStatus==="RS_UNNEEDED"}/>
             {
-                this.props.extraInfo ? <p className="centered">{this.props.extraInfo}</p> : ""
+                this.props.extraInfo ? <p className="centered"><FontAwesomeIcon icon={this.props.iconName} size="1.5x" style={{color:"yellow"}}/> {this.props.extraInfo}</p> : ""
             }
         </div>
     }

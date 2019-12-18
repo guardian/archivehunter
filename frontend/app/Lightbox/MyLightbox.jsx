@@ -124,11 +124,11 @@ class MyLightbox extends CommonSearchView {
     }
 
     componentDidUpdate(prevProps, prevState, snapshot) {
-        if(prevState.showingPreview!==this.state.showingPreview) this.setState({selectedRestoreStatus: null});
+        if(prevState.showingPreview!==this.state.showingPreview) this.setState({selectedRestoreStatus: null, extraInfo: ""});
     }
 
     bulkSelectionChanged(newValue){
-        this.setState({bulkSelectionSelected: newValue, selectedRestoreStatus: null}, this.reloadSearch);
+        this.setState({bulkSelectionSelected: newValue, selectedRestoreStatus: null, extraInfo: ""}, this.reloadSearch);
     }
 
     shouldHideAvailability(entry){
@@ -157,7 +157,7 @@ class MyLightbox extends CommonSearchView {
             window.setTimeout(this.checkArchiveStatus, 3000);
         }).catch(err=>{
             console.error(err);
-            this.setState({showingArchiveSpinner: false, selectedRestoreStatus: err.response.data && err.response.data.detail ? err.response.data.detail : ""});
+            this.setState({showingArchiveSpinner: false});
         }));
     }
 
@@ -177,7 +177,7 @@ class MyLightbox extends CommonSearchView {
 
                 this.updateSearchResults(updatedEntry, itemIndex, this.state.showingPreview.id).then(()=>{
                     if(response.data.restoreStatus==="RS_UNNEEDED"){
-                        this.setState({showingArchiveSpinner: false, selectedRestoreStatus: response.data.restoreStatus, extraInfo: "Not in deep-freeze"})
+                        this.setState({showingArchiveSpinner: false, extraInfo: "Not in deep-freeze"})
                     } else if(this.state.extraInfo!==""){
                         this.setState({showingArchiveSpinner: false, selectedRestoreStatus: response.data.restoreStatus, extraInfo: ""})
                     }
@@ -195,6 +195,22 @@ class MyLightbox extends CommonSearchView {
         return ""
     }
 
+    displayRedo(status){
+        if(status==='RS_UNNEEDED') {
+            return "";
+        } else {
+            return "Redo restore";
+        }
+    }
+
+    displayInfo(status){
+        if(status==='RS_UNNEEDED') {
+            return "Not in deep freeze";
+        } else {
+            return this.state.extraInfo;
+        }
+    }
+
     render(){
         /**
          * this describes an "insert" into the standard entry details view, to provide lightbox-specific data
@@ -204,10 +220,11 @@ class MyLightbox extends CommonSearchView {
                 entry={this.state.showingPreview && this.state.showingPreview.details ?
                             this.state.showingPreview.details : null
                 }
-                extraInfo={this.state.extraInfo}
+                extraInfo={this.displayInfo(this.state.showingPreview ? this.state.showingPreview.details.restoreStatus : "")}
+                iconName="file"
             />
             <p className="centered small"><a style={{cursor: "pointer"}} onClick={this.checkArchiveStatus}>Re-check</a></p>
-            <p className="centered small"><a style={{cursor: "pointer"}} onClick={this.redoRestore}>Redo restore</a><LoadingThrobber show={this.state.showingArchiveSpinner} small={true}/> </p>
+            <p className="centered small"><a style={{cursor: "pointer"}} onClick={this.redoRestore}>{this.displayRedo(this.state.showingPreview ? this.state.showingPreview.details.restoreStatus : "")}</a><LoadingThrobber show={this.state.showingArchiveSpinner} small={true}/> </p>
             <p className="centered small information" style={{display: this.state.selectedRestoreStatus ? "block": "none"}}>
                 {this.state.selectedRestoreStatus}
             </p>
