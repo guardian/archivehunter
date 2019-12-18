@@ -50,7 +50,7 @@ class UpdateIndexRecordsSpec extends Specification with Mockito {
         ProxyLocation("fake-id","proxyid2",ProxyType.AUDIO,"dest-proxy-bucket","path/to/proxy2",None,StorageClass.STANDARD),
         ProxyLocation("fake-id","proxyid3",ProxyType.THUMBNAIL,"dest-proxy-bucket","path/to/proxy3",None,StorageClass.STANDARD),
       )
-      val data = FileMoveTransientData("fake-id",None,Some("dest-file-id"),Some(sourceProxyList),Some(destProxyList),"dest-media-bucket","dest-proxy-bucket")
+      val data = FileMoveTransientData("fake-id",None,Some("dest-file-id"),Some(sourceProxyList),Some(destProxyList),"dest-media-bucket","dest-proxy-bucket", "dest-region")
 
       val actor = system.actorOf(Props(new UpdateIndexRecords(mockedIndexer,mockedProxyLocationDAO)))
       val result = Await.result(actor ? PerformStep(data), 30 seconds).asInstanceOf[MoveActorMessage]
@@ -94,7 +94,7 @@ class UpdateIndexRecordsSpec extends Specification with Mockito {
         ProxyLocation("fake-id","proxyid2",ProxyType.AUDIO,"dest-proxy-bucket","path/to/proxy2",None,StorageClass.STANDARD),
         ProxyLocation("fake-id","proxyid3",ProxyType.THUMBNAIL,"dest-proxy-bucket","path/to/proxy3",None,StorageClass.STANDARD),
       )
-      val data = FileMoveTransientData("fake-id",None,Some("dest-file-id"),Some(sourceProxyList),Some(destProxyList),"dest-media-bucket","dest-proxy-bucket")
+      val data = FileMoveTransientData("fake-id",None,Some("dest-file-id"),Some(sourceProxyList),Some(destProxyList),"dest-media-bucket","dest-proxy-bucket","dest-region")
 
       val actor = system.actorOf(Props(new UpdateIndexRecords(mockedIndexer,mockedProxyLocationDAO)))
       val result = Await.result(actor ? PerformStep(data), 30 seconds).asInstanceOf[MoveActorMessage]
@@ -137,7 +137,7 @@ class UpdateIndexRecordsSpec extends Specification with Mockito {
         ProxyLocation("fake-id","proxyid2",ProxyType.AUDIO,"dest-proxy-bucket","path/to/proxy2",None,StorageClass.STANDARD),
         ProxyLocation("fake-id","proxyid3",ProxyType.THUMBNAIL,"dest-proxy-bucket","path/to/proxy3",None,StorageClass.STANDARD),
       )
-      val data = FileMoveTransientData("fake-id",None,Some("dest-file-id"),Some(sourceProxyList),Some(destProxyList),"dest-media-bucket","dest-proxy-bucket")
+      val data = FileMoveTransientData("fake-id",None,Some("dest-file-id"),Some(sourceProxyList),Some(destProxyList),"dest-media-bucket","dest-proxy-bucket","dest-region")
 
       val actor = system.actorOf(Props(new UpdateIndexRecords(mockedIndexer,mockedProxyLocationDAO)))
       val result = Await.result(actor ? PerformStep(data), 30 seconds).asInstanceOf[MoveActorMessage]
@@ -183,7 +183,7 @@ class UpdateIndexRecordsSpec extends Specification with Mockito {
         ProxyLocation("fake-id","proxyid2",ProxyType.AUDIO,"dest-proxy-bucket","path/to/proxy2",None,StorageClass.STANDARD),
         ProxyLocation("fake-id","proxyid3",ProxyType.THUMBNAIL,"dest-proxy-bucket","path/to/proxy3",None,StorageClass.STANDARD),
       )
-      val data = FileMoveTransientData("fake-id",Some(testItem),Some("dest-file-id"),Some(sourceProxyList),Some(destProxyList),"dest-media-bucket","dest-proxy-bucket")
+      val data = FileMoveTransientData("fake-id",Some(testItem),Some("dest-file-id"),Some(sourceProxyList),Some(destProxyList),"dest-media-bucket","dest-proxy-bucket","dest-region")
 
       val actor = system.actorOf(Props(new UpdateIndexRecords(mockedIndexer,mockedProxyLocationDAO)))
       val result = Await.result(actor ? RollbackStep(data), 30 seconds).asInstanceOf[MoveActorMessage]

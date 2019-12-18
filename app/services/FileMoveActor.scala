@@ -1,10 +1,13 @@
 package services
 
+import java.time.ZonedDateTime
+import java.util.UUID
+
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import akka.stream.{ActorMaterializer, Materializer}
 import com.theguardian.multimedia.archivehunter.common.{Indexer, ProxyLocationDAO}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager}
-import com.theguardian.multimedia.archivehunter.common.cmn_models.ScanTarget
+import com.theguardian.multimedia.archivehunter.common.cmn_models.{JobModel, JobModelDAO, JobStatus, ScanTarget, SourceType}
 import javax.inject.Inject
 import play.api.Configuration
 import services.FileMove.GenericMoveActor.MoveActorMessage
@@ -33,10 +36,11 @@ import scala.util.{Failure, Success}
 
 object FileMoveActor {
 
-  case class MoveFile(sourceFileId:String, destination:ScanTarget) extends MoveActorMessage
+  case class MoveFile(sourceFileId:String, destination:ScanTarget, async:Boolean) extends MoveActorMessage
 
   //replies
   case object MoveSuccess extends MoveActorMessage
+  case class MoveAsync(jobId:String) extends MoveActorMessage
   case class MoveFailed(reason:String) extends MoveActorMessage
 }
 
@@ -49,6 +53,7 @@ class FileMoveActor @Inject() (config:Configuration,
                                proxyLocationDAO: ProxyLocationDAO,
                                esClientManager:ESClientManager,
                                dynamoClientManager: DynamoClientManager,
+                               jobModelDAO: JobModelDAO,
                                s3ClientManager: S3ClientManager)(implicit system:ActorSystem)
   extends Actor {
   import FileMoveActor._
@@ -58,19 +63,19 @@ class FileMoveActor @Inject() (config:Configuration,
   private val logger = LoggerFactory.getLogger(getClass)
   private implicit val mat:Materializer = ActorMaterializer.create(system)
   private implicit val esClient = esClientManager.getClient()
-  private implicit val dynamoClient = dynamoClientManager.getNewAlpakkaDynamoClient()
-  private val indexer = new Indexer(indexName)
-
-  private implicit val timeout:akka.util.Timeout = 30 seconds
+  private implicit val dynamoClient = dynamoClientManager.getNewAlpakkaDynamoClient(config.getOptional[String]("externalData.awsProfile"))
 
   val indexName = config.getOptional[String]("externalData.indexName").getOrElse("archivehunter")
+  private val indexer = new Indexer(indexName)
+
+  private implicit val timeout:akka.util.Timeout = 600 seconds  //time out after 10 minutes
 
   protected val fileMoveChain:Seq[ActorRef] = Seq(
     system.actorOf(Props(new VerifySource(indexer, proxyLocationDAO))),
-    system.actorOf(Props(new CopyMainFile(s3ClientManager))),
-    system.actorOf(Props(new CopyProxyFiles(s3ClientManager))),
+    system.actorOf(Props(new CopyMainFile(s3ClientManager, config))),
+    system.actorOf(Props(new CopyProxyFiles(s3ClientManager, config))),
     system.actorOf(Props(new UpdateIndexRecords(indexer, proxyLocationDAO))),
-    system.actorOf(Props(new DeleteOriginalFiles(s3ClientManager, indexer)))
+    system.actorOf(Props(new DeleteOriginalFiles(s3ClientManager, indexer, config)))
   )
 
   def runNextActorInChain(initialData:FileMoveTransientData, otherSteps:Seq[ActorRef]):Future[Either[StepFailed,StepSucceeded]] = {
@@ -98,22 +103,37 @@ class FileMoveActor @Inject() (config:Configuration,
   }
 
   override def receive:Receive = {
-    case MoveFile(sourceFileId, destination)=>
+    case MoveFile(sourceFileId, destination, isAsync)=>
       val originalSender = sender()
-      val setupData = FileMoveTransientData.initialise(sourceFileId, destination.bucketName,destination.proxyBucket)
+      val newJob = JobModel.newJob("FileMove",sourceFileId,SourceType.SRC_MEDIA).copy(jobStatus = JobStatus.ST_RUNNING)
+      jobModelDAO.putJob(newJob).map({
+        case Some(Right(_)) | None =>
+          val setupData = FileMoveTransientData.initialise(sourceFileId, destination.bucketName, destination.proxyBucket, destination.region)
 
-      logger.info(s"Setting up file move with initial data $setupData")
-      runNextActorInChain(setupData, fileMoveChain).map({
-        case Right(_) =>
-          logger.info(s"File move for $sourceFileId -> ${destination.bucketName} completed successfully")
-          originalSender ! MoveSuccess
-        case Left(errMsg) =>
-          logger.error(s"File move for $sourceFileId -> ${destination.bucketName} failed: ${errMsg.err}")
-          originalSender ! MoveFailed(errMsg.err)
-      }).recover({
-        case err:Throwable=>
-          logger.error(s"File move processor crashed: ", err)
-          originalSender ! akka.actor.Status.Failure(err)
+          logger.info(s"Setting up file move with initial data $setupData")
+          runNextActorInChain(setupData, fileMoveChain).map({
+            case Right(_) =>
+              logger.info(s"File move for $sourceFileId -> ${destination.bucketName} completed successfully")
+              val finalJob = newJob.copy(jobStatus = JobStatus.ST_SUCCESS, completedAt = Some(ZonedDateTime.now()))
+              jobModelDAO.putJob(finalJob)
+              originalSender ! MoveSuccess
+            case Left(errMsg) =>
+              logger.error(s"File move for $sourceFileId -> ${destination.bucketName} failed: ${errMsg.err}")
+              val finalJob = newJob.copy(jobStatus = JobStatus.ST_ERROR, log=Some(errMsg.err), completedAt = Some(ZonedDateTime.now()))
+              jobModelDAO.putJob(finalJob)
+              originalSender ! MoveFailed(errMsg.err)
+          }).recover({
+            case err: Throwable =>
+              val finalJob = newJob.copy(jobStatus = JobStatus.ST_ERROR, log=Some(err.toString), completedAt = Some(ZonedDateTime.now()))
+              jobModelDAO.putJob(finalJob)
+              logger.error(s"File move processor crashed: ", err)
+              originalSender ! akka.actor.Status.Failure(err)
+          })
+          if(isAsync){
+            originalSender ! MoveAsync(newJob.jobId)
+          }
+        case Some(Left(err))=>
+          originalSender ! MoveFailed(err.toString)
       })
   }
 }

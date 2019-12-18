@@ -8,7 +8,7 @@ import play.api.{Configuration, Logger}
 import akka.pattern.ask
 import com.theguardian.multimedia.archivehunter.common.ProxyLocationDAO
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager}
-import com.theguardian.multimedia.archivehunter.common.cmn_models.ScanTarget
+import com.theguardian.multimedia.archivehunter.common.cmn_models.{JobModelDAO, ScanTarget}
 import org.specs2.mock.Mockito
 import services.FileMove.GenericMoveActor
 import services.FileMove.GenericMoveActor.{FileMoveTransientData, PerformStep}
@@ -51,7 +51,7 @@ class FileMoveActorSpec extends Specification with Mockito {
       val target = ScanTarget("some-bucket", true, None, 1234L, false, None, "some-proxy-bucket", "eu-west-1", None, None, None, None)
 
       val resultFuture = ac ? MoveFile("somesourcefileId", target)
-      val initialData = FileMoveTransientData.initialise("somesourcefileId", "some-bucket", "some-proxy-bucket")
+      val initialData = FileMoveTransientData.initialise("somesourcefileId", "some-bucket", "some-proxy-bucket","dest-region")
 
       probe1.expectMsg(5.seconds, PerformStep(initialData))
       logger.info(probe1.lastSender.toString)
@@ -91,7 +91,7 @@ class FileMoveActorSpec extends Specification with Mockito {
           val target = ScanTarget("some-bucket", true, None, 1234L, false, None, "some-proxy-bucket", "eu-west-1", None, None, None, None)
 
           val resultFuture = ac ? MoveFile("somesourcefileId", target)
-          val initialData = FileMoveTransientData.initialise("somesourcefileId", "some-bucket", "some-proxy-bucket")
+          val initialData = FileMoveTransientData.initialise("somesourcefileId", "some-bucket", "some-proxy-bucket","dest-region")
 
           probe1.expectMsg(5.seconds, PerformStep(initialData))
           val updatedStage1 = initialData.copy(destFileId=Some("dest-file-id"))
@@ -116,6 +116,7 @@ class FileMoveActorSpec extends Specification with Mockito {
           val mockedESClientMgr = mock[ESClientManager]
           val mockedDynamoClientMgr = mock[DynamoClientManager]
           val mockedS3ClientMgr = mock[S3ClientManager]
+          val mockedJobModelDAO = mock[JobModelDAO]
           val probe1 = TestProbe()
           val probe2 = TestProbe()
           val probe3 = TestProbe()
@@ -126,6 +127,7 @@ class FileMoveActorSpec extends Specification with Mockito {
             mockedProxyLocationDAO,
             mockedESClientMgr,
             mockedDynamoClientMgr,
+            mockedJobModelDAO,
             mockedS3ClientMgr
           ) {
             override protected val fileMoveChain: Seq[ActorRef] = Seq(probe1.ref, probe2.ref, probe3.ref)
@@ -134,7 +136,7 @@ class FileMoveActorSpec extends Specification with Mockito {
           val target = ScanTarget("some-bucket", true, None, 1234L, false, None, "some-proxy-bucket", "eu-west-1", None, None, None, None)
 
           val resultFuture = ac ? MoveFile("somesourcefileId", target)
-          val initialData = FileMoveTransientData.initialise("somesourcefileId", "some-bucket", "some-proxy-bucket")
+          val initialData = FileMoveTransientData.initialise("somesourcefileId", "some-bucket", "some-proxy-bucket","dest-region")
 
           probe1.expectMsg(5.seconds, PerformStep(initialData))
           probe1.reply(StepSucceeded(initialData))

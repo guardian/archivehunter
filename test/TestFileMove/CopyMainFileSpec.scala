@@ -11,6 +11,7 @@ import com.theguardian.multimedia.archivehunter.common.clientManagers.S3ClientMa
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, DocId, MimeType, StorageClass}
 import org.specs2.mock.Mockito
 import org.specs2.mutable.Specification
+import play.api.Configuration
 import services.FileMove.CopyMainFile
 import services.FileMove.GenericMoveActor._
 
@@ -33,7 +34,7 @@ class CopyMainFileSpec extends Specification with Mockito with DocId {
       val testItem = ArchiveEntry("fake-id","sourcebucket","/path/to/file",None,None,1234L,ZonedDateTime.now(),"fake-etag",
         MimeType.fromString("video/quicktime").right.get,true,StorageClass.STANDARD_IA,Seq(), false,None)
 
-      val request = FileMoveTransientData("fake-id",Some(testItem),None,None,None,"destBucket","destProxies")
+      val request = FileMoveTransientData("fake-id",Some(testItem),None,None,None,"destBucket","destProxies","dest-region")
 
       val actor = system.actorOf(Props(new CopyMainFile(mockedClientMgr)))
 
@@ -54,7 +55,7 @@ class CopyMainFileSpec extends Specification with Mockito with DocId {
       val testItem = ArchiveEntry("fake-id","sourcebucket","/path/to/file",None,None,1234L,ZonedDateTime.now(),"fake-etag",
         MimeType.fromString("video/quicktime").right.get,true,StorageClass.STANDARD_IA,Seq(), false,None)
 
-      val request = FileMoveTransientData("fake-id",Some(testItem),None,None,None,"destBucket","destProxies")
+      val request = FileMoveTransientData("fake-id",Some(testItem),None,None,None,"destBucket","destProxies", "dest-region")
 
       val actor = system.actorOf(Props(new CopyMainFile(mockedClientMgr)))
 
@@ -80,9 +81,9 @@ class CopyMainFileSpec extends Specification with Mockito with DocId {
       val testItem = ArchiveEntry("fake-id","sourcebucket","/path/to/file",None,None,1234L,ZonedDateTime.now(),"fake-etag",
         MimeType.fromString("video/quicktime").right.get,true,StorageClass.STANDARD_IA,Seq(), false,None)
 
-      val request = FileMoveTransientData("fake-id",Some(testItem),None,None,None,"destBucket","destProxies")
+      val request = FileMoveTransientData("fake-id",Some(testItem),None,None,None,"destBucket","destProxies","dest-region")
 
-      val actor = system.actorOf(Props(new CopyMainFile(mockedClientMgr)))
+      val actor = system.actorOf(Props(new CopyMainFile(mockedClientMgr, Configuration.empty)))
 
       val result = Await.result(actor ? RollbackStep(request), 30 seconds).asInstanceOf[MoveActorMessage]
 
@@ -103,9 +104,9 @@ class CopyMainFileSpec extends Specification with Mockito with DocId {
       val testItem = ArchiveEntry("fake-id","sourcebucket","/path/to/file",None,None,1234L,ZonedDateTime.now(),"fake-etag",
         MimeType.fromString("video/quicktime").right.get,true,StorageClass.STANDARD_IA,Seq(), false,None)
 
-      val request = FileMoveTransientData("fake-id",Some(testItem),None,None,None,"destBucket","destProxies")
+      val request = FileMoveTransientData("fake-id",Some(testItem),None,None,None,"destBucket","destProxies","dest-region")
 
-      val actor = system.actorOf(Props(new CopyMainFile(mockedClientMgr)))
+      val actor = system.actorOf(Props(new CopyMainFile(mockedClientMgr, Configuration.empty)))
 
       val result = Await.result(actor ? RollbackStep(request), 30 seconds).asInstanceOf[MoveActorMessage]
 

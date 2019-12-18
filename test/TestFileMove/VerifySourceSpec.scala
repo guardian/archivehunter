@@ -68,7 +68,7 @@ class VerifySourceSpec extends Specification with Mockito {
       val mockedProxyDAO = mock[ProxyLocationDAO]
       mockedProxyDAO.getAllProxiesFor(any)(any) returns Future(mockedProxyData.map(entry=>Right(entry)))
 
-      val initialData = FileMoveTransientData.initialise("source-entry-id","dest-bucket","dest-proxy-bucket")
+      val initialData = FileMoveTransientData.initialise("source-entry-id","dest-bucket","dest-proxy-bucket","dest-region")
       initialData.sourceFileProxies must beNone
       initialData.entry must beNone
 
@@ -94,7 +94,7 @@ class VerifySourceSpec extends Specification with Mockito {
       val mockedProxyDAO = mock[ProxyLocationDAO]
       mockedProxyDAO.getAllProxiesFor(any)(any) returns Future.failed(new RuntimeException("should not get here"))
 
-      val initialData = FileMoveTransientData.initialise("source-entry-id","dest-bucket","dest-proxy-bucket")
+      val initialData = FileMoveTransientData.initialise("source-entry-id","dest-bucket","dest-proxy-bucket","dest-region")
       initialData.sourceFileProxies must beNone
       initialData.entry must beNone
 
@@ -121,7 +121,7 @@ class VerifySourceSpec extends Specification with Mockito {
       val mockedProxyDAO = mock[ProxyLocationDAO]
       mockedProxyDAO.getAllProxiesFor(any)(any) returns Future.failed(new RuntimeException("should not get here"))
 
-      val initialData = FileMoveTransientData.initialise("source-entry-id","dest-bucket","dest-proxy-bucket")
+      val initialData = FileMoveTransientData.initialise("source-entry-id","dest-bucket","dest-proxy-bucket","dest-region")
       initialData.sourceFileProxies must beNone
       initialData.entry must beNone
 
@@ -176,7 +176,7 @@ class VerifySourceSpec extends Specification with Mockito {
       val mockedProxyDAO = mock[ProxyLocationDAO]
       mockedProxyDAO.getAllProxiesFor(any)(any) returns Future(mockedProxyData.map(entry=>Right(entry)) :+ Left(mockedError))
 
-      val initialData = FileMoveTransientData.initialise("source-entry-id","dest-bucket","dest-proxy-bucket")
+      val initialData = FileMoveTransientData.initialise("source-entry-id","dest-bucket","dest-proxy-bucket","dest-region")
       initialData.sourceFileProxies must beNone
       initialData.entry must beNone
 
@@ -202,7 +202,7 @@ class VerifySourceSpec extends Specification with Mockito {
       val mockedProxyDAO = mock[ProxyLocationDAO]
       mockedProxyDAO.getAllProxiesFor(any)(any) returns Future.failed(new RuntimeException("should not get here"))
 
-      val initialData = FileMoveTransientData.initialise("source-entry-id","dest-bucket","dest-proxy-bucket")
+      val initialData = FileMoveTransientData.initialise("source-entry-id","dest-bucket","dest-proxy-bucket","dest-region")
       initialData.sourceFileProxies must beNone
       initialData.entry must beNone
 
@@ -245,7 +245,7 @@ class VerifySourceSpec extends Specification with Mockito {
       val mockedProxyDAO = mock[ProxyLocationDAO]
       mockedProxyDAO.getAllProxiesFor(any)(any) returns Future.failed(new RuntimeException("Aiiiiiiee!"))
 
-      val initialData = FileMoveTransientData.initialise("source-entry-id","dest-bucket","dest-proxy-bucket")
+      val initialData = FileMoveTransientData.initialise("source-entry-id","dest-bucket","dest-proxy-bucket","dest-region")
       initialData.sourceFileProxies must beNone
       initialData.entry must beNone
 
@@ -268,7 +268,7 @@ class VerifySourceSpec extends Specification with Mockito {
       implicit val mockedDynamoClient = mock[DynamoClient]
       val mockedIndexer = mock[Indexer]
       val mockedProxyDAO = mock[ProxyLocationDAO]
-      val initialData = FileMoveTransientData.initialise("source-entry-id","dest-bucket","dest-proxy-bucket")
+      val initialData = FileMoveTransientData.initialise("source-entry-id","dest-bucket","dest-proxy-bucket","dest-region")
       initialData.sourceFileProxies must beNone
       initialData.entry must beNone
 

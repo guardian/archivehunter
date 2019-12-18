@@ -51,7 +51,8 @@ class DeleteOriginalFileSpec extends Specification with Mockito {
         Some(sourceProxyList),
         Some(destProxyList),
         "dest-bucket",
-        "dest-proxy-bucket"
+        "dest-proxy-bucket",
+        "dest-region"
       )
       val result = Await.result((actor ? PerformStep(jobState) ).mapTo[MoveActorMessage], 30 seconds)
 
@@ -103,7 +104,8 @@ class DeleteOriginalFileSpec extends Specification with Mockito {
         Some(sourceProxyList),
         Some(destProxyList),
         "dest-bucket",
-        "dest-proxy-bucket"
+        "dest-proxy-bucket",
+        "dest-region"
       )
       val result = Await.result((actor ? PerformStep(jobState) ).mapTo[MoveActorMessage], 30 seconds)
 
@@ -157,7 +159,8 @@ class DeleteOriginalFileSpec extends Specification with Mockito {
         Some(sourceProxyList),
         Some(destProxyList),
         "dest-bucket",
-        "dest-proxy-bucket"
+        "dest-proxy-bucket",
+        "dest-region"
       )
       val result = Await.result((actor ? PerformStep(jobState) ).mapTo[MoveActorMessage], 30 seconds)
 

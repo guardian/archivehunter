@@ -23,16 +23,20 @@ class VerifySource(indexer:Indexer, proxyLocationDAO:ProxyLocationDAO)(implicit 
     case PerformStep(currentState)=>
       val originalSender = sender()
 
+      logger.debug(s"in verifySource")
       indexer.getByIdFull(currentState.sourceFileId).flatMap({
         case Left(ItemNotFound(_))=>
           logger.warn(s"Requested file id ${currentState.sourceFileId} does not exist")
           originalSender ! StepFailed(currentState, s"Requested file id ${currentState.sourceFileId} does not exist")
           Future( () )
         case Left(err)=>
+          logger.error(s"Could not look up ${currentState.sourceFileId}: $err")
           originalSender ! StepFailed(currentState, err.toString)
           Future( () )
         case Right(entry)=>
+          logger.debug(s"Got entry ${entry.bucket}:${entry.path}")
           proxyLocationDAO.getAllProxiesFor(currentState.sourceFileId).map(results=>{
+            logger.debug(s"Got ${results.length} proxies for ${currentState.sourceFileId}")
             val failures = results.collect({case Left(err)=>err})
             if(failures.nonEmpty){
               originalSender ! StepFailed(currentState, failures.map(_.toString).mkString(","))

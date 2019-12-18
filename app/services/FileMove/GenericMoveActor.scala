@@ -13,11 +13,12 @@ object GenericMoveActor {
                                    sourceFileProxies:Option[Seq[ProxyLocation]],
                                    destFileProxy:Option[Seq[ProxyLocation]],
                                    destBucket:String,
-                                   destProxyBucket:String)
+                                   destProxyBucket:String,
+                                   destRegion:String)
 
   object FileMoveTransientData {
-    def initialise(sourceFileId:String, destBucket:String, destProxyBucket:String) = {
-      new FileMoveTransientData(sourceFileId,None,None,None,None,destBucket,destProxyBucket)
+    def initialise(sourceFileId:String, destBucket:String, destProxyBucket:String,destRegion:String) = {
+      new FileMoveTransientData(sourceFileId,None,None,None,None,destBucket,destProxyBucket,destRegion)
     }
   }
 

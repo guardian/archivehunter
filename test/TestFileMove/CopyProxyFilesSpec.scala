@@ -7,6 +7,7 @@ import com.theguardian.multimedia.archivehunter.common.{DocId, ProxyLocation, Pr
 import com.theguardian.multimedia.archivehunter.common.clientManagers.S3ClientManager
 import org.specs2.mock.Mockito
 import org.specs2.mutable.Specification
+import play.api.Configuration
 import services.FileMove.CopyProxyFiles
 
 import scala.concurrent.Await
@@ -33,11 +34,11 @@ class CopyProxyFilesSpec extends Specification with Mockito with DocId {
         ProxyLocation("source-file-id","proxyid2",ProxyType.AUDIO,"source-proxy-bucket","path/to/proxy2",None,StorageClass.STANDARD),
         ProxyLocation("source-file-id","proxyid3",ProxyType.THUMBNAIL,"source-proxy-bucket","path/to/proxy3",None,StorageClass.STANDARD),
       )
-      val data = FileMoveTransientData("source-file-id",None,Some("dest-file-id"),Some(sourceProxyList),None,"dest-media-bucket","dest-proxy-bucket")
+      val data = FileMoveTransientData("source-file-id",None,Some("dest-file-id"),Some(sourceProxyList),None,"dest-media-bucket","dest-proxy-bucket","dest-region")
 
       val testMsg = PerformStep(data)
 
-      val actor = system.actorOf(Props(new CopyProxyFiles(mockedClientMgr)))
+      val actor = system.actorOf(Props(new CopyProxyFiles(mockedClientMgr, Configuration.empty)))
 
       val result = Await.result(actor ? testMsg, 30 seconds).asInstanceOf[MoveActorMessage]
 
@@ -84,11 +85,11 @@ class CopyProxyFilesSpec extends Specification with Mockito with DocId {
         ProxyLocation("source-file-id","proxyid2",ProxyType.AUDIO,"source-proxy-bucket","path/to/proxy2",None,StorageClass.STANDARD),
         ProxyLocation("source-file-id","proxyid3",ProxyType.THUMBNAIL,"source-proxy-bucket","path/to/proxy3",None,StorageClass.STANDARD),
       )
-      val data = FileMoveTransientData("source-file-id",None,Some("dest-file-id"),Some(sourceProxyList),None,"dest-media-bucket","dest-proxy-bucket")
+      val data = FileMoveTransientData("source-file-id",None,Some("dest-file-id"),Some(sourceProxyList),None,"dest-media-bucket","dest-proxy-bucket","dest-region")
 
       val testMsg = PerformStep(data)
 
-      val actor = system.actorOf(Props(new CopyProxyFiles(mockedClientMgr)))
+      val actor = system.actorOf(Props(new CopyProxyFiles(mockedClientMgr, Configuration.empty)))
 
       val result = Await.result(actor ? testMsg, 30 seconds).asInstanceOf[MoveActorMessage]
       result must beAnInstanceOf[StepFailed]
@@ -117,11 +118,11 @@ class CopyProxyFilesSpec extends Specification with Mockito with DocId {
         ProxyLocation("source-file-id","proxyid2",ProxyType.AUDIO,"source-proxy-bucket","path/to/proxy2",None,StorageClass.STANDARD),
         ProxyLocation("source-file-id","proxyid3",ProxyType.THUMBNAIL,"source-proxy-bucket","path/to/proxy3",None,StorageClass.STANDARD),
       )
-      val data = FileMoveTransientData("source-file-id",None,Some("dest-file-id"),Some(sourceProxyList),None,"dest-media-bucket","dest-proxy-bucket")
+      val data = FileMoveTransientData("source-file-id",None,Some("dest-file-id"),Some(sourceProxyList),None,"dest-media-bucket","dest-proxy-bucket","dest-region")
 
       val testMsg = RollbackStep(data)
 
-      val actor = system.actorOf(Props(new CopyProxyFiles(mockedClientMgr)))
+      val actor = system.actorOf(Props(new CopyProxyFiles(mockedClientMgr,Configuration.empty)))
 
       val result = Await.result(actor ? testMsg, 30 seconds).asInstanceOf[MoveActorMessage]
 

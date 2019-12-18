@@ -12,10 +12,11 @@ import play.api.Configuration
 import play.api.libs.circe.Circe
 import play.api.libs.ws.WSClient
 import play.api.mvc.{AbstractController, ControllerComponents}
-import responses.GenericErrorResponse
+import responses.{GenericErrorResponse, ObjectGetResponse}
 import akka.pattern.ask
 import services.FileMove.GenericMoveActor.MoveActorMessage
 import services.FileMoveActor
+
 import scala.concurrent.duration._
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -49,7 +50,9 @@ class FileMoveController @Inject()(override val config:Configuration,
         logger.error(s"Could not look up scan target in dynamo: ${dbError.toString}")
         Future(InternalServerError(GenericErrorResponse("db_error",dbError.toString).asJson))
       case Some(Right(scanTarget))=>
-        (fileMoveActor ? FileMoveActor.MoveFile(fileId, scanTarget)).mapTo[MoveActorMessage].map({
+        (fileMoveActor ? FileMoveActor.MoveFile(fileId, scanTarget, async=true)).mapTo[MoveActorMessage].map({
+          case FileMoveActor.MoveAsync(jobId)=>
+            Ok(ObjectGetResponse("ok","jobId",jobId).asJson)
           case FileMoveActor.MoveSuccess=>
             Ok(GenericErrorResponse("ok","Move succeeded").asJson)
           case FileMoveActor.MoveFailed(err)=>

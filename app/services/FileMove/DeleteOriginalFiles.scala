@@ -3,6 +3,7 @@ package services.FileMove
 import com.amazonaws.services.s3.AmazonS3
 import com.theguardian.multimedia.archivehunter.common.clientManagers.S3ClientManager
 import com.theguardian.multimedia.archivehunter.common.{DocId, Indexer, ProxyLocation}
+import play.api.Configuration
 
 import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
@@ -13,7 +14,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
   * @param s3ClientMgr An instance of [[S3ClientManager]] to obtain S3 client objects for the relevant region
   * @param indexer an instance of [[Indexer]] to access content in the main index
   */
-class DeleteOriginalFiles(s3ClientMgr:S3ClientManager, indexer:Indexer) extends GenericMoveActor with DocId {
+class DeleteOriginalFiles(s3ClientMgr:S3ClientManager, indexer:Indexer, config:Configuration) extends GenericMoveActor with DocId {
   import GenericMoveActor._
 
   /**
@@ -25,16 +26,16 @@ class DeleteOriginalFiles(s3ClientMgr:S3ClientManager, indexer:Indexer) extends 
     * @param destPath path to the destination file
     * @return either a message explaining why the files don't match (one does not exist, size mistmatch, checksum mismatch) or a Right with no contents if they do
     */
-  protected def verifyFile(srcBucket:String, srcPath:String, destBucket:String, destPath:String)(implicit s3Client:AmazonS3):Either[String, Unit] = {
-    if(!s3Client.doesObjectExist(destBucket, destPath)){
+  protected def verifyFile(srcBucket:String, srcPath:String, destBucket:String, destPath:String, sourceClient:AmazonS3, destClient:AmazonS3):Either[String, Unit] = {
+    if(!destClient.doesObjectExist(destBucket, destPath)){
       return Left(s"Destination file s3://$destBucket/$destPath does not exist")
     }
-    if(!s3Client.doesObjectExist(srcBucket, srcPath)){
+    if(!sourceClient.doesObjectExist(srcBucket, srcPath)){
       return Left(s"Source file s3://$srcBucket/$srcPath does not exist")
     }
 
-    val destFileMeta = s3Client.getObjectMetadata(destBucket, destPath)
-    val srcFileMeta = s3Client.getObjectMetadata(srcBucket, srcPath)
+    val destFileMeta = destClient.getObjectMetadata(destBucket, destPath)
+    val srcFileMeta = sourceClient.getObjectMetadata(srcBucket, srcPath)
 
     if(destFileMeta.getContentLength!=srcFileMeta.getContentLength){
       return Left(s"Destination size was ${destFileMeta.getContentLength} vs ${srcFileMeta.getContentLength}")
@@ -56,10 +57,10 @@ class DeleteOriginalFiles(s3ClientMgr:S3ClientManager, indexer:Indexer) extends 
     * @param state [[FileMoveTransientData]] giving the state of the move
     * @return either a string indicating why the file is not good or the Unit value
     */
-  def verifyNewMedia(state:FileMoveTransientData)(implicit s3Client:AmazonS3):Either[String,Unit] = {
+  def verifyNewMedia(state:FileMoveTransientData, sourceClient:AmazonS3, destClient:AmazonS3):Either[String,Unit] = {
     val archiveEntry = state.entry.get
 
-    verifyFile(archiveEntry.bucket, archiveEntry.path, state.destBucket, archiveEntry.path)
+    verifyFile(archiveEntry.bucket, archiveEntry.path, state.destBucket, archiveEntry.path, sourceClient, destClient)
   }
 
   /**
@@ -68,7 +69,7 @@ class DeleteOriginalFiles(s3ClientMgr:S3ClientManager, indexer:Indexer) extends 
     * @param s3Client implicitly provided s3Client for the correct region
     * @return either a string indicating why the file is not good or the Unit value
     */
-  def verifyProxyFiles(state:FileMoveTransientData)(implicit s3Client:AmazonS3):Either[String,Unit] = {
+  def verifyProxyFiles(state:FileMoveTransientData, sourceClient:AmazonS3, destClient:AmazonS3):Either[String,Unit] = {
     if (state.sourceFileProxies.isEmpty) {
       logger.warn(s"No source file proxies to verify")
       return Right(())
@@ -96,7 +97,7 @@ class DeleteOriginalFiles(s3ClientMgr:S3ClientManager, indexer:Indexer) extends 
     def recursiveVerify(srcProxyList: Seq[ProxyLocation], dstProxyList: Seq[ProxyLocation]): Either[String, Unit] = {
       if (srcProxyList.isEmpty) return Right(())
 
-      verifyFile(srcProxyList.head.bucketName, srcProxyList.head.bucketPath, dstProxyList.head.bucketName, dstProxyList.head.bucketPath) match {
+      verifyFile(srcProxyList.head.bucketName, srcProxyList.head.bucketPath, dstProxyList.head.bucketName, dstProxyList.head.bucketPath, sourceClient, destClient) match {
         case Right(_) =>
           recursiveVerify(srcProxyList.tail, dstProxyList.tail)
         case problem@Left(_) => problem
@@ -142,13 +143,14 @@ class DeleteOriginalFiles(s3ClientMgr:S3ClientManager, indexer:Indexer) extends 
   override def receive: Receive = {
     case PerformStep(state)=>
       //verify new media and proxy files. only if both match do the deletion
-      implicit val s3Client:AmazonS3 = s3ClientMgr.getS3Client(region=state.entry.flatMap(_.region))
-      verifyNewMedia(state).map(_=>verifyProxyFiles(state)) match {
+      val sourceClient:AmazonS3 = s3ClientMgr.getS3Client(profileName=config.getOptional[String]("externalData.awsProfile"),region=state.entry.flatMap(_.region))
+      val destClient:AmazonS3 = s3ClientMgr.getS3Client(profileName=config.getOptional[String]("externalData.awsProfile"),region=Some(state.destRegion))
+      verifyNewMedia(state, sourceClient, destClient).map(_=>verifyProxyFiles(state, sourceClient, destClient)) match {
         case Left(problem)=>
           sender() ! StepFailed(state, problem)
         case Right(_)=> //media and proxies both verified, can proceed to deletion.
           val originalSender = sender()
-          deleteAllFor(state).onComplete({
+          deleteAllFor(state)(sourceClient).onComplete({
             case Success(Right(_))=>
               logger.info(s"Deletion completed")
               val updatedState = state.copy(sourceFileProxies = None)
