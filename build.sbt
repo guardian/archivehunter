@@ -63,6 +63,7 @@ lazy val `archivehunter` = (project in file("."))
       "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
       "com.typesafe.akka" %% "akka-persistence" % akkaVersion,
       "com.typesafe.akka" %% "akka-cluster-sharding" % akkaVersion,
+      "com.gu" % "kinesis-logback-appender" % "1.4.4",
       "org.apache.logging.log4j" % "log4j-api" % "2.8.2",
       // Only if you are using Akka Testkit
       "com.typesafe.akka" %% "akka-testkit" % akkaVersion,
