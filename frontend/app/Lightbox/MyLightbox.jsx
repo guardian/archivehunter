@@ -28,7 +28,6 @@ class MyLightbox extends CommonSearchView {
             selectedUser: "my",
             showingArchiveSpinner: false,
             selectedRestoreStatus: null,
-            showRedoButton: true,
             pageSize: 500
         };
 
@@ -126,11 +125,11 @@ class MyLightbox extends CommonSearchView {
     }
 
     componentDidUpdate(prevProps, prevState, snapshot) {
-        if(prevState.showingPreview!==this.state.showingPreview) this.setState({selectedRestoreStatus: null, showRedoButton: true, extraInfo: ""});
+        if(prevState.showingPreview!==this.state.showingPreview) this.setState({selectedRestoreStatus: null, extraInfo: ""});
     }
 
     bulkSelectionChanged(newValue){
-        this.setState({bulkSelectionSelected: newValue, selectedRestoreStatus: null, showRedoButton: true, extraInfo: ""}, this.reloadSearch);
+        this.setState({bulkSelectionSelected: newValue, selectedRestoreStatus: null, extraInfo: ""}, this.reloadSearch);
     }
 
     shouldHideAvailability(entry){
@@ -179,7 +178,7 @@ class MyLightbox extends CommonSearchView {
 
                 this.updateSearchResults(updatedEntry, itemIndex, this.state.showingPreview.id).then(()=>{
                     if(response.data.restoreStatus==="RS_UNNEEDED"){
-                        this.setState({showingArchiveSpinner: false, showRedoButton: false, extraInfo: "Not in deep-freeze"})
+                        this.setState({showingArchiveSpinner: false, extraInfo: "Not in deep-freeze"})
                     } else if(this.state.extraInfo!==""){
                         this.setState({showingArchiveSpinner: false, selectedRestoreStatus: response.data.restoreStatus, extraInfo: ""})
                     }
@@ -197,11 +196,11 @@ class MyLightbox extends CommonSearchView {
         return ""
     }
 
-    displayRedo(){
-        if(this.state.showRedoButton) {
-            return "Redo restore";
-        } else {
+    displayRedo(status){
+        if(status==='RS_UNNEEDED') {
             return "";
+        } else {
+            return "Redo restore";
         }
     }
 
@@ -217,7 +216,7 @@ class MyLightbox extends CommonSearchView {
                 extraInfo={this.state.extraInfo}
             />
             <p className="centered small"><a style={{cursor: "pointer"}} onClick={this.checkArchiveStatus}>Re-check</a></p>
-            <p className="centered small"><a style={{cursor: "pointer"}} onClick={this.redoRestore}>{this.displayRedo()}</a><LoadingThrobber show={this.state.showingArchiveSpinner} small={true}/> </p>
+            <p className="centered small"><a style={{cursor: "pointer"}} onClick={this.redoRestore}>{this.displayRedo(this.state.showingPreview ? this.state.showingPreview.details.restoreStatus : "")}</a><LoadingThrobber show={this.state.showingArchiveSpinner} small={true}/> </p>
             <p className="centered small information" style={{display: this.state.selectedRestoreStatus ? "block": "none"}}>
                 {this.state.selectedRestoreStatus}
             </p>
