@@ -37,7 +37,6 @@ class MyLightbox extends CommonSearchView {
         this.bulkSearchDeleteRequested = this.bulkSearchDeleteRequested.bind(this);
         this.userChanged = this.userChanged.bind(this);
         this.redoRestore = this.redoRestore.bind(this);
-        this.displayRedo = this.displayRedo.bind(this);
     }
 
     performLoad(){
