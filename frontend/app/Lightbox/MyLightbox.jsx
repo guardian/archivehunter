@@ -204,6 +204,14 @@ class MyLightbox extends CommonSearchView {
         }
     }
 
+    displayInfo(status){
+        if(status==='RS_UNNEEDED') {
+            return "Not in deep freeze";
+        } else {
+            return this.state.extraInfo;
+        }
+    }
+
     render(){
         /**
          * this describes an "insert" into the standard entry details view, to provide lightbox-specific data
@@ -213,7 +221,8 @@ class MyLightbox extends CommonSearchView {
                 entry={this.state.showingPreview && this.state.showingPreview.details ?
                             this.state.showingPreview.details : null
                 }
-                extraInfo={this.state.extraInfo}
+                extraInfo={this.displayInfo(this.state.showingPreview ? this.state.showingPreview.details.restoreStatus : "")}
+                iconName="file"
             />
             <p className="centered small"><a style={{cursor: "pointer"}} onClick={this.checkArchiveStatus}>Re-check</a></p>
             <p className="centered small"><a style={{cursor: "pointer"}} onClick={this.redoRestore}>{this.displayRedo(this.state.showingPreview ? this.state.showingPreview.details.restoreStatus : "")}</a><LoadingThrobber show={this.state.showingArchiveSpinner} small={true}/> </p>
