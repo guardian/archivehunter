@@ -695,6 +695,18 @@ Resources:
           Action: sts:AssumeRole
       Path: "/"
       Policies:
+      - PolicyName: KinesisLogging
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+            Effect: Allow
+            Action:
+              - kinesis:Describe*
+              - kinesis:List*
+              - kinesis:PutRecord
+              - kinesis:PutRecords
+            Resource:
+              - !Sub arn:aws:kinesis:${AWS::Region}:${AWS::AccountId}:stream/${LoggingStreamName}
       - PolicyName: DataAccess
         PolicyDocument:
           Version: 2012-10-17
@@ -1110,7 +1122,12 @@ Resources:
           EOF
 
           cat /usr/share/archivehunter/conf/logback-deployment.xml | sed s/{region}/${AWS::Region}/ > /tmp/logback.xml
-          cat /tmp/logback.xml | sed s/{logging-stream}/${LoggingStreamName}/ > /usr/share/archivehunter/conf/logback.xml
+          cat /tmp/logback.xml | sed s/{app}/${App}/ > /tmp/logback.xml.2
+          cat /tmp/logback.xml.2 | sed s/{stack}/${Stack}/ > /tmp/logback.xml.3
+          cat /tmp/logback.xml.3 | sed s/{stage}/${Stage}/ > /tmp/logback.xml.4
+          cat /tmp/logback.xml.4 | sed s/{logging-stream}/${LoggingStreamName}/ > /usr/share/archivehunter/conf/logback.xml
+
+          rm -f /tmp/logback.xml*
 
           systemctl restart archivehunter
           systemctl enable archivehunter

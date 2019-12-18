@@ -29,7 +29,7 @@
         <streamName>{logging-stream}</streamName>
         <encoding>UTF-8</encoding>
         <layout class="ch.qos.logback.classic.PatternLayout">
-            <pattern>%date{"yyyy-MM-dd'T'HH:mm:ss,SSSXXX"} [%level] from %logger in %thread - %message%n%xException</pattern>
+            <pattern>%date{"yyyy-MM-dd'T'HH:mm:ss,SSSXXX"} |{app}|{stage}| [%level] from %logger in %thread - %message%n%xException</pattern>
         </layout>
     </appender>
 
