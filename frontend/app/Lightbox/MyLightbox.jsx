@@ -28,7 +28,8 @@ class MyLightbox extends CommonSearchView {
             selectedUser: "my",
             showingArchiveSpinner: false,
             selectedRestoreStatus: null,
-            pageSize: 500
+            pageSize: 500,
+            expiryDays: 3
         };
 
         this.checkArchiveStatus = this.checkArchiveStatus.bind(this);
@@ -44,7 +45,8 @@ class MyLightbox extends CommonSearchView {
         const summaryRequest = axios.get("/api/search/myLightBox?user=" + this.state.selectedUser + "&size=" + this.state.pageSize);
         const loginDetailsRequest = axios.get("/api/loginStatus");
         const bulkSelectionsRequest = axios.get("/api/lightbox/" + this.state.selectedUser+"/bulks");
-        return Promise.all([detailsRequest, summaryRequest, loginDetailsRequest, bulkSelectionsRequest]);
+        const configRequest = axios.get("/api/config");
+        return Promise.all([detailsRequest, summaryRequest, loginDetailsRequest, bulkSelectionsRequest, configRequest]);
     }
 
     userChanged(evt){
@@ -57,6 +59,7 @@ class MyLightbox extends CommonSearchView {
             const summaryResult = results[1];   //this is an array
             const loginDetailsResult = results[2];  //this is a map of key->value
             const bulkSelectionsResult = results[3];    //this is an object with "entries" and "entryCount" fields
+            const configResult = results[4];
 
             this.setState({loading: false,
                 lastError: null,
@@ -67,7 +70,8 @@ class MyLightbox extends CommonSearchView {
                 ),
                 userDetails: loginDetailsResult.data,
                 bulkSelections: bulkSelectionsResult.data.entries,
-                bulkSelectionsCount: bulkSelectionsResult.data.entryCount
+                bulkSelectionsCount: bulkSelectionsResult.data.entryCount,
+                expiryDays: configResult.data.entries[0]
             })
         }).catch(err=>{
             console.error(err);
@@ -255,6 +259,7 @@ class MyLightbox extends CommonSearchView {
                                   currentSelection={this.state.bulkSelectionSelected}
                                   forUser={this.state.selectedUser}
                                   isAdmin={this.state.userDetails && this.state.userDetails.isAdmin}
+                                  expiryDays={this.state.expiryDays}
             />
             <BulkSelectionStats user={this.state.selectedUser} bulkId={this.state.bulkSelectionSelected}/>
 
