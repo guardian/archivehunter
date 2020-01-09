@@ -108,7 +108,7 @@ class BulkSelectionsScroll extends React.Component {
                             evt.stopPropagation();
                             this.props.onDeleteClicked(entry.id);
                         }}/>
-                        <span data-tip="Some or all of the media may have returned to the deep archive and may be unavailable."><ReactTooltip/><FontAwesomeIcon icon="exclamation-triangle" style={{marginRight: "6px" ,color: "red", float: "left", display: this.showExpiryWarning(entry.addedAt)}} /></span>
+                        <span data-tip="Some or all of the media may have returned to the deep archive and therefore be unavailable."><ReactTooltip/><FontAwesomeIcon icon="exclamation-triangle" style={{marginRight: "6px" ,color: "red", float: "left", display: this.showExpiryWarning(entry.addedAt)}} /></span>
                         <p className="entry-date black">Added <TimestampFormatter relative={true} value={entry.addedAt}/></p>
 
 
