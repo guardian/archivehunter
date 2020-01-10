@@ -4,6 +4,7 @@ import TimestampFormatter from "../common/TimestampFormatter.jsx";
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome";
 import axios from 'axios';
 import LoadingThrobber from "../common/LoadingThrobber.jsx";
+import ReactTooltip from "react-tooltip";
 
 class BulkSelectionsScroll extends React.Component {
     static propTypes = {
@@ -12,7 +13,8 @@ class BulkSelectionsScroll extends React.Component {
         onSelected: PropTypes.func,
         onDeleteClicked: PropTypes.func,
         forUser: PropTypes.string.isRequired,
-        isAdmin: PropTypes.boolean
+        isAdmin: PropTypes.boolean,
+        expiryDays: PropTypes.string.isRequired,
     };
 
     static nameExtractor = /^([^:]+):(.*)$/;
@@ -62,6 +64,17 @@ class BulkSelectionsScroll extends React.Component {
         })
     }
 
+    showExpiryWarning(addedAt) {
+        let date = Date.now()
+        let addedTime = Date.parse(addedAt)
+        let setting = this.props.expiryDays * 86400000
+        if ((date - addedTime) > setting) {
+            return "inline"
+        } else {
+            return "none"
+        }
+    }
+
     render(){
         return <div className="bulk-selections-scroll">
             {
@@ -95,6 +108,7 @@ class BulkSelectionsScroll extends React.Component {
                             evt.stopPropagation();
                             this.props.onDeleteClicked(entry.id);
                         }}/>
+                        <span data-tip="Some or all of the media may have returned to the deep archive and therefore be unavailable."><ReactTooltip/><FontAwesomeIcon icon="exclamation-triangle" style={{marginRight: "6px" ,color: "red", float: "left", display: this.showExpiryWarning(entry.addedAt)}} /></span>
                         <p className="entry-date black">Added <TimestampFormatter relative={true} value={entry.addedAt}/></p>
 
 
