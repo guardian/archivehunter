@@ -19,7 +19,7 @@ def get_token(uri, secret):
     string_to_sign = "{0}\n{1}".format(httpdate, url_parts.path)
     print("string_to_sign: " + string_to_sign)
     hm = hmac.new(secret.encode('utf-8'), string_to_sign.encode('utf-8'), hashlib.sha256)
-    return "HMAC {0}".format(base64.b64encode(hm.digest())), httpdate
+    return "HMAC {0}".format(base64.b64encode(hm.digest()).decode()), httpdate
 
 #START MAIN
 parser = OptionParser()
