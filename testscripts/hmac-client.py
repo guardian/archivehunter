@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/local/bin/python3
 
 import hashlib
 import hmac
@@ -8,7 +8,7 @@ import base64
 from email.utils import formatdate
 import requests
 from time import mktime
-from urlparse import urlparse
+from urllib.parse import urlparse
 from pprint import pprint
 import json
 
@@ -17,8 +17,8 @@ def get_token(uri, secret):
     url_parts = urlparse(uri)
 
     string_to_sign = "{0}\n{1}".format(httpdate, url_parts.path)
-    print "string_to_sign: " + string_to_sign
-    hm = hmac.new(secret, string_to_sign,hashlib.sha256)
+    print("string_to_sign: " + string_to_sign)
+    hm = hmac.new(secret.encode('utf-8'), string_to_sign.encode('utf-8'), hashlib.sha256)
     return "HMAC {0}".format(base64.b64encode(hm.digest())), httpdate
 
 #START MAIN
@@ -37,7 +37,7 @@ parser.add_option("--raw",dest="raw",help="Call the provided url and display the
 (options, args) = parser.parse_args()
 
 if options.secret is None:
-    print "You must supply the password in --secret"
+    print("You must supply the password in --secret")
     exit(1)
 
 if options.remove:
@@ -49,16 +49,16 @@ elif options.raw:
 else:
     uri = "https://{host}/api/proxy".format(host=options.host)
 
-print "uri is " + uri
+print("uri is " + uri)
 authtoken, httpdate = get_token(uri, options.secret)
-print authtoken
+print(authtoken)
 
 headers = {
         'X-Gu-Tools-HMAC-Date': httpdate,
         'X-Gu-Tools-HMAC-Token': authtoken,
 }
 
-print headers
+print(headers)
 extra_kwargs = {}
 if options.sslnoverify:
     extra_kwargs['verify'] = False
@@ -80,9 +80,9 @@ else:
     headers['Content-Type'] = "application/json"
     response = requests.post(uri, data=requestbody, headers=headers, **extra_kwargs)
 
-print "Server returned {0}".format(response.status_code)
+print("Server returned {0}".format(response.status_code))
 pprint(response.headers)
 if response.status_code==200:
     pprint(response.json())
 else:
-    print response.text
+    print(response.text)
