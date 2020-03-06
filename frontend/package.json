@@ -81,7 +81,7 @@
     "uuid": "^3.3.3",
     "webpack": "^4.41.2",
     "webpack-cli": "^3.3.10",
-    "yarn": "^1.21.0"
+    "yarn": "^1.22.0"
   },
   "license": "ISC"
 }
