@@ -65,9 +65,9 @@ class BulkSelectionsScroll extends React.Component {
     }
 
     showExpiryWarning(addedAt) {
-        let date = Date.now()
-        let addedTime = Date.parse(addedAt)
-        let setting = this.props.expiryDays * 86400000
+        let date = Date.now();
+        let addedTime = Date.parse(addedAt);
+        let setting = this.props.expiryDays * 86400000;
         if ((date - addedTime) > setting) {
             return "inline"
         } else {

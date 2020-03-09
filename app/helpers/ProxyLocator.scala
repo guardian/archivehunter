@@ -61,7 +61,7 @@ object ProxyLocator {
           .withPrefix(stripFileEnding(entry.path))
         val potentialProxies = s3Client.listObjectsV2(rq)
         logger.debug(s"findProxyLocation got ${potentialProxies.getKeyCount} keys")
-        Future.sequence(potentialProxies.getObjectSummaries.asScala.toSeq.map(summary=>{
+        Future.sequence(potentialProxies.getObjectSummaries.asScala.map(summary=>{
           ProxyLocation.fromS3(summary.getBucketName,summary.getKey, entry.bucket, entry.path)
         }))
     })
