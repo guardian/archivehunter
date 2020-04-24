@@ -53,7 +53,6 @@ GET     /api/proxyhealth/problemitems                       @controllers.ProxyHe
 GET     /api/proxyhealth/problemitems/collectionlist        @controllers.ProxyHealthController.collectionsWithProblems
 POST    /api/proxyhealth/triggerproblems/:collectionName    @controllers.ProxyHealthController.triggerProblemItemsFor(collectionName)
 
-
 GET     /api/job/all                            @controllers.JobController.getAllJobs(limit:Int ?=100, scanFrom:Option[String])
 GET     /api/job/:jobId                         @controllers.JobController.getJob(jobId)
 GET     /api/job/forFile/:fileId                @controllers.JobController.jobsFor(fileId)
@@ -85,6 +84,7 @@ GET     /api/config @controllers.ConfigController.getConfig
 
 GET     /api/download/:fileId           @controllers.LightboxController.getDownloadLink(fileId)
 
+PUT     /api/move/:fileId                       @controllers.FileMoveController.moveFile(fileId, to:String)
 GET     /api/archive/status/:fileId     @controllers.LightboxController.checkRestoreStatus(user:String ?= "my", fileId)
 GET     /api/archive/bulkStatus/:user/:bulkId   @controllers.LightboxController.bulkCheckRestoreStatus(user:String, bulkId:String)
 

@@ -31,6 +31,16 @@ final class DDBSink @Inject()(clientMgr: DynamoClientManager,config:Configuratio
 
       val table = Table[ProxyLocation](tableName)
 
+      /**
+        * if the provided Set of items contains duplicate database primary keys (from the perspective of Dynamo) then it fails.
+        * this function removes any duplicates of these keys so that we know that the update will succeed
+        * @return Iterable of unique ProxyLocation objects
+        */
+      def dedupeRecordBuffer:Iterable[ProxyLocation] = {
+        val recordBufferMap = recordBuffer.map(loc=>(loc.fileId,loc.proxyType)->loc).toMap
+        recordBufferMap.values
+      }
+
       setHandler(in, new AbstractInHandler {
         override def onPush(): Unit ={
           val elem=grab(in)
@@ -38,8 +48,9 @@ final class DDBSink @Inject()(clientMgr: DynamoClientManager,config:Configuratio
           recordBuffer++=Seq(elem)
 
           if(recordBuffer.length>=flushFrequency){
-            logger.debug(s"Flushing ${recordBuffer.length} records...")
-            val r = Await.result(ScanamoAlpakka.exec(client)(table.putAll(recordBuffer.toSet)), 1 minute)
+            val dduped = dedupeRecordBuffer.toSeq
+            logger.debug(s"Flushing ${dduped.length} records...")
+            val r = Await.result(ScanamoAlpakka.exec(client)(table.putAll(dduped.toSet)), 1 minute)
             logger.debug(s"Flush completed")
             recordBuffer = Seq()
           } else {
@@ -54,8 +65,9 @@ final class DDBSink @Inject()(clientMgr: DynamoClientManager,config:Configuratio
       }
 
       override def postStop(): Unit = {
-        logger.info(s"Stream ended. Flushing ${recordBuffer.length} remaining records...")
-        val r = Await.result(ScanamoAlpakka.exec(client)(table.putAll(recordBuffer.toSet)), 1 minute)
+        val dduped = dedupeRecordBuffer.toSeq
+        logger.info(s"Stream ended. Flushing ${dduped.length} remaining records...")
+        val r = Await.result(ScanamoAlpakka.exec(client)(table.putAll(dduped.toSet)), 1 minute)
         logger.debug(s"Flush completed")
         recordBuffer = Seq()
       }

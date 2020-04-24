@@ -26,6 +26,8 @@ class ScanTargetDAO @Inject()(config:ArchiveHunterConfiguration, ddbClientMgr: D
   extends ZonedDateTimeEncoder with ZonedTimeFormat with JobModelEncoder with ExtValueConverters {
   private val logger = LogManager.getLogger(getClass)
 
+  private val cacheTime = 60 //in seconds
+
   val table = Table[ScanTarget](config.get[String]("externalData.scanTargets"))
   val maxRetries = config.getOptional[Int]("externalData.maxRetries").getOrElse(10)
   val initialRetryDelay = config.getOptional[Int]("externalData.initialRetryDelay").getOrElse(2)
@@ -35,6 +37,24 @@ class ScanTargetDAO @Inject()(config:ArchiveHunterConfiguration, ddbClientMgr: D
 
   val alpakkaClient = ddbClientMgr.getNewAlpakkaDynamoClient(config.getOptional[String]("externalData.awsProfile"))
   implicit val client = ddbClientMgr.getNewDynamoClient(config.getOptional[String]("externalData.awsProfile"))
+
+  private var cachedLookupTable:Map[String, (ScanTarget, ZonedDateTime)] = Map()
+
+  protected def lookupCachedScanTarget(name:String) = this.synchronized {
+    cachedLookupTable.get(name).flatMap(entry=>{
+      val storedAt = entry._2
+      if(storedAt.plusSeconds(cacheTime.toLong).isBefore(ZonedDateTime.now())){ //this entry has expired, remove from the cache
+        cachedLookupTable = cachedLookupTable - name
+        None
+      } else {
+        Some(entry._1)
+      }
+    })
+  }
+
+  protected def addToCache(name:String, target:ScanTarget) = this.synchronized {
+    cachedLookupTable = cachedLookupTable + (name->(target,ZonedDateTime.now()))
+  }
 
   /**
     * synchronously attempts to make the update, doing exponential delay via sleep until successful.
@@ -124,7 +144,16 @@ class ScanTargetDAO @Inject()(config:ArchiveHunterConfiguration, ddbClientMgr: D
 
   def allScanTargets():Future[List[Either[DynamoReadError,ScanTarget]]] = ScanamoAlpakka.exec(alpakkaClient)(table.scan())
 
-  def get(scanTargetName:String) = ScanamoAlpakka.exec(alpakkaClient)(table.get('bucketName->scanTargetName))
+  def get(scanTargetName:String) = {
+    lookupCachedScanTarget(scanTargetName) match {
+      case Some(scanTarget) => Future(Some(Right(scanTarget)))
+      case None =>
+        ScanamoAlpakka.exec(alpakkaClient)(table.get('bucketName -> scanTargetName)).map(_.map(_.map(scanTarget=>{
+          addToCache(scanTargetName, scanTarget)
+          scanTarget
+        })))
+    }
+  }
 
   def withScanTarget[T](scanTargetName:String)(block:ScanTarget=>T):Future[Option[Either[DynamoReadError,T]]] = {
     get(scanTargetName).map(_.map(_.map(tgt=>block(tgt))))

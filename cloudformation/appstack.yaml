@@ -25,6 +25,9 @@ Parameters:
   ElkStack:
     Description: Name of a deployed ELK6 stack (https://github.com/guardian/elk6) to send logs to
     Type: String
+  LoggingStreamName:
+    Description: Name of a Kinesis stream to send logs to
+    Type: String
   AmiId:
     Type: String
     Description: ID of the base image to build instances from.  Build this with Amigo.
@@ -692,6 +695,18 @@ Resources:
           Action: sts:AssumeRole
       Path: "/"
       Policies:
+      - PolicyName: KinesisLogging
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+            Effect: Allow
+            Action:
+              - kinesis:Describe*
+              - kinesis:List*
+              - kinesis:PutRecord
+              - kinesis:PutRecords
+            Resource:
+              - !Sub arn:aws:kinesis:${AWS::Region}:${AWS::AccountId}:stream/${LoggingStreamName}
       - PolicyName: DataAccess
         PolicyDocument:
           Version: 2012-10-17
@@ -822,6 +837,15 @@ Resources:
               - arn:aws:s3:::*proxies*/*
               - arn:aws:s3:::*proxy*
               - arn:aws:s3:::*proxy*/*
+      - PolicyName: HoldingPenDeletion
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+            Effect: Allow
+            Action:
+              - s3:DeleteObject
+            Resource:
+              - arn:aws:s3:::*holding-pen*
       - PolicyName: DeployablesAccess
         PolicyDocument:
           Version: 2012-10-17
@@ -1097,34 +1121,42 @@ Resources:
           release=${!BUILD_NUMBER}
           EOF
 
+          cat /usr/share/archivehunter/conf/logback-deployment.xml | sed s/{region}/${AWS::Region}/ > /tmp/logback.xml
+          cat /tmp/logback.xml | sed s/{app}/${App}/ > /tmp/logback.xml.2
+          cat /tmp/logback.xml.2 | sed s/{stack}/${Stack}/ > /tmp/logback.xml.3
+          cat /tmp/logback.xml.3 | sed s/{stage}/${Stage}/ > /tmp/logback.xml.4
+          cat /tmp/logback.xml.4 | sed s/{logging-stream}/${LoggingStreamName}/ > /usr/share/archivehunter/conf/logback.xml
+
+          rm -f /tmp/logback.xml*
+
           systemctl restart archivehunter
           systemctl enable archivehunter
 
-          aws s3 cp s3://gnm-multimedia-archivedtech/ELK/filebeat-6.1.2-amd64.deb /tmp/install
-          dpkg --install /tmp/install/filebeat-6.1.2-amd64.deb
-
-          cat > /etc/filebeat/filebeat.yml << EOF
-          filebeat.prospectors:
-          - type: log
-            enabled: true
-            paths:
-            - /var/log/archivehunter/*.log
-            fields:
-              App: ${App}
-              Stack: ${Stack}
-              Stage: ${Stage}
-
-            multiline:
-              pattern: '^\s+'
-              negate: false
-              match: after
-
-          output.logstash:
-            hosts: ["${LogstashEndpoint}"]
-          EOF
-
-          systemctl enable filebeat
-          systemctl start filebeat
+#          aws s3 cp s3://gnm-multimedia-archivedtech/ELK/filebeat-6.1.2-amd64.deb /tmp/install
+#          dpkg --install /tmp/install/filebeat-6.1.2-amd64.deb
+#
+#          cat > /etc/filebeat/filebeat.yml << EOF
+#          filebeat.prospectors:
+#          - type: log
+#            enabled: true
+#            paths:
+#            - /var/log/archivehunter/*.log
+#            fields:
+#              App: ${App}
+#              Stack: ${Stack}
+#              Stage: ${Stage}
+#
+#            multiline:
+#              pattern: '^\s+'
+#              negate: false
+#              match: after
+#
+#          output.logstash:
+#            hosts: ["${LogstashEndpoint}"]
+#          EOF
+#
+#          systemctl enable filebeat
+#          systemctl start filebeat
 
         - DeploySubnetsString: !Join [",",!Ref DeploySubnets]
           LogstashEndpoint:

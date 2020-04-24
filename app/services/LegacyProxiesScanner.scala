@@ -63,6 +63,9 @@ class LegacyProxiesScanner @Inject()(config:Configuration, ddbClientMgr:DynamoCl
       Left(WrongTableState)
     } else {
       val tableThroughput = result.getTable.getProvisionedThroughput
+      if(tableThroughput.getReadCapacityUnits==0){  //we are not in provisioned mode
+        return Right(true)
+      }
       val indexName = result.getTable.getGlobalSecondaryIndexes.get(0).getIndexName
 
       val indexThroughput = result.getTable.getGlobalSecondaryIndexes.get(0).getProvisionedThroughput

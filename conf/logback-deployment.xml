@@ -20,15 +20,17 @@
         </filter>
     </appender>
 
-    <appender name="FILE" class="ch.qos.logback.core.FileAppender">
-        <file>/var/log/archivehunter/application.log</file>
-        <encoder>
-            <pattern>%date{"yyyy-MM-dd'T'HH:mm:ss,SSSXXX"} [%level] from %logger in %thread - %message%n%xException</pattern>
-        </encoder>
-    </appender>
-
-    <appender name="ASYNCFILE" class="ch.qos.logback.classic.AsyncAppender">
-        <appender-ref ref="FILE" />
+    <appender name="KINESIS" class="com.gu.logback.appender.kinesis.KinesisAppender">
+        <bufferSize>1000</bufferSize>
+        <threadCount>20</threadCount>
+        <region>{region}</region>
+        <maxRetries>3</maxRetries>
+        <shutdownTimeout>30</shutdownTimeout>
+        <streamName>{logging-stream}</streamName>
+        <encoding>UTF-8</encoding>
+        <layout class="ch.qos.logback.classic.PatternLayout">
+            <pattern>%date{"yyyy-MM-dd'T'HH:mm:ss,SSSXXX"} |{app}|{stage}| [%level] from %logger in %thread - %message%n%xException</pattern>
+        </layout>
     </appender>
 
     <!-- Configure the Sentry appender, overriding the logging threshold to the WARN level -->
@@ -109,7 +111,7 @@
 
     <root level="WARN">
         <appender-ref ref="STDOUT" />
-        <appender-ref ref="ASYNCFILE"/>
+        <appender-ref ref="KINESIS"/>
         <appender-ref ref="Sentry" />
     </root>
 
