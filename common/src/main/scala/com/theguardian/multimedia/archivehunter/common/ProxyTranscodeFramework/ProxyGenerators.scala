@@ -43,7 +43,6 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration,
   protected implicit val esClient = esClientMgr.getClient()
   protected val indexer = new Indexer(config.get[String]("externalData.indexName"))
 
-
   protected def haveGlacierRestore(entry:ArchiveEntry)(implicit s3Client:AmazonS3) = Try {
     val meta =s3Client.getObjectMetadata(entry.bucket, entry.path)
     Option(meta.getOngoingRestore).map(_.booleanValue()) match {
@@ -74,8 +73,6 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration,
     * try to find an applicable uri to use as the proxy source.  This will use the main media unless it's in the Glacier storage class;
     * otherwise it will try to find an existing proxy and use that.  Failing this, None will be returned
     * @param entry [[ArchiveEntry]] instance representing the entry to proxy
-    * @param proxyLocationDAO implicitly provided [[ProxyLocationDAO]] object
-    * @param ddbClient implicitly provided DynamoClient (alpakka dynamodb implementation) object
     * @return
     */
   def getUriToProxy(entry: ArchiveEntry) = entry.storageClass match {
@@ -269,11 +266,11 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration,
     * @return a Future with the message ID or a Failure if it errors
     */
   protected def sendRequest(rq:RequestModel,region:String) = {
-    proxyFrameworkInstanceDAO.recordsForRegion(region).map(recordList=>{
-      val failures = recordList.collect({case Left(err)=>err})
+    proxyFrameworkInstanceDAO.recordsForRegion(region).map(proxyFrameworkRecords=>{
+      val failures = proxyFrameworkRecords.collect({case Left(err)=>err})
       if(failures.nonEmpty) throw new RuntimeException(s"Database error: $failures")
 
-      val records = recordList.collect({case Right(rec)=>rec})
+      val records = proxyFrameworkRecords.collect({case Right(rec)=>rec})
       if(records.isEmpty){
         throw new RuntimeException(s"No proxy transcode framework available for $region")
       } else if(records.length>1){
@@ -340,17 +337,28 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration,
     saveNSend(jobDesc,rq, region, jobUuid.toString)
   }
 
-  def requestMetadataAnalyse(entry:ArchiveEntry, defaultRegion:String) = {
-    val jobUuid = UUID.randomUUID()
+  def requestMetadataAnalyse(entry:ArchiveEntry, defaultRegion:String) =
+    scanTargetDAO.targetForBucket(entry.bucket).flatMap({
+      case None=>
+        logger.error(s"Bucket ${entry.bucket} on the entry does not have a ScanTarget associated with it!")
+        Future(Left("Bucket has no scan target associated"))
+      case Some(Left(readErr))=>
+        logger.error(s"Could not look up target for ${entry.bucket}: $readErr")
+        Future(Left(readErr.toString))
+      case Some(Right(scanTarget))=>
+        if(scanTarget.proxyEnabled.isDefined && !scanTarget.proxyEnabled.get){
+          logger.info(s"Not requesting metadata analyse on ${entry.bucket}:${entry.path} because proxying is disabled on this target")
+          Future(Left(s"Proxying is disabled on ${scanTarget.bucketName}"))
+        } else {
+          val jobUuid = UUID.randomUUID()
+          val jobDesc = JobModel(jobUuid.toString,"Analyse",Some(ZonedDateTime.now()), None, JobStatus.ST_PENDING, None, entry.id, None, SourceType.SRC_MEDIA,None)
+          val rq = RequestModel(RequestType.ANALYSE,s"s3://${entry.bucket}/${entry.path}","none",jobUuid.toString,None,None,None)
 
-    val jobDesc = JobModel(jobUuid.toString,"Analyse",Some(ZonedDateTime.now()), None, JobStatus.ST_PENDING, None, entry.id, None, SourceType.SRC_MEDIA,None)
-    val rq = RequestModel(RequestType.ANALYSE,s"s3://${entry.bucket}/${entry.path}","none",jobUuid.toString,None,None,None)
-
-    if(entry.storageClass==StorageClass.STANDARD || entry.storageClass==StorageClass.REDUCED_REDUNDANCY) {
-      saveNSend(jobDesc, rq, entry.region.getOrElse(defaultRegion), jobUuid.toString)
-    } else {
-      Future(Left(s"Not running analyse as storage class is ${entry.storageClass}"))
-    }
-  }
-
+          if(entry.storageClass==StorageClass.STANDARD || entry.storageClass==StorageClass.REDUCED_REDUNDANCY) {
+            saveNSend(jobDesc, rq, entry.region.getOrElse(defaultRegion), jobUuid.toString)
+          } else {
+            Future(Left(s"Not running analyse as storage class is ${entry.storageClass}"))
+          }
+        }
+    })
 }
