@@ -29,7 +29,7 @@ class GlacierRestoreActorSpec extends Specification with Mockito {
       mockedRestoreResult.setRequesterCharged(true)
       mockedRestoreResult.setRestoreOutputPath("/some/test/path")
       mockedS3Client.restoreObjectV2(any) returns mockedRestoreResult
-      mockedS3ClientManager.getClient(any) returns mockedS3Client
+      mockedS3ClientManager.getS3Client(any, any) returns mockedS3Client
       val mockedJobModelDAO = mock[JobModelDAO]
       mockedJobModelDAO.putJob(any[JobModel]) returns Future(None)
       val mockedLightboxEntryDAO = mock[LightboxEntryDAO]
@@ -39,6 +39,7 @@ class GlacierRestoreActorSpec extends Specification with Mockito {
       mockedEntry.id returns "mock-entry-id"
       mockedEntry.bucket returns "testbucket"
       mockedEntry.path returns "testpath"
+      mockedEntry.region returns Some("ap-southeast-2")
       val mockedLbEntry = mock[LightboxEntry]
 
       val toTest = system.actorOf(Props(new GlacierRestoreActor(mockedConfig, mockedEsClientMgr, mockedS3ClientManager, mockedJobModelDAO, mockedLightboxEntryDAO, system)))

@@ -49,7 +49,8 @@ class GlacierRestoreActor @Inject() (config:Configuration, esClientMgr:ESClientM
   private val logger = Logger(getClass)
 
   implicit val ec:ExecutionContext = system.getDispatcher
-  val s3client = s3ClientMgr.getClient(config.getOptional[String]("externalData.awsProfile"))
+  private val awsProfile = config.getOptional[String]("externalData.awsProfile")
+
   val defaultExpiry = config.getOptional[Int]("archive.restoresExpireAfter").getOrElse(3)
   logger.info(s"Glacier restores will expire after $defaultExpiry days")
   private val indexer = new Indexer(config.get[String]("externalData.indexName"))
@@ -91,6 +92,7 @@ class GlacierRestoreActor @Inject() (config:Configuration, esClientMgr:ESClientM
       logger.info(s"From lightbox entry $lbEntry")
       logger.info(s"With jobs $jobs")
 
+      val s3client = s3ClientMgr.getS3Client(awsProfile, entry.region)
       val result = s3client.getObjectMetadata(entry.bucket, entry.path)
       val isRestoring = Option(result.getOngoingRestore).map(_.booleanValue()) //true, false or null; see https://forums.aws.amazon.com/thread.jspa?threadID=141678. Also map java boolean to scala.
       isRestoring match {
@@ -157,6 +159,7 @@ class GlacierRestoreActor @Inject() (config:Configuration, esClientMgr:ESClientM
       val originalSender = sender()
 
       //completion is detected by the inputLambda, and the job status will be updated there.
+      val s3client = s3ClientMgr.getS3Client(awsProfile, entry.region)
       jobModelDAO.putJob(newJob).onComplete({
         case Success(None)=>
           logger.debug(s"${entry.location}: initiating restore")
@@ -192,6 +195,7 @@ class GlacierRestoreActor @Inject() (config:Configuration, esClientMgr:ESClientM
       val originalSender = sender()
 
       //completion is detected by the inputLambda, and the job status will be updated there.
+      val s3client = s3ClientMgr.getS3Client(awsProfile, entry.region)
       jobModelDAO.putJob(newJob).map({
         case None=>
           logger.debug(s"${entry.location}: initiating restore")
