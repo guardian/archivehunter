@@ -66,6 +66,7 @@
     <logger name="controllers.BulkDownloadsController" level="DEBUG"/>
 
     <logger name="com.gu.pandomainauth.action.AuthActions" level="INFO"/>
+    <logger name="com.gu" level="DEBUG"/>
 
     <logger name="helpers.DDBSink" level="INFO"/>
     <logger name="helpers.S3ToProxyLocationFlow" level="INFO"/>
