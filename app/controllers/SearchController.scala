@@ -42,7 +42,7 @@ with PanDomainAuthActions {
   private val esClient = esClientManager.getClient()
   import com.sksamuel.elastic4s.http.ElasticDsl._
 
-  def getEntry(fileId:String) = APIAuthAction.async {
+  def getEntry(fileId:String) = HMACAuthAction.async {
     esClient.execute {
       search(indexName) query termQuery("id",fileId)
     }.map({
