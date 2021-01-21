@@ -100,25 +100,11 @@ extends AbstractController(controllerComponents) with PanDomainAuthActions with 
     * @return
     */
   def getFolders(collectionName:String, prefix:Option[String]) = APIAuthAction.async {
-//    withScanTarget(collectionName) { target=>
-//      val rq = new ListObjectsRequest().withBucketName(collectionName).withDelimiter("/")
-//      val finalRq = prefix match {
-//        case Some(p)=>rq.withPrefix(p)
-//        case None=>rq
-//      }
-//      try {
-//        val localS3Client = s3ClientMgr.getS3Client(awsProfile, Some(target.region))
-//        val result = recurseGetFolders(finalRq,localS3Client)
-//        logger.debug(s"Got result:")
-//        result.foreach(summ => logger.debug(s"\t$summ"))
-//        Ok(ObjectListResponse("ok","folder",result, -1).asJson)
-//      } catch {
-//        case ex:Throwable=>
-//          logger.error("Could not list S3 bucket: ", ex)
-//          InternalServerError(GenericErrorResponse("error", ex.toString).asJson)
-//      }
-//    }
-    folderHelper.scanFolders(indexName, collectionName, prefix)
+    val maybePrefix = prefix.flatMap(pfx=>{
+      if(pfx=="") None else Some(pfx)
+    })
+
+    folderHelper.scanFolders(indexName, collectionName, maybePrefix)
       .map(results=>{
         logger.info("getFolders got result: ")
         results.foreach(summ=>logger.info(s"\t$summ"))

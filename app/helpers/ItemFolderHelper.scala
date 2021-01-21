@@ -32,11 +32,20 @@ class ItemFolderHelper @Inject() (esClientMgr:ESClientManager)(implicit actorSys
    * @param forCollection collection name
    * @return
    */
-  protected def getIndexSource(indexName:String, forCollection:String) = {
+  protected def getIndexSource(indexName:String, forCollection:String, maybePrefix:Option[String]) = {
     val initialQuery = matchQuery("bucket.keyword", forCollection)
+    val finalQuery = maybePrefix match {
+      case None=>initialQuery
+      case Some(prefixString)=>
+        boolQuery().must(
+          initialQuery,
+          prefixQuery("path.keyword",prefixString)
+        )
+    }
+
     Source.fromGraph(
       Source.fromPublisher[SearchHit](
-        esClient.publisher(search(indexName) query initialQuery scroll "5m")
+        esClient.publisher(search(indexName) query finalQuery scroll "1m")
       ).map(_.to[ArchiveEntry])
     )
   }
@@ -51,7 +60,7 @@ class ItemFolderHelper @Inject() (esClientMgr:ESClientManager)(implicit actorSys
   def scanFolders(indexName:String, forCollection:String, maybePrefix:Option[String]) = {
     val prefixDepth = maybePrefix.map(_.split("/").length).getOrElse(0)
 
-    getIndexSource(indexName, forCollection)
+    getIndexSource(indexName, forCollection, maybePrefix)
       .filter(entry=>maybePrefix match {
         case Some(prefix)=>
           entry.path.startsWith(prefix)

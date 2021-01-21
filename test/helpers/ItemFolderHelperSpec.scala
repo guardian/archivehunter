@@ -46,11 +46,11 @@ class ItemFolderHelperSpec extends Specification with Mockito {
       implicit val mat:Materializer = ActorMaterializer()
       val mockClientMgr = mock[ESClientManager]
 
-      val mockGetIndexSource = mock[(String,String)=>Unit]
+      val mockGetIndexSource = mock[(String,String,Option[String])=>Unit]
 
       val helper = new ItemFolderHelper(mockClientMgr) {
-        override protected def getIndexSource(indexName: String, forCollection: String): Source[ArchiveEntry, NotUsed] = {
-          mockGetIndexSource(indexName, forCollection)
+        override protected def getIndexSource(indexName: String, forCollection: String, prefix:Option[String]): Source[ArchiveEntry, NotUsed] = {
+          mockGetIndexSource(indexName, forCollection, None)
           Source.fromIterator(()=>fakeAssetList.toIterator)
         }
       }
@@ -61,7 +61,7 @@ class ItemFolderHelperSpec extends Specification with Mockito {
       result(1) mustEqual "another/"
       result(2) mustEqual "this/"
 
-      there was one(mockGetIndexSource).apply("some-index","collection-name")
+      there was one(mockGetIndexSource).apply("some-index","collection-name", None)
     }
 
     "return paths under a prefix" in new AkkaTestkitSpecs2Support {
@@ -69,7 +69,7 @@ class ItemFolderHelperSpec extends Specification with Mockito {
       val mockClientMgr = mock[ESClientManager]
 
       val helper = new ItemFolderHelper(mockClientMgr) {
-        override protected def getIndexSource(indexName: String, forCollection: String): Source[ArchiveEntry, NotUsed] = {
+        override protected def getIndexSource(indexName: String, forCollection: String, prefix:Option[String]): Source[ArchiveEntry, NotUsed] = {
           Source.fromIterator(()=>fakeAssetList.toIterator)
         }
       }
