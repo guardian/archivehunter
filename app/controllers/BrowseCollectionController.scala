@@ -118,7 +118,7 @@ extends AbstractController(controllerComponents) with PanDomainAuthActions with 
 //          InternalServerError(GenericErrorResponse("error", ex.toString).asJson)
 //      }
 //    }
-    folderHelper.scanFolders(indexName, collectionName, prefix, 1)
+    folderHelper.scanFolders(indexName, collectionName, prefix)
       .map(results=>{
         logger.info("getFolders got result: ")
         results.foreach(summ=>logger.info(s"\t$summ"))

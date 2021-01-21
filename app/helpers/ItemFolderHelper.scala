@@ -40,7 +40,9 @@ class ItemFolderHelper @Inject() (esClientMgr:ESClientManager)(implicit actorSys
    * @param depth depth of path to return, e.g. if this is 1 then only top-level folders are returned
    * @return a Future containing a Seq of the paths, delimited by /
    */
-  def scanFolders(indexName:String, forCollection:String, maybePrefix:Option[String], depth:Int) = {
+  def scanFolders(indexName:String, forCollection:String, maybePrefix:Option[String]) = {
+    val prefixDepth = maybePrefix.map(_.split("/").length).getOrElse(0)
+
     getIndexSource(indexName, forCollection)
       .map(_.to[ArchiveEntry])
       .filter(entry=>maybePrefix match {
@@ -48,13 +50,14 @@ class ItemFolderHelper @Inject() (esClientMgr:ESClientManager)(implicit actorSys
           entry.path.startsWith(prefix)
         case None=>
           true
-      })
-      .map(entry=>{
-        val parts = entry.path.split("/")
-        parts.slice(0, depth).mkString("/")
+      }).async
+      .map(_.path.split("/"))
+      .filter(_.length>prefixDepth) //only include paths, not files at this level
+      .map(parts=>{
+        parts.slice(prefixDepth, prefixDepth+1).mkString("/")
       })
       .toMat(Sink.seq[String])(Keep.right)
       .run()
-      .map(_.distinct)
+      .map(_.distinct.map(_+"/")) //frontend expects each item to be terminated with a /
   }
 }
