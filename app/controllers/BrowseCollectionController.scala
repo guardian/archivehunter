@@ -5,7 +5,8 @@ import com.amazonaws.services.s3.model.{ListObjectsRequest, S3ObjectSummary}
 import com.sksamuel.elastic4s.http.search.TermsAggResult
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{ESClientManager, S3ClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{ScanTarget, ScanTargetDAO}
-import helpers.InjectableRefresher
+import helpers.{InjectableRefresher, ItemFolderHelper}
+
 import javax.inject.{Inject, Singleton}
 import play.api.libs.circe.Circe
 import play.api.{Configuration, Logger}
@@ -21,6 +22,7 @@ import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.Try
+
 @Singleton
 class BrowseCollectionController @Inject() (override val config:Configuration,
                                             s3ClientMgr:S3ClientManager,
@@ -28,7 +30,8 @@ class BrowseCollectionController @Inject() (override val config:Configuration,
                                             override val controllerComponents: ControllerComponents,
                                             esClientMgr:ESClientManager,
                                             override val wsClient:WSClient,
-                                            override val refresher:InjectableRefresher)
+                                            override val refresher:InjectableRefresher,
+                                            folderHelper:ItemFolderHelper)
 extends AbstractController(controllerComponents) with PanDomainAuthActions with Circe{
   import com.sksamuel.elastic4s.http.ElasticDsl._
 
@@ -97,24 +100,34 @@ extends AbstractController(controllerComponents) with PanDomainAuthActions with 
     * @return
     */
   def getFolders(collectionName:String, prefix:Option[String]) = APIAuthAction.async {
-    withScanTarget(collectionName) { target=>
-      val rq = new ListObjectsRequest().withBucketName(collectionName).withDelimiter("/")
-      val finalRq = prefix match {
-        case Some(p)=>rq.withPrefix(p)
-        case None=>rq
-      }
-      try {
-        val localS3Client = s3ClientMgr.getS3Client(awsProfile, Some(target.region))
-        val result = recurseGetFolders(finalRq,localS3Client)
-        logger.debug(s"Got result:")
-        result.foreach(summ => logger.debug(s"\t$summ"))
-        Ok(ObjectListResponse("ok","folder",result, -1).asJson)
-      } catch {
-        case ex:Throwable=>
-          logger.error("Could not list S3 bucket: ", ex)
-          InternalServerError(GenericErrorResponse("error", ex.toString).asJson)
-      }
-    }
+//    withScanTarget(collectionName) { target=>
+//      val rq = new ListObjectsRequest().withBucketName(collectionName).withDelimiter("/")
+//      val finalRq = prefix match {
+//        case Some(p)=>rq.withPrefix(p)
+//        case None=>rq
+//      }
+//      try {
+//        val localS3Client = s3ClientMgr.getS3Client(awsProfile, Some(target.region))
+//        val result = recurseGetFolders(finalRq,localS3Client)
+//        logger.debug(s"Got result:")
+//        result.foreach(summ => logger.debug(s"\t$summ"))
+//        Ok(ObjectListResponse("ok","folder",result, -1).asJson)
+//      } catch {
+//        case ex:Throwable=>
+//          logger.error("Could not list S3 bucket: ", ex)
+//          InternalServerError(GenericErrorResponse("error", ex.toString).asJson)
+//      }
+//    }
+    folderHelper.scanFolders(indexName, collectionName, prefix, 1)
+      .map(results=>{
+        logger.info("getFolders got result: ")
+        results.foreach(summ=>logger.info(s"\t$summ"))
+        Ok(ObjectListResponse("ok","folder",results,-1).asJson)
+      }).recover({
+      case err:Throwable=>
+        logger.error("Could not get prefixes from index: ", err)
+        InternalServerError(GenericErrorResponse("error", err.toString).asJson)
+    })
   }
 
   /**
