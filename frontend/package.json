@@ -4,11 +4,18 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "jest --runInBand",
+    "test": "jest __tests__",
     "dev": "webpack -d --watch",
     "build": "webpack -p"
   },
   "jest": {
+    "moduleFileExtensions": [
+      "jsx",
+      "js",
+      "tsx",
+      "ts",
+      "json"
+    ],
     "moduleNameMapper": {
       "\\.(css|less)$": "identity-obj-proxy"
     },
@@ -16,6 +23,10 @@
       "node_modules/react-treebeard/.+\\\\.js$",
       "node_modules/(?!panda-session).+\\\\.js$"
     ],
+    "transform": {
+      "^.+\\.[jt]sx?$": "ts-jest",
+      "node_modules/react-multistep/.+\\.js$": "ts-jest"
+    },
     "testResultsProcessor": "jest-junit",
     "setupFiles": [
       "./jestSetup.jsx"
@@ -30,6 +41,7 @@
     "css-loader": "^2.1.1",
     "enzyme": "^3.11.0",
     "enzyme-adapter-react-16": "^1.15.6",
+    "jest": "^26.0.1",
     "jest-cli": "^25.5.4",
     "jest-junit": "^4.0.0",
     "moxios": "^0.4.0",
