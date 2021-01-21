@@ -151,7 +151,6 @@ class UserList extends React.Component {
                                 //{display: entry.isAdmin ? "list-item" : "none"}
                                 {display: "none"}
                             }><p className="list-control-label">Admin's one-off authorisation limit:</p>
-                            }
                                 <SizeInput sizeInBytes={entry.adminAuthQuota ? (entry.adminAuthQuota*1048576) : 0}
                                            didUpdate={newValue=>this.quotaChanged(entry,"ADMIN_APPROVAL_QUOTA", newValue)}
                                            minimumMultiplier={1048576}

@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "esModuleInterop": true,
+    "jsx": "react",
+    "module": "ES2015",
+    "moduleResolution": "node",
+    "sourceMap": true,
+    "strict": true,
+    "isolatedModules": true,
+    "target": "ES2016",
+    "allowSyntheticDefaultImports": true
+  },
+  "include": ["./app/", "__tests__", "./declarations.d.ts"],
+  "exclude": ["node_modules"]
+}

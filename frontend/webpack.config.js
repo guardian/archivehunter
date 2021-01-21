@@ -17,20 +17,37 @@ var config = {
     module : {
         rules : [
             {
-                test : /\.jsx?/,
+                test : /\.[tj]sx?/,
                 include : APP_DIR,
-                loader : 'babel-loader'
-            },
-            {
-                test : /react-multistep\/.*\.js/,
-                loader: 'babel-loader'
+                loader : 'ts-loader'
             },
             {
                 test: /\.css$/,
-                use: ['style-loader', 'css-loader']
-            }
+                include: [
+                    path.join(__dirname, "app/"),
+                    path.join(__dirname, "node_modules/react-table")
+                ],
+                use: [
+                    "style-loader",
+                    "css-loader",
+                    {
+                        loader: "@teamsupercell/typings-for-css-modules-loader",
+                    },
+                ],
+            },
+            {
+                test : /react-multistep\/.*\.js/,
+                loader: 'ts-loader'
+            },
+            {
+                enforce: "pre",
+                test: /\.js$/,
+                exclude: /node_modules/,
+                loader: "source-map-loader",
+            },
         ]
-    }
+    },
+    devtool: "source-map",
 };
 
 module.exports = config;
