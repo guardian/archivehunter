@@ -1,5 +1,7 @@
 package controllers
 
+import akka.actor.ActorSystem
+import akka.stream.Materializer
 import com.amazonaws.services.s3.AmazonS3
 import com.amazonaws.services.s3.model.{ListObjectsRequest, S3ObjectSummary}
 import com.sksamuel.elastic4s.http.search.TermsAggResult
@@ -14,6 +16,7 @@ import play.api.mvc.{AbstractController, ControllerComponents}
 import responses.{ErrorListResponse, GenericErrorResponse, ObjectListResponse, PathInfoResponse}
 import io.circe.syntax._
 import io.circe.generic.auto._
+import models.PathCacheIndexer
 import play.api.libs.ws.WSClient
 import play.api.mvc.Result
 import requests.SearchRequest
@@ -32,6 +35,7 @@ class BrowseCollectionController @Inject() (override val config:Configuration,
                                             override val wsClient:WSClient,
                                             override val refresher:InjectableRefresher,
                                             folderHelper:ItemFolderHelper)
+                                           (implicit actorSystem:ActorSystem, mat:Materializer)
 extends AbstractController(controllerComponents) with PanDomainAuthActions with Circe{
   import com.sksamuel.elastic4s.http.ElasticDsl._
 
@@ -42,7 +46,7 @@ extends AbstractController(controllerComponents) with PanDomainAuthActions with 
   private val esClient = esClientMgr.getClient()
 
   private val indexName = config.get[String]("externalData.indexName")
-
+  private val pathCacheIndexer = new PathCacheIndexer(config.getOptional[String]("externalData.pathCacheIndex").getOrElse("pathcache"), esClientMgr)
 
   /**
     * execute the provided body with a looked-up ScanTarget.
@@ -77,15 +81,18 @@ extends AbstractController(controllerComponents) with PanDomainAuthActions with 
       if(pfx=="") None else Some(pfx)
     })
 
-    folderHelper.scanFolders(indexName, collectionName, maybePrefix)
+//    folderHelper.scanFolders(indexName, collectionName, maybePrefix)
+    val maybePrefixPartsLength = maybePrefix.map(_.split("/").length)
+
+    pathCacheIndexer.getPaths(collectionName, maybePrefix, maybePrefixPartsLength.getOrElse(1))
       .map(results=>{
         logger.info("getFolders got result: ")
         results.foreach(summ=>logger.info(s"\t$summ"))
-        Ok(ObjectListResponse("ok","folder",results,-1).asJson)
+        Ok(ObjectListResponse("ok","folder",results.map(_.key),-1).asJson)
       }).recover({
-      case err:Throwable=>
-        logger.error("Could not get prefixes from index: ", err)
-        InternalServerError(GenericErrorResponse("error", err.toString).asJson)
+        case err:Throwable=>
+          logger.error("Could not get prefixes from index: ", err)
+          InternalServerError(GenericErrorResponse("error", err.toString).asJson)
     })
   }
 

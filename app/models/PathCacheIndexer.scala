@@ -69,4 +69,23 @@ class PathCacheIndexer(indexName:String, esClientMgr:ESClientManager, batchSize:
       .toMat(getSink())(Keep.right)
       .run()
   }
+
+  /**
+   * returns a list of the paths that match the given query list
+   * @param collectionName collection to check
+   * @param prefix path prefix that must match for a path to be considered
+   * @param level depth of path to retrieve
+   * @return
+   */
+  def getPaths(collectionName:String, prefix:Option[String], level:Int) = {
+    val queryParams = Seq(
+      Some(matchQuery("collection.keyword", collectionName)),
+      prefix.map(pfx=>prefixQuery("key.keyword", pfx)),
+      Some(matchQuery("level", level))
+    ).collect({case Some(q)=>q})
+
+    getSource(search(indexName) query boolQuery().must(queryParams) scroll "5m")
+      .toMat(Sink.seq)(Keep.right)
+      .run()
+  }
 }
