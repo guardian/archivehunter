@@ -1,14 +1,5 @@
 package com.theguardian.multimedia.archivehunter.common
 
-//import software.amazon.awssdk.core.ResponseBytes
-//import software.amazon.awssdk.services.s3.S3AsyncClient
-//import software.amazon.awssdk.services.s3.model.{GetObjectRequest, GetObjectResponse}
-//import software.amazon.awssdk.core.async.AsyncResponseTransformer
-//import org.apache.logging.log4j.LogManager
-//import org.apache.logging.log4j.Logger
-//import scala.compat.java8.FutureConverters
-//import scala.concurrent.Future
-//import scala.concurrent.ExecutionContext.Implicits.global
 
 object MimeType {
   /**

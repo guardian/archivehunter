@@ -26,9 +26,18 @@ class ItemFolderHelper @Inject() (esClientMgr:ESClientManager)(implicit actorSys
 
   implicit val ec:ExecutionContext = actorSystem.dispatcher
 
+  /**
+   * internal method that returns an Akka Source which yields ArchiveEntry instances for the given collection
+   * @param indexName index to query
+   * @param forCollection collection name
+   * @return
+   */
   protected def getIndexSource(indexName:String, forCollection:String) = {
-    Source.fromPublisher[SearchHit](
-      esClient.publisher(search(indexName) query matchQuery("bucket.keyword", forCollection) scroll "5m")
+    val initialQuery = matchQuery("bucket.keyword", forCollection)
+    Source.fromGraph(
+      Source.fromPublisher[SearchHit](
+        esClient.publisher(search(indexName) query initialQuery scroll "5m")
+      ).map(_.to[ArchiveEntry])
     )
   }
 
@@ -37,14 +46,12 @@ class ItemFolderHelper @Inject() (esClientMgr:ESClientManager)(implicit actorSys
    * @param indexName index to query
    * @param forCollection collection (bucket) name to query
    * @param maybePrefix if set, only paths that match this prefix are considered
-   * @param depth depth of path to return, e.g. if this is 1 then only top-level folders are returned
    * @return a Future containing a Seq of the paths, delimited by /
    */
   def scanFolders(indexName:String, forCollection:String, maybePrefix:Option[String]) = {
     val prefixDepth = maybePrefix.map(_.split("/").length).getOrElse(0)
 
     getIndexSource(indexName, forCollection)
-      .map(_.to[ArchiveEntry])
       .filter(entry=>maybePrefix match {
         case Some(prefix)=>
           entry.path.startsWith(prefix)
@@ -52,9 +59,9 @@ class ItemFolderHelper @Inject() (esClientMgr:ESClientManager)(implicit actorSys
           true
       }).async
       .map(_.path.split("/"))
-      .filter(_.length>prefixDepth) //only include paths, not files at this level
+      .filter(_.length>prefixDepth+1) //only include paths, not files at this level
       .map(parts=>{
-        parts.slice(prefixDepth, prefixDepth+1).mkString("/")
+        parts.slice(0, prefixDepth+1).mkString("/")
       })
       .toMat(Sink.seq[String])(Keep.right)
       .run()
