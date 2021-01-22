@@ -11,6 +11,6 @@
     "target": "ES2016",
     "allowSyntheticDefaultImports": true
   },
-  "include": ["./app", "__tests__", "./declarations.d.ts"],
+  "include": ["./app", "__tests__", "types/types.d.ts"],
   "exclude": ["node_modules"]
 }

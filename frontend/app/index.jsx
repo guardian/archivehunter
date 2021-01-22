@@ -34,6 +34,12 @@ import {handle419, setupInterceptor} from "./common/Handle419.jsx";
 import ProxyHealthDash from "./ProxyHealth/ProxyHealthDash.jsx";
 
 import Test419Component from "./testing/test419.jsx";
+import {
+    createMuiTheme,
+    ThemeProvider
+} from "@material-ui/core/styles";
+
+import {customisedTheme} from "./CustomisedTheme.tsx";
 
 library.add(faStroopwafel, faCheckCircle, faCheck, faTimes, faTimesCircle, faRoad,faSearch,faThList,faWrench, faLightbulb, faChevronCircleDown, faChevronCircleRight, faTrashAlt, faFolderPlus, faFolderMinus, faFolder);
 library.add(faFilm, faVolumeUp, faImage, faFile, faClock, faRunning, faExclamationTriangle, faHdd, faBalanceScale, faSyncAlt, faBookReader, faBug, faCompressArrowsAlt, faIndustry, faRedoAlt, faHome, faListOl,);
@@ -65,6 +71,8 @@ class App extends React.Component {
             console.error("Could not intialise sentry", error);
         });
         this.userLoggedOut = this.userLoggedOut.bind(this);
+
+        this.theme = createMuiTheme(customisedTheme);
     }
 
     componentWillMount(){
@@ -82,7 +90,7 @@ class App extends React.Component {
     }
 
     render(){
-        return <div>
+        return <ThemeProvider theme={this.theme}>
             <TopMenu visible={true} isAdmin={this.state.userLogin ? this.state.userLogin.isAdmin : false}/>
             <LoginStatusComponent userData={this.state.userLogin} userLoggedOutCb={this.userLoggedOut}/>
             <Switch>
@@ -103,7 +111,7 @@ class App extends React.Component {
                 <Route path="/" exact={true} component={FrontPage}/>
                 <Route default component={NotFoundComponent}/>
             </Switch>
-        </div>
+        </ThemeProvider>
     }
 }
 

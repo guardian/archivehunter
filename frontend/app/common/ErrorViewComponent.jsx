@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 
 class ErrorViewComponent extends React.Component {
     static propTypes = {
-        error: PropTypes.object.isRequired,
+        error: PropTypes.object,
         brief: PropTypes.bool
     };
 
