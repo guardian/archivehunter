@@ -99,17 +99,9 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
     import com.sksamuel.elastic4s.circe._
 
     val md = getMetadataWithRetry(rec.getS3.getBucket.getName, path)
-    val mimeType = MimeType.fromString(md.getContentType) match {
-      case Left(error) =>
-        println(s"Could not get MIME type for s3://${rec.getS3.getBucket.getName}/$path: $error")
-        MimeType("application", "octet-stream")
-      case Right(mt) =>
-        println(s"MIME type for s3://${rec.getS3.getBucket.getName}/$path is ${mt.toString}")
-        mt
-    }
 
     //build a list of entries to add to the path cache
-    val pathParts = path.split("/")
+    val pathParts = path.split("/").init  //the last element is the filename, which we are not interested in.
     val newCacheEntries = PathCacheExtractor.recursiveGenerateEntries(pathParts.init, pathParts.last, pathParts.length, rec.getS3.getBucket.getName)
 
     println(s"going to update ${newCacheEntries.length} path cache entries")
