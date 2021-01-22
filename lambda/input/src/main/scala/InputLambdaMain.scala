@@ -98,8 +98,6 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
     import io.circe.generic.auto._
     import com.sksamuel.elastic4s.circe._
 
-    val md = getMetadataWithRetry(rec.getS3.getBucket.getName, path)
-
     //build a list of entries to add to the path cache
     val pathParts = path.split("/").init  //the last element is the filename, which we are not interested in.
     val newCacheEntries = PathCacheExtractor.recursiveGenerateEntries(pathParts.init, pathParts.last, pathParts.length, rec.getS3.getBucket.getName)

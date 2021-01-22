@@ -80,7 +80,7 @@ class InputLambdaMainSpec extends Specification with Mockito with ZonedDateTimeE
           throw ex
       }
       there was one(mockSendIngestedMessage).apply(any)
-      there was three(mockESClient).execute(any)(any) //path cache update calls
+      there was two(mockESClient).execute(any)(any) //path cache update calls
     }
 
     "call to index an item delivered via an S3Event then call to dispatch a message to the main app" in {
