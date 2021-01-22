@@ -59,7 +59,7 @@ class PathCacheAdmin extends React.Component {
                     <div>
                         {this.state.loading ?
                             <p className="centered">Loading...</p> :
-                            <p className="centered">There are currently {this.cachedPathCount} cached path fragments</p>
+                            <p className="centered">There are currently {this.state.cachedPathCount} cached path fragments</p>
                         }
                         <p className="centered">You can rebuild the index here. It's not blanked before use.  The process should take less than half an hour.</p>
                         <button onClick={this.requestReindex} disabled={this.state.reindexSuccessful || this.state.reindexWaiting}>Re-index</button>
