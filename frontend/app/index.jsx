@@ -5,7 +5,7 @@ import Raven from 'raven-js';
 import axios from 'axios';
 
 import ScanTargetEdit from './ScanTargets/ScanTargetEdit.jsx';
-import ScanTargetsList from './ScanTargets/ScanTargetsList.jsx';
+import ScanTargetsList from './ScanTargets/ScanTargetsList';
 import NotFoundComponent from './NotFoundComponent.jsx';
 import FrontPage from './FrontPage.jsx';
 import TopMenu from './TopMenu.jsx';
