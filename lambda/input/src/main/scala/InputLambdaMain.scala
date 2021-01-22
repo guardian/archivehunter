@@ -100,7 +100,12 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
 
     //build a list of entries to add to the path cache
     val pathParts = path.split("/").init  //the last element is the filename, which we are not interested in.
-    val newCacheEntries = PathCacheExtractor.recursiveGenerateEntries(pathParts.init, pathParts.last, pathParts.length, rec.getS3.getBucket.getName)
+
+    val newCacheEntries = if(pathParts.isEmpty) {
+      Seq()
+    } else {
+      PathCacheExtractor.recursiveGenerateEntries(pathParts.init, pathParts.last, pathParts.length, rec.getS3.getBucket.getName)
+    }
 
     println(s"going to update ${newCacheEntries.length} path cache entries")
     Future.sequence(
