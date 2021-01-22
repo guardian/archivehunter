@@ -1,8 +1,8 @@
-// import {handle419, setupInterceptor, rejectedCallback} from "../../app/common/Handle419.jsx";
-// import sinon from "sinon";
-// import * as pandasess from "panda-session";
-// import axios from "axios";
-//
+import {handle419, setupInterceptor, rejectedCallback} from "../../app/common/Handle419.jsx";
+import sinon from "sinon";
+import * as pandasess from "panda-session";
+import axios from "axios";
+
 describe("handle419", ()=>{
     it("is temporarily disabled", ()=>{
 

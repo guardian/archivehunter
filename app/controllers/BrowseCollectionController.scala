@@ -84,7 +84,7 @@ extends AbstractController(controllerComponents) with PanDomainAuthActions with 
 //    folderHelper.scanFolders(indexName, collectionName, maybePrefix)
     val maybePrefixPartsLength = maybePrefix.map(_.split("/").length)
 
-    pathCacheIndexer.getPaths(collectionName, maybePrefix, maybePrefixPartsLength.getOrElse(1))
+    pathCacheIndexer.getPaths(collectionName, maybePrefix, maybePrefixPartsLength.getOrElse(0)+1)
       .map(results=>{
         logger.info("getFolders got result: ")
         results.foreach(summ=>logger.info(s"\t$summ"))
