@@ -1,10 +1,12 @@
 import React, {useEffect, useState} from "react";
 import {RouteComponentProps} from "react-router";
-import BreadcrumbComponent from "../common/BreadcrumbComponent";
-import {Button} from "@material-ui/core";
-import LoadingThrobber from "../common/LoadingThrobber";
-import ErrorViewComponent from "../common/ErrorViewComponent";
+import BreadcrumbComponent from "../common/BreadcrumbComponent.jsx";
+import {Button, Paper} from "@material-ui/core";
+import LoadingThrobber from "../common/LoadingThrobber.jsx";
+import ErrorViewComponent from "../common/ErrorViewComponent.jsx";
 import axios from "axios";
+import {DataGrid} from "@material-ui/data-grid";
+import {scanTargetColumns} from "./ScanTargetsListContent.tsx";
 
 const ScanTargetsList:React.FC<RouteComponentProps> = (props) => {
     const [loading, setLoading] = useState(false);
@@ -42,7 +44,9 @@ const ScanTargetsList:React.FC<RouteComponentProps> = (props) => {
             <LoadingThrobber show={loading} small={true} caption={currentActionCaption}/>
             <ErrorViewComponent error={lastError}/>
         </div>
-
+        <Paper elevation={3}>
+            <DataGrid columns={scanTargetColumns} rows={scanTargets} pageSize={5}/>
+        </Paper>
         </>
 }
 

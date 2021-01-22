@@ -2,6 +2,7 @@ import React from 'react';
 import {shallow,mount} from 'enzyme';
 import sinon from 'sinon';
 import BrowseComponent from '../../app/browse/BrowseComponent.jsx';
+import moxios from "moxios";
 
 describe("BrowseComponent.loadNextNodeOfSpecific", ()=>{
     const sampleTree = {
@@ -50,6 +51,14 @@ describe("BrowseComponent.loadNextNodeOfSpecific", ()=>{
             }
         ]
     };
+
+    beforeEach(()=>{
+        moxios.install();
+    })
+
+    afterEach(()=>{
+        moxios.uninstall();
+    });
 
     it("should asynchronously call loadSubFolder for each part of the path", (done)=>{
         const rendered = shallow(<BrowseComponent location={{ }}/>);
