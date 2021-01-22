@@ -2,6 +2,7 @@ import React from 'react';
 import {shallow,mount} from 'enzyme';
 import sinon from 'sinon';
 import BrowseComponent from '../../app/browse/BrowseComponent.jsx';
+import moxios from "moxios";
 
 describe("BrowseComponent.loadNextNodeOfSpecific", ()=>{
     const sampleTree = {
@@ -50,10 +51,15 @@ describe("BrowseComponent.loadNextNodeOfSpecific", ()=>{
             }
         ]
     };
-    it("is temporarily disabled", ()=>{
 
+    beforeEach(()=>{
+        moxios.install();
     });
-/*
+
+    afterEach(()=>{
+        moxios.uninstall();
+    });
+
     it("should asynchronously call loadSubFolder for each part of the path", (done)=>{
         const rendered = shallow(<BrowseComponent location={{ }}/>);
 
@@ -91,6 +97,15 @@ describe("BrowseComponent.loadNextNodeOfSpecific", ()=>{
 });
 
 describe("BrowseComponent.loadSpecificTreePath", ()=>{
+    beforeEach(()=>{
+        moxios.install();
+    });
+
+    afterEach(()=>{
+        moxios.uninstall();
+    });
+
+
     it("should call loadNextNodeOfSpecific if state.openedPath is valid, then call triggerSearch on the terminal node, then resolve", done=>{
         const rendered = shallow(<BrowseComponent location={{ }}/>);
         rendered.instance().triggerSearch = sinon.stub().resolves();
@@ -168,6 +183,5 @@ describe("BrowseComponent.loadSpecificTreePath", ()=>{
             done();
         }).catch(err=>done.fail(err));
     })
-    
- */
+
 });

@@ -85,8 +85,8 @@ extends AbstractController(controllerComponents) with PanDomainAuthActions with 
 
     pathCacheIndexer.getPaths(collectionName, maybePrefix, maybePrefixPartsLength.getOrElse(0)+1)
       .map(results=>{
-        logger.info("getFolders got result: ")
-        results.foreach(summ=>logger.info(s"\t$summ"))
+        logger.debug("getFolders got result: ")
+        results.foreach(summ=>logger.debug(s"\t$summ"))
         Ok(ObjectListResponse("ok","folder",results.map(_.key),-1).asJson)
       }).recover({
         case err:Throwable=>
