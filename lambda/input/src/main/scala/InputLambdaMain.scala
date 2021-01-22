@@ -1,6 +1,5 @@
 import java.net.URLDecoder
 import java.time.ZonedDateTime
-
 import com.amazonaws.services.lambda.runtime.{Context, RequestHandler}
 import com.amazonaws.services.lambda.runtime.events.S3Event
 import com.amazonaws.services.s3.event.S3EventNotification
@@ -12,7 +11,8 @@ import com.google.inject.Guice
 import com.theguardian.multimedia.archivehunter.common._
 import org.apache.logging.log4j.LogManager
 import com.sksamuel.elastic4s.http.{HttpClient, HttpRequestClient}
-import com.theguardian.multimedia.archivehunter.common.cmn_models.{IngestMessage, ItemNotFound, JobModelDAO, JobStatus}
+import com.theguardian.multimedia.archivehunter.common.cmn_helpers.PathCacheExtractor
+import com.theguardian.multimedia.archivehunter.common.cmn_models.{IngestMessage, ItemNotFound, JobModelDAO, JobStatus, PathCacheIndexer}
 import org.apache.http.HttpHost
 import org.elasticsearch.client.RestClient
 import io.circe.syntax._
@@ -43,6 +43,8 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
   protected def getSqsClient() = AmazonSQSClientBuilder.defaultClient()
 
   protected def getIndexer(indexName: String) = new Indexer(indexName)
+
+  protected def getPathCacheIndexer(indexName: String, elasticClient:HttpClient) = new PathCacheIndexer(indexName, elasticClient)
 
   protected def getJobModelDAO = injector.getInstance(classOf[JobModelDAO])
 
@@ -91,9 +93,12 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
     * @param elasticHttpClient implicitly provided HttpClient instance for Elastic Search
     * @return a Future, containing the ID of the new/updated record as a String.  If the operation fails, the Future will fail; pick this up with .onComplete or .recover
     */
-  def handleCreated(rec:S3EventNotification.S3EventNotificationRecord,path: String)(implicit i:Indexer, s3Client:AmazonS3, elasticHttpClient:HttpClient):Future[String] = {
-    val md = getMetadataWithRetry(rec.getS3.getBucket.getName, path)
+  def handleCreated(rec:S3EventNotification.S3EventNotificationRecord,path: String)(implicit i:Indexer, pathCacheIndexer:PathCacheIndexer, s3Client:AmazonS3, elasticHttpClient:HttpClient):Future[String] = {
+    import com.sksamuel.elastic4s.http.ElasticDsl._
+    import io.circe.generic.auto._
+    import com.sksamuel.elastic4s.circe._
 
+    val md = getMetadataWithRetry(rec.getS3.getBucket.getName, path)
     val mimeType = MimeType.fromString(md.getContentType) match {
       case Left(error) =>
         println(s"Could not get MIME type for s3://${rec.getS3.getBucket.getName}/$path: $error")
@@ -103,16 +108,34 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
         mt
     }
 
-    ArchiveEntry.fromS3(rec.getS3.getBucket.getName, path, s3Client.getRegionName).flatMap(entry => {
-      println(s"Going to index $entry")
-      i.indexSingleItem(entry).map({
-        case Right(indexid) =>
-          println(s"Document indexed with ID $indexid")
-          sendIngestedMessage(entry)
-          indexid
-        case Left(err) =>
-          println(s"Could not index document: ${err.toString}")
-          throw new RuntimeException(err.toString) //fail this future so we enter the recover block below
+    //build a list of entries to add to the path cache
+    val pathParts = path.split("/")
+    val newCacheEntries = PathCacheExtractor.recursiveGenerateEntries(pathParts.init, pathParts.last, pathParts.length, rec.getS3.getBucket.getName)
+
+    println(s"going to update ${newCacheEntries.length} path cache entries")
+    Future.sequence(
+      newCacheEntries.map(entry=>elasticHttpClient.execute(
+        update(entry.collection + entry.key) in s"${pathCacheIndexer.indexName}/pathcache" docAsUpsert entry
+      ))
+    ).map(results=>{
+      val errors = results.collect({case Left(err)=>err})
+      if(errors.nonEmpty) {
+        logger.error(s"${errors.length} path cache entries failed: ")
+        errors.foreach(err=>logger.error(err.body.getOrElse(s"${err.error.reason}")))
+      }
+      println(s"${errors.length} / ${newCacheEntries.length} path cache entries failed")
+    }).flatMap(_=> {
+      ArchiveEntry.fromS3(rec.getS3.getBucket.getName, path, s3Client.getRegionName).flatMap(entry => {
+        println(s"Going to index $entry")
+        i.indexSingleItem(entry).map({
+          case Right(indexid) =>
+            println(s"Document indexed with ID $indexid")
+            sendIngestedMessage(entry)
+            indexid
+          case Left(err) =>
+            println(s"Could not index document: ${err.toString}")
+            throw new RuntimeException(err.toString) //fail this future so we enter the recover block below
+        })
       })
     })
   }
@@ -203,6 +226,15 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
       }
   }
 
+  protected def getPathCacheIndexName = sys.env.get("PATH_CACHE_INDEX") match {
+    case Some(name)=>name
+    case None=>
+      Option(System.getProperty("PATH_CACHE_INDEX")) match {
+        case Some(name)=>name
+        case None=>"pathcache"
+      }
+  }
+
   protected def getClusterEndpoint = sys.env.get("ELASTICSEARCH") match {
     case Some(name)=>name
     case None=>
@@ -221,6 +253,7 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
     implicit val s3Client:AmazonS3 = getS3Client
     implicit val elasticClient:HttpClient = getElasticClient(clusterEndpoint)
     implicit val i:Indexer = getIndexer(indexName)
+    implicit val pc:PathCacheIndexer = getPathCacheIndexer(getPathCacheIndexName, elasticClient)
 
     println(s"Lambda was triggered with: \n${dumpEventData(event, Some("\t"))}")
     val resultList = event.getRecords.asScala.map(rec=>{

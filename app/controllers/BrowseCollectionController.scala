@@ -6,7 +6,7 @@ import com.amazonaws.services.s3.AmazonS3
 import com.amazonaws.services.s3.model.{ListObjectsRequest, S3ObjectSummary}
 import com.sksamuel.elastic4s.http.search.TermsAggResult
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{ESClientManager, S3ClientManager}
-import com.theguardian.multimedia.archivehunter.common.cmn_models.{ScanTarget, ScanTargetDAO}
+import com.theguardian.multimedia.archivehunter.common.cmn_models.{PathCacheIndexer, ScanTarget, ScanTargetDAO}
 import helpers.{InjectableRefresher, ItemFolderHelper}
 
 import javax.inject.{Inject, Singleton}
@@ -16,7 +16,6 @@ import play.api.mvc.{AbstractController, ControllerComponents}
 import responses.{ErrorListResponse, GenericErrorResponse, ObjectListResponse, PathInfoResponse}
 import io.circe.syntax._
 import io.circe.generic.auto._
-import models.PathCacheIndexer
 import play.api.libs.ws.WSClient
 import play.api.mvc.Result
 import requests.SearchRequest
@@ -46,7 +45,7 @@ extends AbstractController(controllerComponents) with PanDomainAuthActions with 
   private val esClient = esClientMgr.getClient()
 
   private val indexName = config.get[String]("externalData.indexName")
-  private val pathCacheIndexer = new PathCacheIndexer(config.getOptional[String]("externalData.pathCacheIndex").getOrElse("pathcache"), esClientMgr)
+  private val pathCacheIndexer = new PathCacheIndexer(config.getOptional[String]("externalData.pathCacheIndex").getOrElse("pathcache"), esClient)
 
   /**
     * execute the provided body with a looked-up ScanTarget.

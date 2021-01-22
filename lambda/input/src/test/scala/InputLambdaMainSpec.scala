@@ -1,11 +1,10 @@
 import java.time.{Instant, ZonedDateTime}
 import java.util.Date
-
 import com.amazonaws.services.lambda.runtime.events.S3Event
 import com.amazonaws.services.s3.AmazonS3
 import com.amazonaws.services.s3.event.S3EventNotification
 import com.amazonaws.services.s3.event.S3EventNotification._
-import com.sksamuel.elastic4s.http.HttpClient
+import com.sksamuel.elastic4s.http.{HttpClient, RequestSuccess}
 import com.theguardian.multimedia.archivehunter.common._
 import org.specs2.mock.Mockito
 import org.specs2.mutable._
@@ -44,15 +43,14 @@ class InputLambdaMainSpec extends Specification with Mockito with ZonedDateTimeE
 
       val fakeContext = mock[Context]
       val mockIndexer = mock[Indexer]
+      val mockESClient = mock[HttpClient]
+      mockESClient.execute[Any, Unit](any)(any) returns Future(Right(RequestSuccess[Unit](200,None,Map(), ())))
+
       val mockSendIngestedMessage = mock[Function1[ArchiveEntry, Unit]]
 
       mockIndexer.indexSingleItem(any,any,any)(any).returns(Future(Right("fake-entry-id")))
       val test = new InputLambdaMain {
-        override protected def getElasticClient(clusterEndpoint: String): HttpClient = {
-          val m = mock[HttpClient]
-
-          m
-        }
+        override protected def getElasticClient(clusterEndpoint: String): HttpClient = mockESClient
 
         override def sendIngestedMessage(entry:ArchiveEntry) = mockSendIngestedMessage(entry)
 
@@ -82,6 +80,7 @@ class InputLambdaMainSpec extends Specification with Mockito with ZonedDateTimeE
           throw ex
       }
       there was one(mockSendIngestedMessage).apply(any)
+      there was three(mockESClient).execute(any)(any) //path cache update calls
     }
 
     "call to index an item delivered via an S3Event then call to dispatch a message to the main app" in {
@@ -99,14 +98,12 @@ class InputLambdaMainSpec extends Specification with Mockito with ZonedDateTimeE
       val fakeContext = mock[Context]
       val mockIndexer = mock[Indexer]
       val mockSendIngestedMessage = mock[Function1[ArchiveEntry, Unit]]
+      val mockESClient = mock[HttpClient]
+      mockESClient.execute[Any, Unit](any)(any) returns Future(Right(RequestSuccess[Unit](200,None,Map(), ())))
 
       mockIndexer.indexSingleItem(any,any,any)(any).returns(Future(Right("fake-entry-id")))
       val test = new InputLambdaMain {
-        override protected def getElasticClient(clusterEndpoint: String): HttpClient = {
-          val m = mock[HttpClient]
-
-          m
-        }
+        override protected def getElasticClient(clusterEndpoint: String): HttpClient = mockESClient
 
         override def sendIngestedMessage(entry:ArchiveEntry) = mockSendIngestedMessage(entry)
 

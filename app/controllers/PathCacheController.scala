@@ -3,8 +3,8 @@ package controllers
 import akka.actor.{ActorRef, ActorSystem}
 import akka.stream.Materializer
 import com.theguardian.multimedia.archivehunter.common.clientManagers.ESClientManager
+import com.theguardian.multimedia.archivehunter.common.cmn_models.PathCacheIndexer
 import helpers.InjectableRefresher
-import models.PathCacheIndexer
 import org.slf4j.LoggerFactory
 import play.api.Configuration
 import play.api.libs.circe.Circe
@@ -26,7 +26,9 @@ class PathCacheController @Inject()(override val config:Configuration,
                                  (implicit actorSystem:ActorSystem, mat:Materializer)
   extends AbstractController(controllerComponents) with Circe with PanDomainAuthActions with AdminsOnly {
   private val logger = LoggerFactory.getLogger(getClass)
-  private val indexer = new PathCacheIndexer(config.getOptional[String]("externalData.pathCacheIndex").getOrElse("pathcache"), esClientMgr)
+  private lazy val esClient = esClientMgr.getClient()
+
+  private lazy val indexer = new PathCacheIndexer(config.getOptional[String]("externalData.pathCacheIndex").getOrElse("pathcache"), esClient)
 
   def pathCacheSize() = APIAuthAction.async { request=>
     indexer.size()

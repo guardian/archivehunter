@@ -3,8 +3,9 @@ package helpers
 import TestFileMove.AkkaTestkitSpecs2Support
 import akka.stream.scaladsl.{Keep, Sink, Source}
 import akka.stream.{ActorMaterializer, Materializer}
+import com.theguardian.multimedia.archivehunter.common.cmn_helpers.PathCacheExtractor
+import com.theguardian.multimedia.archivehunter.common.cmn_models.PathCacheEntry
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, MimeType, StorageClass}
-import models.PathCacheEntry
 import org.specs2.mock.Mockito
 import org.specs2.mutable.Specification
 
