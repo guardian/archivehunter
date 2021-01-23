@@ -2,7 +2,6 @@ import React from 'react';
 import {Redirect} from "react-router-dom";
 import axios from 'axios';
 import {createStyles, makeStyles, withStyles} from "@material-ui/core";
-import {baseStyles} from "../BaseStyles.ts";
 
 interface LoginStatusComponentProps {
     userData: any;

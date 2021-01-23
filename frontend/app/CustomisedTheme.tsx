@@ -5,7 +5,6 @@ const customisedTheme:ThemeOptions = {
         type: "dark"
     },
     typography: {
-        fontSize: 18,
         fontFamily: ["Verdana", "Arial", "Helvetica", "sans-serif"].join(",")
     }
 };

@@ -6,10 +6,13 @@ var BUILD_DIR = path.resolve(__dirname + "/..", 'public/javascripts');
 var APP_DIR = path.resolve(__dirname, 'app');
 
 var config = {
-    entry: APP_DIR + '/index.jsx',
+    entry: APP_DIR + '/index.tsx',
     output: {
         path: BUILD_DIR,
         filename: 'bundle.js'
+    },
+    resolve: {
+        extensions: [".ts", ".tsx", ".js", ".jsx"],
     },
     optimization: {
         minimizer: [new TerserPlugin()]
@@ -17,7 +20,7 @@ var config = {
     module : {
         rules : [
             {
-                test : /\.[tj]sx?/,
+                test : /\.[tj]sx?$/,
                 include : APP_DIR,
                 loader : 'ts-loader'
             },

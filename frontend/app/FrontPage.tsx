@@ -1,7 +1,7 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {makeStyles} from "@material-ui/core";
-import {baseStyles} from "./BaseStyles.ts";
+import {baseStyles} from "./BaseStyles";
 import {RouteComponentProps} from "react-router";
 
 const useStyles = makeStyles(Object.assign({

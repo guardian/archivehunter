@@ -5,17 +5,17 @@ import Raven from 'raven-js';
 import axios from 'axios';
 
 import ScanTargetEdit from './ScanTargets/ScanTargetEdit.jsx';
-import ScanTargetsList from './ScanTargets/ScanTargetsList.tsx';
+import ScanTargetsList from './ScanTargets/ScanTargetsList';
 import NotFoundComponent from './NotFoundComponent.jsx';
-import FrontPage from './FrontPage.tsx';
-import TopMenu from './TopMenu.tsx';
+import FrontPage from './FrontPage';
+import TopMenu from './TopMenu';
 import AdminFront from './admin/AdminFront.jsx';
 import AboutComponent from './admin/About.jsx';
 
 import BasicSearchComponent from './search/BasicSearchComponent.jsx';
 import JobsList from './JobsList/JobsList.jsx';
 import BrowseComponent from './browse/BrowseComponent.jsx';
-import LoginStatusComponent from './Login/LoginStatusComponent.tsx';
+import LoginStatusComponent from './Login/LoginStatusComponent';
 import MyLightbox from './Lightbox/MyLightbox.jsx';
 
 import ProxyHealthDetail from './ProxyHealthDetail/ProxyHealthDetail.jsx';
@@ -40,7 +40,8 @@ import {
 } from "@material-ui/core/styles";
 import CssBaseline from "@material-ui/core/CssBaseline";
 
-import {customisedTheme} from "./CustomisedTheme.tsx";
+import {customisedTheme} from "./CustomisedTheme";
+import {Theme} from "@material-ui/core";
 
 library.add(faStroopwafel, faCheckCircle, faCheck, faTimes, faTimesCircle, faRoad,faSearch,faThList,faWrench, faLightbulb, faChevronCircleDown, faChevronCircleRight, faTrashAlt, faFolderPlus, faFolderMinus, faFolder);
 library.add(faFilm, faVolumeUp, faImage, faFile, faClock, faRunning, faExclamationTriangle, faHdd, faBalanceScale, faSyncAlt, faBookReader, faBug, faCompressArrowsAlt, faIndustry, faRedoAlt, faHome, faListOl,);
@@ -52,8 +53,16 @@ library.add(faExclamation, faUnlink);
  */
 setupInterceptor();
 
-class App extends React.Component {
-    constructor(props){
+interface AppContainerState {
+    userLogin?: any;
+    lastError?: any;
+    loading?:boolean;
+}
+
+class App extends React.Component<any, AppContainerState> {
+    theme: Theme;
+
+    constructor(props:any){
         super(props);
 
         this.state = {
@@ -116,4 +125,4 @@ class App extends React.Component {
     }
 }
 
-render(<BrowserRouter root="/"><App/></BrowserRouter>, document.getElementById('app'));
+render(<BrowserRouter basename="/"><App/></BrowserRouter>, document.getElementById('app'));
