@@ -45,7 +45,7 @@ const ScanTargetsList:React.FC<RouteComponentProps> = (props) => {
     return <>
         <BreadcrumbComponent path={props.location ? props.location.pathname : "/unknown"}/>
         <div id="right-button-holder" style={{float: "right"}}>
-            <Button onClick={newButtonClicked}>New</Button>
+            <Button variant="contained" onClick={newButtonClicked}>New</Button>
         </div>
         <div>
             <LoadingThrobber show={loading} small={true} caption={currentActionCaption}/>

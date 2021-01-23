@@ -1,23 +1,23 @@
-html, body, p, th, td, li, dd, dt, pre .ui-dialog-buttonset{
-    font: 1em Verdana, Arial, Helvetica, sans-serif;
-    background-color: #666666;
-    color: white;
-}
+/*html, body, p, th, td, li, dd, dt, pre .ui-dialog-buttonset{*/
+/*    font: 1em Verdana, Arial, Helvetica, sans-serif;*/
+/*    background-color: #666666;*/
+/*    color: white;*/
+/*}*/
 
-.ui-dialog {
-    background-color: #666666;
-}
+/*.ui-dialog {*/
+/*    background-color: #666666;*/
+/*}*/
 
 
 
-.ui-dialog-container {
-    position: fixed;
-    top: -50%;
-    left: 25%;
-    /* don't forget to add prefixes */
-    transform: translate(-50%, -50%);
-    z-index: 999 !important;
-}
+/*.ui-dialog-container {*/
+/*    position: fixed;*/
+/*    top: -50%;*/
+/*    left: 25%;*/
+/*    !* don't forget to add prefixes *!*/
+/*    transform: translate(-50%, -50%);*/
+/*    z-index: 999 !important;*/
+/*}*/
 a {
     color: #AAAAAA;
 }
@@ -47,40 +47,40 @@ table.table {
     width: 85%;
 }
 
-img.smallicon {
-    width: 32px;
-}
+/*img.smallicon {*/
+/*    width: 32px;*/
+/*}*/
 
-img.tinyicon {
-    width: 16px;
-}
+/*img.tinyicon {*/
+/*    width: 16px;*/
+/*}*/
 
-.inline-icon {
-    margin-right: 0.4em;
-}
+/*.inline-icon {*/
+/*    margin-right: 0.4em;*/
+/*}*/
 
-.error-text {
-    color: darkred;
-    font-weight: bold;
-}
+/*.error-text {*/
+/*    color: darkred;*/
+/*    font-weight: bold;*/
+/*}*/
 
-div.inline-dialog {
-    border: 2px solid black;
-    width: 30%;
-    overflow:hidden;
-    margin-top:5em;
-    margin-left: auto;
-    margin-right:auto;
-    border-radius: 30px;
-}
+/*div.inline-dialog {*/
+/*    border: 2px solid black;*/
+/*    width: 30%;*/
+/*    overflow:hidden;*/
+/*    margin-top:5em;*/
+/*    margin-left: auto;*/
+/*    margin-right:auto;*/
+/*    border-radius: 30px;*/
+/*}*/
 
-h2.inline-dialog-title {
-    background-color: lavender;
-    border-top-right-radius: 30px;
-    padding: 0.1em;
-    padding-left: 0.5em;
-    border-top-left-radius: 30px;
-}
+/*h2.inline-dialog-title {*/
+/*    background-color: lavender;*/
+/*    border-top-right-radius: 30px;*/
+/*    padding: 0.1em;*/
+/*    padding-left: 0.5em;*/
+/*    border-top-left-radius: 30px;*/
+/*}*/
 
 h3 { font-size: 2.0em ; }
 
@@ -110,29 +110,29 @@ div.top-menu {
     height: 1em;
 }
 
-.centered {
-    margin-left: auto;
-    margin-right: auto;
-    width: 66%;
-}
+/*.centered {*/
+/*    margin-left: auto;*/
+/*    margin-right: auto;*/
+/*    width: 66%;*/
+/*}*/
 
 p.centered {
     text-align: center;
     width: 100%;
 }
 
-.login-icon{
-    display:inherit;
-    font-size: 40px;
-    line-height: 50px;
-    margin-left: auto;
-    margin-right: auto;
-    color:white;
-    width: 50px;
-    height: 50px;
-    text-align: center;
-    vertical-align: bottom;
-}
+/*.login-icon{*/
+/*    display:inherit;*/
+/*    font-size: 40px;*/
+/*    line-height: 50px;*/
+/*    margin-left: auto;*/
+/*    margin-right: auto;*/
+/*    color:white;*/
+/*    width: 50px;*/
+/*    height: 50px;*/
+/*    text-align: center;*/
+/*    vertical-align: bottom;*/
+/*}*/
 
 .highlight {
     color: white;
@@ -414,6 +414,7 @@ div.selector-panel {
     margin-right: 1em;
 }
 
+/*
 .login-info-container {
     float: right;
     position: absolute;
@@ -423,17 +424,23 @@ div.selector-panel {
     overflow: hidden;
     cursor:pointer;
 }
+*
 
+ */
+/*
 .login-user-avatar {
     height: 24px;
     border-radius: 24px;
     vertical-align: middle;
 }
+*/
 
+/*
 .login-info-text {
     color: #AAAAAA;
     margin: 0.5em;
 }
+*/
 
 .collections-list {
     list-style: none;

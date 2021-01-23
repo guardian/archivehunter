@@ -7,15 +7,15 @@ import axios from 'axios';
 import ScanTargetEdit from './ScanTargets/ScanTargetEdit.jsx';
 import ScanTargetsList from './ScanTargets/ScanTargetsList.tsx';
 import NotFoundComponent from './NotFoundComponent.jsx';
-import FrontPage from './FrontPage.jsx';
-import TopMenu from './TopMenu.jsx';
+import FrontPage from './FrontPage.tsx';
+import TopMenu from './TopMenu.tsx';
 import AdminFront from './admin/AdminFront.jsx';
 import AboutComponent from './admin/About.jsx';
 
 import BasicSearchComponent from './search/BasicSearchComponent.jsx';
 import JobsList from './JobsList/JobsList.jsx';
 import BrowseComponent from './browse/BrowseComponent.jsx';
-import LoginStatusComponent from './Login/LoginStatusComponent.jsx';
+import LoginStatusComponent from './Login/LoginStatusComponent.tsx';
 import MyLightbox from './Lightbox/MyLightbox.jsx';
 
 import ProxyHealthDetail from './ProxyHealthDetail/ProxyHealthDetail.jsx';
@@ -38,13 +38,13 @@ import {
     createMuiTheme,
     ThemeProvider
 } from "@material-ui/core/styles";
+import CssBaseline from "@material-ui/core/CssBaseline";
 
 import {customisedTheme} from "./CustomisedTheme.tsx";
 
 library.add(faStroopwafel, faCheckCircle, faCheck, faTimes, faTimesCircle, faRoad,faSearch,faThList,faWrench, faLightbulb, faChevronCircleDown, faChevronCircleRight, faTrashAlt, faFolderPlus, faFolderMinus, faFolder);
 library.add(faFilm, faVolumeUp, faImage, faFile, faClock, faRunning, faExclamationTriangle, faHdd, faBalanceScale, faSyncAlt, faBookReader, faBug, faCompressArrowsAlt, faIndustry, faRedoAlt, faHome, faListOl,);
 library.add(faExclamation, faUnlink);
-window.React = require('react');
 
 /**
  * set up an Axios Interceptor to handle automatic refreshing of credentials when a 419 (credentials expired)
@@ -91,6 +91,7 @@ class App extends React.Component {
 
     render(){
         return <ThemeProvider theme={this.theme}>
+            <CssBaseline/>
             <TopMenu visible={true} isAdmin={this.state.userLogin ? this.state.userLogin.isAdmin : false}/>
             <LoginStatusComponent userData={this.state.userLogin} userLoggedOutCb={this.userLoggedOut}/>
             <Switch>
