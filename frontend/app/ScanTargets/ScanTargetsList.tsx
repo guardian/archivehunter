@@ -54,7 +54,6 @@ const ScanTargetsList:React.FC<RouteComponentProps> = (props) => {
     const scanTargetColumns = makeScanTargetColumns(deletionCb);
 
     return <>
-        {/*<BreadcrumbComponent path={props.location ? props.location.pathname : "/unknown"}/>*/}
             <AdminContainer {...props}>
             <Grid container justify="space-between">
                 <Grid item>

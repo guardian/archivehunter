@@ -15,11 +15,21 @@ import {
     useTheme
 } from "@material-ui/core";
 import {MenuIcon} from "@material-ui/data-grid";
-import {ChevronLeft, ChevronRight} from "@material-ui/icons";
+import {
+    ChevronLeft,
+    ChevronRight,
+    Healing,
+    PeopleAlt,
+    Storage,
+    TrackChanges,
+    Work,
+    WorkSharp
+} from "@material-ui/icons";
 import {Link as RouterLink} from "react-router-dom";
+import ErrorCatcher from "./ErrorCatcher";
 
 /* mostly taken from the "Persistent Drawer" example at https://material-ui.com/components/drawers/ */
-const drawerWidth = 180;
+const drawerWidth = 220;
 const useStyles = makeStyles((theme)=>({
     appBar: {
         transition: theme.transitions.create(['margin', 'width'], {
@@ -91,25 +101,31 @@ const useStyles = makeStyles((theme)=>({
     }
 }));
 
-/*
-                <li><Link to="/admin/scanTargets">Scan Targets</Link></li>
-                <li><Link to="/admin/jobs">Jobs</Link></li>
-                <li><Link to="/admin/users">Users</Link></li>
-                <li><Link to="/admin/proxyFramework">Proxying Framework</Link></li>
-                <li><Link to="/admin/proxyHealth">Proxying Health Indicator</Link></li>
-                <hr style={{width: "100px", marginLeft: 0, marginRight: "auto"}}/>
-                <li><Link to="/admin/about">About</Link></li>
- */
 const menuItems = [
     {
         uri: "/admin/scanTargets",
-        icon: null,
+        icon: <TrackChanges/>,
         name: "Scan Targets"
     },
     {
         uri: "/admin/jobs",
-        icon: null,
+        icon: <Work/>,
         name: "Jobs"
+    },
+    {
+        uri: "/admin/users",
+        icon: <PeopleAlt/>,
+        name: "Users",
+    },
+    {
+        uri: "/admin/proxyFramework",
+        icon: <Storage/>,
+        name: "Proxying Framework"
+    },
+    {
+        uri: "/admin/proxyHealth",
+        icon: <Healing/>,
+        name: "Proxying Health Indicator"
     }
 ]
 
@@ -138,8 +154,9 @@ const AdminContainer:React.FC<RouteComponentProps> = (props) => {
                 >
                 <MenuIcon/>
             </IconButton>
-            <BreadcrumbComponent path={props.location.pathname}/>
-
+            {
+                props.location.pathname.endsWith("/admin") ? null : <BreadcrumbComponent path={props.location.pathname}/>
+            }
             <Drawer variant="persistent"
                     anchor="left"
                     open={open}
@@ -177,11 +194,8 @@ const AdminContainer:React.FC<RouteComponentProps> = (props) => {
                     [classes.contentShift]: open
                 })}
                 >
-                {
-                    props.children
-                }
+                <ErrorCatcher>{props.children}</ErrorCatcher>
             </main>
-
         </>
     )
 }

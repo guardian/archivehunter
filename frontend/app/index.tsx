@@ -9,7 +9,7 @@ import ScanTargetsList from './ScanTargets/ScanTargetsList';
 import NotFoundComponent from './NotFoundComponent.jsx';
 import FrontPage from './FrontPage';
 import TopMenu from './TopMenu';
-import AdminFront from './admin/AdminFront.jsx';
+import AdminFront from './admin/AdminFront';
 import AboutComponent from './admin/About.jsx';
 
 import BasicSearchComponent from './search/BasicSearchComponent.jsx';
