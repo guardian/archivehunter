@@ -2,7 +2,7 @@ import React from 'react';
 import axios from 'axios';
 import {Redirect} from 'react-router-dom';
 import ErrorViewComponent from "../common/ErrorViewComponent.jsx";
-import BreadcrumbComponent from "../common/BreadcrumbComponent.jsx";
+import BreadcrumbComponent from "../common/BreadcrumbComponent";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import LoadingThrobber from "../common/LoadingThrobber.jsx";
 import SortableTable from 'react-sortable-table';

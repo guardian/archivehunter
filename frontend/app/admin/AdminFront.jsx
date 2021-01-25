@@ -1,5 +1,5 @@
 import React from 'react';
-import BreadcrumbComponent from '../common/BreadcrumbComponent.jsx';
+import BreadcrumbComponent from '../common/BreadcrumbComponent';
 import {Link} from 'react-router-dom';
 
 class AdminFront extends React.Component {

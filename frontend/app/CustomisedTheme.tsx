@@ -2,7 +2,13 @@ import {ThemeOptions} from "@material-ui/core/styles";
 
 const customisedTheme:ThemeOptions = {
     palette: {
-        type: "dark"
+        type: "dark",
+        primary: {
+            light: "#FFFFFF",
+            main: "#AAAAAA",
+            dark: "#888888",
+            contrastText: "#7986cb"
+        }
     },
     typography: {
         fontFamily: ["Verdana", "Arial", "Helvetica", "sans-serif"].join(",")

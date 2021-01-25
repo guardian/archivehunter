@@ -7,6 +7,12 @@ import {Styles} from "@material-ui/core/styles/withStyles"
  * having imported baseStyles from this file.
  */
 const baseStyles:Styles<Theme,{}> = {
+    root: {
+       "& a": {
+           textDecoration: "none",
+           color: "#AAAAAA"
+       }
+    },
     smallIcon: {
         width: "32px"
     },

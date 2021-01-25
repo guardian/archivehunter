@@ -2,7 +2,7 @@ import React from 'react';
 import axios from 'axios';
 import {HorizontalBar} from 'react-chartjs-2';
 import ErrorViewComponent from '../common/ErrorViewComponent.jsx';
-import BreadcrumbComponent from "../common/BreadcrumbComponent.jsx";
+import BreadcrumbComponent from "../common/BreadcrumbComponent";
 
 class ProxyHealthDash extends React.Component
 {

@@ -89,18 +89,18 @@ h4 {
     display: inline;
 }
 
-span.breadcrumb {
-    text-transform: capitalize;
-    margin-bottom: 1em;
-}
+/*span.breadcrumb {*/
+/*    text-transform: capitalize;*/
+/*    margin-bottom: 1em;*/
+/*}*/
 
-a.breadcrumb:link {
-    text-decoration: none;
-}
+/*a.breadcrumb:link {*/
+/*    text-decoration: none;*/
+/*}*/
 
-a.breadcrumb:hover {
-    text-decoration: underline;
-}
+/*a.breadcrumb:hover {*/
+/*    text-decoration: underline;*/
+/*}*/
 
 div.top-menu {
     margin-left: auto;

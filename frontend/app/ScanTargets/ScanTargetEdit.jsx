@@ -5,7 +5,7 @@ import TimeIntervalComponent from '../common/TimeIntervalComponent.jsx';
 import axios from 'axios';
 import {Redirect} from 'react-router-dom';
 import ErrorViewComponent from "../common/ErrorViewComponent.jsx";
-import BreadcrumbComponent from "../common/BreadcrumbComponent.jsx";
+import BreadcrumbComponent from "../common/BreadcrumbComponent";
 import RegionSelector from "../common/RegionSelector.jsx";
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome";
 import TranscoderCheckComponent from "./TranscoderCheckComponent.jsx";

@@ -4,7 +4,7 @@ import FindDeploymentComponent from './multistep/FindDeploymentComponent.jsx';
 import InitiateAddComponent from "./multistep/InitiateAddComponent.jsx";
 import ConfirmationComponent from "./multistep/ConfirmationComponent.jsx";
 import ErrorViewComponent from "../common/ErrorViewComponent.jsx";
-import BreadcrumbComponent from "../common/BreadcrumbComponent.jsx";
+import BreadcrumbComponent from "../common/BreadcrumbComponent";
 
 class ProxyFrameworkAdd extends React.Component {
     constructor(props){

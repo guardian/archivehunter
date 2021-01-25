@@ -6,7 +6,7 @@ import 'react-table/react-table.css'
 
 import TimestampFormatter from '../common/TimestampFormatter.jsx';
 import ErrorViewComponent from '../common/ErrorViewComponent.jsx';
-import BreadcrumbComponent from "../common/BreadcrumbComponent.jsx";
+import BreadcrumbComponent from "../common/BreadcrumbComponent";
 import {Link} from "react-router-dom";
 import ReactTooltip from "react-tooltip";
 import JobTypeIcon from "./JobTypeIcon.jsx";

@@ -1,9 +1,9 @@
 import React from "react";
 import { DataGrid, ColDef, ValueGetterParams } from "@material-ui/data-grid";
-import {IconButton, Typography} from "@material-ui/core";
+import {IconButton, Link, Typography} from "@material-ui/core";
 import {DeleteForever} from "@material-ui/icons";
-import {Link} from "react-router-dom";
-import TickCrossIcon from "../common/TickCrossIcon.tsx";
+import {Link as RouterLink} from "react-router-dom";
+import TickCrossIcon from "../common/TickCrossIcon";
 import TimestampFormatter from "../common/TimestampFormatter.jsx";
 import TimeIntervalComponent from "../common/TimeIntervalComponent.jsx";
 import {TranscoderCheck} from "../types";
@@ -18,9 +18,13 @@ function makeScanTargetColumns(deletionCb:(targetName:string)=>void): ColDef[] {
             }}><DeleteForever/></IconButton>
         },
         { field: "bucketName", headerName: "Bucket Name", width: 200,
-            renderCell: (params)=><Link to={`scanTargets/${params.getValue("bucketName")}`}>{params.getValue("bucketName")}</Link>
+            renderCell: (params)=>
+                <Link component={RouterLink} to={`scanTargets/${params.getValue("bucketName")}`}>{params.getValue("bucketName")}</Link>
         },
-        { field: "region", headerName: "Region", width: 100},
+        { field: "region", headerName: "Region", width: 100,
+            renderCell: (params)=>
+                <Typography>{params.getValue("region")}</Typography>
+        },
         { field: "enabled", headerName: "Enabled", width: 40,
             renderCell: (params)=>{
                 const value = params.getValue("enabled");

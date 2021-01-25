@@ -1,19 +1,30 @@
 import React, {useEffect, useState} from "react";
 import {RouteComponentProps} from "react-router";
-import BreadcrumbComponent from "../common/BreadcrumbComponent.jsx";
-import {Button, Paper} from "@material-ui/core";
+import BreadcrumbComponent from "../common/BreadcrumbComponent";
+import {Button, Grid, makeStyles, Paper} from "@material-ui/core";
 import LoadingThrobber from "../common/LoadingThrobber.jsx";
 import ErrorViewComponent from "../common/ErrorViewComponent.jsx";
 import axios from "axios";
 import {DataGrid} from "@material-ui/data-grid";
-import {makeScanTargetColumns} from "./ScanTargetsListContent.tsx";
+import {makeScanTargetColumns} from "./ScanTargetsListContent";
 import {ScanTarget, ScanTargetResponse} from "../types";
+import AdminContainer from "../admin/AdminContainer";
+import { baseStyles } from "../BaseStyles";
+
+const useStyles = makeStyles(Object.assign({
+    tableContainer: {
+        marginTop: "1em",
+        height: "80vh"
+    }
+}, baseStyles));
 
 const ScanTargetsList:React.FC<RouteComponentProps> = (props) => {
     const [loading, setLoading] = useState(false);
     const [currentActionCaption, setCurrentActionCaption] = useState("Loading...");
     const [lastError, setLastError] = useState<string|null>(null)
     const [scanTargets, setScanTargets] = useState<ScanTarget[]>([]);
+
+    const classes = useStyles();
 
     useEffect(()=>{
         setLoading(true);
@@ -43,17 +54,21 @@ const ScanTargetsList:React.FC<RouteComponentProps> = (props) => {
     const scanTargetColumns = makeScanTargetColumns(deletionCb);
 
     return <>
-        <BreadcrumbComponent path={props.location ? props.location.pathname : "/unknown"}/>
-        <div id="right-button-holder" style={{float: "right"}}>
-            <Button variant="contained" onClick={newButtonClicked}>New</Button>
-        </div>
-        <div>
-            <LoadingThrobber show={loading} small={true} caption={currentActionCaption}/>
-            <ErrorViewComponent error={lastError}/>
-        </div>
-        <Paper elevation={3} style={{height: "50vh"}}>
-            <DataGrid columns={scanTargetColumns} rows={scanTargets} pageSize={5}/>
-        </Paper>
+        {/*<BreadcrumbComponent path={props.location ? props.location.pathname : "/unknown"}/>*/}
+            <AdminContainer {...props}>
+            <Grid container justify="space-between">
+                <Grid item>
+                    <LoadingThrobber show={loading} small={true} caption={currentActionCaption}/>
+                    <ErrorViewComponent error={lastError}/>
+                </Grid>
+                <Grid item >
+                    <Button variant="contained" onClick={newButtonClicked}>New</Button>
+                </Grid>
+            </Grid>
+            <Paper elevation={3} className={classes.tableContainer}>
+                <DataGrid columns={scanTargetColumns} rows={scanTargets} pageSize={5}/>
+            </Paper>
+        </AdminContainer>
         </>
 }
 

@@ -10,7 +10,7 @@ import { Link } from 'react-router-dom';
 import TimeIntervalComponent from '../common/TimeIntervalComponent.jsx';
 import TimestampFormatter from '../common/TimestampFormatter.jsx';
 import ErrorViewComponent from '../common/ErrorViewComponent.jsx';
-import BreadcrumbComponent from "../common/BreadcrumbComponent.jsx";
+import BreadcrumbComponent from "../common/BreadcrumbComponent";
 import Dialog from 'react-dialog';
 import ReactTooltip from 'react-tooltip'
 import TranscoderCheckComponent from "./TranscoderCheckComponent.jsx";

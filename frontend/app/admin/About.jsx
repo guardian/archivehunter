@@ -1,6 +1,6 @@
 import React from 'react';
 import axios from 'axios';
-import BreadcrumbComponent from "../common/BreadcrumbComponent.jsx";
+import BreadcrumbComponent from "../common/BreadcrumbComponent";
 import ErrorViewComponent from "../common/ErrorViewComponent.jsx";
 import TimestampFormatter from "../common/TimestampFormatter.jsx";
 

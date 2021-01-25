@@ -1,5 +1,15 @@
 import {ReactText} from "react";
 
+/**
+ * this is used when combining a static object with the baseStyles using Object.assign().
+ * when calling `makeStyles()` with a static object it's not necessary, but when calling with a
+ * function to inject the theme you need to force the static object like so:
+ * makeStyles( (theme:Theme) => Object.assign({myStyles} as StylesMap, baseStyles));
+ */
+interface StylesMap {
+    [name:string]: any
+}
+
 interface ObjectListResponse<T> {
     status: string;
     entityClass: string;
