@@ -33,7 +33,15 @@ const baseStyles:Styles<Theme,{}> = {
         marginLeft: "auto",
         marginRight: "auto",
         width: "66%"
+    },
+    inlineThrobber: {
+        marginTop: "-1em",
+        marginBottom: "-0.5em"
+    },
+    clickable: {
+        cursor: "pointer"
     }
+
 }
 
 export {baseStyles};

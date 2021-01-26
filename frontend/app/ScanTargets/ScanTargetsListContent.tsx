@@ -37,7 +37,10 @@ function makeScanTargetColumns(deletionCb:(targetName:string)=>void): ColDef[] {
             }
         },
         { field: "scanInterval", headerName: "Scan Interval", width: 200,
-            renderCell: (params)=><TimeIntervalComponent editable={false} value={params.getValue("scanInterval")}/>
+            renderCell: (params)=>{
+                const value = (params.getValue("scanInterval") as number|undefined) ?? 0;
+                return <TimeIntervalComponent editable={false} value={value}/>
+            }
         },  //needs to interpret data via TimestampFormatter
         { field: "scanInProgress", headerName: "Currently Scanning", width: 150},   //needs something wizzy
         { field: "lastError", headerName: "Last scan error", width: 200},

@@ -1,16 +1,47 @@
 import React from 'react';
-import PropTypes from 'prop-types';
 import TimestampFormatter from '../common/TimestampFormatter.jsx';
 import TimeIntervalComponent from '../common/TimeIntervalComponent.jsx';
 import axios from 'axios';
 import {Redirect} from 'react-router-dom';
 import ErrorViewComponent from "../common/ErrorViewComponent.jsx";
-import BreadcrumbComponent from "../common/BreadcrumbComponent";
 import RegionSelector from "../common/RegionSelector.jsx";
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome";
 import TranscoderCheckComponent from "./TranscoderCheckComponent.jsx";
-import ReactTooltip from 'react-tooltip';
 import JobEntry from "../common/JobEntry.jsx";
+import MuiAlert from '@material-ui/lab/Alert';
+import {
+    Grid,
+    Snackbar,
+    TextField,
+    Typography,
+    Button,
+    Switch,
+    Tooltip,
+    Paper,
+    createStyles,
+    IconButton
+} from "@material-ui/core";
+import AdminContainer from "../admin/AdminContainer";
+import {makeStyles, withStyles} from "@material-ui/core";
+import clsx from "clsx";
+import {baseStyles} from "../BaseStyles";
+import ScanTargetActionsBox from "./ScanTargetActionsBox";
+
+const styles = (theme) => Object.assign(createStyles({
+    formContainer: {
+        padding: "1em",
+        paddingTop: "0.4em",
+        marginBottom: "3em"
+    },
+    formErrors: {
+        display: "inline"
+    },
+    actionButtonsContainer: {
+        width: "95%",
+        marginLeft: "auto",
+        marginRight: "auto"
+    }
+}, baseStyles));
 
 class ScanTargetEdit extends React.Component {
     constructor(props){
@@ -25,6 +56,7 @@ class ScanTargetEdit extends React.Component {
             scanInterval: 7200,
             scanInProgress: false,
             lastError: "",
+            lastErrorSeverity: "information",
             pendingJobIds: [],
             paranoid: false,
             proxyEnabled: false
@@ -36,7 +68,8 @@ class ScanTargetEdit extends React.Component {
             loading: false,
             error: null,
             formValidationErrors: [],
-            completed: false
+            completed: false,
+            showingAlert: false
         };
 
         this.updateBucketname = this.updateBucketname.bind(this);
@@ -49,6 +82,7 @@ class ScanTargetEdit extends React.Component {
 
         this.formSubmit = this.formSubmit.bind(this);
 
+        this.closeAlert = this.closeAlert.bind(this);
         this.updatePendingJobs = this.updatePendingJobs.bind(this);
     }
 
@@ -167,89 +201,30 @@ class ScanTargetEdit extends React.Component {
         );
     }
 
-    triggerAddedScan(){
-        return this.generalScanTrigger("additionScan")
-    }
-    triggerRemovedScan(){
-        return this.generalScanTrigger("deletionScan")
-    }
-    triggerFullScan(){
-        return this.generalScanTrigger("scan")
-    }
-
-    triggerValidateConfig(){
-        const targetId = this.state.idToLoad;
-        this.setState({loading: true,  lastError:null, currentActionCaption: "Validating config..."}, ()=>axios.post("/api/scanTarget/" + encodeURIComponent(targetId) + "/" + "checkTranscoder")
-            .then(result=>{
-                console.log("Config validation has been started with job ID " + result.data.entity);
-                this.setState({loading: false, lastError: null, currentActionCaption: null}, );
-            }).catch(err=>{
-                console.error(err);
-                this.setState({loading: false, lastError: err, currentActionCaption: null});
-            }))
-    }
-
-    triggerTranscodeSetup(){
-        const targetId = this.state.idToLoad;
-        this.setState({loading:true, lastError:null, currentActionCaption: "Starting setup..."}, ()=>axios.post("/api/scanTarget/" + encodeURIComponent(targetId) + "/" + "createPipelines?force=true")
-            .then(result=>{
-                console.log("Transcode setup has been started with job ID " + result.data.entity);
-                this.setState({loading: false, lastError: null, currentActionCaption: null});
-            }).catch(err=>{
-                console.error(err);
-                this.setState({loading: false, lastError: err, currentActionCaption: null});
-            }))
-    }
-
-    triggerProxyGen(){
-        const targetId = this.state.idToLoad;
-        this.setState({loading: true,  lastError:null, currentActionCaption: "Starting proxy generation..."},()=>axios.post("/api/scanTarget/" + encodeURIComponent(targetId) + "/" + "genProxies")
-            .then(result=>{
-                console.log("Proxy generation has been triggered");
-                this.setState({loading:false, lastError:null, scanTargets:[],currentActionCaption: null});
-            })
-            .catch(err=>{
-                console.error(err);
-                this.setState({loading: false, lastError: err,currentActionCaption: null});
-            }))
-    }
-
-    triggerProxyRelink(){
-        const targetId = this.state.idToLoad;
-        this.setState({loading:true,  lastError:null}, ()=>axios.post("/api/proxy/relink/" + this.state.entry.bucketName)
-            .then(result=>{
-                console.log("Global proxy relink has been triggered");
-                this.setState({loading: false, lastError:null});
-            }).catch(err=>{
-                console.error(err);
-                this.setState({loading: false, lastError:err});
-            }))
-    }
-
-    generalScanTrigger(type){
-        const targetId = this.state.idToLoad;
-        console.log(this.state);
-        console.log(targetId);
-        this.setState({loading: true, lastError:null, currentActionCaption: "Starting scan..."},()=>axios.post("/api/scanTarget/" + encodeURIComponent(targetId) + "/" + type)
-            .then(result=>{
-                this.setState({currentActionCaption: "Scan started"});
-                console.log("Manual rescan has been triggered");
-            })
-            .catch(err=>{
-                console.error(err);
-                this.setState({loading: false, lastError: err, currentActionCaption: null});
-            }))
+    closeAlert() {
+        this.setState({showingAlert: false});
     }
 
     render(){
         if(this.state.completed) return <Redirect to="/admin/scanTargets"/>;
-        return <form onSubmit={this.formSubmit}>
-            <ReactTooltip/>
-            <BreadcrumbComponent path={this.props.location.pathname}/>
-            <h2>Edit scan target <img src="/assets/images/Spinner-1s-44px.svg"
-                                      alt="loading" style={{display: this.state.loading ? "inline" : "none"}}
-                                      className="inline-throbber"
-            /></h2>
+        return <>
+            <Snackbar
+                open={this.state.showingAlert}
+                autoHideDuration={60000}
+                onClose={this.closeAlert}
+            >
+                <MuiAlert elevation={6} variant="filled" onClose={this.closeAlert} severity={this.state.lastErrorSeverity}>
+                    {this.state.lastError}
+                </MuiAlert>
+            </Snackbar>
+            <AdminContainer {...this.props}>
+
+        <form onSubmit={this.formSubmit}>
+            <Paper elevation={3} className={this.props.classes.formContainer}>
+            <Typography variant="h4" style={{overflow: "hidden"}}>Edit scan target <img src="/assets/images/Spinner-1s-44px.svg"
+                                      alt="loading" style={{display: this.state.loading ? "inline" : "none", height:"32px"}}
+                                      className={this.props.classes.inlineThrobber}
+            /></Typography>
             <div className="centered" style={{display: this.state.formValidationErrors.length>0 ? "block" : "none"}}>
                 <ul className="form-errors">
                     {
@@ -261,11 +236,11 @@ class ScanTargetEdit extends React.Component {
                 <tbody>
                 <tr>
                     <td>Bucket name</td>
-                    <td><input value={this.state.entry.bucketName} onChange={this.updateBucketname} style={{width:"95%"}}/></td>
+                    <td><TextField value={this.state.entry.bucketName} onChange={this.updateBucketname} style={{width:"95%"}}/></td>
                 </tr>
                 <tr>
                     <td>Proxy bucket</td>
-                    <td><input value={this.state.entry.proxyBucket} onChange={this.updateProxyBucket} style={{width: "95%"}}/></td>
+                    <td><TextField value={this.state.entry.proxyBucket} onChange={this.updateProxyBucket} style={{width: "95%"}}/></td>
                 </tr>
                 <tr>
                     <td>Region</td>
@@ -273,7 +248,7 @@ class ScanTargetEdit extends React.Component {
                 </tr>
                 <tr>
                     <td>Enabled</td>
-                    <td><input type="checkbox" checked={this.state.entry.enabled} onChange={this.toggleEnabled}/></td>
+                    <td><Switch checked={this.state.entry.enabled} onClick={this.toggleEnabled}/></td>
                 </tr>
                 <tr>
                     <td>Last Scanned</td>
@@ -285,67 +260,75 @@ class ScanTargetEdit extends React.Component {
                 </tr>
                 <tr>
                     <td>Last Error</td>
-                    <td><textarea contentEditable={false} readOnly={true} value={this.state.entry.lastError ? this.state.entry.lastError : ""} style={{width: "85%", verticalAlign:"middle"}}/>
-                        <button type="button" onClick={this.clearErrorLog} style={{marginLeft: "0.5em", verticalAlign: "middle"}}>Clear</button></td>
+                    <td><TextField multiline={true} contentEditable={false} readOnly={true} value={this.state.entry.lastError ? this.state.entry.lastError : ""} style={{width: "85%", verticalAlign:"middle"}}/>
+                        <Button onClick={this.clearErrorLog} style={{marginLeft: "0.5em", verticalAlign: "middle"}}>Clear</Button></td>
                 </tr>
                 <tr>
                     <td>Paranoid Mode</td>
-                    <td><input type="checkbox" checked={this.state.entry.paranoid} onChange={this.toggleParanoid}/></td>
+                    <td><Switch checked={this.state.entry.paranoid} onChange={this.toggleParanoid}/></td>
                 </tr>
                 <tr>
-                    <td>Transcode Setup</td>
+                    <td>Enable proxying</td>
+                    <td><Tooltip title="Clearing this will prevent any proxies from being generated">
+                        <Switch checked={this.state.entry.proxyEnabled}
+                        onChange={this.toggleProxyEnabled}
+                        style={{marginRight: "0.2em"}}
+                        data-tip="Clearing this will prevent any proxies from being generated"
+                        />
+                    </Tooltip>
+                        </td>
+                </tr>
+                <tr>
+                    <td style={{verticalAlign: "top"}}>Transcode Setup</td>
                     <td>
-                        <span style={{display: "block"}}>
-                            <input type="checkbox" checked={this.state.entry.proxyEnabled}
-                                   onChange={this.toggleProxyEnabled}
-                                   style={{marginRight: "0.2em"}}
-                                   data-tip="Clearing this will prevent any proxies from being generated"
-                            />
-                            Enable proxying
-                        </span>
-                        <span data-tip="Validate transcode config"><FontAwesomeIcon icon="bug" className="clickable button-row" onClick={()=>this.triggerValidateConfig()}/></span>
-                        <FontAwesomeIcon icon="industry" className="clickable button-row" data-tip="(Redo) Transcode Setup" onClick={()=>this.triggerTranscodeSetup()}/>
+                        <Tooltip title="Validate transcode config">
+                            <FontAwesomeIcon icon="bug"  className={clsx()}
+                                             className="clickable button-row" onClick={()=>this.triggerValidateConfig()}/>
+                        </Tooltip>
+                        <Tooltip title="(Redo) Transcode Setup">
+                            <FontAwesomeIcon icon="industry" className="clickable button-row" onClick={()=>this.triggerTranscodeSetup()}/>
+                        </Tooltip>
                         {
                         this.state.entry.transcoderCheck ?
                             <TranscoderCheckComponent status={this.state.entry.transcoderCheck.status} checkedAt={this.state.entry.transcoderCheck.checkedAt} log={this.state.entry.transcoderCheck.log}/> :
-                            <p className="information">Not checked</p>
+                            <Typography variant="caption">No transcoder check has been run</Typography>
                         }
                     </td>
                 </tr>
                 </tbody>
             </table>
-            <h3>Actions</h3>
-            <ul className="no-bullets">
-                <li className="list-grid">
-                    <span data-tip="Addition scan"><FontAwesomeIcon icon="folder-plus" className="clickable button-row" onClick={()=>this.triggerAddedScan()}/>Scan for added files only</span>
-                </li>
-                <li className="list-grid">
-                    <span data-tip="Removal scan"><FontAwesomeIcon icon="folder-minus" className="clickable button-row" onClick={()=>this.triggerRemovedScan()}/>Scan for removed files</span>
-                </li>
-                <li className="list-grid">
-                    <span data-tip="Full scan"><FontAwesomeIcon icon="folder" className="clickable button-row " onClick={()=>this.triggerFullScan()}/>Scan for added and removed files</span>
-                </li>
-                <li className="list-grid">
-                    <span data-tip="Proxy generation"><FontAwesomeIcon icon="compress-arrows-alt" className="clickable button-row" onClick={()=>this.triggerProxyGen()}/>Generate proxies</span>
-                </li>
-                <li className="list-grid">
-                    <span data-tip="Relink proxies"><FontAwesomeIcon icon="book-reader" className="clickable button-row" onClick={()=>this.triggerProxyRelink()}/>Relink existing proxies</span>
-                </li>
-            </ul>
-            <h3>Pending jobs</h3>
-            <ErrorViewComponent error={this.state.lastError}/>
-            <span>{this.state.currentActionCaption}</span>
-            <ul className="no-bullets">
-                {
-                    this.state.pendingJobIds ?
-                        this.state.pendingJobIds.map(jobId=><li key={jobId}><JobEntry jobId={jobId} showLink={true}/></li>) : <li><i>no pending job ids</i></li>
-                }
-            </ul>
-            <input type="submit" value="Save"/>
-            <button type="button" onClick={()=>window.location="/admin/scanTargets"}>Back</button>
-            {this.state.error ? <ErrorViewComponent error={this.state.error}/> : <span/>}
+            </Paper>
+
+            <Grid container direction="row" spacing={3}>
+                <Grid item xs={6}>
+            <ScanTargetActionsBox idToLoad={this.state.idToLoad}
+                                  actionDidStart={(msg)=>this.setState({lastErrorSeverity: "info", lastError:msg, showingAlert: true})}
+                                  actionDidFail={(msg)=>this.setState({lastErrorSeverity: "error", lastError:msg, showingAlert:true})}
+                                  actionDidSucceed={}
+                                  classes={this.props.classes}
+                                  bucketName={this.state.bucketName}/>
+                </Grid>
+                <Grid item xs={6}>
+                    <Paper elevation={3} className={this.props.classes.formContainer}>
+                        <Typography variant="h4">Pending jobs</Typography>
+                        <ul className="no-bullets">
+                            {
+                                this.state.pendingJobIds && this.state.pendingJobIds.length>0 ?
+                                    this.state.pendingJobIds.map(jobId=><li key={jobId}><JobEntry jobId={jobId} showLink={true}/></li>) : <li><i>no pending job ids</i></li>
+                            }
+                        </ul>
+                    </Paper>
+                </Grid>
+            </Grid>
+            <Grid container direction="row" spacing={3} style={{width:"100%"}}>
+                <Grid item><Button variant="contained" type="submit">Save</Button></Grid>
+                <Grid item><Button variant="contained" type="button" onClick={()=>this.props.location.history.back()}>Back</Button></Grid>
+            </Grid>
         </form>
+            {this.state.error ? <ErrorViewComponent error={this.state.error}/> : <span/>}
+        </AdminContainer>
+        </>
     }
 }
 
-export default ScanTargetEdit;
+export default withStyles(styles)(ScanTargetEdit);

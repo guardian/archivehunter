@@ -1,6 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import axios from 'axios';
+import {MenuItem, Select} from "@material-ui/core";
 
 class RegionSelector extends React.Component {
     static propTypes = {
@@ -18,7 +19,7 @@ class RegionSelector extends React.Component {
         }
     }
 
-    componentWillMount(){
+    componentDidMount(){
         this.setState({loading: true, lastError: null}, ()=>axios.get("/api/regions")
             .then(response=>{
                 this.setState({loading: false, lastError: null, availableRegions: response.data.entries})
@@ -29,11 +30,11 @@ class RegionSelector extends React.Component {
     }
 
     render(){
-        return <select onChange={this.props.onChange} value={this.props.value}>
+        return <Select onChange={this.props.onChange} value={this.props.value}>
             {
-                this.state.availableRegions.map(entry=><option key={entry} value={entry}>{entry}</option>)
+                this.state.availableRegions.map(entry=><MenuItem key={entry} value={entry}>{entry}</MenuItem>)
             }
-        </select>
+        </Select>
     }
 }
 

@@ -2,12 +2,21 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import moment from 'moment';
 import 'moment-duration-format';
+import {withStyles, createStyles, TextField, Typography} from "@material-ui/core";
+
+const styles = (theme) => createStyles({
+    timeInterval: {
+        marginLeft: "1em",
+        width: "3em"
+    }
+});
 
 class TimeIntervalComponent extends React.Component {
     static propTypes = {
         editable: PropTypes.bool.isRequired,
         value: PropTypes.number.isRequired,
-        didUpdate: PropTypes.func
+        didUpdate: PropTypes.func,
+        classes: PropTypes.object
     };
 
     constructor(props){
@@ -24,7 +33,7 @@ class TimeIntervalComponent extends React.Component {
         this.notifyParent = this.notifyParent.bind(this);
     }
 
-    componentWillMount(){
+    componentDidMount(){
         const d = moment.duration(this.props.value,"seconds");
         this.setState({moment: d, daysSet: d.days(), hoursSet: d.hours(), minutesSet: d.minutes(), secondsSet: d.seconds()})
     }
@@ -54,19 +63,19 @@ class TimeIntervalComponent extends React.Component {
     render(){
         if(this.props.editable){
             return <span className="duration">
-                <input className="time-interval"
+                <TextField className="time-interval"
                        type="number"
                        value={this.state.daysSet}
                        onChange={evt=>this.safeUpdateValue("daysSet", evt.target.value)}/> days
-                <input className="time-interval"
+                <TextField className="time-interval"
                        type="number"
                        value={this.state.hoursSet}
                        onChange={evt=>this.safeUpdateValue("hoursSet", evt.target.value)}/> hours
-                <input className="time-interval"
+                <TextField className="time-interval"
                        type="number"
                        value={this.state.minutesSet}
                        onChange={evt=>this.safeUpdateValue("minutesSet", evt.target.value)}/> minutes
-                <input className="time-interval"
+                <TextField className="time-interval"
                        type="number"
                        value={this.state.secondsSet}
                        onChange={evt=>this.safeUpdateValue("secondsSet", evt.target.value)}/> seconds
@@ -78,14 +87,14 @@ class TimeIntervalComponent extends React.Component {
             if (this.state.minutesSet > 0) fmtStringParts = fmtStringParts.concat(["m [minutes]"]);
             if (this.state.secondsSet > 0) fmtStringParts = fmtStringParts.concat(["s [seconds]"]);
             if(fmtStringParts.length===0){
-                return <span className="duration">invalid duration</span>
+                return <Typography className="duration">invalid duration</Typography>
             } else {
                 const formatString = fmtStringParts.join(", ");
 
-                return <span className="duration">{this.state.moment.format(formatString)}</span>
+                return <Typography className="duration">{this.state.moment.format(formatString)}</Typography>
             }
         }
     }
 }
 
-export default TimeIntervalComponent;
+export default withStyles(styles)(TimeIntervalComponent);

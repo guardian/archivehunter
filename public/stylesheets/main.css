@@ -300,10 +300,10 @@ li.suggestions-list {
     margin-right: 0.2em;
 }
 
-input.time-interval {
-    margin-left: 1em;
-    width: 3em;
-}
+/*input.time-interval {*/
+/*    margin-left: 1em;*/
+/*    width: 3em;*/
+/*}*/
 
 .metadata-table {
     margin-top: 1em;
@@ -579,18 +579,14 @@ pre.inline-log {
     overflow-x: auto;
 }
 
-.inline-throbber {
-    margin-top: -1em;
-    margin-bottom: -0.5em;
-}
+/*.inline-throbber {*/
+/*    margin-top: -1em;*/
+/*    margin-bottom: -0.5em;*/
+/*}*/
 
 li.list-grid {
     display: inline;
     margin-right: 1em;
-}
-.inline-throbber {
-    margin-top: -1em;
-    margin-bottom: -0.5em;
 }
 
 div.dialog-content {
