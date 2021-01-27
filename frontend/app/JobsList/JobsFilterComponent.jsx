@@ -4,7 +4,19 @@ import omit from 'lodash.omit';
 import ItemEntryName from "../common/ItemEntryName.jsx";
 import ClickableIcon from "../common/ClickableIcon.jsx";
 import RefreshButton from "../common/RefreshButton.jsx";
+import {Grid, MenuItem, Select, createStyles, withStyles, InputLabel, Button} from "@material-ui/core";
+import {Refresh} from "@material-ui/icons";
 
+const styles = (theme)=>createStyles({
+    selector: {
+        minWidth: "200px",
+        maxWidth: "400px"
+    },
+    rightAlignedButton: {
+        marginLeft:"auto",
+        marginTop: "auto"
+    }
+});
 
 class JobsFilterComponent extends React.Component {
     static propTypes = {
@@ -25,7 +37,7 @@ class JobsFilterComponent extends React.Component {
         if(this.props.activeFilters.hasOwnProperty("jobType")){
             return this.props.activeFilters.jobType
         } else {
-            return "";
+            return "proxy";
         }
     }
 
@@ -37,21 +49,21 @@ class JobsFilterComponent extends React.Component {
         }
     }
 
-    selectorChanged(evt){
-        console.log("Changed", evt.target.getAttribute("id"));
-        console.log("new value", evt.target.value);
+    JOB_CHANGE=1;
+    STATUS_CHANGE=2;
 
-        switch(evt.target.getAttribute("id")){
-            case "jobtype-selector":
-                const updatedFilters = evt.target.value!=="" ? Object.assign({}, this.props.activeFilters, {jobType: evt.target.value}) : omit(this.props.activeFilters, "jobType");
+    selectorChanged(change, value){
+        switch(change){
+            case this.JOB_CHANGE:
+                const updatedFilters = value!=="" ? Object.assign({}, this.props.activeFilters, {jobType: value}) : omit(this.props.activeFilters, "jobType");
                 this.props.filterChanged(updatedFilters);
                 break;
-            case "status-selector":
-                const stUpdatedFilters = evt.target.value!=="" ? Object.assign({}, this.props.activeFilters, {jobStatus: evt.target.value}) : omit(this.props.activeFilters, "jobStatus");
+            case this.STATUS_CHANGE:
+                const stUpdatedFilters = value!=="" ? Object.assign({}, this.props.activeFilters, {jobStatus: value}) : omit(this.props.activeFilters, "jobStatus");
                 this.props.filterChanged(stUpdatedFilters);
                 break;
             default:
-                console.error("Got selector changed from unknown source: ", evt.target.getAttribute("id"))
+                console.error("Got selector changed from unknown source: ", change)
         }
     }
 
@@ -61,37 +73,58 @@ class JobsFilterComponent extends React.Component {
     }
 
     render() {
-        return <div className="filter-bar">
-            <span className="filter-entry">
-                <label htmlFor="jobtype-selector" className="filter-control-label">Job type</label>
-                <select id="jobtype-selector" onChange={this.selectorChanged} value={this.jobTypeFilter()}>
-                    <option value="proxy">Proxy</option>
-                    <option value="thumbnail">Thumbnail</option>
-                    <option value="RESTORE">Restore</option>
-                    <option value="Analyse">Analyse</option>
-                    <option value="CheckSetup">Check setup</option>
-                    <option value="SetupTranscoding">Set up transcoding</option>
-                    <option value="FileMove">File move</option>
-                </select>
-            </span>
-            <span className="filter-entry">
-                <label htmlFor="status-selector" className="filter-control-label">Status</label>
-                <select id="status-selector" onChange={this.selectorChanged} value={this.statusFilter()}>
-                    <option value="">(any)</option>
-                    <option value="ST_PENDING">Pending</option>
-                    <option value="ST_RUNNING">Running</option>
-                    <option value="ST_SUCCESS">Success</option>
-                    <option value="ST_ERROR">Error</option>
-                </select>
-            </span>
-            <span className="filter-entry" style={{display: this.props.activeFilters.hasOwnProperty("sourceId") ? "inherit" : "none"}}>
+        return <Grid container direction="row" spacing={3}>
+            <Grid item>
+                <InputLabel shrink id="jobtype-selector-label">Job Type</InputLabel>
+                <Select id="jobtype-selector"
+                        onChange={(evt)=>this.selectorChanged(this.JOB_CHANGE, evt.target.value)}
+                        value={this.jobTypeFilter()}
+                        labelId="jobtype-selector-label"
+                        className={this.props.classes.selector}
+                >
+                    <MenuItem value="proxy">Proxy</MenuItem>
+                    <MenuItem value="thumbnail">Thumbnail</MenuItem>
+                    <MenuItem value="RESTORE">Restore</MenuItem>
+                    <MenuItem value="Analyse">Analyse</MenuItem>
+                    <MenuItem value="CheckSetup">Check setup</MenuItem>
+                    <MenuItem value="SetupTranscoding">Set up transcoding</MenuItem>
+                    <MenuItem value="FileMove">File move</MenuItem>
+                </Select>
+            </Grid>
+            <Grid item>
+                <InputLabel shrink id="status-selector-label">Status</InputLabel>
+                <Select id="status-selector"
+                        onChange={(evt)=>this.selectorChanged(this.STATUS_CHANGE, evt.target.value)}
+                        value={this.statusFilter()}
+                        labelId="status-selector-label"
+                        className={this.props.classes.selector}
+                        inputProps={{"data-id":"status-selector"}}
+                >
+                    <MenuItem value="">(any)</MenuItem>
+                    <MenuItem value="ST_PENDING">Pending</MenuItem>
+                    <MenuItem value="ST_RUNNING">Running</MenuItem>
+                    <MenuItem value="ST_SUCCESS">Success</MenuItem>
+                    <MenuItem value="ST_ERROR">Error</MenuItem>
+                </Select>
+            </Grid>
+            <Grid item style={{display: this.props.activeFilters.hasOwnProperty("sourceId") ? "inherit" : "none"}}>
                 <ClickableIcon icon="times" onClick={this.sourceIdRemoved} style={{paddingRight: "0.4em"}}/>
                 <label htmlFor="entry-filter" className="filter-control-label">Specific item:</label>
                 <ItemEntryName id="entry-filter" showLink={true} entryId={this.props.activeFilters.hasOwnProperty("sourceId") ? this.props.activeFilters.sourceId : null}/>
-            </span>
-            <RefreshButton isRunning={this.props.isLoading} clickedCb={this.props.refreshClicked} showText={true} caption={this.props.isLoading ? "Loading..." : "Refresh"}/>
-        </div>
+            </Grid>
+            <Grid item className={this.props.classes.rightAlignedButton}>
+                <Button startIcon={<Refresh/>}
+                        variant="outlined"
+                        onClick={this.props.refreshClicked}>
+                    Refresh
+                </Button>
+                {/*<RefreshButton*/}
+                {/*    isRunning={this.props.isLoading}*/}
+                {/*    clickedCb={this.props.refreshClicked}*/}
+                {/*    showText={true} caption={this.props.isLoading ? "Loading..." : "Refresh"}/>*/}
+            </Grid>
+        </Grid>
     }
 }
 
-export default JobsFilterComponent;
+export default withStyles(styles)(JobsFilterComponent);

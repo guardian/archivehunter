@@ -1,21 +1,21 @@
 import React from 'react';
 import axios from 'axios';
-import ReactTable from 'react-table';
-import { ReactTableDefaults } from 'react-table';
 import 'react-table/react-table.css'
-
-import TimestampFormatter from '../common/TimestampFormatter.jsx';
 import ErrorViewComponent from '../common/ErrorViewComponent.jsx';
-import BreadcrumbComponent from "../common/BreadcrumbComponent";
-import {Link} from "react-router-dom";
-import ReactTooltip from "react-tooltip";
-import JobTypeIcon from "./JobTypeIcon.jsx";
-import JobStatusIcon from "./JobStatusIcon.jsx";
-import FilterButton from "../common/FilterButton.jsx";
 import omit from "lodash.omit";
 import Dialog from 'react-dialog';
 import JobsFilterComponent from "./JobsFilterComponent.jsx";
-import ResubmitComponent from "./ResubmitComponent.jsx";
+import {makeJobsListColumns} from "./JobsListContent";
+import AdminContainer from "../admin/AdminContainer";
+import {DataGrid} from "@material-ui/data-grid";
+import {withStyles, createStyles, Paper} from "@material-ui/core";
+
+const styles = (theme)=>createStyles({
+    tableContainer: {
+        marginTop: "1em",
+        height: "80vh"
+    }
+});
 
 class JobsList extends  React.Component {
     static knownKeys = [
@@ -44,76 +44,6 @@ class JobsList extends  React.Component {
         this.filterbarUpdated = this.filterbarUpdated.bind(this);
         this.handleModalClose = this.handleModalClose.bind(this);
         this.refreshData = this.refreshData.bind(this);
-
-        this.columns = [
-            {
-                Header: "ID",
-                accessor: "jobId",
-                Cell: props=><p className="small">{props.value}</p>
-            },
-            {
-                Header: "Type",
-                accessor: "jobType",
-                Cell: props=><span>
-                        <FilterButton fieldName="jobType" values={props.value} type="plus" onActivate={this.filterUpdated}/>
-                        <FilterButton fieldName="jobType" values={props.value} type="minus" onActivate={this.filterUpdated}/>
-                        <JobTypeIcon jobType={props.value}/>
-                    </span>
-            },
-            {
-                Header: "Start time",
-                accessor: "startedAt",
-                Cell: props=><TimestampFormatter relative={this.state.showRelativeTimes} value={props.value}/>
-            },
-            {
-                Header: "Completion time",
-                accessor: "completedAt",
-                Cell: props=><TimestampFormatter relative={this.state.showRelativeTimes} value={props.value}/>
-            },
-            {
-                Header: "Status",
-                accessor: "jobStatus",
-                Cell: props=><span>
-                        <FilterButton fieldName="jobStatus" values={props.value} type="plus" onActivate={this.filterUpdated}/>
-                        <FilterButton fieldName="jobStatus" values={props.value} type="minus" onActivate={this.filterUpdated}/>
-                        <JobStatusIcon status={props.value}/>
-                </span>
-            },
-            {
-                Header: "Log",
-                accessor: "log",
-                Cell: props=> (!props.value || props.value==="") ? <p>None</p> : <a style={{cursor: "pointer"}} onClick={()=>this.setState({logContent: props.value, showingLog: true})}>View</a>
-            },
-            {
-                Header: "Resubmit",
-                accessor: "jobId",
-                Cell: props=><ResubmitComponent jobId={props.value} visible={props.original.jobType==="proxy"}/>
-            },
-            {
-                Header: "Source file",
-                accessor: "sourceId",
-                Cell: props=><span>
-                        <FilterButton fieldName="sourceId" values={props.value} type="plus" onActivate={this.filterUpdated}/>
-                        <FilterButton fieldName="sourceId" values={props.value} type="minus" onActivate={this.filterUpdated}/>
-                        <Link to={"/browse?open="+props.value}>View</Link>
-                </span>
-            },
-            {
-                Header: "Source type",
-                accessor: "sourceType",
-            }
-        ];
-        this.style = {
-            backgroundColor: '#eee',
-            border: '1px solid black',
-            borderCollapse: 'collapse'
-        };
-
-        this.iconStyle = {
-            color: '#aaa',
-            paddingLeft: '5px',
-            paddingRight: '5px'
-        };
     }
 
     /**
@@ -282,9 +212,10 @@ class JobsList extends  React.Component {
     }
 
     render(){
+        const columns = makeJobsListColumns(this.filterUpdated, this.openLog, this.state.showRelativeTimes);
+
         if(this.state.lastError) return <ErrorViewComponent error={this.state.lastError}/>;
-        return <div>
-            <BreadcrumbComponent path={this.props.location.pathname}/>
+        return <AdminContainer {...this.props}>
             <JobsFilterComponent activeFilters={this.state.activeFilters}
                                  filterChanged={this.filterbarUpdated}
                                  refreshClicked={this.refreshData}
@@ -309,18 +240,12 @@ class JobsList extends  React.Component {
                     <div className="dialog-content">{this.state.logContent.split("\n").map(para=><p className="centered longlines">{para}</p>)}</div>
                 </Dialog>
             }
-            <ReactTable
-            data={this.state.jobsList}
-            columns={this.columns}
-            column={Object.assign({}, ReactTableDefaults.column, {headerClassName: 'dashboardheader'})}
-            defaultSorted={[{
-                id: 'startedAt',
-                desc: true
-            }]}
-        />
-            <ReactTooltip id="jobslist-tooltip"/>
-        </div>
+
+            <Paper elevation={3} className={this.props.classes.tableContainer}>
+                <DataGrid columns={columns} rows={this.state.jobsList}/>
+            </Paper>
+        </AdminContainer>
     }
 }
 
-export default JobsList;
+export default withStyles(styles)(JobsList);
