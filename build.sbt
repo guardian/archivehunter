@@ -31,7 +31,7 @@ lazy val commonSettings = Seq(
       specs2 % Test)
 )
 
-scalaVersion := "2.12.2"
+scalaVersion := "2.12.13"
 
 val akkaVersion = "2.5.18"
 val akkaClusterVersion = "0.20.0"

@@ -144,7 +144,11 @@ class BrowseComponent extends CommonSearchView {
                 console.error(index);
                 reject("Could not find relevant child node");
             } else {
-                this.loadSubFolder(childNode).then(() => this.loadNextNodeOfSpecific(childNode, pathParts, index + 1).then((terminalNode)=>resolve(terminalNode)).catch(err=>reject(err)));
+                this.loadSubFolder(childNode)
+                    .then(() => this.loadNextNodeOfSpecific(childNode, pathParts, index + 1)
+                        .then((terminalNode)=>resolve(terminalNode))
+                        .catch(err=>reject(err))
+                    );
             }
         });
     }
@@ -288,7 +292,9 @@ class BrowseComponent extends CommonSearchView {
         if (node.isLoaded) {
             this.setState({openedPath: node.fullPath.split("/").slice(0,-1)}, ()=>this.triggerSearch(node));
         } else {
-            this.loadSubFolder(node).then(() => this.setState({openedPath: node.fullPath.split("/").slice(0,-1)}, ()=>this.triggerSearch(node)));
+            this.loadSubFolder(node)
+                .then(() => this.setState({openedPath: node.fullPath.split("/").slice(0,-1)}, ()=>this.triggerSearch(node)))
+                .catch((err)=> this.setState({lastError: err}));
         }
     }
 

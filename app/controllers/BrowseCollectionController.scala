@@ -1,11 +1,14 @@
 package controllers
 
+import akka.actor.ActorSystem
+import akka.stream.Materializer
 import com.amazonaws.services.s3.AmazonS3
 import com.amazonaws.services.s3.model.{ListObjectsRequest, S3ObjectSummary}
 import com.sksamuel.elastic4s.http.search.TermsAggResult
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{ESClientManager, S3ClientManager}
-import com.theguardian.multimedia.archivehunter.common.cmn_models.{ScanTarget, ScanTargetDAO}
-import helpers.InjectableRefresher
+import com.theguardian.multimedia.archivehunter.common.cmn_models.{PathCacheIndexer, ScanTarget, ScanTargetDAO}
+import helpers.{InjectableRefresher, ItemFolderHelper}
+
 import javax.inject.{Inject, Singleton}
 import play.api.libs.circe.Circe
 import play.api.{Configuration, Logger}
@@ -21,6 +24,7 @@ import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.Try
+
 @Singleton
 class BrowseCollectionController @Inject() (override val config:Configuration,
                                             s3ClientMgr:S3ClientManager,
@@ -28,7 +32,9 @@ class BrowseCollectionController @Inject() (override val config:Configuration,
                                             override val controllerComponents: ControllerComponents,
                                             esClientMgr:ESClientManager,
                                             override val wsClient:WSClient,
-                                            override val refresher:InjectableRefresher)
+                                            override val refresher:InjectableRefresher,
+                                            folderHelper:ItemFolderHelper)
+                                           (implicit actorSystem:ActorSystem, mat:Materializer)
 extends AbstractController(controllerComponents) with PanDomainAuthActions with Circe{
   import com.sksamuel.elastic4s.http.ElasticDsl._
 
@@ -39,7 +45,7 @@ extends AbstractController(controllerComponents) with PanDomainAuthActions with 
   private val esClient = esClientMgr.getClient()
 
   private val indexName = config.get[String]("externalData.indexName")
-
+  private val pathCacheIndexer = new PathCacheIndexer(config.getOptional[String]("externalData.pathCacheIndex").getOrElse("pathcache"), esClient)
 
   /**
     * execute the provided body with a looked-up ScanTarget.
@@ -62,33 +68,6 @@ extends AbstractController(controllerComponents) with PanDomainAuthActions with 
     withScanTargetAsync(collectionName){ target=> Future(block(target)) }
 
   /**
-    * iterate through the S3 bucket recursively, until there are no more prefixes available.
-    * @param baseRequest ListObjectsRequest that contains details of what we want to list. This is updated to add pagination before actual sending to S3
-    * @param s3Client AmazonS3 client object
-    * @param continuationToken Optional continuation token. Defaults to None; for recursion purposes, don't specify when calling
-    * @param currentSummaries List of current ObjectSummary. Defaults to empty sequence; for recursion purposes, don't specify when calling
-    * @return list of folder names ("common prefixes") from the S3 bucket, as a List of strings
-    */
-  def recurseGetFolders(baseRequest:ListObjectsRequest, s3Client:AmazonS3,
-                        continuationToken:Option[String]=None, currentSummaries:Seq[String]=Seq()):Seq[String] =
-  {
-    val finalRequest = continuationToken match {
-      case None=>baseRequest
-      case Some(token)=>baseRequest.withMarker(token)
-    }
-
-    val result = s3Client.listObjects(finalRequest)
-    val updatedList = currentSummaries ++ result.getCommonPrefixes.asScala
-
-    Option(result.getNextMarker) match {
-      case Some(marker) =>
-        recurseGetFolders(baseRequest, s3Client, Some(marker), updatedList)
-      case None=>
-        updatedList
-    }
-  }
-
-  /**
     * get all of the "subfolders" ("common prefix" in s3 parlance) for the provided bucket, but only if it
     * is one that is registered as managed by us.
     * this is to drive the tree view in the browse window
@@ -97,24 +76,21 @@ extends AbstractController(controllerComponents) with PanDomainAuthActions with 
     * @return
     */
   def getFolders(collectionName:String, prefix:Option[String]) = APIAuthAction.async {
-    withScanTarget(collectionName) { target=>
-      val rq = new ListObjectsRequest().withBucketName(collectionName).withDelimiter("/")
-      val finalRq = prefix match {
-        case Some(p)=>rq.withPrefix(p)
-        case None=>rq
-      }
-      try {
-        val localS3Client = s3ClientMgr.getS3Client(awsProfile, Some(target.region))
-        val result = recurseGetFolders(finalRq,localS3Client)
-        logger.debug(s"Got result:")
-        result.foreach(summ => logger.debug(s"\t$summ"))
-        Ok(ObjectListResponse("ok","folder",result, -1).asJson)
-      } catch {
-        case ex:Throwable=>
-          logger.error("Could not list S3 bucket: ", ex)
-          InternalServerError(GenericErrorResponse("error", ex.toString).asJson)
-      }
-    }
+    val maybePrefix = prefix.flatMap(pfx=>{
+      if(pfx=="") None else Some(pfx)
+    })
+    val maybePrefixPartsLength = maybePrefix.map(_.split("/").length)
+
+    pathCacheIndexer.getPaths(collectionName, maybePrefix, maybePrefixPartsLength.getOrElse(0)+1)
+      .map(results=>{
+        logger.debug("getFolders got result: ")
+        results.foreach(summ=>logger.debug(s"\t$summ"))
+        Ok(ObjectListResponse("ok","folder",results.map(_.key),-1).asJson)
+      }).recover({
+        case err:Throwable=>
+          logger.error("Could not get prefixes from index: ", err)
+          InternalServerError(GenericErrorResponse("error", err.toString).asJson)
+    })
   }
 
   /**

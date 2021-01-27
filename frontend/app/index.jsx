@@ -32,8 +32,9 @@ import ProxyFrameworkAdd from './ProxyFramework/ProxyFrameworkAdd.jsx';
 import {handle419, setupInterceptor} from "./common/Handle419.jsx";
 
 import ProxyHealthDash from "./ProxyHealth/ProxyHealthDash.jsx";
-
+import QuickRestoreComponent from "./admin/QuickRestore.jsx";
 import Test419Component from "./testing/test419.jsx";
+import PathCacheAdmin from "./admin/PathCacheAdmin.jsx";
 
 library.add(faStroopwafel, faCheckCircle, faCheck, faTimes, faTimesCircle, faRoad,faSearch,faThList,faWrench, faLightbulb, faChevronCircleDown, faChevronCircleRight, faTrashAlt, faFolderPlus, faFolderMinus, faFolder);
 library.add(faFilm, faVolumeUp, faImage, faFile, faClock, faRunning, faExclamationTriangle, faHdd, faBalanceScale, faSyncAlt, faBookReader, faBug, faCompressArrowsAlt, faIndustry, faRedoAlt, faHome, faListOl,);
@@ -87,6 +88,7 @@ class App extends React.Component {
             <LoginStatusComponent userData={this.state.userLogin} userLoggedOutCb={this.userLoggedOut}/>
             <Switch>
                 <Route path="/test/419" component={Test419Component}/>
+                <Route path="/admin/pathcache" component={PathCacheAdmin}/>
                 <Route path="/admin/proxyHealth" component={ProxyHealthDetail}/>
                 <Route path="/admin/proxyFramework/new" component={ProxyFrameworkAdd}/>
                 <Route path="/admin/proxyFramework" component={ProxyFrameworkList}/>
@@ -96,6 +98,7 @@ class App extends React.Component {
                 <Route path="/admin/jobs" component={JobsList}/>
                 <Route path="/admin/scanTargets/:id" component={ScanTargetEdit}/> /*this also handles "new" */
                 <Route path="/admin/scanTargets" component={ScanTargetsList}/>
+                <Route path="/admin/quickrestore" component={QuickRestoreComponent}/>
                 <Route path="/admin" exact={true} component={AdminFront}/>
                 <Route path="/lightbox" exact={true} component={MyLightbox}/>
                 <Route path="/browse" exact={true} component={BrowseComponent}/>
