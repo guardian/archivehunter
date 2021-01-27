@@ -79,8 +79,6 @@ extends AbstractController(controllerComponents) with PanDomainAuthActions with 
     val maybePrefix = prefix.flatMap(pfx=>{
       if(pfx=="") None else Some(pfx)
     })
-
-//    folderHelper.scanFolders(indexName, collectionName, maybePrefix)
     val maybePrefixPartsLength = maybePrefix.map(_.split("/").length)
 
     pathCacheIndexer.getPaths(collectionName, maybePrefix, maybePrefixPartsLength.getOrElse(0)+1)
