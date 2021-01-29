@@ -442,11 +442,11 @@ div.selector-panel {
 }
 */
 
-.collections-list {
-    list-style: none;
-    padding-left: 0.2em;
-    padding-right: 0.2em;
-}
+/*.collections-list {*/
+/*    list-style: none;*/
+/*    padding-left: 0.2em;*/
+/*    padding-right: 0.2em;*/
+/*}*/
 
 .collection-list-item-disabled {
     color: #AAAAAA;

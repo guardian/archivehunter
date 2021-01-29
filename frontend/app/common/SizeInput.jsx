@@ -1,5 +1,6 @@
 import React from 'react';
 import PropTypes from 'prop-types';
+import {Input, MenuItem, Select} from "@material-ui/core";
 
 /**
  * a simple edit-box-and-multiplier selector component for inputting data sizes
@@ -36,7 +37,7 @@ class SizeInput extends React.Component {
         if(prevProps.sizeInBytes!==this.props.sizeInBytes) this.setInternalValues();
     }
 
-    componentWillMount() {
+    componentDidMount() {
         this.setInternalValues();
     }
 
@@ -85,13 +86,13 @@ class SizeInput extends React.Component {
 
     render() {
         return <span>
-            <input type="number" onChange={this.numberUpdated} value={this.state.value} style={{width: "50px", marginRight: "1em"}}/>
-            <select onChange={this.multiplierUpdated} value={this.state.multiplier}>
+            <Input type="number" onChange={this.numberUpdated} value={this.state.value} style={{width: "50px", marginRight: "1em"}}/>
+            <Select onChange={this.multiplierUpdated} value={this.state.multiplier}>
                 {
                     SizeInput.multipliers
-                        .map((mul,idx)=><option key={idx} value={idx}>{mul.label}</option>)
+                        .map((mul,idx)=><MenuItem key={idx} value={idx}>{mul.label}</MenuItem>)
                 }
-            </select>
+            </Select>
         </span>
     }
 }

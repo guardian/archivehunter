@@ -21,7 +21,6 @@ import MyLightbox from './Lightbox/MyLightbox.jsx';
 import ProxyHealthDetail from './ProxyHealthDetail/ProxyHealthDetail.jsx';
 
 import { library } from '@fortawesome/fontawesome-svg-core'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faStroopwafel, faCheckCircle, faCheck, faTimes, faTimesCircle, faRoad, faSearch,faThList,faWrench, faLightbulb, faFolderPlus, faFolderMinus, faFolder, faBookReader, faRedoAlt, faHome } from '@fortawesome/free-solid-svg-icons'
 import { faChevronCircleDown,faChevronCircleRight,faTrashAlt, faFilm, faVolumeUp,faImage, faFile, faClock, faRunning, faExclamationTriangle, faHdd, faBalanceScale, faSyncAlt, faIndustry, faListOl} from '@fortawesome/free-solid-svg-icons'
 import { faCompressArrowsAlt, faBug, faExclamation, faUnlink } from '@fortawesome/free-solid-svg-icons'
@@ -84,7 +83,7 @@ class App extends React.Component<any, AppContainerState> {
         this.theme = createMuiTheme(customisedTheme);
     }
 
-    componentWillMount(){
+    componentDidMount(){
         this.setState({loading: true}, ()=>axios.get("/api/loginStatus")
             .then(response=> {
                 this.setState({userLogin: response.data})

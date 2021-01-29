@@ -1,4 +1,5 @@
 import {ReactText} from "react";
+import {RowModel} from "@material-ui/data-grid";
 
 /**
  * this is used when combining a static object with the baseStyles using Object.assign().
@@ -42,3 +43,19 @@ interface ScanTarget {
 }
 
 type ScanTargetResponse = ObjectListResponse<ScanTarget>;
+
+interface UserProfile {
+    adminAuthQuota?: number;
+    adminRollingAuthQuota?: number;
+    allCollectionsVisible: boolean;
+    department?: string;
+    isAdmin?: boolean;
+    perRestoreQuota?: number;
+    productionOffice?: string;
+    rollingRestoreQuota?: number;
+    userEmail: string;
+    visibleCollections: string[];
+}
+
+//this is used in the UserList UI to represent a table row containing UserProfile objects
+type UserProfileRow = RowModel & UserProfile;
