@@ -59,3 +59,18 @@ interface UserProfile {
 
 //this is used in the UserList UI to represent a table row containing UserProfile objects
 type UserProfileRow = RowModel & UserProfile;
+
+/**
+ * see ProxyFrameworkInstance in cmn_models
+ * region:String, inputTopicArn:String, outputTopicArn:String, roleArn:String, subscriptionId:Option[String]
+ */
+interface ProxyFrameworkDeployment {
+    region: string;
+    inputTopicArn: string;
+    outputTopicArn: string;
+    roleArn: string;
+    subscriptionId?: string;
+}
+
+type ProxyFrameworkDeploymentsResponse = ObjectListResponse<ProxyFrameworkDeployment>;
+type ProxyFrameworkDeploymentRow = ProxyFrameworkDeployment & {id: string};

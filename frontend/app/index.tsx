@@ -26,7 +26,7 @@ import { faChevronCircleDown,faChevronCircleRight,faTrashAlt, faFilm, faVolumeUp
 import { faCompressArrowsAlt, faBug, faExclamation, faUnlink } from '@fortawesome/free-solid-svg-icons'
 import UserList from "./Users/UserList.jsx";
 
-import ProxyFrameworkList from "./ProxyFramework/ProxyFrameworkList.jsx";
+import ProxyFrameworkList from "./ProxyFramework/ProxyFrameworkList";
 import ProxyFrameworkAdd from './ProxyFramework/ProxyFrameworkAdd.jsx';
 import {handle419, setupInterceptor} from "./common/Handle419.jsx";
 

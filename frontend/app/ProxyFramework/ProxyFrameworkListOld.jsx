@@ -7,7 +7,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import LoadingThrobber from "../common/LoadingThrobber.jsx";
 import SortableTable from 'react-sortable-table';
 
-class ProxyFrameworkList extends React.Component {
+class ProxyFrameworkListOld extends React.Component {
     constructor(props){
         super(props);
 
@@ -90,6 +90,7 @@ class ProxyFrameworkList extends React.Component {
             this.setState({loading: false, lastError: err});
         }))
     }
+
     render(){
         if(this.state.lastError) return <ErrorViewComponent error={this.state.lastError}/>;
         if(this.state.goToNew) return <Redirect to="/admin/proxyFramework/new"/>;
@@ -111,4 +112,4 @@ class ProxyFrameworkList extends React.Component {
     }
 }
 
-export default ProxyFrameworkList;
+export default ProxyFrameworkListOld;

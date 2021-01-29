@@ -109,6 +109,7 @@ class FindDeploymentComponent extends React.Component {
     renderInputInterface(){
         return <div>not implemented</div>
     }
+
     render(){
         return this.props.shouldSearch ? this.renderSearchInterface() : this.renderInputInterface();
     }
