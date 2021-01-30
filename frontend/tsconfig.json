@@ -5,6 +5,10 @@
     "jsx": "react",
     "module": "ES2015",
     "moduleResolution": "node",
+    "lib": [
+      "es2019",
+      "dom"
+    ],
     "sourceMap": true,
     "strict": true,
     "isolatedModules": true,

@@ -74,3 +74,41 @@ interface ProxyFrameworkDeployment {
 
 type ProxyFrameworkDeploymentsResponse = ObjectListResponse<ProxyFrameworkDeployment>;
 type ProxyFrameworkDeploymentRow = ProxyFrameworkDeployment & {id: string};
+
+interface RegionScanError {
+    region: string;
+    error: string;
+}
+
+interface MultiResultResponse<T,V> {
+    status: string;
+    entityClass: string;
+    success: T[];
+    failure: V[];
+}
+
+interface ProxyFrameworkStack {
+    region: string;
+    stackId: string;
+    stackName: string;
+    stackStatus: string;
+    templateDescription: string;
+    creationTime: string;
+}
+
+type ProxyFrameworkStackRow = ProxyFrameworkStack & {id: number};
+
+//this response contains an array of arrays; the outer array is for each region and the inner array is the deployments for that region.
+type ProxyFrameworkSearchResponse = MultiResultResponse<ProxyFrameworkStack[], string[]>;
+
+interface ProxyFrameworkManualConnection {
+    inputTopic: string;
+    replyTopic: string;
+    managementRole: string;
+}
+
+interface ProxyFrameworkAutoConnection {
+    region: string;
+    stackName: string;
+    uuid: string;
+}

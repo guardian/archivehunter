@@ -27,7 +27,7 @@ import { faCompressArrowsAlt, faBug, faExclamation, faUnlink } from '@fortawesom
 import UserList from "./Users/UserList.jsx";
 
 import ProxyFrameworkList from "./ProxyFramework/ProxyFrameworkList";
-import ProxyFrameworkAdd from './ProxyFramework/ProxyFrameworkAdd.jsx';
+import ProxyFrameworkAdd from './ProxyFramework/ProxyFrameworkAdd';
 import {handle419, setupInterceptor} from "./common/Handle419.jsx";
 
 import ProxyHealthDash from "./ProxyHealth/ProxyHealthDash.jsx";
