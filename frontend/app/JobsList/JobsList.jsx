@@ -1,19 +1,24 @@
 import React from 'react';
 import axios from 'axios';
-import 'react-table/react-table.css'
 import ErrorViewComponent from '../common/ErrorViewComponent.jsx';
 import omit from "lodash.omit";
-import Dialog from 'react-dialog';
 import JobsFilterComponent from "./JobsFilterComponent.jsx";
 import {makeJobsListColumns} from "./JobsListContent";
 import AdminContainer from "../admin/AdminContainer";
 import {DataGrid} from "@material-ui/data-grid";
-import {withStyles, createStyles, Paper} from "@material-ui/core";
+import {withStyles, createStyles, Paper, Dialog, DialogTitle, Typography} from "@material-ui/core";
 
 const styles = (theme)=>createStyles({
     tableContainer: {
         marginTop: "1em",
         height: "80vh"
+    },
+    logLine: {
+        fontFamily: "Courier, serif",
+        color: "green"
+    },
+    silentList: {
+        listType: "none"
     }
 });
 
@@ -222,24 +227,34 @@ class JobsList extends  React.Component {
                                  isLoading={this.state.loading}
             />
 
-            {
-                this.state.showingLog && <Dialog modal={true}
-                                                 title="Job log"
-                                                 onClose={this.handleModalClose}
-                                                 closeOnEscape={true}
-                                                 hasCloseIcon={true}
-                                                 isDraggable={true}
-                                                 position={{x: window.innerWidth/2-250, y:window.innerHeight}}
-                                                 buttons={
-                                                     [{
-                                                         text: "Close",
-                                                         onClick: ()=>this.handleModalClose()
-                                                     }]
-                                                 }
-                >
-                    <div className="dialog-content">{this.state.logContent.split("\n").map(para=><p className="centered longlines">{para}</p>)}</div>
-                </Dialog>
-            }
+            <Dialog open={this.state.showingLog} onClose={()=>this.setState({showingLog: false})} aria-labelledby="logs-title">
+                <DialogTitle id="logs-title">Logs</DialogTitle>
+                <ul className={this.props.classes.silentList}>
+                    {
+                        this.state.logContent
+                            .split("\n")
+                            .map((line, idx)=><li key={idx}><Typography className={this.props.classes.logLine}>{line}</Typography></li>)
+                    }
+                </ul>
+            </Dialog>
+            {/*{*/}
+            {/*    this.state.showingLog && <Dialog modal={true}*/}
+            {/*                                     title="Job log"*/}
+            {/*                                     onClose={this.handleModalClose}*/}
+            {/*                                     closeOnEscape={true}*/}
+            {/*                                     hasCloseIcon={true}*/}
+            {/*                                     isDraggable={true}*/}
+            {/*                                     position={{x: window.innerWidth/2-250, y:window.innerHeight}}*/}
+            {/*                                     buttons={*/}
+            {/*                                         [{*/}
+            {/*                                             text: "Close",*/}
+            {/*                                             onClick: ()=>this.handleModalClose()*/}
+            {/*                                         }]*/}
+            {/*                                     }*/}
+            {/*    >*/}
+            {/*        <div className="dialog-content">{this.state.logContent.split("\n").map(para=><p className="centered longlines">{para}</p>)}</div>*/}
+            {/*    </Dialog>*/}
+            {/*}*/}
 
             <Paper elevation={3} className={this.props.classes.tableContainer}>
                 <DataGrid columns={columns} rows={this.state.jobsList}/>
