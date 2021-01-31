@@ -1,13 +1,26 @@
 import React from 'react';
 import axios from 'axios';
-import BreadcrumbComponent from "../common/BreadcrumbComponent";
 import TimestampFormatter from "../common/TimestampFormatter.jsx";
 import TimestampDiffComponent from "../common/TimestampDiffComponent.jsx";
 import ErrorViewComponent from "../common/ErrorViewComponent.jsx";
 import ByCollectionChart from "./ByCollectionChart.jsx";
 import GeneralOverviewChart from "./GeneralOverviewChart.jsx";
-import InfoTable from "./InfoTable.jsx";
+import InfoTable from "./InfoTable";
 import LoadingThrobber from "../common/LoadingThrobber.jsx";
+import AdminContainer from "../admin/AdminContainer";
+import {
+    Button,
+    CircularProgress,
+    Divider,
+    Grid,
+    Paper,
+    Snackbar,
+    Tooltip,
+    Typography,
+    withStyles
+} from "@material-ui/core";
+import MuiAlert from "@material-ui/lab/Alert";
+import {proxyHealthStyles} from "./ProxyHealthStyles";
 
 class ProxyHealthDetail extends React.Component {
     constructor(props) {
@@ -15,6 +28,7 @@ class ProxyHealthDetail extends React.Component {
 
         this.state = {
             loading: false,
+            showingAlert: false,
             lastError: null,
             collectionSummary: [],
             mostRecentRun: null,
@@ -27,6 +41,7 @@ class ProxyHealthDetail extends React.Component {
             triggerInProgress: false
         };
 
+        this.closeAlert = this.closeAlert.bind(this);
         this.collectionSelectedCb = this.collectionSelectedCb.bind(this);
         this.triggerSelectedCollectionFix = this.triggerSelectedCollectionFix.bind(this);
     }
@@ -55,7 +70,8 @@ class ProxyHealthDetail extends React.Component {
                     console.error(err);
                     this.setState({
                         loading: false,
-                        lastError: err
+                        lastError: err,
+                        showingAlert: true
                     }, ()=>reject(err))
                 })
             })
@@ -132,7 +148,7 @@ class ProxyHealthDetail extends React.Component {
 
         }).catch(err=>{
             console.error(err);
-            this.setState({loading: false, lastError: err});
+            this.setState({loading: false, lastError: err, showingAlert: true});
         }))
     }
 
@@ -143,7 +159,7 @@ class ProxyHealthDetail extends React.Component {
         this.setState({tableData:[], tableStart: 0}, ()=>this.loadMoreTableData());
     }
 
-    componentWillMount() {
+    componentDidMount() {
         this.loadData().then(()=>this.reloadTableData());
     }
 
@@ -153,47 +169,65 @@ class ProxyHealthDetail extends React.Component {
                 this.setState({triggerInProgress: false})
             }).catch(err=>{
                 console.error(err);
-                this.setState({triggerInProgress: false, lastError: err});
+                this.setState({triggerInProgress: false, lastError: err, showingAlert: true});
             }))
     }
 
+    closeAlert() {
+        this.setState({showingAlert: false})
+    }
     render() {
-        return <div>
-            <BreadcrumbComponent path={this.props.location.pathname}/>
-
-            <div className="chart-error-container">
-                <ErrorViewComponent error={this.state.lastError}/>
-            </div>
-
-            <div className="chart-container">
-                <h3>Proxy Health</h3>
-                {this.state.mostRecentRun ? <div className="info-box">Last check:
-                        <ul>
-                            <li>was at <TimestampFormatter relative={false} value={this.state.mostRecentRun.scanStart} formatString="hh:mm:ss a [on] MMMM Do YYYY"/>
-                            </li>
-                            <li>completed <TimestampDiffComponent startTime={this.state.mostRecentRun.scanStart}
-                                                           endTime={this.state.mostRecentRun.scanFinish}/></li>
-                        </ul>
-                </div> : <div className="info-box"><p>Loading...</p></div>
+        return <AdminContainer {...this.props}>
+            <Snackbar open={this.state.showingAlert} onClose={this.closeAlert} autoHideDuration={8000}>
+                {
+                    this.state.lastError ? <MuiAlert severity="error" onClose={this.closeAlert}>{ErrorViewComponent.formatError(this.state.lastError)}</MuiAlert> : null
                 }
-                <div style={{display: this.state.selectedCollection ? "block" : "none"}}>
-                    <LoadingThrobber show={this.state.triggerInProgress} small={true}/>
-                    <a onClick={this.triggerSelectedCollectionFix} className="clickable">Re-run proxies for {this.state.selectedCollection ? this.state.selectedCollection : "(none)" }</a>
-                </div>
-            </div>
-            <div className="chart-container">
-                <GeneralOverviewChart recentCountData={this.state.mostRecentRun}/>
-            </div>
+            </Snackbar>
 
-            <div className="chart-container" style={{float:"right"}}>
-                <ByCollectionChart facetData={this.state.collectionSummary} dataSeriesClicked={this.collectionSelectedCb}/>
-            </div>
+            <Grid container className={this.props.classes.chartsBar} spacing={3} justify="space-between">
+                <Grid item className={this.props.classes.chartContainer}>
+                    <Typography variant="h5">Proxy Health</Typography>
+                    {this.state.mostRecentRun ? <Paper elevation={0}>
+                        <Typography>Last check:</Typography>
+                        <ul>
+                            <li>
+                                <Typography>
+                                    was at <TimestampFormatter relative={false}
+                                                               value={this.state.mostRecentRun.scanStart}
+                                                               formatString="hh:mm:ss a [on] MMMM Do YYYY"/>
+                                </Typography>
+                            </li>
+                            <li>
+                                <Typography>
+                                    completed <TimestampDiffComponent startTime={this.state.mostRecentRun.scanStart}
+                                                                      endTime={this.state.mostRecentRun.scanFinish}/>
+                                </Typography>
+                            </li>
+                        </ul>
+                        {
+                            this.state.selectedCollection ? <Tooltip
+                                title={"Re-run proxies for " + this.state.selectedCollection ? this.state.selectedCollection : "(none)"}>
+                                <Button onClick={this.triggerSelectedCollectionFix}
+                                        disabled={this.state.triggerInProgress}>Re-create</Button>
+                            </Tooltip> : null
+                        }
+                    </Paper> : <div><CircularProgress/><Typography>Loading...</Typography></div>
+                    }
+                </Grid>
 
-            <div style={{display:"block", float:"left", width: "100vw"}}>
-                <InfoTable tableData={this.state.tableData}/>
-            </div>
-        </div>
+                <Grid item className={this.props.classes.chartContainer}>
+                    <GeneralOverviewChart recentCountData={this.state.mostRecentRun}/>
+                </Grid>
+
+                <Grid item className={this.props.classes.chartContainer} >
+                    <ByCollectionChart facetData={this.state.collectionSummary} dataSeriesClicked={this.collectionSelectedCb}/>
+                </Grid>
+            </Grid>
+
+            <Divider className={this.props.classes.chartDivider}/>
+            <InfoTable tableData={this.state.tableData}/>
+        </AdminContainer>
     }
 }
 
-export default ProxyHealthDetail;
+export default withStyles(proxyHealthStyles)(ProxyHealthDetail);

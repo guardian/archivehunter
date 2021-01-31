@@ -76,11 +76,16 @@ const ProxyFrameworkAdd:React.FC<RouteComponentProps> = (props) => {
 
     const [activeStep, setActiveStep] = useState(0);
     const [searchMode, setSearchMode] = useState<"search"|"entry">("search");
-    const [selectedDeployment, setSelectedDeployment] = useState<any|undefined>(undefined);
+    const [selectedDeployment, setSelectedDeployment] = useState<string|undefined>(undefined);
     const [manualInput, setManualInput] = useState<ProxyFrameworkManualConnection|undefined>(undefined);
     const [lastError, setLastError] = useState<string|undefined>(undefined);
     const [connectionInProgress, setConnectionInProgress] = useState(false);
     const [showingAlert, setShowingAlert] = useState(false);
+
+    const componentErrorOccurrec = (description:string)=>{
+        setLastError(description);
+        setShowingAlert(true);
+    }
 
     /**
      * returns the component for this step.  Returns null if the step is out of range
@@ -91,6 +96,7 @@ const ProxyFrameworkAdd:React.FC<RouteComponentProps> = (props) => {
                 return <InitiateAddComponent searchMode={searchMode} searchModeUpdated={(newMode)=>setSearchMode(newMode)}/>;
             case 1:
                 return searchMode=="search" ? <FindDeploymentComponent
+                                                errorOccurred={componentErrorOccurrec}
                                                 deploymentSelected={(dpl:any)=>setSelectedDeployment(dpl)}
                                                 currentSelectedDeployment={selectedDeployment}
                                                 /> :
@@ -108,7 +114,7 @@ const ProxyFrameworkAdd:React.FC<RouteComponentProps> = (props) => {
     const maxSteps = steps.length;
 
     const connectExistingStack = async ()=>{
-        const stackInfo = breakdownStackId(selectedDeployment);
+        const stackInfo = selectedDeployment ? breakdownStackId(selectedDeployment) : null;
 
         if(stackInfo==null) {
             setLastError("The given stack ID is not valid")

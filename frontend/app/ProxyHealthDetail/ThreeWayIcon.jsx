@@ -1,6 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {Tooltip} from "@material-ui/core";
 
 class ThreeWayIcon extends React.Component {
     static propTypes = {
@@ -15,7 +16,9 @@ class ThreeWayIcon extends React.Component {
         const colour = this.props.state ? this.props.onColour : "grey";
         const display = this.props.hide ? "none" : "inline";
 
-        return <FontAwesomeIcon icon={this.props.iconName} title={this.props.title} size="1.5x" style={{display: display, color: colour, marginLeft: "0.2em", marginRight: "0.2em"}}/>
+        return <Tooltip title={this.props.title}>
+            <FontAwesomeIcon icon={this.props.iconName} size="1.5x" style={{display: display, color: colour, marginLeft: "0.2em", marginRight: "0.2em"}}/>
+        </Tooltip>
     }
 }
 

@@ -112,3 +112,29 @@ interface ProxyFrameworkAutoConnection {
     stackName: string;
     uuid: string;
 }
+
+/*
+fileId:String, proxyType:ProxyType.Value, wantProxy:Boolean, esRecordSays:Boolean, haveProxy:Option[Boolean]=None
+ */
+interface ProxyVerifyResult {
+    fileId: string;
+    proxyType: "VIDEO"|"AUDIO"|"THUMBNAIL"|"UNKNOWN";
+    wantProxy: boolean;
+    esRecordSays: boolean;
+    haveProxy?: boolean;
+    known?:boolean;
+}
+/*
+fileId:String, collection:String, filePath:String, esRecordSays: Boolean, verifyResults:Seq[ProxyVerifyResult], decision:Option[ProxyHealth.Value]
+ */
+interface ProblemItem {
+    fileId: string;
+    collection: string;
+    filePath: string;
+    esRecordSays: boolean;
+    verifyResults: ProxyVerifyResult[]
+    decision?:  "Proxied"|"Partial"|"Unproxied"|"NotNeeded"|"DotFile"|"GlacierClass";
+}
+
+type ProblemItemResponse = ObjectListResponse<ProblemItem>;
+type ProblemItemRow = ProblemItem & {id: number, thumbnailResult: ProxyVerifyResult, videoResult: ProxyVerifyResult, audioResult: ProxyVerifyResult};

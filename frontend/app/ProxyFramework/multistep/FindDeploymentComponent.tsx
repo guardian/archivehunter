@@ -9,10 +9,12 @@ import {
 } from "../../types";
 import {ColDef, DataGrid} from "@material-ui/data-grid";
 import axios from "axios";
+import ErrorViewComponent from "../../common/ErrorViewComponent";
 
 interface FindDeploymentComponentProps {
     deploymentSelected: (deploymentId:string)=>void;
     currentSelectedDeployment?: string;
+    errorOccurred: (description:string)=>void;
 }
 
 const useStyles = makeStyles((theme:Theme)=>({
@@ -77,7 +79,6 @@ const FindDeploymentComponent:React.FC<FindDeploymentComponentProps> = (props) =
     const classes = useStyles();
 
     const [loading, setLoading] = useState(false);
-    const [lastError, setLastError] = useState<any|undefined>(undefined);
     const [regionErrors, setRegionErrors] = useState<RegionScanError[]>([]);
     const [foundDeployments, setFoundDeployments] = useState<ProxyFrameworkStackRow[]>([]);
 
@@ -114,7 +115,7 @@ const FindDeploymentComponent:React.FC<FindDeploymentComponentProps> = (props) =
                     console.log("proxy framework search was aborted")
                 } else {
                     setLoading(false);
-                    setLastError(err);
+                    props.errorOccurred(ErrorViewComponent.formatError(err, false));
                 }
             }
         }
