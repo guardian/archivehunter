@@ -1,5 +1,12 @@
 import React from 'react';
 import PropTypes from 'prop-types';
+import {createStyles, Typography, withStyles} from "@material-ui/core";
+
+const styles = (theme)=>createStyles({
+    errorText: {
+        color: theme.palette.error.dark
+    }
+});
 
 class ErrorViewComponent extends React.Component {
     static propTypes = {
@@ -65,8 +72,12 @@ class ErrorViewComponent extends React.Component {
             return <p className="error-text"/>
         }
 
-        return ErrorViewComponent.formatError(this.props.error, this.props.brief)
+        return <Typography className={this.props.classes.errorText}>
+            {
+                ErrorViewComponent.formatError(this.props.error, this.props.brief)
+            }
+        </Typography>
     }
 }
 
-export default ErrorViewComponent;
+export default withStyles(styles)(ErrorViewComponent);

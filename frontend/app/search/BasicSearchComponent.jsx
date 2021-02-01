@@ -34,10 +34,6 @@ class BasicSearchComponent extends CommonSearchView {
         this.addedToLightbox = this.addedToLightbox.bind(this);
     }
 
-    componentWillMount(){
-
-    }
-
     runSearch(startAt){
         const tok=this.cancelTokenSource.token;
         const encodedParamString = encodeURIComponent(this.state.searchTerms);

@@ -113,9 +113,7 @@ interface ProxyFrameworkAutoConnection {
     uuid: string;
 }
 
-/*
-fileId:String, proxyType:ProxyType.Value, wantProxy:Boolean, esRecordSays:Boolean, haveProxy:Option[Boolean]=None
- */
+
 interface ProxyVerifyResult {
     fileId: string;
     proxyType: "VIDEO"|"AUDIO"|"THUMBNAIL"|"UNKNOWN";
@@ -124,9 +122,7 @@ interface ProxyVerifyResult {
     haveProxy?: boolean;
     known?:boolean;
 }
-/*
-fileId:String, collection:String, filePath:String, esRecordSays: Boolean, verifyResults:Seq[ProxyVerifyResult], decision:Option[ProxyHealth.Value]
- */
+
 interface ProblemItem {
     fileId: string;
     collection: string;
@@ -138,3 +134,74 @@ interface ProblemItem {
 
 type ProblemItemResponse = ObjectListResponse<ProblemItem>;
 type ProblemItemRow = ProblemItem & {id: number, thumbnailResult: ProxyVerifyResult, videoResult: ProxyVerifyResult, audioResult: ProxyVerifyResult};
+
+/*
+q: null,
+                path: pathToSearch,
+                collection: this.state.collectionName,
+                sortBy: this.state.sortField,
+                sortOrder: this.state.sortOrder,
+                hideDotFiles: !this.state.showDotFiles
+            }
+ */
+interface AdvancedSearchDoc {
+    q?: string;
+    path?: string;
+    collection: string;
+    sortBy?: string; //field name to sort by
+    sortOrder?: "Ascending"|"Descending";
+    hideDotFiles?: boolean;
+}
+
+interface MimeType {
+    major: string;
+    minor: string;
+}
+
+interface LightboxIndex {
+    owner: string;
+    avatarUrl?: string;
+    addedAt: string;    //ISO datetime string
+    memberOfBulk?: string;
+}
+
+interface MediaFormat {
+    tags: Record<string,string>;
+    nb_streams: number;
+    start_time?: number;
+    format_long_name: string;
+    format_name: string;
+    bit_rate: number;
+    nb_programs: number;
+    duration: number;
+    size: number;
+}
+
+interface MediaMetadata {
+    format: MediaFormat;
+    streams: any[]; //sorry but i can't be bothered to type out the MediaStreams definition
+}
+
+/*
+id:String, bucket: String, path: String, region:Option[String], file_extension: Option[String], size: scala.Long, last_modified: ZonedDateTime,
+etag: String, mimeType: MimeType, proxied: Boolean, storageClass:StorageClass, lightboxEntries:Seq[LightboxIndex], beenDeleted:Boolean=false,
+ mediaMetadata:Option[MediaMetadata]
+ */
+interface ArchiveEntry {
+    id: string;
+    bucket: string;
+    path: string;
+    region?: string;
+    file_extension?: string;
+    size: number;
+    last_modified: string;
+    etag: string;
+    mimeType: MimeType;
+    proxied: boolean;
+    storageClass: "STANDARD"|"STANDARD_IA"|"GLACIER"|"REDUCED_REDUNDANCY";
+    lightboxEntries: LightboxIndex[];
+    beenDeleted: boolean;
+    mediaMetadata?: MediaMetadata;
+}
+
+type SearchResponse = ObjectListResponse<ArchiveEntry>;

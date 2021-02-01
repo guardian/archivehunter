@@ -1,6 +1,6 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import EntryView from './EntryView.jsx';
+import EntryView from './EntryView';
 
 class SearchResultsComponent extends React.Component {
     static propTypes = {

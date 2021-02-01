@@ -51,13 +51,15 @@ class EntryThumbnail extends React.Component {
         }
     }
 
-    componentWillMount(){
+    componentDidMount(){
         this.setState({loading: true, lastError: null},()=>{
             axios.get("/api/proxy/" + this.props.entryId + "/playable?proxyType=THUMBNAIL", {cancelToken: this.props.cancelToken})
                 .then(result=>{
                     this.setState({loading: false, lastError: null, thumbnailUri: result.data.uri})
                 }).catch(err=>{
-                    this.setState({loading: false, lastError: err})
+                    if(!axios.isCancel(err)) {
+                        this.setState({loading: false, lastError: err})
+                    }
                 })
         })
     }
