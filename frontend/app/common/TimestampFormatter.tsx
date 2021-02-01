@@ -6,6 +6,7 @@ interface TimestampFormatterProps {
     relative: boolean;
     value: string;
     formatString?: string;
+    className?: string;
 }
 
 const TimestampFormatter:React.FC<TimestampFormatterProps> = (props) => {
@@ -13,7 +14,7 @@ const TimestampFormatter:React.FC<TimestampFormatterProps> = (props) => {
     const m = moment(props.value);
 
     const out = props.relative ? m.fromNow(false) : m.format(formatToUse);
-    return <Typography>{out}</Typography>
+    return <Typography className={props.className}>{out}</Typography>
 }
 
 export default TimestampFormatter;

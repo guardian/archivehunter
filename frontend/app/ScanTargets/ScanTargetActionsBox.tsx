@@ -2,7 +2,7 @@ import React from "react";
 import {Button, Grid, Paper, Tooltip, Typography} from "@material-ui/core";
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome";
 import axios from "axios";
-import ErrorViewComponent from "../common/ErrorViewComponent";
+import ErrorViewComponent, {formatError} from "../common/ErrorViewComponent";
 
 interface ScanTargetActionsBoxProps {
     idToLoad: string;
@@ -32,7 +32,7 @@ const ScanTargetActionsBox:React.FC<ScanTargetActionsBoxProps> = (props)=>{
             console.log("Config validation has been started with job ID " + result.data.entity);
         } catch(err) {
             console.error(err);
-            props.actionDidFail(ErrorViewComponent.formatError(err, false));
+            props.actionDidFail(formatError(err, false));
         }
     }
 
@@ -42,7 +42,7 @@ const ScanTargetActionsBox:React.FC<ScanTargetActionsBoxProps> = (props)=>{
             const result = await axios.post("/api/scanTarget/" + encodeURIComponent(targetId) + "/" + "createPipelines?force=true")
             props.actionDidStart("Transcode setup has been started with job ID " + result.data.entity);
         } catch(err) {
-            props.actionDidFail(ErrorViewComponent.formatError(err, false))
+            props.actionDidFail(formatError(err, false))
         }
     }
 
@@ -53,7 +53,7 @@ const ScanTargetActionsBox:React.FC<ScanTargetActionsBoxProps> = (props)=>{
             props.actionDidStart("Proxy generation has started on this target")
         } catch (err) {
             console.error(err);
-            props.actionDidFail(ErrorViewComponent.formatError(err, false));
+            props.actionDidFail(formatError(err, false));
         }
     }
 
@@ -64,7 +64,7 @@ const ScanTargetActionsBox:React.FC<ScanTargetActionsBoxProps> = (props)=>{
             props.actionDidStart("Global proxy relink has been started");
         } catch(err) {
             console.error(err);
-            props.actionDidFail(ErrorViewComponent.formatError(err, false))
+            props.actionDidFail(formatError(err, false))
         }
     }
 
@@ -75,7 +75,7 @@ const ScanTargetActionsBox:React.FC<ScanTargetActionsBoxProps> = (props)=>{
             await axios.post("/api/scanTarget/" + encodeURIComponent(targetId) + "/" + type)
             props.actionDidStart("Rescan of this bucket has been triggered")
         } catch (err) {
-            props.actionDidFail(ErrorViewComponent.formatError(err, false))
+            props.actionDidFail(formatError(err, false))
         }
     }
 

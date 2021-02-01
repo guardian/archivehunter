@@ -9,7 +9,7 @@ import {
 } from "../../types";
 import {ColDef, DataGrid} from "@material-ui/data-grid";
 import axios from "axios";
-import ErrorViewComponent from "../../common/ErrorViewComponent";
+import ErrorViewComponent, {formatError} from "../../common/ErrorViewComponent";
 
 interface FindDeploymentComponentProps {
     deploymentSelected: (deploymentId:string)=>void;
@@ -115,7 +115,7 @@ const FindDeploymentComponent:React.FC<FindDeploymentComponentProps> = (props) =
                     console.log("proxy framework search was aborted")
                 } else {
                     setLoading(false);
-                    props.errorOccurred(ErrorViewComponent.formatError(err, false));
+                    props.errorOccurred(formatError(err, false));
                 }
             }
         }

@@ -1,7 +1,7 @@
 import React, {useState, useEffect} from "react";
 import {AdvancedSearchDoc, ArchiveEntry, SearchResponse} from "../types";
 import axios, {CancelToken} from "axios";
-import ErrorViewComponent from "./ErrorViewComponent";
+import ErrorViewComponent, {formatError} from "./ErrorViewComponent";
 import {Grid, makeStyles} from "@material-ui/core";
 import EntryView from "../search/EntryView";
 
@@ -22,6 +22,11 @@ const useStyles = makeStyles({
     }
 });
 
+/**
+ * Replacement for SearchComponent and SearchManager.  Encapsulates frontend search request and display logic.
+ * @param props
+ * @constructor
+ */
 const NewSearchComponent:React.FC<NewSearchComponentProps> = (props) => {
     const [entries, setEntries] = useState<ArchiveEntry[]>([]);
     const [cancelToken, setCancelToken] = useState<CancelToken|undefined>(undefined);
@@ -61,7 +66,7 @@ const NewSearchComponent:React.FC<NewSearchComponentProps> = (props) => {
                 setEntries([]);
                 return false;
             } else {
-                props.onErrorOccurred(ErrorViewComponent.formatError(err, false));
+                props.onErrorOccurred(formatError(err, false));
                 return false;
             }
         }

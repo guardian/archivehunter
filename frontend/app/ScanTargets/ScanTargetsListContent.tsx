@@ -4,7 +4,7 @@ import {IconButton, Link, Typography} from "@material-ui/core";
 import {DeleteForever} from "@material-ui/icons";
 import {Link as RouterLink} from "react-router-dom";
 import TickCrossIcon from "../common/TickCrossIcon";
-import TimestampFormatter from "../common/TimestampFormatter.jsx";
+import TimestampFormatter from "../common/TimestampFormatter";
 import TimeIntervalComponent from "../common/TimeIntervalComponent.jsx";
 import {TranscoderCheck} from "../types";
 import TranscoderCheckComponent from "./TranscoderCheckComponent.jsx";
@@ -33,7 +33,7 @@ function makeScanTargetColumns(deletionCb:(targetName:string)=>void): ColDef[] {
         { field: "lastScanned", headerName: "Last Scanned", width: 200,
             renderCell: (params) => {
                 const value = params.getValue("lastScanned");
-                return value ? <TimestampFormatter relative={true} value={value}/> : <Typography>Never scanned</Typography>
+                return value ? <TimestampFormatter relative={true} value={value as string}/> : <Typography>Never scanned</Typography>
             }
         },
         { field: "scanInterval", headerName: "Scan Interval", width: 200,

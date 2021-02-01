@@ -20,7 +20,7 @@ import EnterDeploymentComponent from "./multistep/EnterDeploymentComponent";
 import axios from "axios";
 import MuiAlert from "@material-ui/lab/Alert";
 import {ProxyFrameworkAutoConnection, ProxyFrameworkManualConnection} from "../types";
-import ErrorViewComponent from "../common/ErrorViewComponent";
+import ErrorViewComponent, {formatError} from "../common/ErrorViewComponent";
 
 const useStyles = makeStyles((theme: Theme) =>
     createStyles({
@@ -132,7 +132,7 @@ const ProxyFrameworkAdd:React.FC<RouteComponentProps> = (props) => {
                 props.history.push("/admin/proxyFramework")
             } catch(err) {
                 console.error(err);
-                setLastError(ErrorViewComponent.formatError(err, false));
+                setLastError(formatError(err, false));
                 setShowingAlert(true);
                 setConnectionInProgress(false);
             }

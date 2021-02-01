@@ -1,6 +1,6 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import TimestampFormatter from "../common/TimestampFormatter.jsx";
+import TimestampFormatter from "../common/TimestampFormatter";
 import RestoreStatusComponent from "./RestoreStatusComponent.jsx";
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome";
 

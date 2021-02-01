@@ -1,6 +1,6 @@
 import React from 'react';
 import axios from 'axios';
-import TimestampFormatter from "../common/TimestampFormatter.jsx";
+import TimestampFormatter from "../common/TimestampFormatter";
 import TimestampDiffComponent from "../common/TimestampDiffComponent.jsx";
 import ErrorViewComponent from "../common/ErrorViewComponent.jsx";
 import ByCollectionChart from "./ByCollectionChart.jsx";

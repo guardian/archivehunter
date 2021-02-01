@@ -1,7 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import TimestampFormatter from "../common/TimestampFormatter.jsx";
+import TimestampFormatter from "../common/TimestampFormatter";
 import axios from 'axios';
 
 class RestoreStatusComponent extends React.Component {

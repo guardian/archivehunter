@@ -1,5 +1,5 @@
 import React from 'react';
-import TimestampFormatter from '../common/TimestampFormatter.jsx';
+import TimestampFormatter from '../common/TimestampFormatter';
 import TimeIntervalComponent from '../common/TimeIntervalComponent.jsx';
 import axios from 'axios';
 import {Redirect} from 'react-router-dom';

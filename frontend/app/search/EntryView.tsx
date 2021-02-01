@@ -61,6 +61,12 @@ const useStyles = makeStyles({
     entryGoneMissing: {
         backgroundColor: "darkred !important",
         color: "white !important"
+    },
+    entryDate: {
+        fontSize: "0.6em",
+        fontStyle: "italic",
+        backgroundColor: "inherit",
+        marginTop:0
     }
 });
 
@@ -89,9 +95,10 @@ const EntryView:React.FC<EntryViewProps> = (props) => {
         <Typography className={classes.entryTitle}><Folder className={classes.entryIcon}/>{filename()}</Typography>
         <EntryThumbnail mimeType={props.entry.mimeType} entryId={props.entry.id} cancelToken={props.cancelToken} fileExtension={props.entry.file_extension}/>
         <EntryLightboxBanner lightboxEntries={props.entry.lightboxEntries} entryClassName="entry-lightbox-banner-entry-small"/>
-        <p className="entry-date"><TimestampFormatter relative={false}
-                                                      value={props.entry.last_modified}
-                                                      formatString="Do MMM YYYY, h:mm a"/></p>
+        <TimestampFormatter relative={false}
+                            className={classes.entryDate}
+                            value={props.entry.last_modified}
+                            formatString="Do MMM YYYY, h:mm a"/>
     </Grid>
 }
 

@@ -8,6 +8,31 @@ const styles = (theme)=>createStyles({
     }
 });
 
+
+/**
+ * return a string containing text that describes the given axios error.
+ * @param error
+ * @param brief
+ * @returns {string}
+ */
+function formatError(error, brief) {
+    if (error.response) {
+        // The request was made and the server responded with a status code
+        // that falls out of the range of 2xx
+        return `Server error ${error.response.status}: ` + ErrorViewComponent.bestErrorString(error.response.data, brief);
+    } else if (error.request) {
+        // The request was made but no response was received
+        // `error.request` is an instance of XMLHttpRequest in the browser and an instance of
+        // http.ClientRequest in node.js
+        console.error("Failed request: ", error.request);
+        return brief ? "No response" : "No response from server. See console log for more details."
+    } else {
+        // Something happened in setting up the request that triggered an Error
+        console.error('Axios error setting up request: ', error.message);
+        return brief ? "Couldn't send" : "Unable to set up request. See console log for more details."
+    }
+}
+
 class ErrorViewComponent extends React.Component {
     static propTypes = {
         error: PropTypes.object,
@@ -43,30 +68,6 @@ class ErrorViewComponent extends React.Component {
         return errorObj.toString();
     }
 
-    /**
-     * return a string containing text that describes the given axios error.
-     * @param error
-     * @param brief
-     * @returns {string}
-     */
-    static formatError(error, brief) {
-        if (error.response) {
-            // The request was made and the server responded with a status code
-            // that falls out of the range of 2xx
-            return `Server error ${error.response.status}: ` + ErrorViewComponent.bestErrorString(error.response.data, brief);
-        } else if (error.request) {
-            // The request was made but no response was received
-            // `error.request` is an instance of XMLHttpRequest in the browser and an instance of
-            // http.ClientRequest in node.js
-            console.error("Failed request: ", error.request);
-            return brief ? "No response" : "No response from server. See console log for more details."
-        } else {
-            // Something happened in setting up the request that triggered an Error
-            console.error('Axios error setting up request: ', error.message);
-            return brief ? "Couldn't send" : "Unable to set up request. See console log for more details."
-        }
-    }
-
     render(){
         if(!this.props.error){
             return <p className="error-text"/>
@@ -74,10 +75,11 @@ class ErrorViewComponent extends React.Component {
 
         return <Typography className={this.props.classes.errorText}>
             {
-                ErrorViewComponent.formatError(this.props.error, this.props.brief)
+                formatError(this.props.error, this.props.brief)
             }
         </Typography>
     }
 }
 
+export {formatError};
 export default withStyles(styles)(ErrorViewComponent);

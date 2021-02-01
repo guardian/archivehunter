@@ -36,13 +36,13 @@ function makeJobsListColumns(filterUpdated: (fieldName:string, values:string, ty
             field: "startedAt",
             headerName: "Start Time",
             width: 200,
-            renderCell: (params)=><TimestampFormatter relative={showRelativeTimes} value={params.value}/>
+            renderCell: (params)=><TimestampFormatter relative={showRelativeTimes} value={params.value as string}/>
         },
         {
             field: "completedAt",
             headerName: "Completion Time",
             width: 200,
-            renderCell: (params)=><TimestampFormatter relative={showRelativeTimes} value={params.value}/>
+            renderCell: (params)=><TimestampFormatter relative={showRelativeTimes} value={params.value as string}/>
         },
         {
             field: "status",

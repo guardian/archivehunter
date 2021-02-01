@@ -1,15 +1,14 @@
 import React, {useEffect, useState} from "react";
 import {RouteComponentProps} from "react-router";
-import BreadcrumbComponent from "../common/BreadcrumbComponent";
-import {Button, Grid, makeStyles, Paper} from "@material-ui/core";
+import {Button, Grid, makeStyles, Paper, Snackbar} from "@material-ui/core";
 import LoadingThrobber from "../common/LoadingThrobber.jsx";
-import ErrorViewComponent from "../common/ErrorViewComponent.jsx";
 import axios from "axios";
 import {DataGrid} from "@material-ui/data-grid";
 import {makeScanTargetColumns} from "./ScanTargetsListContent";
 import {ScanTarget, ScanTargetResponse} from "../types";
 import AdminContainer from "../admin/AdminContainer";
 import { baseStyles } from "../BaseStyles";
+import MuiAlert from "@material-ui/lab/Alert";
 
 const useStyles = makeStyles(Object.assign({
     tableContainer: {
@@ -23,6 +22,7 @@ const ScanTargetsList:React.FC<RouteComponentProps> = (props) => {
     const [currentActionCaption, setCurrentActionCaption] = useState("Loading...");
     const [lastError, setLastError] = useState<string|null>(null)
     const [scanTargets, setScanTargets] = useState<ScanTarget[]>([]);
+    const [showingAlert, setShowingAlert] = useState(false);
 
     const classes = useStyles();
 
@@ -53,12 +53,18 @@ const ScanTargetsList:React.FC<RouteComponentProps> = (props) => {
 
     const scanTargetColumns = makeScanTargetColumns(deletionCb);
 
+    const closeAlert = ()=>setShowingAlert(false);
+
     return <>
             <AdminContainer {...props}>
+                {lastError ?
+                    <Snackbar open={showingAlert} onClose={closeAlert} autoHideDuration={8000}>
+                        <MuiAlert onClose={closeAlert}>{lastError}</MuiAlert>
+                    </Snackbar> : null
+                }
             <Grid container justify="space-between">
                 <Grid item>
                     <LoadingThrobber show={loading} small={true} caption={currentActionCaption}/>
-                    <ErrorViewComponent error={lastError}/>
                 </Grid>
                 <Grid item >
                     <Button variant="contained" onClick={newButtonClicked}>New</Button>
