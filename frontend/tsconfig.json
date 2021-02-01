@@ -12,8 +12,7 @@
     "sourceMap": true,
     "strict": true,
     "isolatedModules": true,
-    "target": "ES2016",
-    "allowSyntheticDefaultImports": true
+    "target": "ES2016"
   },
   "include": ["./app/", "__tests__", "types/types.d.ts"],
   "exclude": ["node_modules"]

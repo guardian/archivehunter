@@ -145,19 +145,19 @@ p.centered {
 /*
 Search entries
  */
-div.entry-view {
-    border: 1px solid black;
-    overflow: hidden;
-    width: 140px;
-    height: 150px;
-    border-radius: 10px;
-    background-color: white;
-    display:inline-block;
-    margin-right: 2em;
-    margin-bottom: 2em;
-    padding: 0.4em;
-    padding-top: 0.2em;
-}
+/*div.entry-view {*/
+/*    border: 1px solid black;*/
+/*    overflow: hidden;*/
+/*    width: 140px;*/
+/*    height: 150px;*/
+/*    border-radius: 10px;*/
+/*    background-color: white;*/
+/*    display:inline-block;*/
+/*    margin-right: 2em;*/
+/*    margin-bottom: 2em;*/
+/*    padding: 0.4em;*/
+/*    padding-top: 0.2em;*/
+/*} */
 
 div.bulk-selection-view {
     height: 95px;
@@ -183,31 +183,31 @@ div.bulk-selection-view {
     background-color: inherit;
 }
 
-.entry-title {
-    margin-top: 0;
-    margin-bottom: 0.2em;
-    color: blue;
-    font-size: 0.8em;
-    font-weight: bold;
-    background-color: inherit;
-    margin-left:0.2em;
-    margin-right:0.2em;
-    height: 2.5em;
-    overflow: hidden;
-}
+/*.entry-title {*/
+/*    margin-top: 0;*/
+/*    margin-bottom: 0.2em;*/
+/*    color: blue;*/
+/*    font-size: 0.8em;*/
+/*    font-weight: bold;*/
+/*    background-color: inherit;*/
+/*    margin-left:0.2em;*/
+/*    margin-right:0.2em;*/
+/*    height: 2.5em;*/
+/*    overflow: hidden;*/
+/*}*/
 
-.entry-icon {
-    color: #333333;
-}
+/*.entry-icon {*/
+/*    color: #333333;*/
+/*}*/
 
-.entry-standard {
-    background-color: lightgray !important;
-}
+/*.entry-standard {*/
+/*    background-color: lightgray !important;*/
+/*}*/
 
-.entry-deep-archive {
-    background-color: #2676b5 !important;
-    color: white !important;
-}
+/*.entry-deep-archive {*/
+/*    background-color: #2676b5 !important;*/
+/*    color: white !important;*/
+/*}*/
 
 .entry-shallow-archive {
     background-color: #cceeff !important;
