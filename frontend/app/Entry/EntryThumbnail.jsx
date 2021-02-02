@@ -2,7 +2,6 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import axios from 'axios';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import ReactTooltip from 'react-tooltip';
 import {createStyles, withStyles} from "@material-ui/core";
 import clsx from "clsx";
 
@@ -102,9 +101,9 @@ class EntryThumbnail extends React.Component {
         if(!this.props.mimeType) return this.iconFromExtension();
 
         if(this.props.mimeType.major==="application" && this.props.mimeType.minor==="octet-stream") return this.iconFromExtension();
-        if(this.props.mimeType.major==="video") return <FontAwesomeIcon icon="film" size="4x" className="entry-thumbnail"/>;
-        if(this.props.mimeType.major==="audio") return <FontAwesomeIcon icon="volume-up" size="4x" className="entry-thumbnail"/>;
-        if(this.props.mimeType.major==="image") return <FontAwesomeIcon icon="image" size="4x" className="entry-thumbnail"/>;
+        if(this.props.mimeType.major==="video") return <FontAwesomeIcon icon="film" size="4x" className={this.props.classes.entryThumbnail}/>;
+        if(this.props.mimeType.major==="audio") return <FontAwesomeIcon icon="volume-up" size="4x" className={this.props.classes.entryThumbnail}/>;
+        if(this.props.mimeType.major==="image") return <FontAwesomeIcon icon="image" size="4x" className={this.props.classes.entryThumbnail}/>;
         return <FontAwesomeIcon icon="file" size="4x" className={this.props.classes.entryThumbnail}/>;
     }
 }

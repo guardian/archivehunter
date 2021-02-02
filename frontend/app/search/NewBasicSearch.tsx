@@ -1,12 +1,11 @@
 import React, {useState, useEffect} from "react";
 import {RouteComponentProps} from "react-router";
-import {CircularProgress, FormControlLabel, Grid, Input, makeStyles, Snackbar} from "@material-ui/core";
+import {CircularProgress, Grid, Input, makeStyles, Snackbar} from "@material-ui/core";
 import {Search} from "@material-ui/icons";
 import MuiAlert from "@material-ui/lab/Alert";
 import NewSearchComponent from "../common/NewSearchComponent";
 import {ArchiveEntry} from "../types";
 import EntryDetails from "../Entry/EntryDetails";
-import axios from "axios";
 
 const useStyles = makeStyles({
     searchBox: {

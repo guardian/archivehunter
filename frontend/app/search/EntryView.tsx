@@ -2,7 +2,7 @@ import React from 'react';
 import TimestampFormatter from "../common/TimestampFormatter";
 import EntryThumbnail from "../Entry/EntryThumbnail";
 import EntryLightboxBanner from '../Entry/EntryLightboxBanner';
-import {Grid, makeStyles, Typography} from "@material-ui/core";
+import {Grid, makeStyles, Tooltip, Typography} from "@material-ui/core";
 import {ArchiveEntry} from "../types";
 import {CancelToken} from "axios";
 import clsx from "clsx";
@@ -15,7 +15,7 @@ interface EntryViewProps {
     cancelToken: CancelToken|undefined;
 }
 
-const useStyles = makeStyles({
+const useStyles = makeStyles((theme)=>({
     entryView: {
         border: "1px solid black",
         overflow: "hidden",
@@ -39,13 +39,16 @@ const useStyles = makeStyles({
         marginLeft: "0.2em",
         marginRight: "0.2em",
         height: "2.5em",
-        overflow: "hidden"
+        overflow: "hidden",
+        wordBreak: "break-all"
     },
     entryIcon: {
-        color: "#333333"
+        color: "#333333",
+        verticalAlign: "top"
     },
     entryStandard: {
         backgroundColor: "lightgray !important",
+        color: "#333333"
     },
     entryShallowArchive: {
         backgroundColor: "#cceeff !important",
@@ -63,12 +66,16 @@ const useStyles = makeStyles({
         color: "white !important"
     },
     entryDate: {
-        fontSize: "0.6em",
+        fontSize: "0.7em",
         fontStyle: "italic",
         backgroundColor: "inherit",
         marginTop:0
+    },
+    centered: {
+        marginLeft: "auto",
+        marginRight: "auto"
     }
-});
+}));
 
 const EntryView:React.FC<EntryViewProps> = (props) => {
     const classes = useStyles();
@@ -92,8 +99,15 @@ const EntryView:React.FC<EntryViewProps> = (props) => {
     };
 
     return <Grid item className={clsx(classList)} onClick={entryClicked}>
-        <Typography className={classes.entryTitle}><Folder className={classes.entryIcon}/>{filename()}</Typography>
-        <EntryThumbnail mimeType={props.entry.mimeType} entryId={props.entry.id} cancelToken={props.cancelToken} fileExtension={props.entry.file_extension}/>
+        <Tooltip title={filename()}>
+            <Typography className={classes.entryTitle}>
+                <Folder className={classes.entryIcon}/>{filename()}
+            </Typography>
+        </Tooltip>
+
+        <div className={classes.centered}>
+            <EntryThumbnail mimeType={props.entry.mimeType} entryId={props.entry.id} cancelToken={props.cancelToken} fileExtension={props.entry.file_extension}/>
+        </div>
         <EntryLightboxBanner lightboxEntries={props.entry.lightboxEntries} small={true}/>
         <TimestampFormatter relative={false}
                             className={classes.entryDate}

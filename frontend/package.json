@@ -77,7 +77,6 @@
     "panda-session": "^0.1.6",
     "raven-js": "^3.27.2",
     "react": "^16.14.0",
-    "react-autocomplete": "^1.8.1",
     "react-chartjs-2": "^2.11.1",
     "react-dom": "^16.14.0",
     "react-radio-button-group": "^1.2.7",

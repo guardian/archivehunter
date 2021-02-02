@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import EntryPreview from './EntryPreview.jsx';
 import EntryJobs from "./EntryJobs.jsx";
 import axios from 'axios';
-import ErrorViewComponent, {formatError} from "../common/ErrorViewComponent.jsx";
+import {formatError} from "../common/ErrorViewComponent.jsx";
 import {Button, createStyles, Grid, IconButton, Typography, withStyles} from "@material-ui/core";
 import MetadataTable from "./details/MetadataTable";
 import LightboxInsert from "./details/LightboxInsert";
