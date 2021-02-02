@@ -118,6 +118,9 @@ const NewSearchComponent:React.FC<NewSearchComponentProps> = (props) => {
                 results.forEach((result) => {
                     const entryIndex = indexForFileid(result.data.entry.id);
                     updateSearchResults(result.data.entry, entryIndex);
+                    if(result.data.entry.id===props.selectedEntry?.id) {
+                        props.onEntryClicked(result.data.entry)
+                    }
                 })
             } catch(err) {
                 console.error("could not update lightboxed entries: ", err);

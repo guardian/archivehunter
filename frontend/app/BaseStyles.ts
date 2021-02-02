@@ -25,14 +25,11 @@ const baseStyles:Styles<Theme,{}> = {
     inlineIcon: {
         marginRight: "0.4em"
     },
-    errorText: {
-        color: "darkred",
-        fontWeight: "bold"
-    },
     centered: {
         marginLeft: "auto",
         marginRight: "auto",
-        width: "66%"
+        width: "66%",
+        textAlign: "center",
     },
     inlineThrobber: {
         marginTop: "-1em",

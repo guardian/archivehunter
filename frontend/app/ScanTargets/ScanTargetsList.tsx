@@ -9,6 +9,7 @@ import {ScanTarget, ScanTargetResponse} from "../types";
 import AdminContainer from "../admin/AdminContainer";
 import { baseStyles } from "../BaseStyles";
 import MuiAlert from "@material-ui/lab/Alert";
+import {formatError} from "../common/ErrorViewComponent";
 
 const useStyles = makeStyles(Object.assign({
     tableContainer: {
@@ -26,20 +27,21 @@ const ScanTargetsList:React.FC<RouteComponentProps> = (props) => {
 
     const classes = useStyles();
 
+    const doLoad = async ()=> {
+        try {
+            const response = await axios.get<ScanTargetResponse>("/api/scanTarget")
+            setScanTargets(response.data.entries.map((entry, idx)=>Object.assign({}, entry, {id: idx})));
+            setLoading(false);
+        } catch (err) {
+            console.error("Could not load in scan targets: ", err);
+            setLoading(false);
+            setLastError(err.toString());
+        }
+    }
+
+
     useEffect(()=>{
         setLoading(true);
-
-        const doLoad = async ()=> {
-            try {
-                const response = await axios.get<ScanTargetResponse>("/api/scanTarget")
-                setScanTargets(response.data.entries.map((entry, idx)=>Object.assign({}, entry, {id: idx})));
-                setLoading(false);
-            } catch (err) {
-                console.error("Could not load in scan targets: ", err);
-                setLoading(false);
-                setLastError(err.toString());
-            }
-        }
         doLoad();
     }, []);
 
@@ -47,8 +49,19 @@ const ScanTargetsList:React.FC<RouteComponentProps> = (props) => {
         props.history.push('/admin/scanTargets/new');
     }
 
-    const deletionCb:(targetName:string)=>void = (targetName)=> {
-        console.log("Delete button clicked for ", targetName);
+    const deletionCb = async (targetName:string)=> {
+        try {
+            await axios.delete(`/api/scanTarget/${targetName}`);
+            window.setTimeout(()=> {
+                setScanTargets([]);
+                setLoading(true);
+                return doLoad();
+            }, 500);
+        } catch(err) {
+            console.error("Could not delete scan target: ", err);
+            setLastError(formatError(err, false));
+            setShowingAlert(true);
+        }
     }
 
     const scanTargetColumns = makeScanTargetColumns(deletionCb);

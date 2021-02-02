@@ -1,18 +1,20 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import {LightboxIndex} from "../types";
-import {makeStyles} from "@material-ui/core";
+import {Grid, IconButton, makeStyles, Toolbar, Tooltip} from "@material-ui/core";
+import {Add, RemoveCircle} from "@material-ui/icons";
 
 interface EntryLightboxBannerProps {
     lightboxEntries: LightboxIndex[];
     small?: boolean;
+    removeFromLightbox?: ()=>void;
+    putToLightbox?: ()=>void;
+    isInLightbox?: boolean;
 }
 
 const useStyles = makeStyles({
     entryLightboxBanner: {
         width: "100%",
-        height: "16px",
-        overflow: "hidden",
         marginLeft: "0.1em",
         marginRight: "0.1em",
     },
@@ -34,16 +36,34 @@ const useStyles = makeStyles({
 const EntryLightboxBanner:React.FC<EntryLightboxBannerProps> = (props)=> {
     const classes = useStyles();
 
-    return <span className={classes.entryLightboxBanner}>
+    return <Grid container className={classes.entryLightboxBanner} alignItems="flex-end" justify="center">
+        {
+            props.removeFromLightbox && props.putToLightbox ?
+                <Grid item>
+                    <IconButton onClick={() => props.isInLightbox && props.removeFromLightbox  ? props.removeFromLightbox() : props.putToLightbox ? props.putToLightbox() : false}>
+                    {
+                        props.isInLightbox ? <Tooltip title="Remove from my lightbox">
+                                <RemoveCircle/></Tooltip>
+                            :
+                            <Tooltip title="Add to my lightbox">
+                                <Add/>
+                            </Tooltip>
+                    }
+                </IconButton>
+                </Grid>: null
+        }
         {
             props.lightboxEntries.map(entry=>
-                <img src={entry.avatarUrl ? entry.avatarUrl : "/static/default-avatar.png"}
-                     alt={entry.owner}
-                     className={props.small ? classes.entryLightboxBannerSmall : classes.entryLightboxBannerLarge }
-                />
+                <Grid item>
+                    <Tooltip title={entry.owner}>
+                        <img src={entry.avatarUrl ? entry.avatarUrl : "/static/default-avatar.png"}
+                         alt={entry.owner}
+                         className={props.small ? classes.entryLightboxBannerSmall : classes.entryLightboxBannerLarge }/>
+                    </Tooltip>
+                </Grid>
             )
         }
-    </span>
+    </Grid>
 }
 
 export default EntryLightboxBanner;

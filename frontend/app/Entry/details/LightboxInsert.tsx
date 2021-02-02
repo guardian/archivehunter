@@ -1,12 +1,17 @@
 import React, {useEffect, useState} from "react";
-import {CircularProgress, Grid, makeStyles} from "@material-ui/core";
+import {CircularProgress, Grid, IconButton, makeStyles, Typography} from "@material-ui/core";
 import axios from "axios";
 import {formatError} from "../../common/ErrorViewComponent";
+import {FontAwesomeIcon} from "@fortawesome/react-fontawesome";
+import EntryLightboxBanner from "../EntryLightboxBanner";
+import {Add, RemoveCircle} from "@material-ui/icons";
+import {LightboxIndex} from "../../types";
 
 interface LightboxInsertProps {
     isInLightbox: boolean;
     lightboxedCb?: (entryId:string)=>Promise<void>;
     entryId: string;
+    lightboxEntries: LightboxIndex[];
     onError: (description:string)=>void;
 }
 
@@ -42,19 +47,36 @@ const LightboxInsert:React.FC<LightboxInsertProps> = (props) => {
         }
     }
 
-    return <Grid container spacing={1}>
-        <Grid item>Lightbox</Grid>
-        <Grid item>
-            {
-                props.isInLightbox ?
-                    <span>Saved <a onClick={removeFromLightbox} style={{cursor: "pointer"}}>remove</a></span> :
-                    <a onClick={putToLightbox} style={{cursor: "pointer"}}>Save to lightbox</a>
-            }
-        </Grid>
-        {
-            lightboxSaving ? <Grid item><CircularProgress/></Grid> : null
-        }
-    </Grid>
+    return (<>
+            <Grid container spacing={1} justify="center">
+                <Grid item>
+                    <FontAwesomeIcon icon="lightbulb"/>
+                </Grid>
+                <Grid item>
+                    <Typography>Lightboxes</Typography>
+                </Grid>
+            </Grid>
+            <EntryLightboxBanner lightboxEntries={props.lightboxEntries}
+                                 isInLightbox={props.isInLightbox}
+                                 putToLightbox={putToLightbox}
+                                 removeFromLightbox={removeFromLightbox}
+                                 small={false}
+            />
+    </>);
+
+    // return <Grid container spacing={1}>
+    //     <Grid item>Lightbox</Grid>
+    //     <Grid item>
+    //         {
+    //             props.isInLightbox ?
+    //                 <span>Saved <a onClick={removeFromLightbox} style={{cursor: "pointer"}}>remove</a></span> :
+    //                 <a onClick={putToLightbox} style={{cursor: "pointer"}}>Save to lightbox</a>
+    //         }
+    //     </Grid>
+    //     {
+    //         lightboxSaving ? <Grid item><CircularProgress/></Grid> : null
+    //     }
+    // </Grid>
 }
 
 export default LightboxInsert;

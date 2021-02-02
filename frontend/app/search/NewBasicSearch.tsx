@@ -35,11 +35,14 @@ const NewBasicSearch:React.FC<RouteComponentProps> = (props) => {
     const [lastError, setLastError] = useState<string|undefined>(undefined);
     const [selectedEntry, setSelectedEntry] = useState<ArchiveEntry|undefined>(undefined);
     const [isLoading, setIsLoading] = useState(false);
-    const [dividerLocation, setDividerLocation] = useState(16);
+    const [dividerLocation, setDividerLocation] = useState(20);
     const [newlyLightboxedList, setNewlyLightboxedList] = useState<string[]>([]);
 
     const closeAlert = ()=>setShowingAlert(false);
 
+    /**
+     * 1 second after the user finishes typing, update the search parameter to trigger the search
+     */
     useEffect(()=>{
         const timerId = window.setTimeout(()=>setActiveSearch(typedSearch), 1000);
 
@@ -48,6 +51,17 @@ const NewBasicSearch:React.FC<RouteComponentProps> = (props) => {
             window.clearTimeout(timerId);
         }
     }, [typedSearch]);
+
+    /**
+     * if the user has selected an entry, then open the details panel; if s/he has deselected then close it.
+     */
+    useEffect(()=>{
+        if(selectedEntry) {
+            setDividerLocation(16); //panel open
+        } else {
+            setDividerLocation(20); //panel closed
+        }
+    }, [selectedEntry]);
 
     return <>
         <Snackbar open={showingAlert} onClose={closeAlert} autoHideDuration={8000}>

@@ -1,21 +1,26 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import EntryPreview from './EntryPreview.jsx';
-import EntryThumbnail from './EntryThumbnail.jsx';
-import FileSizeView from './FileSizeView.jsx';
 import EntryJobs from "./EntryJobs.jsx";
 import axios from 'axios';
-import EntryLightboxBanner from "./EntryLightboxBanner";
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import MediaDurationComponent from "../common/MediaDurationComponent.jsx";
 import ErrorViewComponent, {formatError} from "../common/ErrorViewComponent.jsx";
-import {createStyles, withStyles} from "@material-ui/core";
+import {Button, createStyles, Grid, IconButton, Typography, withStyles} from "@material-ui/core";
 import MetadataTable from "./details/MetadataTable";
 import LightboxInsert from "./details/LightboxInsert";
+import {baseStyles} from "../BaseStyles";
 
-const styles = (theme)=>createStyles({
-
-});
+const styles = (theme)=>Object.assign(createStyles({
+    entryDetails: {
+        overflow: "hidden",
+        height: "100%"
+    },
+    entryDetailsLightboxes: {
+        marginLeft: "1.5em"
+    },
+    partialDivider: {
+        width: "70%"
+    }
+}), baseStyles);
 
 class EntryDetails extends React.Component {
     static propTypes = {
@@ -25,7 +30,6 @@ class EntryDetails extends React.Component {
         loadJobs: PropTypes.boolean,
         lightboxedCb: PropTypes.func,
         userLogin: null,
-        lastError: null,
 
         preLightboxInsert: PropTypes.object,
         postLightboxInsert: PropTypes.object,
@@ -38,7 +42,6 @@ class EntryDetails extends React.Component {
         super(props);
         this.state = {
             loading: false,
-            lastError: null,
             jobsAutorefresh: false,
             lightboxSaving: false,
         };
@@ -54,7 +57,7 @@ class EntryDetails extends React.Component {
                 this.setState({userLogin: response.data})
             }).catch(err=>{
                 console.error(err);
-                this.setState({lastError: err})
+                props.onError(formatError(err));
             }));
     }
 
@@ -75,7 +78,7 @@ class EntryDetails extends React.Component {
             }).catch(err=>{
                 console.error(err);
                 props.onError(formatError(err));
-                this.setState({loading: false, lastError: err});
+                this.setState({loading: false});
             }));
     }
 
@@ -90,10 +93,10 @@ class EntryDetails extends React.Component {
 
     render(){
         if(!this.props.entry){
-            return <div className="entry-details">
+            return <div className={this.props.classes.entryDetails}>
             </div>
         }
-        return <div className="entry-details" style={{overflowX: "scroll"}}>
+        return <div className={this.props.classes.entryDetails} style={{overflowX: "auto"}}>
                 <EntryPreview entryId={this.props.entry.id}
                               hasProxy={this.props.entry.proxied}
                               fileExtension={this.props.entry.file_extension}
@@ -102,10 +105,15 @@ class EntryDetails extends React.Component {
                               triggeredProxyGeneration={this.proxyGenerationWasTriggered}
                 />
             <div className="entry-details-insert">{ this.props.preLightboxInsert ? this.props.preLightboxInsert : "" }</div>
-            <div className="entry-details-lightboxes" style={{display: this.props.entry.lightboxEntries.length>0 ? "block":"none"}}>
-                <span style={{display:"block", marginBottom: "0.4em"}}><FontAwesomeIcon icon="lightbulb" style={{paddingRight: "0.4em"}}/>Lightboxes</span>
-                <EntryLightboxBanner lightboxEntries={this.props.entry.lightboxEntries} entryClassName="entry-lightbox-banner-entry-large"/>
+            <div className={this.props.classes.entryDetailsLightboxes}>
+                <LightboxInsert isInLightbox={this.isInLightbox()}
+                                entryId={this.props.entry.id}
+                                onError={this.props.onError}
+                                lightboxedCb={this.props.lightboxedCb}
+                                lightboxEntries={this.props.entry.lightboxEntries}
+                />
             </div>
+            <hr className={this.props.classes.partialDivider}/>
             <div className="entry-details-insert">{ this.props.postLightboxInsert ? this.props.postLightboxInsert : "" }</div>
             {
                 this.props.showJobs ? <EntryJobs entryId={this.props.entry.id}
@@ -115,17 +123,11 @@ class EntryDetails extends React.Component {
             }
             <div className="entry-details-insert">{ this.props.postJobsInsert ? this.props.postJobsInsert : "" }</div>
             <div className="entry-details-insert">
-                <LightboxInsert isInLightbox={this.isInLightbox()} entryId={this.state.entry.id} onError={this.props.onError} lightboxedCb={this.props.lightboxedCb}/>
+                <MetadataTable entry={this.props.entry}/>
             </div>
-            <div className="entry-details-insert">
-                <MetadataTable entry={this.state.entry}/>
+            <div className={this.props.classes.centered} style={{marginTop: "1em"}}>
+                <Button variant="outlined" onClick={this.triggerAnalyse}>Refresh metadata</Button>
             </div>
-            <p className="information">
-                <a onClick={this.triggerAnalyse} style={{cursor: "pointer"}}>Refresh metadata</a>
-            </p>
-            {
-                this.state.lastError ? <ErrorViewComponent error={this.state.lastError}/> : <span/>
-            }
         </div>
     }
 }
