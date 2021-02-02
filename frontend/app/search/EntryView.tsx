@@ -1,7 +1,7 @@
 import React from 'react';
 import TimestampFormatter from "../common/TimestampFormatter";
-import EntryThumbnail from "../Entry/EntryThumbnail.jsx";
-import EntryLightboxBanner from '../Entry/EntryLightboxBanner.jsx';
+import EntryThumbnail from "../Entry/EntryThumbnail";
+import EntryLightboxBanner from '../Entry/EntryLightboxBanner';
 import {Grid, makeStyles, Typography} from "@material-ui/core";
 import {ArchiveEntry} from "../types";
 import {CancelToken} from "axios";
@@ -94,7 +94,7 @@ const EntryView:React.FC<EntryViewProps> = (props) => {
     return <Grid item className={clsx(classList)} onClick={entryClicked}>
         <Typography className={classes.entryTitle}><Folder className={classes.entryIcon}/>{filename()}</Typography>
         <EntryThumbnail mimeType={props.entry.mimeType} entryId={props.entry.id} cancelToken={props.cancelToken} fileExtension={props.entry.file_extension}/>
-        <EntryLightboxBanner lightboxEntries={props.entry.lightboxEntries} entryClassName="entry-lightbox-banner-entry-small"/>
+        <EntryLightboxBanner lightboxEntries={props.entry.lightboxEntries} small={true}/>
         <TimestampFormatter relative={false}
                             className={classes.entryDate}
                             value={props.entry.last_modified}

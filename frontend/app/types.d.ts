@@ -18,6 +18,12 @@ interface ObjectListResponse<T> {
     entryCount: number;
 }
 
+interface ObjectGetResponse<T> {
+    status: string;
+    objectClass: string;
+    entry: T;
+}
+
 type JobStatus = "ST_PENDING"|"ST_RUNNING"|"ST_SUCCESS"|"ST_ERROR"|"ST_CANCELLED"|"ST_WARNING";
 
 interface TranscoderCheck {
@@ -205,3 +211,4 @@ interface ArchiveEntry {
 }
 
 type SearchResponse = ObjectListResponse<ArchiveEntry>;
+type ArchiveEntryResponse = ObjectGetResponse<ArchiveEntry>;

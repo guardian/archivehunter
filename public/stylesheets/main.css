@@ -226,6 +226,7 @@ div.bulk-selection-view {
     margin-top:0;
 }
 */
+/*
 .entry-thumbnail {
     color: inherit;
     margin-left: auto;
@@ -240,6 +241,7 @@ div.bulk-selection-view {
 .entry-thumbnail-shadow {
     box-shadow: 2px 2px 6px black;
 }
+*/
 
 div.search-results-container {
     overflow-y: scroll;
@@ -306,30 +308,30 @@ li.suggestions-list {
 /*    width: 3em;*/
 /*}*/
 
-.metadata-table {
-    margin-top: 1em;
-    border: none;
-}
+/*.metadata-table {*/
+/*    margin-top: 1em;*/
+/*    border: none;*/
+/*}*/
 
-td.metadata-heading {
-    font-weight: bold;
-    border: none;
-    text-align: right;
-    padding-right: 0.8em;
-    padding-top: 0;
-    padding-bottom: 0;
-}
+/*td.metadata-heading {*/
+/*    font-weight: bold;*/
+/*    border: none;*/
+/*    text-align: right;*/
+/*    padding-right: 0.8em;*/
+/*    padding-top: 0;*/
+/*    padding-bottom: 0;*/
+/*}*/
 
-td.metadata-entry {
-    border: none;
-    text-align: left;
-    padding-top: 0;
-    padding-bottom: 0;
-}
+/*td.metadata-entry {*/
+/*    border: none;*/
+/*    text-align: left;*/
+/*    padding-top: 0;*/
+/*    padding-bottom: 0;*/
+/*}*/
 
-td.spacebelow {
-    padding-bottom: 0.8em;
-}
+/*td.spacebelow {*/
+/*    padding-bottom: 0.8em;*/
+/*}*/
 
 .entry-details {
     float: right;
@@ -458,28 +460,28 @@ div.selector-panel {
     margin-left: 1.5em;
 }
 
-span.entry-lightbox-banner {
-    width: 100%;
-    height: 16px;
-    overflow: hidden;
-    margin-left: 0.1em;
-    margin-right: 0.1em;
-}
+/*span.entry-lightbox-banner {*/
+/*    width: 100%;*/
+/*    height: 16px;*/
+/*    overflow: hidden;*/
+/*    margin-left: 0.1em;*/
+/*    margin-right: 0.1em;*/
+/*}*/
 
-.entry-lightbox-banner-entry-small {
-     width: 16px;
-     height: 16px;
-     margin-right: 0.2em;
-     border-radius: 16px;
- }
+/*.entry-lightbox-banner-entry-small {*/
+/*     width: 16px;*/
+/*     height: 16px;*/
+/*     margin-right: 0.2em;*/
+/*     border-radius: 16px;*/
+/* }*/
 
-.entry-lightbox-banner-entry-large {
-    width: 26px;
-    height: 26px;
-    margin-right: 0.4em;
-    margin-bottom: 0.6em;
-    border-radius: 32px;
-}
+/*.entry-lightbox-banner-entry-large {*/
+/*    width: 26px;*/
+/*    height: 26px;*/
+/*    margin-right: 0.4em;*/
+/*    margin-bottom: 0.6em;*/
+/*    border-radius: 32px;*/
+/*}*/
 
 p.no-spacing {
     margin-bottom: 0px;

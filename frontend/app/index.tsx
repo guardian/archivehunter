@@ -41,6 +41,7 @@ import CssBaseline from "@material-ui/core/CssBaseline";
 
 import {customisedTheme} from "./CustomisedTheme";
 import {Theme} from "@material-ui/core";
+import NewBasicSearch from "./search/NewBasicSearch";
 
 library.add(faStroopwafel, faCheckCircle, faCheck, faTimes, faTimesCircle, faRoad,faSearch,faThList,faWrench, faLightbulb, faChevronCircleDown, faChevronCircleRight, faTrashAlt, faFolderPlus, faFolderMinus, faFolder);
 library.add(faFilm, faVolumeUp, faImage, faFile, faClock, faRunning, faExclamationTriangle, faHdd, faBalanceScale, faSyncAlt, faBookReader, faBug, faCompressArrowsAlt, faIndustry, faRedoAlt, faHome, faListOl,);
@@ -116,7 +117,7 @@ class App extends React.Component<any, AppContainerState> {
                 <Route path="/admin" exact={true} component={AdminFront}/>
                 <Route path="/lightbox" exact={true} component={MyLightbox}/>
                 <Route path="/browse" exact={true} component={BrowseComponent}/>
-                <Route path="/search" exact={true} component={BasicSearchComponent}/>
+                <Route path="/search" exact={true} component={NewBasicSearch}/>
                 <Route path="/" exact={true} component={FrontPage}/>
                 <Route default component={NotFoundComponent}/>
             </Switch>
