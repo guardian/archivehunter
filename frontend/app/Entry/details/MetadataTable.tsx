@@ -39,6 +39,22 @@ const useStyles = makeStyles({
     }
 });
 
+const extractFileInfo = (fullpath:string) => {
+    const parts = fullpath.split("/");
+    const len = parts.length;
+    if(len===0){
+        return {
+            filename: parts[0],
+            filepath: ""
+        }
+    }
+
+    return {
+        filename: parts[len-1],
+        filepath: parts.slice(0,len-1).join("/")
+    }
+}
+
 const MetadataTable:React.FC<MetadataTableProps> = (props) => {
     const [firstVideoStream, setFirstVideoStream] = useState<any|undefined>(undefined);
     const [firstAudioStream, setFirstAudioStream] = useState<any|undefined>(undefined);
@@ -46,22 +62,6 @@ const MetadataTable:React.FC<MetadataTableProps> = (props) => {
     const [audioStreamCount, setAudioStreamCount] = useState(0);
 
     const classes = useStyles();
-
-    const extractFileInfo = (fullpath:string) => {
-        const parts = fullpath.split("/");
-        const len = parts.length;
-        if(len===0){
-            return {
-                filename: parts[0],
-                filepath: ""
-            }
-        }
-
-        return {
-            filename: parts[len-1],
-            filepath: parts.slice(0,len-1).join("/")
-        }
-    }
 
     /**
      * cache some information that is more expensive to obtain
@@ -152,4 +152,5 @@ const MetadataTable:React.FC<MetadataTableProps> = (props) => {
     </table>
 }
 
+export {extractFileInfo};
 export default MetadataTable;
