@@ -155,7 +155,7 @@ interface AdvancedSearchDoc {
     path?: string;
     collection: string;
     sortBy?: string; //field name to sort by
-    sortOrder?: "Ascending"|"Descending";
+    sortOrder?: SortOrder;
     hideDotFiles?: boolean;
 }
 
@@ -212,3 +212,8 @@ interface ArchiveEntry {
 
 type SearchResponse = ObjectListResponse<ArchiveEntry>;
 type ArchiveEntryResponse = ObjectGetResponse<ArchiveEntry>;
+
+type CollectionNamesResponse = ObjectListResponse<string>;
+
+type SortOrder = "Ascending"|"Descending";
+type SortableField = "path"|"last_modified"|"size";

@@ -308,7 +308,7 @@ class BrowseComponent extends CommonSearchView {
         if(oldState.collectionName!==this.state.collectionName) this.refreshTreeContents();
     }
 
-    componentWillMount(){
+    componentDidMount(){
         const qp = this.breakdownQueryParams();
 
         if(qp.hasOwnProperty("open")) {   //request to open a specific id
