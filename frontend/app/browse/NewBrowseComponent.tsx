@@ -6,25 +6,31 @@ import {AdvancedSearchDoc, CollectionNamesResponse, SortableField, SortOrder} fr
 import axios from "axios";
 import {formatError} from "../common/ErrorViewComponent";
 import MuiAlert from "@material-ui/lab/Alert";
+import NewTreeView from "./NewTreeView";
 
 const useStyles = makeStyles({
     browserWindow: {
         display: "grid",
         gridTemplateColumns: "repeat(20, 5%)",
-        gridTemplateRows: "[top] 200px [info-area] auto [bottom]"
+        gridTemplateRows: "[top] 200px [info-area] auto [bottom]",
+        height: "95vh"
     },
     pathSelector: {
         gridColumnStart: 1,
-        gridColumnEnd: 2,
+        gridColumnEnd: 4,
         gridRowStart: "top",
-        gridRowEnd: "bottom"
+        gridRowEnd: "bottom",
+        borderRight: "1px solid white",
+        padding: "1em",
+        overflow: "hidden"
     },
     sortOrderSelector: {
         gridColumnStart: -4,
-        gridColumnEnd: -1,
+        gridColumnEnd: -3,
         gridRowStart: "top",
-        gridRowEnd: "info-area"
-    }
+        gridRowEnd: "info-area",
+        padding: "1em"
+    },
 });
 
 const NewBrowseComponent:React.FC<RouteComponentProps> = (props) => {
@@ -34,6 +40,8 @@ const NewBrowseComponent:React.FC<RouteComponentProps> = (props) => {
     const [showingAlert, setShowingAlert] = useState(false);
     const [collectionNames, setCollectionNames] = useState<string[]>([]);
     const [currentCollection, setCurrentCollection] = useState("");
+    const [currentPath, setCurrentPath] = useState("");
+    const [reloadCounter, setReloadCounter] = useState(0);
     const [searchDoc, setSearchDoc] = useState<AdvancedSearchDoc|undefined>(undefined);
     const classes = useStyles();
 
@@ -65,6 +73,13 @@ const NewBrowseComponent:React.FC<RouteComponentProps> = (props) => {
         );
     }, [currentCollection]);
 
+    /**
+     * update search doc if collection name, path or reload counter changes
+     */
+    useEffect(()=>{
+
+    }, [currentCollection, reloadCounter, currentPath]);
+
     const closeAlert = () => setShowingAlert(false);
 
     return <div className={classes.browserWindow}>
@@ -76,6 +91,16 @@ const NewBrowseComponent:React.FC<RouteComponentProps> = (props) => {
                              field={sortField}
                              orderChanged={(newOrder)=>setSortOrder(newOrder)}
                              fieldChanged={(newField)=>setSortField(newField)}/>
+        </div>
+        <div className={classes.pathSelector}>
+            <NewTreeView currentCollection={currentCollection}
+                         collectionList={collectionNames}
+                         collectionDidChange={(newCollection)=>setCurrentCollection(newCollection)}
+                         pathSelectionChanged={(newpath)=>setCurrentPath(newpath)}
+                         onError={(errString)=>{
+                             setLastError(errString);
+                             setShowingAlert(true);
+                         }}/>
         </div>
     </div>
 }

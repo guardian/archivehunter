@@ -217,3 +217,12 @@ type CollectionNamesResponse = ObjectListResponse<string>;
 
 type SortOrder = "Ascending"|"Descending";
 type SortableField = "path"|"last_modified"|"size";
+
+type BrowseDirectoryResponse = ObjectListResponse<string>;
+
+//used in the tree view for a single directory entry
+interface PathEntry {
+    name: string;
+    fullpath: string;
+    idx: number;
+}
