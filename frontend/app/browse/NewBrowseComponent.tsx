@@ -2,11 +2,12 @@ import React, {useState, useEffect} from "react";
 import {RouteComponentProps} from "react-router";
 import {makeStyles, Snackbar} from "@material-ui/core";
 import BrowseSortOrder from "./BrowseSortOrder";
-import {AdvancedSearchDoc, CollectionNamesResponse, SortableField, SortOrder} from "../types";
+import {AdvancedSearchDoc, ArchiveEntry, CollectionNamesResponse, SortableField, SortOrder} from "../types";
 import axios from "axios";
 import {formatError} from "../common/ErrorViewComponent";
 import MuiAlert from "@material-ui/lab/Alert";
 import NewTreeView from "./NewTreeView";
+import NewSearchComponent from "../common/NewSearchComponent";
 
 const useStyles = makeStyles({
     browserWindow: {
@@ -31,6 +32,24 @@ const useStyles = makeStyles({
         gridRowEnd: "info-area",
         padding: "1em"
     },
+    summaryInfoArea: {
+        gridColumnStart:4,
+        gridColumnEnd: -4,
+        gridRowStart: "top",
+        gridRowEnd: "info-area",
+        padding: "1em",
+        overflow: "hidden"
+    },
+    searchResultsArea: {
+        gridColumnStart: 4,
+        gridColumnEnd: -4,
+        gridRowStart: "info-area",
+        gridRowEnd: "bottom",
+        overflowX: "hidden",
+        overflowY: "auto",
+        marginLeft: "auto",
+        marginRight: "auto"
+    }
 });
 
 const NewBrowseComponent:React.FC<RouteComponentProps> = (props) => {
@@ -43,6 +62,12 @@ const NewBrowseComponent:React.FC<RouteComponentProps> = (props) => {
     const [currentPath, setCurrentPath] = useState("");
     const [reloadCounter, setReloadCounter] = useState(0);
     const [searchDoc, setSearchDoc] = useState<AdvancedSearchDoc|undefined>(undefined);
+    const [pageSize, setPageSize] = useState(100);
+    const [itemLimit, setItemLimit] = useState(200);
+    const [newlyLightboxed, setNewlyLightboxed] = useState<string[]>([]);
+    const [selectedEntry, setSelectedEntry] = useState<ArchiveEntry|undefined>(undefined);
+    const [loading, setLoading] = useState(false);
+
     const classes = useStyles();
 
     const refreshCollectionNames = async () => {
@@ -64,21 +89,29 @@ const NewBrowseComponent:React.FC<RouteComponentProps> = (props) => {
         refreshCollectionNames()
     }, []);
 
-    /**
-     * reload if collection name changes
-     */
-    useEffect(()=>{
-        setSearchDoc((prevState)=>
-            prevState ? Object.assign({}, prevState, {collection: currentCollection}) : {collection:currentCollection}
-        );
-    }, [currentCollection]);
+    const stripTrailingSlash = (from:string)=> from.endsWith("/") ? from.slice(0,from.length-1) : from;
 
     /**
      * update search doc if collection name, path or reload counter changes
      */
     useEffect(()=>{
+        const initialDoc:AdvancedSearchDoc = {
+            collection: currentCollection,
+            sortBy: sortField,
+            sortOrder: sortOrder
+        };
 
-    }, [currentCollection, reloadCounter, currentPath]);
+        const docWithPath = currentPath=="" ? initialDoc : Object.assign(initialDoc, {path: stripTrailingSlash(currentPath)});
+
+        setSearchDoc((prevState)=>
+            prevState ? Object.assign({}, prevState, docWithPath) : docWithPath
+        );
+    }, [currentCollection, reloadCounter, currentPath, sortField, sortOrder]);
+
+    const showComponentError = (errString:string)=>{
+        setLastError(errString);
+        setShowingAlert(true);
+    }
 
     const closeAlert = () => setShowingAlert(false);
 
@@ -97,10 +130,19 @@ const NewBrowseComponent:React.FC<RouteComponentProps> = (props) => {
                          collectionList={collectionNames}
                          collectionDidChange={(newCollection)=>setCurrentCollection(newCollection)}
                          pathSelectionChanged={(newpath)=>setCurrentPath(newpath)}
-                         onError={(errString)=>{
-                             setLastError(errString);
-                             setShowingAlert(true);
-                         }}/>
+                         onError={showComponentError}/>
+        </div>
+        <div className={classes.searchResultsArea}>
+            <NewSearchComponent pageSize={pageSize}
+                                itemLimit={itemLimit}
+                                newlyLightboxed={newlyLightboxed}
+                                onEntryClicked={(entry)=>setSelectedEntry(entry)}
+                                selectedEntry={selectedEntry}
+                                onErrorOccurred={showComponentError}
+                                advancedSearch={searchDoc}
+                                onLoadingStarted={()=>setLoading(true)}
+                                onLoadingFinished={()=>setLoading(false)}
+            />
         </div>
     </div>
 }

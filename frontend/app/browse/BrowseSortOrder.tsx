@@ -35,7 +35,7 @@ const BrowseSortOrder:React.FC<BrowseSortOrderProps> = (props) => {
         <Grid item>
             <Select id="sort-order-selector" value={props.field} className={classes.selector}
                     onChange={(evt) => props.fieldChanged(evt.target.value as SortableField)}>
-                <MenuItem value="path">Filename</MenuItem>
+                <MenuItem value="path">File path</MenuItem>
                 <MenuItem value="last_modified">Age</MenuItem>
                 <MenuItem value="size">Size</MenuItem>
             </Select>

@@ -53,8 +53,7 @@ const NewSearchComponent:React.FC<NewSearchComponentProps> = (props) => {
                 return true;
             }
             const results = props.advancedSearch ?
-                await axios.post<SearchResponse>("/api/search/browser", {
-                    body: JSON.stringify(props.advancedSearch),
+                await axios.post<SearchResponse>(`/api/search/browser?start=${startAt}&size=${props.pageSize}`, props.advancedSearch, {
                     cancelToken: token
                 }) :
                 await axios.get<SearchResponse>("/api/search/basic?q=" + encodeURIComponent(props.basicQuery as string) + "&start=" + startAt + "&length=" + props.pageSize, {cancelToken: token})
@@ -145,6 +144,7 @@ const NewSearchComponent:React.FC<NewSearchComponentProps> = (props) => {
         setCancelToken(cancelTokenFactory.token);
 
         if(props.onLoadingStarted) props.onLoadingStarted();
+        setEntries([]);
         loadNextPage(cancelTokenFactory.token, 0);
         return ()=>{
             cancelTokenFactory.cancel("search interrupted");
