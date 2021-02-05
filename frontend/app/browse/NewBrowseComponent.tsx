@@ -8,6 +8,7 @@ import {formatError} from "../common/ErrorViewComponent";
 import MuiAlert from "@material-ui/lab/Alert";
 import NewTreeView from "./NewTreeView";
 import NewSearchComponent from "../common/NewSearchComponent";
+import BrowsePathSummary from "./BrowsePathSummary";
 
 const useStyles = makeStyles({
     browserWindow: {
@@ -61,7 +62,7 @@ const NewBrowseComponent:React.FC<RouteComponentProps> = (props) => {
     const [currentCollection, setCurrentCollection] = useState("");
     const [currentPath, setCurrentPath] = useState("");
     const [reloadCounter, setReloadCounter] = useState(0);
-    const [searchDoc, setSearchDoc] = useState<AdvancedSearchDoc|undefined>(undefined);
+    const [searchDoc, setSearchDoc] = useState<AdvancedSearchDoc>({collection:""});
     const [pageSize, setPageSize] = useState(100);
     const [itemLimit, setItemLimit] = useState(200);
     const [newlyLightboxed, setNewlyLightboxed] = useState<string[]>([]);
@@ -131,6 +132,18 @@ const NewBrowseComponent:React.FC<RouteComponentProps> = (props) => {
                          collectionDidChange={(newCollection)=>setCurrentCollection(newCollection)}
                          pathSelectionChanged={(newpath)=>setCurrentPath(newpath)}
                          onError={showComponentError}/>
+        </div>
+        <div className={classes.summaryInfoArea}>
+            <BrowsePathSummary collectionName={currentCollection}
+                               searchDoc={searchDoc}
+                               path={currentPath}
+                               parentIsLoading={loading}
+                               refreshCb={()=>setReloadCounter(prevState => prevState+1)}
+                               goToRootCb={()=>setCurrentPath("")}
+                               showDotFiles={false}
+                               showDotFilesUpdated={()=>{}}
+                               onError={showComponentError}
+                               />
         </div>
         <div className={classes.searchResultsArea}>
             <NewSearchComponent pageSize={pageSize}
