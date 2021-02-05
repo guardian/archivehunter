@@ -14,7 +14,6 @@ import AboutComponent from './admin/About';
 
 import JobsList from './JobsList/JobsList.jsx';
 import LoginStatusComponent from './Login/LoginStatusComponent';
-import MyLightbox from './Lightbox/MyLightbox.jsx';
 
 import ProxyHealthDetail from './ProxyHealthDetail/ProxyHealthDetail.jsx';
 
@@ -28,8 +27,6 @@ import ProxyFrameworkList from "./ProxyFramework/ProxyFrameworkList";
 import ProxyFrameworkAdd from './ProxyFramework/ProxyFrameworkAdd';
 import {handle419, setupInterceptor} from "./common/Handle419.jsx";
 
-import ProxyHealthDash from "./ProxyHealth/ProxyHealthDash.jsx";
-
 import Test419Component from "./testing/test419.jsx";
 import {
     createMuiTheme,
@@ -41,6 +38,7 @@ import {customisedTheme} from "./CustomisedTheme";
 import {Theme} from "@material-ui/core";
 import NewBasicSearch from "./search/NewBasicSearch";
 import NewBrowseComponent from "./browse/NewBrowseComponent";
+import NewLightbox from "./Lightbox/NewLightbox";
 
 library.add(faStroopwafel, faCheckCircle, faCheck, faTimes, faTimesCircle, faRoad,faSearch,faThList,faWrench, faLightbulb, faChevronCircleDown, faChevronCircleRight, faTrashAlt, faFolderPlus, faFolderMinus, faFolder);
 library.add(faFilm, faVolumeUp, faImage, faFile, faClock, faRunning, faExclamationTriangle, faHdd, faBalanceScale, faSyncAlt, faBookReader, faBug, faCompressArrowsAlt, faIndustry, faRedoAlt, faHome, faListOl,);
@@ -114,7 +112,7 @@ class App extends React.Component<any, AppContainerState> {
                 <Route path="/admin/scanTargets/:id" component={ScanTargetEdit}/> /*this also handles "new" */
                 <Route path="/admin/scanTargets" component={ScanTargetsList}/>
                 <Route path="/admin" exact={true} component={AdminFront}/>
-                <Route path="/lightbox" exact={true} component={MyLightbox}/>
+                <Route path="/lightbox" exact={true} component={NewLightbox}/>
                 <Route path="/browse" exact={true} component={NewBrowseComponent}/>
                 <Route path="/search" exact={true} component={NewBasicSearch}/>
                 <Route path="/" exact={true} component={FrontPage}/>

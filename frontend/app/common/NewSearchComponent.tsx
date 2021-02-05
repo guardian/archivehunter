@@ -1,13 +1,14 @@
 import React, {useState, useEffect} from "react";
 import {AdvancedSearchDoc, ArchiveEntry, ArchiveEntryResponse, SearchResponse} from "../types";
-import axios, {CancelToken} from "axios";
+import axios, {AxiosResponse, CancelToken} from "axios";
 import ErrorViewComponent, {formatError} from "./ErrorViewComponent";
 import {Grid, makeStyles, Typography} from "@material-ui/core";
 import EntryView from "../search/EntryView";
 
 interface NewSearchComponentProps {
     advancedSearch?: AdvancedSearchDoc; //if advancedSearch is set, then it is preferred over basicQuery
-    basicQuery?: string;
+    basicQuery?: string;                //query string to use if advancedSearch is not set
+    basicQueryUrl?: string;             //supply a full URL for the query if advancedSearch is not set. This overrides basicQuery
     pageSize: number;
     itemLimit: number;
     selectedEntry?: ArchiveEntry;
@@ -39,6 +40,25 @@ const NewSearchComponent:React.FC<NewSearchComponentProps> = (props) => {
     const [cancelToken, setCancelToken] = useState<CancelToken|undefined>(undefined);
     const classes = useStyles();
 
+    const makeSearchRequest = (token:CancelToken, startAt: number):Promise<AxiosResponse<SearchResponse>> => {
+        if(props.advancedSearch) {
+            return axios.post<SearchResponse>(`/api/search/browser?start=${startAt}&size=${props.pageSize}`, props.advancedSearch, {
+                cancelToken: token
+            })
+        } else if(props.basicQueryUrl) {
+            //if we already have a query string then append, if we do not then start one
+            const separator = props.basicQueryUrl.includes("?") ? "&" : "?";
+            return axios.get<SearchResponse>(props.basicQueryUrl + `${separator}start=${startAt}&length=${props.pageSize}`, {
+                cancelToken: token
+            })
+        } else {
+            return axios.get<SearchResponse>("/api/search/basic?q=" + encodeURIComponent(props.basicQuery as string) + "&start=" + startAt + "&length=" + props.pageSize,
+                {
+                    cancelToken: token
+                });
+        }
+    }
+
     /**
      * recursively load in pages from the server.  This will recurse until either all results are loaded or
      * props.itemLimit is hit.
@@ -52,11 +72,7 @@ const NewSearchComponent:React.FC<NewSearchComponentProps> = (props) => {
                 console.log(`Hit the item limit of ${props.itemLimit}, stopping`);
                 return true;
             }
-            const results = props.advancedSearch ?
-                await axios.post<SearchResponse>(`/api/search/browser?start=${startAt}&size=${props.pageSize}`, props.advancedSearch, {
-                    cancelToken: token
-                }) :
-                await axios.get<SearchResponse>("/api/search/basic?q=" + encodeURIComponent(props.basicQuery as string) + "&start=" + startAt + "&length=" + props.pageSize, {cancelToken: token})
+            const results = await makeSearchRequest(token, startAt);
 
             if(results.data.entries.length>0) {
                 console.log(`Received ${results.data.entries.length} results, loading next page...`)

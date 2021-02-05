@@ -178,10 +178,10 @@ div.bulk-selection-view {
     float: right;
 }
 
-.black {
-    color: black;
-    background-color: inherit;
-}
+/*.black {*/
+/*    color: black;*/
+/*    background-color: inherit;*/
+/*}*/
 
 /*.entry-title {*/
 /*    margin-top: 0;*/
@@ -271,9 +271,9 @@ li.suggestions-list {
     display: inline;
 }
 
-.clickable {
-    cursor: pointer;
-}
+/*.clickable {*/
+/*    cursor: pointer;*/
+/*}*/
 
 .title {
     background-color: lavender;
@@ -380,10 +380,10 @@ p.information {
     font-size: 0.8em;
 }
 
-p.dont-expand {
-    margin-bottom: 0;
-    margin-top: 0;
-}
+/*p.dont-expand {*/
+/*    margin-bottom: 0;*/
+/*    margin-top: 0;*/
+/*}*/
 .entry-jobs-list {
     margin-left: 1.5em;
 }
@@ -405,10 +405,10 @@ p.dont-expand {
     text-decoration:underline;
 }
 
-.entry-view-selected {
-    border-color: white !important;
-    box-shadow: 3px 3px 5px black
-}
+/*.entry-view-selected {*/
+/*    border-color: white !important;*/
+/*    box-shadow: 3px 3px 5px black*/
+/*}*/
 
 div.selector-panel {
     width: 20%;
@@ -490,9 +490,9 @@ p.no-spacing {
     padding-top: 0;
 }
 
-p.small {
-    font-size: 0.7em;
-}
+/*p.small {*/
+/*    font-size: 0.7em;*/
+/*}*/
 
 
 p.large {
@@ -577,10 +577,10 @@ pre.inline-log {
 /*@-webkit-keyframes spin { 100% { -webkit-transform: rotate(360deg); } }*/
 /*@keyframes spin { 100% { -webkit-transform: rotate(360deg); transform:rotate(360deg); } }*/
 
-.bulk-selections-scroll {
-    overflow-y: hidden;
-    overflow-x: auto;
-}
+/*.bulk-selections-scroll {*/
+/*    overflow-y: hidden;*/
+/*    overflow-x: auto;*/
+/*}*/
 
 /*.inline-throbber {*/
 /*    margin-top: -1em;*/

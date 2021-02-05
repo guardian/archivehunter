@@ -8,7 +8,10 @@ const customisedTheme:ThemeOptions = {
             main: "#AAAAAA",
             dark: "#888888",
             contrastText: "#7986cb"
-        }
+        },
+        // secondary: {
+        //
+        // }
     },
     typography: {
         fontFamily: ["Verdana", "Arial", "Helvetica", "sans-serif"].join(",")

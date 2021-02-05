@@ -226,3 +226,42 @@ interface PathEntry {
     fullpath: string;
     idx: number;
 }
+
+interface UserDetails {
+    firstName?: string;
+    lastName?: string;
+    email: string;
+    avatarUrl?: string;
+    isAdmin: boolean;
+}
+
+type UserDetailsResponse = UserDetails; //this response is not in a wrapper
+
+/*
+(id: String, description: String, userEmail: String, addedAt: ZonedDateTime, errorCount: Int, availCount: Int, restoringCount: Int)
+ */
+interface LightboxBulk {
+    id: string;
+    description: string;
+    userEmail: string;
+    addedAt: string;
+    errorCount: number;
+    availCount: number;
+    restoringCount: number;
+}
+
+type LightboxBulkResponse = ObjectListResponse<LightboxBulk>;
+
+
+interface LightboxEntry {
+    userEmail: string;
+    fileId: string;
+    addedAt: string;
+    restoreStatus: "RS_UNNEEDED"|"RS_ALREADY"|"RS_PENDING"|"RS_UNDERWAY"|"RS_SUCCESS"|"RS_ERROR";
+    restoreStarted?: string;
+    restoreCompleted?: string;
+    availableUntil?: string;
+    lastError?: string;
+    memberOfBulk?: string;
+}
+type LightboxDetailsResponse = ObjectListResponse<Record<string, LightboxEntry>>;
