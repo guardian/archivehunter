@@ -77,7 +77,7 @@ class EntryDetails extends React.Component {
                 this.setState({loading: false, jobsAutorefresh: true});
             }).catch(err=>{
                 console.error(err);
-                props.onError(formatError(err));
+                if(this.props.onError) this.props.onError(formatError(err));
                 this.setState({loading: false});
             }));
     }

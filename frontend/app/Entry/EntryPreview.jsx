@@ -128,7 +128,7 @@ class EntryPreview extends React.Component {
                                                  style={{marginTop: "0.4em"}}
                                                  variant="outlined"
                                                  onClick={this.initiateCreateProxy}>
-                        Create {this.state.selectedType} now
+                        Create now
                     </Button> : ""
                 }
             </div>;
@@ -161,7 +161,7 @@ class EntryPreview extends React.Component {
                 {this.controlBody()}
                 <hr className={this.props.classes.partialDivider}/>
                 <EntryPreviewSwitcher availableTypes={this.state.proxyTypes} typeSelected={this.switcherChanged}/>
-                {this.state.processMessage ? <Typography className={clsx(this.classes.processingText, this.classes.centered)}>{this.state.processMessage}</Typography> : ""}
+                {this.state.processMessage ? <Typography className={clsx(this.props.classes.processingText, this.props.classes.centered)}>{this.state.processMessage}</Typography> : ""}
                 <hr className={this.props.classes.partialDivider}/>
             </>
         </Tooltip>

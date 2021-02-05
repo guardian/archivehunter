@@ -9,6 +9,7 @@ import MuiAlert from "@material-ui/lab/Alert";
 import NewTreeView from "./NewTreeView";
 import NewSearchComponent from "../common/NewSearchComponent";
 import BrowsePathSummary from "./BrowsePathSummary";
+import EntryDetails from "../Entry/EntryDetails";
 
 const useStyles = makeStyles({
     browserWindow: {
@@ -27,14 +28,15 @@ const useStyles = makeStyles({
         overflow: "hidden"
     },
     sortOrderSelector: {
-        gridColumnStart: -4,
-        gridColumnEnd: -3,
+        gridColumnStart: 4,
+        gridColumnEnd: 6,
         gridRowStart: "top",
         gridRowEnd: "info-area",
-        padding: "1em"
+        padding: "1em",
+        overflow: "hidden"
     },
     summaryInfoArea: {
-        gridColumnStart:4,
+        gridColumnStart:6,
         gridColumnEnd: -4,
         gridRowStart: "top",
         gridRowEnd: "info-area",
@@ -50,6 +52,13 @@ const useStyles = makeStyles({
         overflowY: "auto",
         marginLeft: "auto",
         marginRight: "auto"
+    },
+    detailsArea: {
+        gridColumnStart: -4,
+        gridColumnEnd: -1,
+        gridRowStart: "top",
+        gridRowEnd: "bottom",
+        overflow: "auto",
     }
 });
 
@@ -155,6 +164,20 @@ const NewBrowseComponent:React.FC<RouteComponentProps> = (props) => {
                                 advancedSearch={searchDoc}
                                 onLoadingStarted={()=>setLoading(true)}
                                 onLoadingFinished={()=>setLoading(false)}
+            />
+        </div>
+        <div className={classes.detailsArea}>
+            <EntryDetails entry={selectedEntry}
+                          autoPlay={true}
+                          showJobs={true}
+                          loadJobs={false}
+                          onError={(message:string)=>{
+                              setLastError(message);
+                              setShowingAlert(true);
+                          }}
+                //when the user adds to lightbox we record it here. This state var is bound to the NewSearchComponent
+                //which will then re-load data for the given entry (after a short delay)
+                          lightboxedCb={(entryId:string)=>setNewlyLightboxed((prevState) => prevState.concat(entryId))}
             />
         </div>
     </div>
