@@ -51,11 +51,13 @@ const NewSearchComponent:React.FC<NewSearchComponentProps> = (props) => {
             return axios.get<SearchResponse>(props.basicQueryUrl + `${separator}start=${startAt}&length=${props.pageSize}`, {
                 cancelToken: token
             })
-        } else {
+        } else if(props.basicQuery) {
             return axios.get<SearchResponse>("/api/search/basic?q=" + encodeURIComponent(props.basicQuery as string) + "&start=" + startAt + "&length=" + props.pageSize,
                 {
                     cancelToken: token
                 });
+        } else {
+            return new Promise((resolve, reject)=>reject("No query to make"));
         }
     }
 
@@ -87,13 +89,13 @@ const NewSearchComponent:React.FC<NewSearchComponentProps> = (props) => {
             if(axios.isCancel(err)) {
                 console.log("search was cancelled, clearing results");
                 setEntries([]);
-                if(props.onLoadingFinished) props.onLoadingFinished();
-                return false;
+            } else if(err=="No query to make") {
+
             } else {
                 props.onErrorOccurred(formatError(err, false));
-                if(props.onLoadingFinished) props.onLoadingFinished();
-                return false;
             }
+            if(props.onLoadingFinished) props.onLoadingFinished();
+            return false;
         }
     }
 
@@ -165,7 +167,7 @@ const NewSearchComponent:React.FC<NewSearchComponentProps> = (props) => {
         return ()=>{
             cancelTokenFactory.cancel("search interrupted");
         }
-    }, [props.advancedSearch, props.basicQuery]);
+    }, [props.advancedSearch, props.basicQuery, props.basicQueryUrl]);
 
     return <Grid container className={classes.searchResultsContainer}>
         {

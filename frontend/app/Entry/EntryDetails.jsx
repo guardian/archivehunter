@@ -25,9 +25,9 @@ const styles = (theme)=>Object.assign(createStyles({
 class EntryDetails extends React.Component {
     static propTypes = {
         entry: PropTypes.object.isRequired,
-        autoPlay: PropTypes.boolean,
-        showJobs: PropTypes.boolean,
-        loadJobs: PropTypes.boolean,
+        autoPlay: PropTypes.bool,
+        showJobs: PropTypes.bool,
+        loadJobs: PropTypes.bool,
         lightboxedCb: PropTypes.func,
         userLogin: null,
 

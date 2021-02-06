@@ -11,12 +11,14 @@ interface StylesMap {
     [name:string]: any
 }
 
-interface ObjectListResponse<T> {
+interface ObjectMapResponse<T> {
     status: string;
     entityClass: string;
-    entries: T[];
+    entries: T;
     entryCount: number;
 }
+
+type ObjectListResponse<T> = ObjectMapResponse<T[]>;
 
 interface ObjectGetResponse<T> {
     status: string;
@@ -252,16 +254,29 @@ interface LightboxBulk {
 
 type LightboxBulkResponse = ObjectListResponse<LightboxBulk>;
 
+type RestoreStatus = "RS_UNNEEDED"|"RS_ALREADY"|"RS_PENDING"|"RS_UNDERWAY"|"RS_SUCCESS"|"RS_ERROR";
 
 interface LightboxEntry {
     userEmail: string;
     fileId: string;
     addedAt: string;
-    restoreStatus: "RS_UNNEEDED"|"RS_ALREADY"|"RS_PENDING"|"RS_UNDERWAY"|"RS_SUCCESS"|"RS_ERROR";
+    restoreStatus: RestoreStatus;
     restoreStarted?: string;
     restoreCompleted?: string;
     availableUntil?: string;
     lastError?: string;
     memberOfBulk?: string;
 }
-type LightboxDetailsResponse = ObjectListResponse<Record<string, LightboxEntry>>;
+
+type LightboxDetailsResponse = ObjectMapResponse<Record<string, LightboxEntry>>;
+
+/*
+status:String, fileId: String, restoreStatus:RestoreStatus.Value, expiry:Option[ZonedDateTime], downloadLink:Option[String]
+ */
+interface RestoreStatusResponse {
+    status: string;
+    fileId: string;
+    restoreStatus: RestoreStatus;
+    expiry?: string;
+    downloadLink?: string;
+}
