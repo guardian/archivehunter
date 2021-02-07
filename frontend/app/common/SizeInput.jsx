@@ -46,7 +46,7 @@ class SizeInput extends React.Component {
     }
 
     multiplierIndexForValue(value){
-        for(var i=0;i<SizeInput.multipliers.length; ++i){
+        for(let i=0;i<SizeInput.multipliers.length; ++i){
             if(SizeInput.multipliers[i].value>=value) return i;
         }
         return 0;

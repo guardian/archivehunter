@@ -1,41 +1,56 @@
 import React, {useState} from "react";
-import LightboxInfoInsert from "./LightboxInfoInsert";
-import AvailabilityInsert from "./AvailabilityInsert";
-import {LightboxEntry, RestoreStatus} from "../types";
-import {CircularProgress, makeStyles} from "@material-ui/core";
+import {LightboxEntry, ObjectGetResponse, RestoreStatus, StylesMap} from "../types";
+import {CircularProgress, Divider, Grid, Icon, IconButton, makeStyles, Tooltip, Typography} from "@material-ui/core";
+import TimestampFormatter from "../common/TimestampFormatter";
+import RestoreStatusComponent from "./RestoreStatusComponent";
+import {baseStyles} from "../BaseStyles";
+import {IconProp} from "@fortawesome/fontawesome-svg-core";
+import clsx from "clsx";
+import RestoreStatusIndicator from "./RestoreStatusIndicator";
+import {AirportShuttle, GetApp, YoutubeSearchedFor} from "@material-ui/icons";
+import axios from "axios";
+import {formatError} from "../common/ErrorViewComponent";
 
 interface LightboxDetailsInsertProps {
     lightboxEntry: LightboxEntry;
     archiveEntryId?: string;
     archiveEntryPath?: string;
     checkArchiveStatusClicked: ()=>void;
-    redoRestoreClicked: ()=>void;
+    redoRestoreClicked: (entryId:string)=>void;
+    showingArchiveSpinner: boolean;
     user: string;
     onError?: (errorDesc:string) => void;
 }
 
-const useStyles = makeStyles({
+const useStyles = makeStyles((theme)=>Object.assign({
     smallSpinner: {
         width: "20px",
         height: "20px"
+    },
+    runOnText: {
+        display: "inline"
+    },
+    nicelyAlignedIcon: {
+        marginTop: "auto",
+        marginBottom: "auto"
     }
-});
+} as StylesMap, baseStyles));
 
 /**
  * this describes an "insert" into the standard entry details view, to provide lightbox-specific data
  */
 const LightboxDetailsInsert:React.FC<LightboxDetailsInsertProps> = (props) => {
-    const [showingArchiveSpinner, setShowingArchiveSpinner] = useState(false);
+    const [downloadUrl, setDownloadUrl] = useState<string|undefined>();
 
     const classes = useStyles();
 
-    const displayInfo = (status:string) => {
-        if(status=='RS_UNNEEDED') {
-            return "Not in deep freeze";
-        } else {
-            return undefined;
-        }
-    }
+    // const displayInfo = (status:string) => {
+    //     if(status=='RS_UNNEEDED') {
+    //         return "Not in deep freeze";
+    //     } else {
+    //         return undefined;
+    //     }
+    // }
 
     const displayRedo = (status:RestoreStatus) => {
         switch(status) {
@@ -50,38 +65,112 @@ const LightboxDetailsInsert:React.FC<LightboxDetailsInsertProps> = (props) => {
         }
     }
 
-    const shouldHideAvailability = () => props.lightboxEntry.restoreStatus!="RS_UNNEEDED" && props.lightboxEntry.restoreStatus!="RS_SUCCESS";
-    const extractPath = () =>  props.archiveEntryPath ? props.archiveEntryPath.substring(props.archiveEntryPath.lastIndexOf('/') + 1) : "unknown";
+    const isDownloadable = () => {
+        return props.lightboxEntry.restoreStatus=="RS_SUCCESS" || props.lightboxEntry.restoreStatus=="RS_UNNEEDED" || props.lightboxEntry.restoreStatus=="RS_ALREADY"
+    }
 
-    return <div>
-            <LightboxInfoInsert
-                entry={props.lightboxEntry}
-                extraInfo={displayInfo(props.lightboxEntry.restoreStatus)}
-                iconName="file"
-            />
-            <p className="centered small">
-                <a style={{cursor: "pointer"}} onClick={props.checkArchiveStatusClicked}>Re-check</a>
-            </p>
-            <p className="centered small">
-                <a style={{cursor: "pointer"}} onClick={props.redoRestoreClicked}>
-                    {displayRedo(props.lightboxEntry.restoreStatus)}
-                </a>
-                {
-                    showingArchiveSpinner ? <CircularProgress className={classes.smallSpinner}/> : null
-                }
-            </p>
-            <p className="centered small information">
-                {props.lightboxEntry.restoreStatus}
-            </p>
-            <hr/>
-            <AvailabilityInsert status={props.lightboxEntry.restoreStatus}
-                                availableUntil={props.lightboxEntry.availableUntil}
-                                hidden={shouldHideAvailability()}
-                                fileId={props.archiveEntryId}
-                                fileNameOnly={extractPath()}
-            />
-            <hr style={{display: shouldHideAvailability() ? "inherit" : "none" }}/>
-        </div>;
+    // const getIconName = (status:RestoreStatus) => {
+    //     return "file";  //FIXME: should return appropriate icon for the archive status of the item
+    // }
+    //
+    // const shouldHideAvailability = () => props.lightboxEntry.restoreStatus!="RS_UNNEEDED" && props.lightboxEntry.restoreStatus!="RS_SUCCESS";
+    // const extractPath = () =>  props.archiveEntryPath ? props.archiveEntryPath.substring(props.archiveEntryPath.lastIndexOf('/') + 1) : "unknown";
+
+    const doDownload  = async () => {
+        try {
+            const response = await axios.get<ObjectGetResponse<string>>("/api/download/" + props.archiveEntryId);
+            setDownloadUrl(response.data.entry);
+        } catch(err) {
+            console.error("Could not get download URL: ", err);
+            props.onError ? props.onError(formatError(err, false)) : null;
+        }
+    }
+
+    return <div className={classes.centered}>
+        {
+            downloadUrl ? <iframe src={downloadUrl} style={{display:"none"}}/> : null
+        }
+        <span style={{display: "block"}}>
+            <Typography className={classes.runOnText}>Added to lightbox&nbsp;</Typography>
+            <TimestampFormatter className={classes.runOnText} relative={true} value={props.lightboxEntry.addedAt}/>
+        </span>
+        <RestoreStatusComponent
+            status={props.lightboxEntry.restoreStatus}
+            startTime={props.lightboxEntry.restoreStarted}
+            completed={props.lightboxEntry.restoreCompleted}
+            expires={props.lightboxEntry.availableUntil}
+            hidden={props.lightboxEntry.restoreStatus==="RS_UNNEEDED"}
+        />
+        <Grid container direction="row" justify="space-between" spacing={3}>
+            <Grid item className={classes.nicelyAlignedIcon} style={{marginLeft: "auto"}}>
+                <RestoreStatusIndicator entry={props.lightboxEntry}/>
+            </Grid>
+            <Grid item>
+                <Grid container direction="row" justify="center">
+
+                    <Grid item>
+                        <Tooltip title="Re-check archive status">
+                                <IconButton onClick={props.checkArchiveStatusClicked}>
+                                <YoutubeSearchedFor/>
+                            </IconButton>
+                        </Tooltip>
+                    </Grid>
+                    <Grid item>
+                        {
+                            displayRedo(props.lightboxEntry.restoreStatus) ?
+                                <Tooltip title="Retry restore">
+                                    <IconButton onClick={()=>props.archiveEntryId ? props.redoRestoreClicked(props.archiveEntryId) : null}>
+                                        <AirportShuttle/>
+                                    </IconButton>
+                                </Tooltip> : null
+                        }
+                        {
+                            props.showingArchiveSpinner ? <CircularProgress className={classes.smallSpinner}/> : null
+                        }
+                    </Grid>
+                    <Grid item>
+                        {
+                            isDownloadable() ? <Tooltip title="Download just this file">
+                                <IconButton onClick={doDownload}>
+                                    <GetApp/>
+                                </IconButton>
+                            </Tooltip> : null
+                        }
+                    </Grid>
+                </Grid>
+            </Grid>
+        </Grid>
+        {
+            props.lightboxEntry.availableUntil ? <>
+                <Typography className={classes.runOnText}>
+                    Available for
+                </Typography>
+                <TimestampFormatter relative={true} value={props.lightboxEntry.availableUntil} className={classes.runOnText}/>
+            </> : <Typography className={classes.runOnText}>Available indefinitely</Typography>
+        }
+
+        {/*<Typography className={clsx(classes.centered, classes.small)}>*/}
+        {/*    <a style={{cursor: "pointer"}} onClick={props.checkArchiveStatusClicked}>Re-check</a>*/}
+        {/*</Typography>*/}
+        {/*<Typography className={clsx(classes.centered, classes.small)}>*/}
+        {/*    <a style={{cursor: "pointer"}} onClick={()=>props.archiveEntryId ? props.redoRestoreClicked(props.archiveEntryId) : null}>*/}
+        {/*        {displayRedo(props.lightboxEntry.restoreStatus)}*/}
+        {/*    </a>*/}
+        {/*    {*/}
+        {/*        props.showingArchiveSpinner ? <CircularProgress className={classes.smallSpinner}/> : null*/}
+        {/*    }*/}
+        {/*</Typography>*/}
+        {/*<AvailabilityInsert status={props.lightboxEntry.restoreStatus}*/}
+        {/*                    availableUntil={props.lightboxEntry.availableUntil}*/}
+        {/*                    hidden={shouldHideAvailability()}*/}
+        {/*                    fileId={props.archiveEntryId}*/}
+        {/*                    fileNameOnly={extractPath()}*/}
+        {/*/>*/}
+        {/*<Typography className={clsx(classes.centered, classes.small, classes.information)}>*/}
+        {/*    {props.lightboxEntry.restoreStatus}*/}
+        {/*</Typography>*/}
+        {/*<Divider style={{display: shouldHideAvailability() ? "inherit" : "none" }}/>*/}
+    </div>;
 }
 
 export default LightboxDetailsInsert;

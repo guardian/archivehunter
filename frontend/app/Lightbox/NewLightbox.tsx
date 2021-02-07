@@ -87,6 +87,7 @@ const NewLightbox:React.FC<RouteComponentProps> = (props) => {
     const [pageSize, setPageSize] = useState(100);
     const [itemLimit, setItemLimit] = useState(300);
     const [basicSearchUrl, setBasicSearchUrl] = useState<string|undefined>(undefined);
+    const [showingArchiveSpinner, setShowingArchiveSpinner] = useState(false);
 
     const userDisplayName = ()=>{
         if(selectedUser!=="my") return selectedUser;
@@ -113,7 +114,6 @@ const NewLightbox:React.FC<RouteComponentProps> = (props) => {
 
     const performLoad = () => {
         const detailsRequest = axios.get<LightboxDetailsResponse>("/api/lightbox/" + selectedUser+"/details");
-        //const summaryRequest = axios.get<ObjectListResponse<ArchiveEntry>>(`/api/search/myLightBox?user=${selectedUser}&size=${pageSize}`);
         const loginDetailsRequest = axios.get<UserDetailsResponse>("/api/loginStatus");
         const bulkSelectionsRequest = axios.get<LightboxBulkResponse>("/api/lightbox/" + selectedUser+"/bulks");
         const configRequest = axios.get<ObjectListResponse<string>>("/api/config");
@@ -126,13 +126,9 @@ const NewLightbox:React.FC<RouteComponentProps> = (props) => {
             const results = await performLoad();
 
             const detailsResult = results[0].data as LightboxDetailsResponse;
-            //const summaryResult = results[1].data as ObjectListResponse<ArchiveEntry>;
             const loginDetailsResult = results[1].data as UserDetailsResponse;
             const bulkSelectionsResult = results[2].data as LightboxBulkResponse;
             const configResult = results[3].data as ObjectListResponse<string>;
-            // setSearchResults(summaryResult.entries.map(entry=>
-            //     Object.assign({}, entry, {details: detailsResult.entries.includes(entry.id) ? detailsResult.entries[entry.id] : null}))
-            // );
             setLightboxDetails(detailsResult.entries)
             setUserDetails(loginDetailsResult);
             setBulkSelections(bulkSelectionsResult.entries);
@@ -153,30 +149,7 @@ const NewLightbox:React.FC<RouteComponentProps> = (props) => {
         try {
             const response = await axios.get<RestoreStatusResponse>(`/api/archive/status/${archiveEntryId}?user=${selectedUser}`)
 
-            console.info(response.data);
-            //const itemIndex = indexForFileid(response.data.fileId);
-            // if (itemIndex === -1) {
-            //     console.error("Could not find file ID " + response.data.fileId + " in the component's data??");
-            //     //setShowingArchivedSpinner(false);
-            // } else {
-            //     const updatedDetails = Object.assign({}, lightboxDetails[itemIndex], {
-            //         restoreStatus: response.data.restoreStatus,
-            //         availableUntil: response.data.expiry
-            //     });
-            //
-            //     //setLightboxDetails((prevState) => prevState.slice(0, itemIndex).concat(updatedDetails, prevState.slice(itemIndex+1, prevState.length)));
-            //
-            //     this.updateSearchResults(updatedEntry, itemIndex, this.state.showingPreview.id).then(() => {
-            //         if (response.data.restoreStatus === "RS_UNNEEDED") {
-            //             this.setState({showingArchiveSpinner: false, extraInfo: "Not in deep-freeze"})
-            //         } else if (this.state.extraInfo !== "") {
-            //             this.setState({
-            //                 showingArchiveSpinner: false,
-            //                 selectedRestoreStatus: response.data.restoreStatus,
-            //                 extraInfo: ""
-            //             })
-            //         }
-            //     })
+            setShowingArchiveSpinner(false);
             if(lightboxDetails.hasOwnProperty(response.data.fileId)) {
                 const updatedEntry = Object.assign({},
                     lightboxDetails[response.data.fileId],
@@ -195,7 +168,25 @@ const NewLightbox:React.FC<RouteComponentProps> = (props) => {
             console.error(err);
             setLastError(formatError(err, false));
             setShowingAlert(true);
-            //this.setState({showingArchiveSpinner: false, selectedRestoreStatus: err.response.data && err.response.data.detail ? err.response.data.detail : ""});
+            setShowingArchiveSpinner(false);
+        }
+    }
+
+    const redoRestore = async (entryId:string) => {
+        const url = `/api/lightbox/${selectedUser}/redoRestore/${entryId}`;
+        setShowingArchiveSpinner(true);
+
+        try {
+            await axios.put(url);
+            console.info("redo restore requested, updating archive status in 1s...");
+
+            window.setTimeout(()=>checkArchiveStatus(entryId), 1000);
+
+        } catch(err) {
+            console.error(`could not request redo restore on ${entryId}: `, err);
+            setLastError(formatError(err, false));
+            setShowingAlert(true);
+            setShowingArchiveSpinner(false);
         }
     }
 
@@ -273,11 +264,12 @@ const NewLightbox:React.FC<RouteComponentProps> = (props) => {
                           preLightboxInsert={selectedEntry ?
                               <LightboxDetailsInsert
                                   checkArchiveStatusClicked={()=>checkArchiveStatus(selectedEntry.id)}
-                                  redoRestoreClicked={()=>{}}
+                                  redoRestoreClicked={redoRestore}
                                   archiveEntryId={selectedEntry?.id}
                                   archiveEntryPath={selectedEntry?.path}
                                   lightboxEntry={lightboxDetails[selectedEntry.id]}
-                                    user={selectedUser}
+                                  user={selectedUser}
+                                  showingArchiveSpinner={showingArchiveSpinner}
                               /> : null
                           }
             />
