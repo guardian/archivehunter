@@ -4,14 +4,14 @@ import axios from 'axios';
 import BytesFormatter from "../common/BytesFormatter.jsx";
 import RefreshButton from "../common/RefreshButton";
 import BulkLightboxAdd from "./BulkLightboxAdd.jsx";
-import {CircularProgress, createStyles, Grid, IconButton, Typography, withStyles} from "@material-ui/core";
+import {CircularProgress, createStyles, Grid, IconButton, Tooltip, Typography, withStyles} from "@material-ui/core";
 import {baseStyles} from "../BaseStyles";
-import {FolderRounded, HomeOutlined, HomeRounded, Storage} from "@material-ui/icons";
+import {FolderRounded, HomeOutlined, HomeRounded, Storage, WarningRounded} from "@material-ui/icons";
 import {formatError} from "../common/ErrorViewComponent";
 import PathDisplayComponent from "./PathDisplayComponent";
 import clsx from "clsx";
 
-const styles=Object.assign(createStyles({
+const styles=(theme)=>Object.assign(createStyles({
     summaryIcon: {
         marginRight: "0.1em",
         verticalAlign: "bottom"
@@ -23,6 +23,9 @@ const styles=Object.assign(createStyles({
         marginTop: "auto",
         marginBottom: "auto",
         marginLeft: "1em"
+    },
+    warningIcon: {
+        color: theme.palette.warning.dark
     }
 }), baseStyles);
 
@@ -108,53 +111,58 @@ class BrowsePathSummary extends React.Component {
 
         /*TODO: add in jschart and put a horizontal bar of the filetypes breakdown*/
         if(this.state.hasLoaded) return <div className="browse-path-summary">
-            <Grid container direction="column" alignContent="center" spacing={1}>
+            <Grid container direction="column" alignContent="center" justify="center">
                 <Grid item className={clsx(this.props.classes.summaryBoxElement,this.props.classes.centered)}>
-                    <Typography className={this.props.classes.collectionNameText}>
-                        <Storage className={this.props.classes.summaryIcon}/>
-                        {this.props.collectionName}
-                    </Typography>
-                </Grid>
-
-                {
-                    <Grid item className={this.props.classes.centered}>
-                        <Grid container direction="row"  justify="center" alignContent="space-around">
-                            {this.props.path ? <>
-                                <Grid item><IconButton
-                                    onClick={this.props.goToRootCb}><HomeRounded/></IconButton></Grid>
-                                <Grid item className={this.props.classes.summaryBoxElement}>
-                                    <PathDisplayComponent path={this.props.path}/>
-                                    {/*<Typography style={{display: "inline"}}>{this.props.path}</Typography>*/}
-                                </Grid>
-                            </> : null
-                            }
+                    <Grid container direction="row"  justify="center" alignContent="space-around" alignItems="center">
+                        {this.props.path ?
+                            <Grid item>
+                                <IconButton onClick={this.props.goToRootCb}>
+                                    <HomeRounded/>
+                                </IconButton>
+                            </Grid> : null
+                        }
+                        <Grid item>
+                            <Typography className={this.props.classes.collectionNameText}>
+                                <Storage className={this.props.classes.summaryIcon}/>
+                                {this.props.collectionName}
+                            </Typography>
                         </Grid>
                     </Grid>
+                </Grid>
+                {
+                    this.props.path ? <Grid item className={this.props.classes.summaryBoxElement}>
+                        <PathDisplayComponent path={this.props.path}/>
+                    </Grid> : null
                 }
 
-                <Grid item className={this.props.classes.centered}>
-                    <BulkLightboxAdd path={this.props.path}
-                                     hideDotFiles={! this.props.showDotFiles}
-                                     collection={this.props.collectionName}
-                                     searchDoc={this.props.searchDoc}
-                                     onError={this.props.onError}
-                    />
+
+            <Grid item>
+                <Grid container direction="row" spacing={1} alignItems="center" >
+                    <Grid item>
+                        <RefreshButton isRunning={this.props.parentIsLoading}
+                                       clickedCb={this.props.refreshCb}/>
+                    </Grid>
+                    <Grid item>
+                        <Typography>Total of {this.state.totalHits} items occupying <BytesFormatter value={this.state.totalSize}/></Typography>
+                    </Grid>
+                    { this.state.deletedCounts.hasOwnProperty("1")  ? <Grid item>
+                        <Tooltip title={`${this.state.deletedCounts["1"]} tracked items have been deleted`}>
+                            <WarningRounded className={this.props.classes.warningIcon}/>
+                        </Tooltip>
+                    </Grid> : null }
+
+                    <Grid item>
+                        <BulkLightboxAdd path={this.props.path}
+                                         hideDotFiles={! this.props.showDotFiles}
+                                         collection={this.props.collectionName}
+                                         searchDoc={this.props.searchDoc}
+                                         onError={this.props.onError}
+                        />
+                    </Grid>
                 </Grid>
             </Grid>
 
-            <div>
-                <Typography>
-                    <RefreshButton isRunning={this.props.parentIsLoading}
-                                   clickedCb={this.props.refreshCb}/>
-                                   Total of {this.state.totalHits} items occupying <BytesFormatter value={this.state.totalSize}/>
-                </Typography>
-            </div>
-
-            {
-                this.state.deletedCounts.hasOwnProperty("1") ? <Typography>
-                    {this.state.deletedCounts["1"]} tracked items have been deleted
-                </Typography> : null
-            }
+            </Grid>
         </div>;
 
         return <div><i>not loaded</i></div>
