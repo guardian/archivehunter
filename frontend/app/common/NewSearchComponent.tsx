@@ -1,7 +1,7 @@
 import React, {useState, useEffect} from "react";
 import {AdvancedSearchDoc, ArchiveEntry, ArchiveEntryResponse, SearchResponse} from "../types";
 import axios, {AxiosResponse, CancelToken} from "axios";
-import ErrorViewComponent, {formatError} from "./ErrorViewComponent";
+import {formatError} from "./ErrorViewComponent";
 import {Grid, makeStyles, Typography} from "@material-ui/core";
 import EntryView from "../search/EntryView";
 
@@ -22,7 +22,10 @@ interface NewSearchComponentProps {
 const useStyles = makeStyles({
     searchResultsContainer: {
         overflowY: "auto",
-        overflowX: "hidden"
+        overflowX: "hidden",
+        height: "100%",
+        marginLeft: "1.8em",
+        marginRight: "1.8em"
     },
     centeredText: {
         marginLeft: "auto",

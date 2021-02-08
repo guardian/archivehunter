@@ -11,8 +11,8 @@ import {baseStyles} from "../BaseStyles";
 
 const styles = (theme)=>Object.assign(createStyles({
     entryDetails: {
-        overflow: "hidden",
-        height: "100%"
+        overflow: "auto",
+        height: "100%",
     },
     entryDetailsLightboxes: {
         marginLeft: "1.5em"
@@ -96,7 +96,7 @@ class EntryDetails extends React.Component {
             return <div className={this.props.classes.entryDetails}>
             </div>
         }
-        return <div className={this.props.classes.entryDetails} style={{overflowX: "auto"}}>
+        return <div className={this.props.classes.entryDetails}>
                 <EntryPreview entryId={this.props.entry.id}
                               hasProxy={this.props.entry.proxied}
                               fileExtension={this.props.entry.file_extension}

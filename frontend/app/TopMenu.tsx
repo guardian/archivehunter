@@ -14,7 +14,7 @@ const useStyles = makeStyles((theme)=>Object.assign({
     menuContainer: {
         marginLeft: "auto",
         marginRight: "auto",
-        width: "25%"
+        width: "fit-content"
     },
     menuText: {
         fontSize: "1.2rem"
@@ -27,7 +27,7 @@ const TopMenu:React.FC<TopMenuProps> = (props) => {
     const classes = useStyles();
 
     const iconClassName = `${classes.smallIcon} ${classes.inlineIcon} ${classes.highlight}`
-    return <Grid container justify="space-around" className={classes.menuContainer}>
+    return <Grid container justify="space-around" className={classes.menuContainer} spacing={4}>
         <Grid item>
             <Link component={RouterLink} className={classes.menuText} to="/search"><FontAwesomeIcon className={iconClassName} icon="search"/>Search</Link>
         </Grid>
