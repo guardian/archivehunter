@@ -1,10 +1,8 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import {FontAwesomeIcon} from "@fortawesome/react-fontawesome";
 import axios from 'axios';
-import ErrorViewComponent, {formatError} from "../common/ErrorViewComponent.jsx";
-import BytesFormatter from "../common/BytesFormatter.jsx";
-import {Button, CircularProgress} from "@material-ui/core";
+import {formatError} from "../common/ErrorViewComponent.jsx";
+import {Button, CircularProgress, Tooltip} from "@material-ui/core";
 import {WbIncandescent} from "@material-ui/icons";
 
 class BulkLightboxAdd extends React.Component {
@@ -28,7 +26,7 @@ class BulkLightboxAdd extends React.Component {
     }
 
     componentDidMount() {
-        this.checkBulkRecord();
+        if(this.props.searchDoc.hasOwnProperty("path")) this.checkBulkRecord();
     }
 
     componentDidUpdate(prevProps, prevState, snapshot) {
@@ -79,6 +77,12 @@ class BulkLightboxAdd extends React.Component {
     }
 
     render() {
+        if(!this.props.searchDoc.hasOwnProperty("path")) return (
+            <Tooltip title="You shouldn't lightbox an entire collection, you must select a subfolder">
+                <Button startIcon={<WbIncandescent/>} variant="outlined" disabled={true}>Lightbox all</Button>
+            </Tooltip>
+        )
+
         return <>
             {
                 this.state.loading ? <Button disabled={true} startIcon={<CircularProgress/>} variant="contained">Lightboxing...</Button> :

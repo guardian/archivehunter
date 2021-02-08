@@ -113,9 +113,7 @@ const NewBrowseComponent:React.FC<RouteComponentProps> = (props) => {
 
         const docWithPath = currentPath=="" ? initialDoc : Object.assign(initialDoc, {path: stripTrailingSlash(currentPath)});
 
-        setSearchDoc((prevState)=>
-            prevState ? Object.assign({}, prevState, docWithPath) : docWithPath
-        );
+        setSearchDoc(docWithPath);
     }, [currentCollection, reloadCounter, currentPath, sortField, sortOrder]);
 
     const showComponentError = (errString:string)=>{

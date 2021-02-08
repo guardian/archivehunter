@@ -5,8 +5,9 @@ import axios from 'axios';
 import LoadingThrobber from "../common/LoadingThrobber.jsx";
 import {LightboxBulk} from "../types";
 import {formatError} from "../common/ErrorViewComponent";
-import {makeStyles, Tooltip, Typography} from "@material-ui/core";
+import {Grid, IconButton, makeStyles, Tooltip, Typography} from "@material-ui/core";
 import clsx from "clsx";
+import {AirportShuttle, DeleteOutline, GetApp, Timelapse, WarningRounded} from "@material-ui/icons";
 
 interface BulkSelectionsScrollProps {
     entries: LightboxBulk[];
@@ -52,9 +53,10 @@ const useStyles = makeStyles((theme)=>({
         overflow: "hidden",
     },
     bulkSelectionView: {
-        height: "95px",
+        height: "130px",
         width: "280px",
         overflow: "hidden",
+        backgroundColor: theme.palette.primary.main,
         whiteSpace: "nowrap"
     },
     bulkSelectionScroll: {
@@ -93,20 +95,19 @@ const useStyles = makeStyles((theme)=>({
         fontSize: "0.8em",
         zIndex: 999,
         float: "right"
+    },
+    runOnText: {
+        display: "inline"
+    },
+    warningIcon: {
+        color: theme.palette.warning.dark
     }
 }));
 
 const BulkSelectionsScroll:React.FC<BulkSelectionsScrollProps> = (props) => {
-    const [showRestoreSpinner, setShowRestoreSpinner] = useState(false);
     const classes = useStyles();
 
     const nameExtractor = /^([^:]+):(.*)$/;
-    //
-    // entryClicked(newId) {
-    //     if(this.props.onSelected){
-    //         this.props.onSelected(newId);
-    //     }
-    // }
 
     const extractNameAndPathArray = (str:string) => {
         const result = nameExtractor.exec(str);
@@ -141,14 +142,11 @@ const BulkSelectionsScroll:React.FC<BulkSelectionsScrollProps> = (props) => {
             let date = Date.now();
             let addedTime = Date.parse(addedAt);
             let setting = props.expiryDays * 86400000;
-            if ((date - addedTime) > setting) {
-                return "inline"
-            } else {
-                return "none"
-            }
+            return ((date - addedTime) > setting);
         } catch (err) {
             console.error("could not set expiry warning: ", err);
-            if(props.onError) props.onError("An internal error occurred calculating expiry time")
+            if(props.onError) props.onError("An internal error occurred calculating expiry time");
+            return false
         }
     }
 
@@ -172,36 +170,57 @@ const BulkSelectionsScroll:React.FC<BulkSelectionsScrollProps> = (props) => {
                         {bulkInfo.pathArray.length>0 ? bulkInfo.pathArray.slice(-1) : ""}
                     </Typography>
                     <Typography className={clsx(classes.black, classes.small, classes.dontExpand)}>
-                        <FontAwesomeIcon style={{marginRight: "0.5em"}} icon="list-ol"/>{entry.availCount} items
+                        <TimestampFormatter relative={true} value={entry.addedAt} className={classes.runOnText}/>
                     </Typography>
-                    <div style={{overflow:"hidden", width:"100%"}}>
-                        <a onClick={(evt)=>{
-                            evt.preventDefault();
-                            initiateDownloadInApp(entry.id);
-                            return false;
-                        }} className={classes.bulkDownloadLink}>Download in app</a>
-
-                        {props.isAdmin ?
-                            <a onClick={() => {
-                                initiateRedoBulk(entry.id);
-                                return false
-                            }} className={classes.redoRestoreLink}>
-                                <LoadingThrobber show={showRestoreSpinner} small={true} inline={true}/>
-                                Redo restore of folder
-                            </a> : ""
-                        }
-
-                    </div>
-                    <FontAwesomeIcon icon="trash-alt" className={classes.clickable} style={{color: "red", float: "right"}} onClick={evt=>{
-                        evt.stopPropagation();
-                        props.onDeleteClicked(entry.id);
-                    }}/>
-                    <Tooltip title="Some or all of the media may have returned to the deep archive and therefore be unavailable.">
-                        <span><FontAwesomeIcon icon="exclamation-triangle"
-                                         style={{marginRight: "6px" ,color: "red", float: "left", display: showExpiryWarning(entry.addedAt)}}
-                        /></span>
-                    </Tooltip>
-                    <Typography className="entry-date black">Added <TimestampFormatter relative={true} value={entry.addedAt}/></Typography>
+                    <Grid container justify="space-between" alignItems="center">
+                        <Grid item>
+                            <Typography className={clsx(classes.black, classes.small, classes.dontExpand)}>
+                                <FontAwesomeIcon style={{marginRight: "0.5em"}} icon="list-ol"/>{entry.availCount} items
+                            </Typography>
+                        </Grid>
+                        <Grid>
+                            <Grid container justify="flex-end" alignItems="center">
+                                {
+                                    showExpiryWarning(entry.addedAt) ?
+                                        <Tooltip title="Some or all of the media may have returned to the deep archive and therefore be unavailable.">
+                                            <WarningRounded className={classes.warningIcon}/>
+                                        </Tooltip> : null
+                                }
+                                <Grid item>
+                                    <Tooltip title="Download in app">
+                                        <IconButton onClick={(evt)=>{
+                                            evt.preventDefault();
+                                            initiateDownloadInApp(entry.id)
+                                        }}>
+                                            <GetApp/>
+                                        </IconButton>
+                                    </Tooltip>
+                                </Grid>
+                                {
+                                    props.isAdmin ? <Grid item>
+                                        <Tooltip title="Re-do restore of folder">
+                                            <IconButton onClick={(evt)=>{
+                                                evt.preventDefault();
+                                                initiateRedoBulk(entry.id);
+                                            }}>
+                                                <AirportShuttle/>
+                                            </IconButton>
+                                        </Tooltip>
+                                    </Grid> : null
+                                }
+                                <Grid item>
+                                    <Tooltip title="Remove this bulk from your lightbox">
+                                        <IconButton style={{float: "right"}} onClick={(evt)=>{
+                                            evt.stopPropagation();
+                                            props.onDeleteClicked(entry.id);
+                                        }}>
+                                            <DeleteOutline style={{color: "red"}}/>
+                                        </IconButton>
+                                    </Tooltip>
+                                </Grid>
+                            </Grid>
+                        </Grid>
+                    </Grid>
                 </div>
             })
         }
