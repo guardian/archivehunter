@@ -197,7 +197,7 @@ class JobsList extends  React.Component {
             }, {});
     }
 
-    componentWillMount(){
+    componentDidMount(){
         const qpFilters = this.filtersFromQueryParams();
         console.log(qpFilters);
         const initialFilters = qpFilters.length===0 ? this.state.activeFilters : qpFilters;

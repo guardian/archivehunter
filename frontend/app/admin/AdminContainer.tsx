@@ -16,8 +16,9 @@ import {
 } from "@material-ui/core";
 import {MenuIcon} from "@material-ui/data-grid";
 import {
+    ArrowRightAlt,
     ChevronLeft,
-    ChevronRight,
+    ChevronRight, DirectionsRun,
     Healing,
     PeopleAlt,
     Storage,
@@ -126,6 +127,15 @@ const menuItems = [
         uri: "/admin/proxyHealth",
         icon: <Healing/>,
         name: "Proxying Health Indicator"
+    },
+    {
+        uri: "/admin/quickrestore",
+        icon: <DirectionsRun/>,
+        name: "Failsafe media restore"
+    },{
+        uri: "/admin/pathcache",
+        icon: <ArrowRightAlt/>,
+        name: "Paths caching"
     }
 ]
 
