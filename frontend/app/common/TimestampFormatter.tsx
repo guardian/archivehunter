@@ -1,6 +1,6 @@
 import React from 'react';
 import moment from 'moment';
-import {makeStyles, Typography} from "@material-ui/core";
+import {Typography} from "@material-ui/core";
 
 interface TimestampFormatterProps {
     relative: boolean;

@@ -70,16 +70,12 @@ const loadInPaths = async (collectionName:string, from:string)=> {
     const result = await axios.get<BrowseDirectoryResponse>(`/api/browse/${collectionName}?prefix=${from}`);
     const pathsToAdd: PathEntry[] = result.data.entries.map((fullpath, idx) => {
         const extracted = nameExtractor.exec("/"+fullpath);
-        console.log("extraction result was ", extracted);
 
         const name = extracted ? extracted[1] : "";
         return {
             name: name,
-            //children: [],
-            // hasLoaded: false,
             fullpath: fullpath,
             idx: idx
-            //parent: parent
         }
     });
 
@@ -94,17 +90,12 @@ const TreeLeaf:React.FC<TreeLeafProps> = (props) => {
     const [isLoaded, setIsLoaded] = useState(false);
 
     const handleToggle = (evt:React.MouseEvent<Element, MouseEvent>) => {
-        //if(evt) evt.preventDefault();
-        //console.log("toggle clicked")
-
         if(!isLoaded) {
             //save the event so we can re-play it once the async call is done
             if(evt) evt.persist();
 
-            //console.log("loading in more content")
             loadInPaths(props.collectionName, props.path.fullpath)
                 .then(morePaths => {
-                    //console.log("setting ", morePaths);
                     setChildNodes(morePaths);
                     setIsLoaded(true);
                     /* the component view has already refreshed by the time our load has finished.
@@ -125,8 +116,6 @@ const TreeLeaf:React.FC<TreeLeafProps> = (props) => {
         props.leafWasSelected(props.path);
     }
 
-    //console.log("re-render ", props.path, childNodes);
-
     return <TreeItem nodeId={props.path.fullpath}
                      label={<Typography>{props.path.name}</Typography>}
                      collapseIcon={<ExpandMore/>}
@@ -138,7 +127,6 @@ const TreeLeaf:React.FC<TreeLeafProps> = (props) => {
                      onLabelClick={handleSelect}
     >{
         childNodes.map((childPath, idx)=> {
-            //console.log(childPath.fullpath)
             return <TreeLeaf path={childPath}
                       key={`${props.path.idx}${idx}`}
                       parentKey={`${props.path.idx}-${idx}`}
@@ -161,13 +149,11 @@ const NewTreeView:React.FC<NewTreeViewProps> = (props) => {
 
     useEffect(()=>{
         if(props.currentCollection=="") {
-            //console.log("note, can't load paths for non-existent collection");
             setLoadedPaths([]);
         } else {
             loadInPaths(props.currentCollection, "")
                 .then(paths=>setLoadedPaths(paths))
                 .catch(err=>{
-                    //console.error("Could not perform initial load of paths: ", err);
                     props.onError(formatError(err, false))
                 })
         }
@@ -189,8 +175,7 @@ const NewTreeView:React.FC<NewTreeViewProps> = (props) => {
             <TreeView className={classes.root}
                       defaultCollapseIcon={<ChevronRight/>}
                       defaultExpandIcon={<ExpandMore/>}
-                      defaultExpanded={[]}
-                      onNodeToggle={()=>console.log("onnodeToggle")}>
+                      defaultExpanded={[]}>
                 {
                     loadedPaths.length==0 ? <Typography variant="caption">No subfolders present</Typography>
                         : loadedPaths.map((path, idx)=><TreeLeaf path={path}

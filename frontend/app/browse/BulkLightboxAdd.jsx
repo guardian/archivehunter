@@ -52,7 +52,6 @@ class BulkLightboxAdd extends React.Component {
         )
     }
 
-
     triggerBulkLightboxing() {
         if(this.state.loading) return;
         this.setState({loading: true},
@@ -79,40 +78,11 @@ class BulkLightboxAdd extends React.Component {
         )
     }
 
-    //return an icon name based on the component state.
-    iconForState() {
-        if(this.state.loading) return "redo-alt";
-        if(this.state.bulkRecord) return "check";
-        return "lightbulb";
-    }
-
-    // render(){
-    //     return <div className="centered" style={{marginTop: "0.1em", paddingLeft: "0.5em", display: this.props.path ? "inline":"none"}}>
-    //         {
-    //             this.state.quotaExceeded ? <span><p><FontAwesomeIcon icon="lightbulb" className="button-icon"/>Can't add as this would exceed your quota. You would need <BytesFormatter value={this.state.quotaRequired*1048576}/> but only have <BytesFormatter value={this.state.quotaLevel*1048576}/>.</p></span> : ""
-    //         }
-    //         {
-    //             this.state.quotaExceeded || this.state.bulkRecord ? "" : <span>
-    //                 <FontAwesomeIcon icon={this.iconForState()} className={this.state.loading ? "button-icon spin" : "button-icon"}/>
-    //                 <a style={{cursor: "pointer"}} onClick={this.triggerBulkLightboxing}>Lightbox All</a>
-    //             </span>
-    //         }
-    //         {
-    //             this.state.bulkRecord ? <span>
-    //                 <FontAwesomeIcon icon={this.iconForState()} className={this.state.loading ? "button-icon spin" : "button-icon"}/>
-    //                 <a>Saved to lightbox</a>
-    //             </span> : ""
-    //         }
-    //         {
-    //             this.state.lastError ? <span className="error-text" style={{marginLeft: "0.6em"}}>Server error, not all items were added</span> : ""
-    //         }
-    //     </div>
-    // }
     render() {
         return <>
             {
                 this.state.loading ? <Button disabled={true} startIcon={<CircularProgress/>} variant="contained">Lightboxing...</Button> :
-                    <Button startIcon={<WbIncandescent/>} variant="outlined">Lightbox all</Button>
+                    <Button startIcon={<WbIncandescent/>} variant="outlined" onClick={this.triggerBulkLightboxing}>Lightbox all</Button>
             }
             </>
     }

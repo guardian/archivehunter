@@ -39,7 +39,7 @@ const useStyles = makeStyles((theme)=>Object.assign({
 /**
  * this describes an "insert" into the standard entry details view, to provide lightbox-specific data
  */
-const LightboxDetailsInsert:React.FC<LightboxDetailsInsertProps> = (props) => {
+const LightboxDetailsInsertImpl:React.FC<LightboxDetailsInsertProps> = (props) => {
     const [downloadUrl, setDownloadUrl] = useState<string|undefined>();
 
     const classes = useStyles();
@@ -68,13 +68,6 @@ const LightboxDetailsInsert:React.FC<LightboxDetailsInsertProps> = (props) => {
     const isDownloadable = () => {
         return props.lightboxEntry.restoreStatus=="RS_SUCCESS" || props.lightboxEntry.restoreStatus=="RS_UNNEEDED" || props.lightboxEntry.restoreStatus=="RS_ALREADY"
     }
-
-    // const getIconName = (status:RestoreStatus) => {
-    //     return "file";  //FIXME: should return appropriate icon for the archive status of the item
-    // }
-    //
-    // const shouldHideAvailability = () => props.lightboxEntry.restoreStatus!="RS_UNNEEDED" && props.lightboxEntry.restoreStatus!="RS_SUCCESS";
-    // const extractPath = () =>  props.archiveEntryPath ? props.archiveEntryPath.substring(props.archiveEntryPath.lastIndexOf('/') + 1) : "unknown";
 
     const doDownload  = async () => {
         try {
@@ -173,4 +166,32 @@ const LightboxDetailsInsert:React.FC<LightboxDetailsInsertProps> = (props) => {
     </div>;
 }
 
+/**
+ * this class is an error-catching wrapper around the functional component above
+ */
+class LightboxDetailsInsert extends React.Component<LightboxDetailsInsertProps, { lastError:string|undefined }> {
+    constructor(props:LightboxDetailsInsertProps) {
+        super(props);
+
+        this.state = {
+            lastError: undefined
+        }
+    }
+
+    componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+        console.error("Could not load lightbox details insert: ", error);
+        console.error(errorInfo);
+    }
+
+    static getDerivedStateFromError(err:Error) {
+        return {lastError: err.toString()};
+    }
+
+    render() {
+        if(this.state.lastError) return <Typography>Lightbox details couldn't load, please see the console for details</Typography>
+        return (
+            <LightboxDetailsInsertImpl {...this.props}/>
+        );
+    }
+}
 export default LightboxDetailsInsert;

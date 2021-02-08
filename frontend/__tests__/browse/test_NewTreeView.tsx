@@ -32,7 +32,7 @@ describe("loadInPaths", ()=>{
                     });
                 const result = await resultPromise;
 
-                console.log(result);
+                //console.log(result);
                 expect(result.length).toEqual(3);
 
                 expect(result[0]).toEqual({name: "content1", fullpath: "path/to/directory/content1/", idx: 0});
