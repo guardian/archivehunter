@@ -8,6 +8,8 @@ import {CircularProgress, createStyles, Grid, IconButton, Typography, withStyles
 import {baseStyles} from "../BaseStyles";
 import {FolderRounded, HomeOutlined, HomeRounded, Storage} from "@material-ui/icons";
 import {formatError} from "../common/ErrorViewComponent";
+import PathDisplayComponent from "./PathDisplayComponent";
+import clsx from "clsx";
 
 const styles=Object.assign(createStyles({
     summaryIcon: {
@@ -107,8 +109,11 @@ class BrowsePathSummary extends React.Component {
         /*TODO: add in jschart and put a horizontal bar of the filetypes breakdown*/
         if(this.state.hasLoaded) return <div className="browse-path-summary">
             <Grid container direction="column" alignContent="center" spacing={1}>
-                <Grid item className={this.props.classes.centered}>
-
+                <Grid item className={clsx(this.props.classes.summaryBoxElement,this.props.classes.centered)}>
+                    <Typography className={this.props.classes.collectionNameText}>
+                        <Storage className={this.props.classes.summaryIcon}/>
+                        {this.props.collectionName}
+                    </Typography>
                 </Grid>
 
                 {
@@ -118,17 +123,11 @@ class BrowsePathSummary extends React.Component {
                                 <Grid item><IconButton
                                     onClick={this.props.goToRootCb}><HomeRounded/></IconButton></Grid>
                                 <Grid item className={this.props.classes.summaryBoxElement}>
-                                    <FolderRounded className={this.props.classes.summaryIcon}/>
-                                    <Typography style={{display: "inline"}}>{this.props.path}</Typography>
+                                    <PathDisplayComponent path={this.props.path}/>
+                                    {/*<Typography style={{display: "inline"}}>{this.props.path}</Typography>*/}
                                 </Grid>
                             </> : null
                             }
-                            <Grid item className={this.props.classes.summaryBoxElement}>
-                                <Typography className={this.props.classes.collectionNameText}>
-                                    <Storage className={this.props.classes.summaryIcon}/>
-                                    {this.props.collectionName}
-                                </Typography>
-                            </Grid>
                         </Grid>
                     </Grid>
                 }

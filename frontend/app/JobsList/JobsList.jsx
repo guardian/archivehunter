@@ -1,13 +1,13 @@
 import React from 'react';
 import axios from 'axios';
-import ErrorViewComponent from '../common/ErrorViewComponent.jsx';
+import ErrorViewComponent, {formatError} from '../common/ErrorViewComponent.jsx';
 import omit from "lodash.omit";
 import JobsFilterComponent from "./JobsFilterComponent.jsx";
 import {makeJobsListColumns} from "./JobsListContent";
 import AdminContainer from "../admin/AdminContainer";
 import {DataGrid} from "@material-ui/data-grid";
-import {withStyles, createStyles, Paper, Dialog, DialogTitle, Typography} from "@material-ui/core";
-
+import {withStyles, createStyles, Paper, Dialog, DialogTitle, Typography, Snackbar} from "@material-ui/core";
+import MuiAlert from "@material-ui/lab/Alert";
 const styles = (theme)=>createStyles({
     tableContainer: {
         marginTop: "1em",
@@ -36,6 +36,7 @@ class JobsList extends  React.Component {
             jobsList: [],
             loading: false,
             showRelativeTimes: true,
+            showingAlert: false,
             lastError: null,
             activeFilters: {
                 jobType: "proxy"
@@ -49,6 +50,7 @@ class JobsList extends  React.Component {
         this.filterbarUpdated = this.filterbarUpdated.bind(this);
         this.handleModalClose = this.handleModalClose.bind(this);
         this.refreshData = this.refreshData.bind(this);
+        this.closeAlert = this.closeAlert.bind(this);
     }
 
     /**
@@ -81,7 +83,7 @@ class JobsList extends  React.Component {
                     this.updateJobList(response.data.entry).then(()=>{
                         this.setState({loading: false});
                     }).catch(err=>{
-                        this.setState({loading:false, lastError: err});
+                        this.setState({loading:false, lastError: err, showingAlert: true});
                     })
                 })
             }, 1000)
@@ -91,10 +93,23 @@ class JobsList extends  React.Component {
                 this.updateJobList(response.data.entry).then(()=>{
                     this.setState({loading: false});
                 }).catch(err=>{
-                    this.setState({loading:false, lastError: err});
+                    this.setState({loading:false, lastError: err, showingAlert: true});
                 })
             });
         }))
+    }
+
+    componentDidCatch(error, errorInfo) {
+        console.error("JobsList failed to load: ", error, errorInfo);
+    }
+
+    static getDerivedStateFromError(err) {
+        return {
+            lastError: "A frontend internal error occurred, please see the browser console for more details",
+            showingAlert: true,
+            loading: false,
+
+        }
     }
 
     /**
@@ -147,14 +162,14 @@ class JobsList extends  React.Component {
                 this.setState({lastError: null, jobsList: [result.data.entry], loading: false})
             ).catch(err=>{
                 console.error(err);
-                this.setState({lastError: err, loading: false});
+                this.setState({lastError: err, loading: false, showingAlert: true});
             }))
         } else {
             this.setState({lastError: null, loading: true}, () => this.makeUpdateRequest().then(result => {
                 this.setState({lastError: null, jobsList: result.data.entries, loading: false})
             }).catch(err => {
                 console.error(err);
-                this.setState({loading: false, lastError: err});
+                this.setState({loading: false, lastError: err, showingAlert: true});
             }))
         }
     }
@@ -216,11 +231,19 @@ class JobsList extends  React.Component {
         this.setState({showingLog: false});
     }
 
+    closeAlert() {
+        this.setState({showingAlert: false});
+    }
+
     render(){
         const columns = makeJobsListColumns(this.filterUpdated, this.openLog, this.state.showRelativeTimes);
 
-        if(this.state.lastError) return <ErrorViewComponent error={this.state.lastError}/>;
         return <AdminContainer {...this.props}>
+            <Snackbar open={this.state.showingAlert} onClose={this.closeAlert} autoHideDuration={8000}>
+                <MuiAlert severity="error" onClose={this.closeAlert}>
+                    {this.state.lastError ? formatError(this.state.lastError, false) : ""}
+                </MuiAlert>
+            </Snackbar>
             <JobsFilterComponent activeFilters={this.state.activeFilters}
                                  filterChanged={this.filterbarUpdated}
                                  refreshClicked={this.refreshData}
@@ -237,24 +260,6 @@ class JobsList extends  React.Component {
                     }
                 </ul>
             </Dialog>
-            {/*{*/}
-            {/*    this.state.showingLog && <Dialog modal={true}*/}
-            {/*                                     title="Job log"*/}
-            {/*                                     onClose={this.handleModalClose}*/}
-            {/*                                     closeOnEscape={true}*/}
-            {/*                                     hasCloseIcon={true}*/}
-            {/*                                     isDraggable={true}*/}
-            {/*                                     position={{x: window.innerWidth/2-250, y:window.innerHeight}}*/}
-            {/*                                     buttons={*/}
-            {/*                                         [{*/}
-            {/*                                             text: "Close",*/}
-            {/*                                             onClick: ()=>this.handleModalClose()*/}
-            {/*                                         }]*/}
-            {/*                                     }*/}
-            {/*    >*/}
-            {/*        <div className="dialog-content">{this.state.logContent.split("\n").map(para=><p className="centered longlines">{para}</p>)}</div>*/}
-            {/*    </Dialog>*/}
-            {/*}*/}
 
             <Paper elevation={3} className={this.props.classes.tableContainer}>
                 <DataGrid columns={columns} rows={this.state.jobsList}/>
