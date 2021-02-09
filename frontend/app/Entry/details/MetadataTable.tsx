@@ -4,6 +4,7 @@ import FileSizeView from "../FileSizeView";
 import {ArchiveEntry} from "../../types";
 import {makeStyles} from "@material-ui/core";
 import clsx from "clsx";
+import PathDisplayComponent from "../../browse/PathDisplayComponent";
 
 interface MetadataTableProps {
     entry: ArchiveEntry;
@@ -132,7 +133,7 @@ const MetadataTable:React.FC<MetadataTableProps> = (props) => {
         </tr>
         <tr>
             <td className={classes.metadataHeading}>File path</td>
-            <td className={classes.metadataEntry}>{fileinfo.filepath==="" ? <i>root</i> : fileinfo.filepath}</td>
+            <td className={classes.metadataEntry}>{fileinfo.filepath==="" ? <i>root</i> : <PathDisplayComponent path={fileinfo.filepath}/>}</td>
         </tr>
 
         <tr>

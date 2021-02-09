@@ -28,13 +28,11 @@ const PathDisplayComponent:React.FC<PathDisplayComponentProps> = (props) => {
         </Grid>
         {
             parts.map((pathPart, idx)=> {
-                console.log(pathlen, pathPart, idx);
-                   return pathPart=="" ? null : <React.Fragment key={idx}>
-                        <Grid item><Typography className={classes.pathPart}>{pathPart}</Typography></Grid>
-                       {idx==pathlen-2 ? null : <Grid item><ChevronRightRounded/></Grid>}
-                   </React.Fragment>
-                }
-            )
+               return pathPart=="" ? null : <React.Fragment key={idx}>
+                    <Grid item><Typography className={classes.pathPart}>{pathPart}</Typography></Grid>
+                   {idx==pathlen-2 ? null : <Grid item><ChevronRightRounded/></Grid>}
+               </React.Fragment>
+            })
         }
     </Grid>
 }
