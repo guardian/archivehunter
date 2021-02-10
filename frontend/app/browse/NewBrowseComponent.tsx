@@ -10,6 +10,7 @@ import NewTreeView from "./NewTreeView";
 import NewSearchComponent from "../common/NewSearchComponent";
 import BrowsePathSummary from "./BrowsePathSummary";
 import EntryDetails from "../Entry/EntryDetails";
+import BoxSizing from "../common/BoxSizing";
 
 const useStyles = makeStyles({
     browserWindow: {
@@ -78,6 +79,9 @@ const NewBrowseComponent:React.FC<RouteComponentProps> = (props) => {
     const [selectedEntry, setSelectedEntry] = useState<ArchiveEntry|undefined>(undefined);
     const [loading, setLoading] = useState(false);
 
+    const [leftDividerPos, setLeftDividerPos] = useState(4);
+    const [rightDividerPos, setRightDividerPos] = useState(-4);
+
     const classes = useStyles();
 
     const refreshCollectionNames = async () => {
@@ -127,20 +131,24 @@ const NewBrowseComponent:React.FC<RouteComponentProps> = (props) => {
         <Snackbar open={showingAlert} onClose={closeAlert} autoHideDuration={8000}>
             <MuiAlert severity="error" onClose={closeAlert}>{lastError}</MuiAlert>
         </Snackbar>
-        <div className={classes.sortOrderSelector}>
+        <div className={classes.sortOrderSelector} style={{gridColumnStart: leftDividerPos, gridColumnEnd: leftDividerPos+2}}>
             <BrowseSortOrder sortOrder={sortOrder}
                              field={sortField}
                              orderChanged={(newOrder)=>setSortOrder(newOrder)}
                              fieldChanged={(newField)=>setSortField(newField)}/>
         </div>
-        <div className={classes.pathSelector}>
+        <div className={classes.pathSelector} style={{gridColumnEnd: leftDividerPos}}>
+            <BoxSizing justify="right"
+                       onRightClicked={()=>setLeftDividerPos((prev)=>prev+1)}
+                       onLeftClicked={()=>setLeftDividerPos((prev)=>prev-1)}
+                       />
             <NewTreeView currentCollection={currentCollection}
                          collectionList={collectionNames}
                          collectionDidChange={(newCollection)=>setCurrentCollection(newCollection)}
                          pathSelectionChanged={(newpath)=>setCurrentPath(newpath)}
                          onError={showComponentError}/>
         </div>
-        <div className={classes.summaryInfoArea}>
+        <div className={classes.summaryInfoArea} style={{gridColumnStart: leftDividerPos, gridColumnEnd: rightDividerPos}}>
             <BrowsePathSummary collectionName={currentCollection}
                                searchDoc={searchDoc}
                                path={currentPath}
@@ -152,7 +160,7 @@ const NewBrowseComponent:React.FC<RouteComponentProps> = (props) => {
                                onError={showComponentError}
                                />
         </div>
-        <div className={classes.searchResultsArea}>
+        <div className={classes.searchResultsArea}  style={{gridColumnStart: leftDividerPos, gridColumnEnd: rightDividerPos}}>
             <NewSearchComponent pageSize={pageSize}
                                 itemLimit={itemLimit}
                                 newlyLightboxed={newlyLightboxed}
@@ -164,7 +172,11 @@ const NewBrowseComponent:React.FC<RouteComponentProps> = (props) => {
                                 onLoadingFinished={()=>setLoading(false)}
             />
         </div>
-        <div className={classes.detailsArea}>
+        <div className={classes.detailsArea} style={{gridColumnStart: rightDividerPos}}>
+            <BoxSizing justify="left"
+                       onRightClicked={()=>setRightDividerPos((prev)=>prev+1)}
+                       onLeftClicked={()=>setRightDividerPos((prev)=>prev-1)}
+            />
             <EntryDetails entry={selectedEntry}
                           autoPlay={true}
                           showJobs={true}
