@@ -16,7 +16,7 @@ interface NewSearchComponentProps {
     onEntryClicked: (entry:ArchiveEntry)=>void;         //called when an entry is clicked
     onErrorOccurred: (errorDescription:string)=>void;   //called when a load error occurs, parent should display the error
     onLoadingStarted?: ()=>void;
-    onLoadingFinished?: ()=>void;
+    onLoadingFinished?: (loadedData:ArchiveEntry[])=>void;
 }
 
 const useStyles = makeStyles({
@@ -40,6 +40,8 @@ const useStyles = makeStyles({
  */
 const NewSearchComponent:React.FC<NewSearchComponentProps> = (props) => {
     const [entries, setEntries] = useState<ArchiveEntry[]>([]);
+    const [loadingInProgress, setLoadingInProgress] = useState(false);
+
     const [cancelToken, setCancelToken] = useState<CancelToken|undefined>(undefined);
     const classes = useStyles();
 
@@ -85,7 +87,7 @@ const NewSearchComponent:React.FC<NewSearchComponentProps> = (props) => {
                 return loadNextPage(token, startAt+results.data.entries.length);
             } else {
                 console.log("Received 0 results, assuming got to the end of iteration");
-                if(props.onLoadingFinished) props.onLoadingFinished();
+                setLoadingInProgress(false);
                 return true;
             }
         } catch(err) {
@@ -97,10 +99,18 @@ const NewSearchComponent:React.FC<NewSearchComponentProps> = (props) => {
             } else {
                 props.onErrorOccurred(formatError(err, false));
             }
-            if(props.onLoadingFinished) props.onLoadingFinished();
+            setLoadingInProgress(false);
+
             return false;
         }
     }
+
+
+    useEffect(()=>{
+        if(!loadingInProgress && props.onLoadingFinished) {
+            props.onLoadingFinished(entries);
+        }
+    }, [loadingInProgress, entries]);
 
     const indexForFileid = (entryId:string)=>{
         for(let i=0;i<entries.length;++i){
@@ -165,6 +175,7 @@ const NewSearchComponent:React.FC<NewSearchComponentProps> = (props) => {
         setCancelToken(cancelTokenFactory.token);
 
         if(props.onLoadingStarted) props.onLoadingStarted();
+        setLoadingInProgress(true);
         setEntries([]);
         loadNextPage(cancelTokenFactory.token, 0);
         return ()=>{

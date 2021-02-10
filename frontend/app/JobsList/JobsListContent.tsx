@@ -5,10 +5,12 @@ import JobTypeIcon from "./JobTypeIcon";
 import TimestampFormatter from "../common/TimestampFormatter";
 import JobStatusIcon from "./JobStatusIcon";
 import ResubmitComponent from "./ResubmitComponent";
-import {Link} from "react-router-dom";
+import {Button, IconButton, Tooltip} from "@material-ui/core";
+import {Launch} from "@material-ui/icons";
 
 function makeJobsListColumns(filterUpdated: (fieldName:string, values:string, type:"add"|"remove")=>void,
                              openLog: (logContent:string)=>void,
+                             openItem: (itemId:string)=>void,
                              showRelativeTimes: boolean):ColDef[] {
     return [
         {
@@ -88,7 +90,12 @@ function makeJobsListColumns(filterUpdated: (fieldName:string, values:string, ty
                                       values={params.value}
                                       type="minus"
                                       onActivate={params.value ? filterUpdated("sourceId", params.value as string,"remove") : null}/>
-                        <Link to={"/browse?open="+params.value}>View</Link>
+                        {/*<Link to={"/browse?open="+params.value}>View</Link>*/}
+                        <Tooltip title="View source file in Browse">
+                            <IconButton onClick={()=>openItem(params.value as string)}>
+                                <Launch/>
+                            </IconButton>
+                        </Tooltip>
                 </span>
         },
         {

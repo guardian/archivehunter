@@ -11,6 +11,8 @@ import NewSearchComponent from "../common/NewSearchComponent";
 import BrowsePathSummary from "./BrowsePathSummary";
 import EntryDetails from "../Entry/EntryDetails";
 import BoxSizing from "../common/BoxSizing";
+import {urlParamsFromSearch} from "../common/UrlPathHelpers";
+import Helmet from "react-helmet";
 
 const useStyles = makeStyles({
     browserWindow: {
@@ -79,6 +81,8 @@ const NewBrowseComponent:React.FC<RouteComponentProps> = (props) => {
     const [selectedEntry, setSelectedEntry] = useState<ArchiveEntry|undefined>(undefined);
     const [loading, setLoading] = useState(false);
 
+    const [urlRequestedItem, setUrlRequestedItem] = useState<string|undefined>(undefined);
+
     const [leftDividerPos, setLeftDividerPos] = useState(4);
     const [rightDividerPos, setRightDividerPos] = useState(-4);
 
@@ -100,7 +104,20 @@ const NewBrowseComponent:React.FC<RouteComponentProps> = (props) => {
      * load in collection names at startup
      */
     useEffect(()=>{
-        refreshCollectionNames()
+        refreshCollectionNames();
+    }, []);
+
+    /**
+     * if an item is specified on the url then open it
+     */
+    useEffect(()=>{
+        const urlParams = urlParamsFromSearch(props.location.search);
+
+        if(urlParams.hasOwnProperty("open")) {
+            console.log("Requested to open file id ", urlParams.open);
+            setUrlRequestedItem(urlParams.open);
+        }
+
     }, []);
 
     const stripTrailingSlash = (from:string)=> from.endsWith("/") ? from.slice(0,from.length-1) : from;
@@ -120,6 +137,36 @@ const NewBrowseComponent:React.FC<RouteComponentProps> = (props) => {
         setSearchDoc(docWithPath);
     }, [currentCollection, reloadCounter, currentPath, sortField, sortOrder]);
 
+    // const pathOnlyRegex = new RegExp("/[^/]*$");
+    //  commented out, this makes clicking on an entry lose everything else that is not in its dirs
+    // /**
+    //  * make sure that the path is open if an item is selected
+    //  */
+    // useEffect(()=>{
+    //     if(selectedEntry && currentPath!=selectedEntry.path) {
+    //         const pathOnly = selectedEntry.path.replace(pathOnlyRegex, "");
+    //         console.log("setting path to ", pathOnly);
+    //         setCurrentPath(pathOnly);
+    //     }
+    //     if(selectedEntry && currentCollection!=selectedEntry.bucket) {
+    //         setCurrentCollection(selectedEntry.bucket)
+    //     }
+    // }, [selectedEntry]);
+
+    useEffect(()=>{
+        if(selectedEntry) {
+            setUrlRequestedItem(selectedEntry.id);
+        }
+    });
+
+    useEffect(()=>{
+        if(urlRequestedItem) {
+            props.history.push(`?open=${urlRequestedItem}`);
+        } else {
+            props.history.push("?");
+        }
+    }, [urlRequestedItem]);
+
     const showComponentError = (errString:string)=>{
         setLastError(errString);
         setShowingAlert(true);
@@ -127,7 +174,29 @@ const NewBrowseComponent:React.FC<RouteComponentProps> = (props) => {
 
     const closeAlert = () => setShowingAlert(false);
 
+    /**
+     * callback for NewSearchcomponent, this is called whenever a data load is completed.
+     * if we have an item to open provided on the url, then select it IF it appears in the search results
+     * @param loadedData array of ArchiveEntry that were loaded
+     */
+    const loadingDidComplete = (loadedData:ArchiveEntry[])=>{
+        if(urlRequestedItem) {
+            const maybeItemToSelect = loadedData.filter(entry=>entry.id==urlRequestedItem);
+            if(maybeItemToSelect.length>0) {
+                setSelectedEntry(maybeItemToSelect[0])
+            } else {
+                console.log("could not open item ", urlRequestedItem, " because it is not in the returned results")
+            }
+        }
+        setLoading(false)
+    }
+
     return <div className={classes.browserWindow}>
+        <Helmet>
+            <title>{
+                selectedEntry ? `${selectedEntry.path} - Archive Hunter` : "Archive Hunter"
+            }</title>
+        </Helmet>
         <Snackbar open={showingAlert} onClose={closeAlert} autoHideDuration={8000}>
             <MuiAlert severity="error" onClose={closeAlert}>{lastError}</MuiAlert>
         </Snackbar>
@@ -169,7 +238,7 @@ const NewBrowseComponent:React.FC<RouteComponentProps> = (props) => {
                                 onErrorOccurred={showComponentError}
                                 advancedSearch={searchDoc}
                                 onLoadingStarted={()=>setLoading(true)}
-                                onLoadingFinished={()=>setLoading(false)}
+                                onLoadingFinished={loadingDidComplete}
             />
         </div>
         <div className={classes.detailsArea} style={{gridColumnStart: rightDividerPos}}>
