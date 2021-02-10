@@ -6,7 +6,6 @@ import ErrorViewComponent from "../common/ErrorViewComponent.jsx";
 import ByCollectionChart from "./ByCollectionChart.jsx";
 import GeneralOverviewChart from "./GeneralOverviewChart.jsx";
 import InfoTable from "./InfoTable";
-import LoadingThrobber from "../common/LoadingThrobber.jsx";
 import AdminContainer from "../admin/AdminContainer";
 import {
     Button,
@@ -118,6 +117,7 @@ class ProxyHealthDetail extends React.Component {
         return incomingData.map(entry=>{
             const pathParts = this.splitPath(entry.filePath);
             return {
+                id: entry.fileId,
                 fileId: entry.fileId,
                 collection: entry.collection,
                 esRecordSays: entry.esRecordSays,
