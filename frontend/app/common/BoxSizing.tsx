@@ -11,10 +11,12 @@ interface BoxSizingProps {
 
 const useStyles = makeStyles({
     rightAligned: {
-        float: "right"
+        marginLeft: "auto",
+        marginRight: 0
     },
     leftAligned: {
-        float: "left"
+        marginRight: "auto",
+        marginLeft: 0
     },
     container: {
         width: "max-content"
