@@ -1,6 +1,6 @@
 import React from 'react';
 import axios from 'axios';
-import ErrorViewComponent, {formatError} from '../common/ErrorViewComponent.jsx';
+import {formatError} from '../common/ErrorViewComponent.jsx';
 import omit from "lodash.omit";
 import JobsFilterComponent from "./JobsFilterComponent.jsx";
 import {makeJobsListColumns} from "./JobsListContent";
@@ -8,6 +8,8 @@ import AdminContainer from "../admin/AdminContainer";
 import {DataGrid} from "@material-ui/data-grid";
 import {withStyles, createStyles, Paper, Dialog, DialogTitle, Typography, Snackbar} from "@material-ui/core";
 import MuiAlert from "@material-ui/lab/Alert";
+import uuid from "uuid";
+
 const styles = (theme)=>createStyles({
     tableContainer: {
         marginTop: "1em",
@@ -156,17 +158,27 @@ class JobsList extends  React.Component {
             axios.get("/api/job/all") : axios.put("/api/job/search",this.state.activeFilters)
     }
 
+    /**
+     * MUI wants an 'id' prop on each record, so let's give it one
+     */
+    enrichServerEntry(sourceData) {
+        if(sourceData.hasOwnProperty("jobId")) {
+            return Object.assign(sourceData, {id: sourceData.jobId})
+        } else {
+            return Object.assign(sourceData, {id: uuid()});
+        }
+    }
     refreshData(){
         if(this.state.specificJob){
             this.setState({lastError: null, loading: true}, ()=>axios.get("/api/job/" + this.state.specificJob).then(result=>
-                this.setState({lastError: null, jobsList: [result.data.entry], loading: false})
+                this.setState({lastError: null, jobsList: [this.enrichServerEntry(result.data.entry)], loading: false})
             ).catch(err=>{
                 console.error(err);
                 this.setState({lastError: err, loading: false, showingAlert: true});
             }))
         } else {
             this.setState({lastError: null, loading: true}, () => this.makeUpdateRequest().then(result => {
-                this.setState({lastError: null, jobsList: result.data.entries, loading: false})
+                this.setState({lastError: null, jobsList: result.data.entries.map(this.enrichServerEntry), loading: false})
             }).catch(err => {
                 console.error(err);
                 this.setState({loading: false, lastError: err, showingAlert: true});
