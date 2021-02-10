@@ -217,7 +217,7 @@ const NewBrowseComponent:React.FC<RouteComponentProps> = (props) => {
                          pathSelectionChanged={(newpath)=>setCurrentPath(newpath)}
                          onError={showComponentError}/>
         </div>
-        <div className={classes.summaryInfoArea} style={{gridColumnStart: leftDividerPos, gridColumnEnd: rightDividerPos}}>
+        <div className={classes.summaryInfoArea} style={{gridColumnStart: leftDividerPos+2, gridColumnEnd: rightDividerPos}}>
             <BrowsePathSummary collectionName={currentCollection}
                                searchDoc={searchDoc}
                                path={currentPath}
