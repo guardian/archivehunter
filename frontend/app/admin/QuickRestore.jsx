@@ -7,6 +7,7 @@ import {createStyles, withStyles, Snackbar, TextField, Paper, Button, Grid, Typo
 import {formatError} from "../common/ErrorViewComponent";
 import MuiAlert from "@material-ui/lab/Alert";
 import {Check, Search, Warning, WarningRounded, WbIncandescent} from "@material-ui/icons";
+import {Helmet} from "react-helmet";
 
 const styles = createStyles((theme)=>({
     wide: {
@@ -145,6 +146,9 @@ class QuickRestoreComponent extends React.Component {
     render() {
         return (
             <AdminContainer {...this.props}>
+                <Helmet>
+                    <title>Failsafe media restore - ArchiveHunter</title>
+                </Helmet>
                 <Snackbar open={this.state.showingAlert} onClose={this.closeAlert} autoHideDuration={8000}>
                     <MuiAlert severity="error" onClose={this.closeAlert}>{this.state.lastError}</MuiAlert>
                 </Snackbar>

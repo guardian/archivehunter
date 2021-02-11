@@ -10,6 +10,7 @@ import AdminContainer from "../admin/AdminContainer";
 import { baseStyles } from "../BaseStyles";
 import MuiAlert from "@material-ui/lab/Alert";
 import {formatError} from "../common/ErrorViewComponent";
+import {Helmet} from "react-helmet";
 
 const useStyles = makeStyles(Object.assign({
     tableContainer: {
@@ -69,6 +70,9 @@ const ScanTargetsList:React.FC<RouteComponentProps> = (props) => {
     const closeAlert = ()=>setShowingAlert(false);
 
     return <>
+        <Helmet>
+            <title>Scan Targets - Archive Hunter</title>
+        </Helmet>
             <AdminContainer {...props}>
                 {lastError ?
                     <Snackbar open={showingAlert} onClose={closeAlert} autoHideDuration={8000}>

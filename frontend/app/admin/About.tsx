@@ -5,6 +5,7 @@ import AdminContainer from "./AdminContainer"
 import ErrorViewComponent from "../common/ErrorViewComponent";
 import TimestampFormatter from "../common/TimestampFormatter";
 import {Typography} from "@material-ui/core";
+import {Helmet} from "react-helmet";
 
 interface VersionInfo {
     buildNumber: number;
@@ -25,8 +26,10 @@ const AboutComponent:React.FC<RouteComponentProps> = (props) => {
         })
     }, []);
 
-    return <div>
-        <AdminContainer {...props}>
+    return <AdminContainer {...props}>
+        <Helmet>
+            <title>About - ArchiveHunter</title>
+        </Helmet>
         {
             lastError ?
                 <ErrorViewComponent error={lastError}/> :
@@ -36,7 +39,6 @@ const AboutComponent:React.FC<RouteComponentProps> = (props) => {
                 </div>
         }
         </AdminContainer>
-    </div>
 }
 
 export default AboutComponent;

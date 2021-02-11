@@ -6,11 +6,12 @@ import JobsFilterComponent from "./JobsFilterComponent.jsx";
 import {makeJobsListColumns} from "./JobsListContent";
 import AdminContainer from "../admin/AdminContainer";
 import {DataGrid} from "@material-ui/data-grid";
-import {withStyles, createStyles, Paper, Dialog, DialogTitle, Typography, Snackbar} from "@material-ui/core";
+import {withStyles, createStyles, Paper, Dialog, DialogTitle, Typography, Snackbar, Theme} from "@material-ui/core";
 import MuiAlert from "@material-ui/lab/Alert";
 import uuid from "uuid";
+import {Helmet} from "react-helmet";
 
-const styles = (theme)=>createStyles({
+const styles = (theme) => createStyles({
     tableContainer: {
         marginTop: "1em",
         height: "80vh"
@@ -40,6 +41,7 @@ class JobsList extends  React.Component {
             showRelativeTimes: true,
             showingAlert: false,
             lastError: null,
+            showMessage: null,
             activeFilters: {
                 jobType: "proxy"
             },
@@ -55,6 +57,9 @@ class JobsList extends  React.Component {
         this.closeAlert = this.closeAlert.bind(this);
         this.openItemRequested = this.openItemRequested.bind(this);
         this.openLog = this.openLog.bind(this);
+
+        this.subComponentErrored = this.subComponentErrored.bind(this);
+        this.resubmitSuccess = this.resubmitSuccess.bind(this);
     }
 
     /**
@@ -188,11 +193,21 @@ class JobsList extends  React.Component {
         }
     }
 
-    componentDidUpdate(oldProps, oldState){
+    componentDidUpdate(oldProps, oldState, snapshot){
         /*if the url changes, update the data */
         if(oldProps.match!==this.props.match){
             this.setState({specificJob: this.props.match.params.hasOwnProperty("jobid") ? this.props.match.params.jobid : null},()=>
             this.refreshData());
+        }
+        if(oldState.lastError==null && this.state.lastError!=null) {
+            this.setState({
+                showingMessage: null
+            });
+        }
+        if(oldState.showingMessage==null && this.state.showingMessage!=null) {
+            this.setState({
+                lastError: null
+            })
         }
     }
 
@@ -249,22 +264,63 @@ class JobsList extends  React.Component {
         this.setState({showingAlert: false});
     }
 
-    openItemRequested(itemId) {
-        this.props.location.history.push(`/browse?open=${itemId}`)
+    openItemRequested(itemRecord) {
+        let url = undefined;
+        switch(itemRecord.sourceType) {
+            case "SRC_MEDIA":
+                url = `/browse?open=${encodeURIComponent(itemRecord.sourceId)}`;
+                break;
+            case "SRC_SCANTARGET":
+                url = `/admin/scanTargets/${encodeURIComponent(itemRecord.sourceId)}`;
+                break;
+            default:
+                break;
+        }
+        if(url) this.props.history.push(url);
     }
 
     openLog() {
         this.setState({showingLog: true});
     }
 
+    subComponentErrored(errorDesc) {
+        this.setState({
+            lastError: errorDesc,
+            showingAlert: true
+        });
+    }
+
+    resubmitSuccess() {
+        this.setState({
+            showMessage: "Job was resubmitted",
+            showingAlert: true
+        });
+    }
     render(){
-        const columns = makeJobsListColumns(this.filterUpdated, this.openLog, this.openItemRequested, this.state.showRelativeTimes);
+        const columns = makeJobsListColumns(this.filterUpdated,
+            this.openLog,
+            this.openItemRequested,
+            this.subComponentErrored,
+            this.resubmitSuccess,
+            this.state.showRelativeTimes);
 
         return <AdminContainer {...this.props}>
+            <Helmet>
+                <title>Jobs - ArchiveHunter</title>
+            </Helmet>
             <Snackbar open={this.state.showingAlert} onClose={this.closeAlert} autoHideDuration={8000}>
-                <MuiAlert severity="error" onClose={this.closeAlert}>
-                    {this.state.lastError ? formatError(this.state.lastError, false) : ""}
-                </MuiAlert>
+                <>
+                {
+                    this.state.lastError ? <MuiAlert severity="error" onClose={this.closeAlert}>
+                        {typeof(this.state.lastError)==="string" ? this.state.lastError : formatError(this.state.lastError, false)}
+                    </MuiAlert> : null
+                }
+                {
+                    this.state.showMessage ? <MuiAlert severity="info" onClose={this.closeAlert}>
+                        {this.state.showMessage}
+                    </MuiAlert> : null
+                }
+                </>
             </Snackbar>
             <JobsFilterComponent activeFilters={this.state.activeFilters}
                                  filterChanged={this.filterbarUpdated}

@@ -12,7 +12,7 @@ import TopMenu from './TopMenu';
 import AdminFront from './admin/AdminFront';
 import AboutComponent from './admin/About';
 
-import JobsList from './JobsList/JobsList.jsx';
+import JobsList from './JobsList/JobsList';
 import LoginStatusComponent from './Login/LoginStatusComponent';
 
 import ProxyHealthDetail from './ProxyHealthDetail/ProxyHealthDetail.jsx';

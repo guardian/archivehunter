@@ -7,10 +7,13 @@ import JobStatusIcon from "./JobStatusIcon";
 import ResubmitComponent from "./ResubmitComponent";
 import {Button, IconButton, Tooltip} from "@material-ui/core";
 import {Launch} from "@material-ui/icons";
+import {JobEntry} from "../types";
 
 function makeJobsListColumns(filterUpdated: (fieldName:string, values:string, type:"add"|"remove")=>void,
                              openLog: (logContent:string)=>void,
-                             openItem: (itemId:string)=>void,
+                             openItem: (record:JobEntry)=>void,
+                             onError: (errorDesc:string)=>void,
+                             onResubmit: ()=>void,
                              showRelativeTimes: boolean):ColDef[] {
     return [
         {
@@ -74,14 +77,21 @@ function makeJobsListColumns(filterUpdated: (fieldName:string, values:string, ty
             width: 150,
             renderCell: (params)=>{
                 const maybeJobType = params.getValue("jobType");
-                return <ResubmitComponent jobId={params.value as string} visible={maybeJobType!=undefined}/>
+                return params.value != undefined ? <ResubmitComponent jobId={params.value as string}
+                                          visible={maybeJobType!=undefined}
+                                          onFailed={onError}
+                                          onSuccess={onResubmit}
+                /> : <span/>
             }
         },
         {
             field: "sourceId",
             headerName: "Source file",
             width: 400,
-            renderCell: (params)=><span>
+            renderCell: (params)=> {
+                const entry = (params.row as unknown) as JobEntry;
+
+                return entry.sourceType=="SRC_MEDIA"|| entry.sourceType=="SRC_SCANTARGET" ? <span>
                         <FilterButton fieldName="sourceId"
                                       values={params.value}
                                       type="plus"
@@ -91,11 +101,12 @@ function makeJobsListColumns(filterUpdated: (fieldName:string, values:string, ty
                                       type="minus"
                                       onActivate={params.value ? filterUpdated("sourceId", params.value as string,"remove") : null}/>
                         <Tooltip title="View source file in Browse">
-                            <IconButton onClick={()=>openItem(params.value as string)}>
+                            <IconButton onClick={()=>openItem(entry)}>
                                 <Launch/>
                             </IconButton>
                         </Tooltip>
-                </span>
+                </span> : <span/>
+            }
         },
         {
             field: "sourceType",

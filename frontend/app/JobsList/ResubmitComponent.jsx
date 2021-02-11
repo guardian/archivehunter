@@ -1,7 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import axios from "axios";
-import ErrorViewComponent from "../common/ErrorViewComponent.jsx";
+import ErrorViewComponent, {formatError} from "../common/ErrorViewComponent.jsx";
 import {createStyles, Grid, IconButton, Tooltip, withStyles} from "@material-ui/core";
 import {Check, Replay, WarningRounded} from "@material-ui/icons";
 import clsx from "clsx";
@@ -55,7 +55,7 @@ class ResubmitComponent extends React.Component {
             .catch(err=>{
                 console.error(err);
                 this.setState({loading: false, lastError: err, success:false, attempted: true}, ()=>{
-                    if(this.props.onFailed) this.props.onFailed(err);
+                    if(this.props.onFailed) this.props.onFailed(formatError(err));
                 });
             }));
     }
@@ -73,15 +73,16 @@ class ResubmitComponent extends React.Component {
                 }
             </Grid>
             {
-                this.state.lastError ? <>
+                this.state.lastError ?
                     <Grid item>
+                        <Tooltip title={formatError(this.state.lastError, true)}>
+                            <span>
                         <WarningRounded
-                            className={clsx(this.props.classes.icon, this.state.success ? this.props.classes.warningIcon : this.props.classes.errorIcon)}/>
-                    </Grid>
-                    <Grid item>
-                        <ErrorViewComponent error={this.state.lastError} brief={true}/>
-                    </Grid>
-                    </> : null
+                            className={clsx(this.props.classes.icon, this.state.success ? this.props.classes.warningIcon : this.props.classes.errorIcon)}
+                        />
+                        </span>
+                        </Tooltip>
+                    </Grid>: null
             }
         </Grid>
     }

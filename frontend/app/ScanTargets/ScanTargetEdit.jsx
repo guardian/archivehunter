@@ -26,6 +26,7 @@ import {makeStyles, withStyles} from "@material-ui/core";
 import clsx from "clsx";
 import {baseStyles} from "../BaseStyles";
 import ScanTargetActionsBox from "./ScanTargetActionsBox";
+import {Helmet} from "react-helmet";
 
 const styles = (theme) => Object.assign(createStyles({
     formContainer: {
@@ -117,7 +118,7 @@ class ScanTargetEdit extends React.Component {
         );
     }
 
-    componentWillMount(){
+    componentDidMount(){
         const idToLoad = this.props.location.pathname.split('/').slice(-1)[0];
         console.log("going to load from id", idToLoad);
 
@@ -208,6 +209,9 @@ class ScanTargetEdit extends React.Component {
     render(){
         if(this.state.completed) return <Redirect to="/admin/scanTargets"/>;
         return <>
+            <Helmet>
+                <title>Scan Targets - ArchiveHunter</title>
+            </Helmet>
             <Snackbar
                 open={this.state.showingAlert}
                 autoHideDuration={60000}

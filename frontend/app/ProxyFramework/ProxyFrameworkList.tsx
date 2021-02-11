@@ -9,6 +9,7 @@ import {Button, Grid, makeStyles, Paper} from "@material-ui/core";
 import {baseStyles} from "../BaseStyles";
 import {ProxyFrameworkDeploymentRow, ProxyFrameworkDeploymentsResponse} from "../types";
 import {makeProxyFrameworkColumns} from "./ProxyFrameworkContent";
+import {Helmet} from "react-helmet";
 
 const useStyles = makeStyles(Object.assign({
     tableContainer: {
@@ -56,6 +57,9 @@ const ProxyFrameworkList:React.FC<RouteComponentProps> = (props) => {
     const columns = makeProxyFrameworkColumns(callDelete);
 
     return <AdminContainer {...props}>
+        <Helmet>
+            <title>Proxying Frameworks - ArchiveHunter</title>
+        </Helmet>
         <Grid container justify="flex-start">
             <Grid item>
                 <LoadingThrobber show={loading} caption="Loading data..." small={true}/>

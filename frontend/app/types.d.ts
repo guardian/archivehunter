@@ -28,6 +28,21 @@ interface ObjectGetResponse<T> {
 
 type JobStatus = "ST_PENDING"|"ST_RUNNING"|"ST_SUCCESS"|"ST_ERROR"|"ST_CANCELLED"|"ST_WARNING";
 
+interface JobEntry {
+    jobId: string;  //UUID
+    jobType: string;
+    startedAt?: string;
+    completedAt?: string;
+    jobStatus: JobStatus;
+    log?: string;
+    sourceId?: string;
+    transcodeInfo?: string;
+    sourceType: "SRC_MEDIA"|"SRC_PROXY"|"SRC_THUMBNAIL"|"SRC_SCANTARGET"|"SRC_GLOBAL";
+    lastUpdatedTS?: string;
+}
+
+type JobListResponse = ObjectListResponse<JobEntry>;
+
 interface TranscoderCheck {
     checkedAt: string;  //ISO timestamp
     status: JobStatus;

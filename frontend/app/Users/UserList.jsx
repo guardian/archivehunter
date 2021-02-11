@@ -7,6 +7,7 @@ import {makeUserListColumns} from "./UserListContent";
 import {DataGrid} from "@material-ui/data-grid";
 import MuiAlert from "@material-ui/lab/Alert";
 import ErrorViewComponent from "../common/ErrorViewComponent";
+import {Helmet} from "react-helmet";
 
 const styles = (theme)=> Object.assign(createStyles({
     tableContainer: {
@@ -164,6 +165,9 @@ class UserList extends React.Component {
             this.state.collectionsList.length * 40 : 52;
 
         return <>
+            <Helmet>
+                <title>Users - ArchiveHunter</title>
+            </Helmet>
             <Snackbar open={this.state.showingAlert}
                       autoHideDuration={8000}
                       onClose={this.handleClose}>

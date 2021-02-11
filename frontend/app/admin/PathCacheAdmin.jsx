@@ -5,6 +5,7 @@ import {formatError} from "../common/ErrorViewComponent.jsx";
 import AdminContainer from "./AdminContainer";
 import {Button, createStyles, withStyles, Paper, Snackbar, Typography} from "@material-ui/core";
 import {LibraryBooks} from "@material-ui/icons";
+import {Helmet} from "react-helmet";
 
 const styles = createStyles({
     area: {
@@ -63,6 +64,9 @@ class PathCacheAdmin extends React.Component {
 
     render() {
         return <AdminContainer {...this.props}>
+            <Helmet>
+                <title>Paths Caching - ArchiveHunter</title>
+            </Helmet>
             <Snackbar open={this.state.showingError} onClose={this.closeError} autoHideDuration={8000}>
                 {
                     this.state.lastError ? <MuiAlert severity="error" onClose={this.closeError}>{formatError(this.state.lastError, false)}</MuiAlert> : null

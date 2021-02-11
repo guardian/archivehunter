@@ -2,7 +2,6 @@ import React from 'react';
 import axios from 'axios';
 import TimestampFormatter from "../common/TimestampFormatter";
 import TimestampDiffComponent from "../common/TimestampDiffComponent.jsx";
-import ErrorViewComponent from "../common/ErrorViewComponent.jsx";
 import ByCollectionChart from "./ByCollectionChart.jsx";
 import GeneralOverviewChart from "./GeneralOverviewChart.jsx";
 import InfoTable from "./InfoTable";
@@ -20,6 +19,8 @@ import {
 } from "@material-ui/core";
 import MuiAlert from "@material-ui/lab/Alert";
 import {proxyHealthStyles} from "./ProxyHealthStyles";
+import {Helmet} from "react-helmet";
+import {formatError} from "../common/ErrorViewComponent";
 
 class ProxyHealthDetail extends React.Component {
     constructor(props) {
@@ -178,9 +179,12 @@ class ProxyHealthDetail extends React.Component {
     }
     render() {
         return <AdminContainer {...this.props}>
+            <Helmet>
+                <title>Proxy Health - ArchiveHunter</title>
+            </Helmet>
             <Snackbar open={this.state.showingAlert} onClose={this.closeAlert} autoHideDuration={8000}>
                 {
-                    this.state.lastError ? <MuiAlert severity="error" onClose={this.closeAlert}>{ErrorViewComponent.formatError(this.state.lastError)}</MuiAlert> : null
+                    this.state.lastError ? <MuiAlert severity="error" onClose={this.closeAlert}>{formatError(this.state.lastError)}</MuiAlert> : null
                 }
             </Snackbar>
 

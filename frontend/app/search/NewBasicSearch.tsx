@@ -6,6 +6,7 @@ import MuiAlert from "@material-ui/lab/Alert";
 import NewSearchComponent from "../common/NewSearchComponent";
 import {ArchiveEntry} from "../types";
 import EntryDetails from "../Entry/EntryDetails";
+import {Helmet} from "react-helmet";
 
 const useStyles = makeStyles({
     searchBox: {
@@ -63,6 +64,9 @@ const NewBasicSearch:React.FC<RouteComponentProps> = (props) => {
     }, [selectedEntry]);
 
     return <>
+        <Helmet>
+            <title>Search - ArchiveHunter</title>
+        </Helmet>
         <Snackbar open={showingAlert} onClose={closeAlert} autoHideDuration={8000}>
             <MuiAlert severity="error" onClose={closeAlert}>{lastError}</MuiAlert>
         </Snackbar>
