@@ -20,8 +20,8 @@ const styles = (theme)=>createStyles({
         marginTop: "auto",
         marginBottom: "auto",
         paddingRight: "0.2em",
-        width: "16px",
-        height: "16px"
+        width: "24px",
+        height: "24px"
     }
 });
 
@@ -61,7 +61,7 @@ class ResubmitComponent extends React.Component {
     }
 
     render(){
-        return <Grid direction="row" alignContent="space-between">
+        return <Grid container direction="row" alignContent="space-between">
             <Grid item>
                 {this.state.success ?
                     <Check className={clsx(this.props.classes.successIcon, this.props.classes.icon)}/> :
@@ -72,10 +72,17 @@ class ResubmitComponent extends React.Component {
                     </Tooltip>
                 }
             </Grid>
-            <Grid item>
-                <WarningRounded className={clsx(this.props.classes.icon, this.state.success ? this.props.classes.warningIcon : this.props.classes.errorIcon)}/>
-                <ErrorViewComponent error={this.state.lastError} brief={true}/>
-            </Grid>
+            {
+                this.state.lastError ? <>
+                    <Grid item>
+                        <WarningRounded
+                            className={clsx(this.props.classes.icon, this.state.success ? this.props.classes.warningIcon : this.props.classes.errorIcon)}/>
+                    </Grid>
+                    <Grid item>
+                        <ErrorViewComponent error={this.state.lastError} brief={true}/>
+                    </Grid>
+                    </> : null
+            }
         </Grid>
     }
 }

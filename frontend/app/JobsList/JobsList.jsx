@@ -17,7 +17,7 @@ const styles = (theme)=>createStyles({
     },
     logLine: {
         fontFamily: "Courier, serif",
-        color: "green"
+        color: theme.palette.success.dark,
     },
     silentList: {
         listType: "none"
@@ -258,7 +258,7 @@ class JobsList extends  React.Component {
     }
 
     render(){
-        const columns = makeJobsListColumns(this.filterUpdated, this.openLog, this.state.showRelativeTimes, this.openItemRequested);
+        const columns = makeJobsListColumns(this.filterUpdated, this.openLog, this.openItemRequested, this.state.showRelativeTimes);
 
         return <AdminContainer {...this.props}>
             <Snackbar open={this.state.showingAlert} onClose={this.closeAlert} autoHideDuration={8000}>
