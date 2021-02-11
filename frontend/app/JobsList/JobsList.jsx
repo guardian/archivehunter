@@ -53,6 +53,8 @@ class JobsList extends  React.Component {
         this.handleModalClose = this.handleModalClose.bind(this);
         this.refreshData = this.refreshData.bind(this);
         this.closeAlert = this.closeAlert.bind(this);
+        this.openItemRequested = this.openItemRequested.bind(this);
+        this.openLog = this.openLog.bind(this);
     }
 
     /**
@@ -247,8 +249,16 @@ class JobsList extends  React.Component {
         this.setState({showingAlert: false});
     }
 
+    openItemRequested(itemId) {
+        this.props.location.history.push(`/browse?open=${itemId}`)
+    }
+
+    openLog() {
+        this.setState({showingLog: true});
+    }
+
     render(){
-        const columns = makeJobsListColumns(this.filterUpdated, this.openLog, this.state.showRelativeTimes);
+        const columns = makeJobsListColumns(this.filterUpdated, this.openLog, this.state.showRelativeTimes, this.openItemRequested);
 
         return <AdminContainer {...this.props}>
             <Snackbar open={this.state.showingAlert} onClose={this.closeAlert} autoHideDuration={8000}>

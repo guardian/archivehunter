@@ -74,7 +74,7 @@ function makeJobsListColumns(filterUpdated: (fieldName:string, values:string, ty
             width: 150,
             renderCell: (params)=>{
                 const maybeJobType = params.getValue("jobType");
-                return <ResubmitComponent jobId={params.value} visible={maybeJobType}/>
+                return <ResubmitComponent jobId={params.value as string} visible={maybeJobType!=undefined}/>
             }
         },
         {
@@ -90,7 +90,6 @@ function makeJobsListColumns(filterUpdated: (fieldName:string, values:string, ty
                                       values={params.value}
                                       type="minus"
                                       onActivate={params.value ? filterUpdated("sourceId", params.value as string,"remove") : null}/>
-                        {/*<Link to={"/browse?open="+params.value}>View</Link>*/}
                         <Tooltip title="View source file in Browse">
                             <IconButton onClick={()=>openItem(params.value as string)}>
                                 <Launch/>
