@@ -1,13 +1,12 @@
 import React from 'react';
 import {render} from 'react-dom';
-import {BrowserRouter, Link, Route, Switch} from 'react-router-dom';
+import {BrowserRouter, Link, Redirect, Route, Switch} from 'react-router-dom';
 import Raven from 'raven-js';
 import axios from 'axios';
 
 import ScanTargetEdit from './ScanTargets/ScanTargetEdit.jsx';
 import ScanTargetsList from './ScanTargets/ScanTargetsList';
 import NotFoundComponent from './NotFoundComponent.jsx';
-import FrontPage from './FrontPage';
 import TopMenu from './TopMenu';
 import AdminFront from './admin/AdminFront';
 import AboutComponent from './admin/About';
@@ -120,7 +119,7 @@ class App extends React.Component<any, AppContainerState> {
                 <Route path="/lightbox" exact={true} component={NewLightbox}/>
                 <Route path="/browse" exact={true} component={NewBrowseComponent}/>
                 <Route path="/search" exact={true} component={NewBasicSearch}/>
-                <Route path="/" exact={true} component={FrontPage}/>
+                <Route path="/" exact={true} render={()=><Redirect to="/search"/>}/>
                 <Route default component={NotFoundComponent}/>
             </Switch>
         </ThemeProvider>
