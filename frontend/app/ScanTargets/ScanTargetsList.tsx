@@ -88,7 +88,12 @@ const ScanTargetsList:React.FC<RouteComponentProps> = (props) => {
                 </Grid>
             </Grid>
             <Paper elevation={3} className={classes.tableContainer}>
-                <DataGrid columns={scanTargetColumns} rows={scanTargets} pageSize={5}/>
+                <DataGrid columns={scanTargetColumns}
+                          rows={scanTargets}
+                          pageSize={20}
+                          pagination
+                          rowsPerPageOptions={[5,10,20,50]}
+                />
             </Paper>
         </AdminContainer>
         </>

@@ -17,39 +17,11 @@ interface NewTreeViewProps {
 const useStyles = makeStyles({
     root: {
         width: "100%"
+    },
+    scrollable: {
+        overflowY: "auto"
     }
 });
-
-// const findParentPath = (forPath:string, loadedPaths:PathEntry[]) => {
-//     const pathParts = forPath
-//         .split("/")
-//         .filter(part=>part.length>0);
-//
-//     console.log("pathParts are ", pathParts);
-//
-//     /**
-//      * recursively traverses the tree looking for the right name at each place
-//      * @param pathSegment
-//      * @param within
-//      * @param remainingSegments
-//      */
-//     const recursiveFind:(pathSegment:string,within:PathEntry[],remainingSegments:string[])=>PathEntry|undefined = (pathSegment, within, remainingSegments) => {
-//         const matches = within.filter(entry=>entry.name==pathSegment);
-//         if(matches.length>0) {
-//             if(remainingSegments.length>0) {
-//                 return recursiveFind(remainingSegments[0], matches[0].children, remainingSegments.slice(1))
-//             } else {
-//                 //we are done
-//                 return matches[0];
-//             }
-//         } else {
-//             console.error("No match found for ", pathSegment, " within ", within);
-//             return undefined;
-//         }
-//     }
-//
-//     return recursiveFind(pathParts[0], loadedPaths, pathParts.slice(1))
-// }
 
 interface TreeLeafProps {
     path:PathEntry;
@@ -171,7 +143,7 @@ const NewTreeView:React.FC<NewTreeViewProps> = (props) => {
                 }
             </Select>
         </Grid>
-        <Grid item>
+        <Grid item className={classes.scrollable}>
             <TreeView className={classes.root}
                       defaultCollapseIcon={<ChevronRight/>}
                       defaultExpandIcon={<ExpandMore/>}
