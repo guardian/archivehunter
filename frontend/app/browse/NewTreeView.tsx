@@ -143,7 +143,7 @@ const NewTreeView:React.FC<NewTreeViewProps> = (props) => {
                 }
             </Select>
         </Grid>
-        <Grid item className={classes.scrollable}>
+        <Grid item>
             <TreeView className={classes.root}
                       defaultCollapseIcon={<ChevronRight/>}
                       defaultExpandIcon={<ExpandMore/>}

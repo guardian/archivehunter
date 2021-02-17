@@ -28,7 +28,8 @@ const useStyles = makeStyles({
         gridRowEnd: "bottom",
         borderRight: "1px solid white",
         padding: "1em",
-        overflow: "hidden"
+        overflowX: "hidden",
+        overflowY: "auto",
     },
     sortOrderSelector: {
         gridColumnStart: 4,
