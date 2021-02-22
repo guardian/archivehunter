@@ -8,7 +8,7 @@ enablePlugins(RiffRaffArtifact, DockerPlugin, SystemdPlugin)
 scalaVersion := "2.12.13"
 
 val akkaVersion = "2.5.18"
-val akkaClusterVersion = "0.20.0"
+val akkaClusterVersion = "1.0.9"
 val elastic4sVersion = "6.0.4"
 val awsSdkVersion = "1.11.959"
 val jacksonVersion = "2.9.10"
@@ -34,6 +34,7 @@ lazy val commonSettings = Seq(
     "com.gu" %% "scanamo-alpakka" % "1.0.0-M8",
     "com.fasterxml.jackson.dataformat" % "jackson-dataformat-yaml" % jacksonVersion,
     "com.fasterxml.jackson.core" % "jackson-databind" % jacksonCoreVersion,
+    "com.google.guava" % "guava" % "30.0-jre",
       specs2 % Test)
 )
 
@@ -42,7 +43,7 @@ lazy val `archivehunter` = (project in file("."))
   .dependsOn(common)
   .settings(commonSettings,
     libraryDependencies ++= Seq(
-      "com.typesafe.play" %% "play-guice" % "2.6.15",
+      "com.typesafe.play" %% "play-guice" % "2.6.25",
       "org.scala-lang.modules" %% "scala-java8-compat" % "0.8.0",
       "com.dripower" %% "play-circe" % "2610.0",
       "com.sksamuel.elastic4s" %% "elastic4s-http" % elastic4sVersion,
@@ -52,8 +53,6 @@ lazy val `archivehunter` = (project in file("."))
       "com.typesafe.akka" %% "akka-cluster-tools" % akkaVersion,
       "com.lightbend.akka.management" %% "akka-management-cluster-http" % akkaClusterVersion,
       "com.lightbend.akka.management" %% "akka-management-cluster-bootstrap" % akkaClusterVersion,
-      "com.lightbend.akka.discovery" %% "akka-discovery-config" % akkaClusterVersion,
-      "com.lightbend.akka.discovery" %% "akka-discovery-dns" % akkaClusterVersion,
       "com.lightbend.akka.discovery" %% "akka-discovery-kubernetes-api" % akkaClusterVersion,
       "com.lightbend.akka.discovery" %% "akka-discovery-aws-api" % akkaClusterVersion,
       "com.typesafe.akka" %% "akka-cluster" % akkaVersion,
@@ -161,7 +160,7 @@ lazy val autoDowningLambda = (project in file("lambda/autodowning")).settings(co
       "com.amazonaws" % "aws-lambda-java-core" % "1.0.0",
       "org.scala-lang.modules" %% "scala-java8-compat" % "0.8.0",
       "ch.qos.logback"          %  "logback-classic" % "1.2.3",
-      "com.fasterxml.jackson.module" %% "jackson-module-scala" % jacksonVersion,
+      "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.10.5",
       specs2 % Test
     ),
     assemblyJarName in assembly := "autoDowningLambda.jar",
