@@ -5,13 +5,19 @@ import com.typesafe.sbt.packager.docker._
 
 enablePlugins(RiffRaffArtifact, DockerPlugin, SystemdPlugin)
 
+scalaVersion := "2.12.13"
+
+val akkaVersion = "2.5.18"
+val akkaClusterVersion = "0.20.0"
 val elastic4sVersion = "6.0.4"
-val awsSdkVersion = "1.11.346"
+val awsSdkVersion = "1.11.959"
+val jacksonVersion = "2.9.10"
+val jacksonCoreVersion = "2.9.10.8"
 
 lazy val commonSettings = Seq(
   version := "1.0",
   scalaVersion := "2.12.2",
-  libraryDependencies ++= Seq("org.apache.logging.log4j" % "log4j-core" % "2.8.2",
+  libraryDependencies ++= Seq("org.apache.logging.log4j" % "log4j-core" % "2.13.2",
     "org.apache.logging.log4j" % "log4j-api" % "2.8.2",
     "org.scala-lang.modules" %% "scala-java8-compat" % "0.8.0",
     "com.amazonaws" % "aws-java-sdk-s3" % awsSdkVersion,
@@ -26,15 +32,10 @@ lazy val commonSettings = Seq(
     "com.lightbend.akka" %% "akka-stream-alpakka-dynamodb" % "0.20",
     "com.lightbend.akka" %% "akka-stream-alpakka-s3" % "0.20",
     "com.gu" %% "scanamo-alpakka" % "1.0.0-M8",
-    "com.fasterxml.jackson.dataformat" % "jackson-dataformat-yaml" % "2.9.7",
-    "com.fasterxml.jackson.core" % "jackson-databind" % "2.9.7",
+    "com.fasterxml.jackson.dataformat" % "jackson-dataformat-yaml" % jacksonVersion,
+    "com.fasterxml.jackson.core" % "jackson-databind" % jacksonCoreVersion,
       specs2 % Test)
 )
-
-scalaVersion := "2.12.13"
-
-val akkaVersion = "2.5.18"
-val akkaClusterVersion = "0.20.0"
 
 lazy val `archivehunter` = (project in file("."))
   .enablePlugins(PlayScala)
@@ -63,11 +64,10 @@ lazy val `archivehunter` = (project in file("."))
       "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
       "com.typesafe.akka" %% "akka-persistence" % akkaVersion,
       "com.typesafe.akka" %% "akka-cluster-sharding" % akkaVersion,
-      "com.gu" % "kinesis-logback-appender" % "1.4.4",
+      "com.gu" % "kinesis-logback-appender" % "2.0.1",
+      "com.fasterxml.jackson.dataformat" % "jackson-dataformat-cbor" % "2.11.4",  //fix vulnerable dependency for kinesis-logback-appender
       "org.apache.logging.log4j" % "log4j-api" % "2.8.2",
-      // Only if you are using Akka Testkit
       "com.typesafe.akka" %% "akka-testkit" % akkaVersion,
-      "com.gu" %% "pan-domain-auth-play_2-6" % "0.7.1",
       "com.gu" %% "panda-hmac-play_2-6" % "1.3.1",
       "io.sentry" % "sentry-logback" % "1.7.2",
         jdbc, ehcache, ws)
@@ -135,18 +135,6 @@ lazy val proxyStatsGathering = (project in file("ProxyStatsGathering"))
       "com.amazonaws" % "aws-lambda-java-log4j2" % "1.0.0",
       "com.sandinh" %% "akka-guice" % "3.2.0"
     ),
-//    assemblyJarName in assembly := "proxyStatsGathering.jar",
-//    assemblyMergeStrategy in assembly := {
-//      case PathList("javax", "servlet", xs @ _*)         => MergeStrategy.first
-//      case PathList(ps @ _*) if ps.last endsWith ".html" => MergeStrategy.first
-//      case "application.conf" => MergeStrategy.concat
-//      //META-INF/org/apache/logging/log4j/core/config/plugins/Log4j2Plugins.dat
-//      case PathList("META-INF","org","apache","logging","log4j","core","config","plugins","Log4j2Plugins.dat") => MergeStrategy.last
-//      case meta(_)=>MergeStrategy.discard
-//      case x=>
-//        val oldStrategy = (assemblyMergeStrategy in assembly).value
-//        oldStrategy(x)
-//    }
     version := sys.props.getOrElse("build.number","DEV"),
     dockerUsername  := sys.props.get("docker.username"),
     dockerRepository := Some("andyg42"),
@@ -173,20 +161,10 @@ lazy val autoDowningLambda = (project in file("lambda/autodowning")).settings(co
       "com.amazonaws" % "aws-lambda-java-core" % "1.0.0",
       "org.scala-lang.modules" %% "scala-java8-compat" % "0.8.0",
       "ch.qos.logback"          %  "logback-classic" % "1.2.3",
-      "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.9.7",
+      "com.fasterxml.jackson.module" %% "jackson-module-scala" % jacksonVersion,
       specs2 % Test
     ),
     assemblyJarName in assembly := "autoDowningLambda.jar",
-//    assemblyMergeStrategy in assembly := {x=>
-//        if(x.contains("io.netty.versions.properties")){ //no idea why this is not working in pattern matching
-//          MergeStrategy.first
-//        } else if(x=="META-INF/org/apache/logging/log4j/core/config/plugins/Log4j2Plugins.dat"){
-//          MergeStrategy.first
-//        } else {
-//          val oldStrategy = (assemblyMergeStrategy in assembly).value
-//          oldStrategy(x)
-//        }
-//    }
   )
 
 val jsTargetDir = "target/riffraff/packages"
@@ -198,11 +176,7 @@ riffRaffArtifactResources := Seq(
   (packageBin in Debian in archivehunter).value -> s"archivehunter-webapp/${(name in archivehunter).value}.deb",
   (assembly in Universal in inputLambda).value -> s"archivehunter-input-lambda/${(assembly in Universal in inputLambda).value.getName}",
   (assembly in Universal in autoDowningLambda).value -> s"archivehunter-autodowning-lambda/${(assembly in Universal in autoDowningLambda).value.getName}",
-//  (packageBin in Universal in expirer).value -> s"${(name in expirer).value}/${(packageBin in Universal in expirer).value.getName}",
-//  (packageBin in Universal in scheduler).value -> s"${(name in scheduler).value}/${(packageBin in Universal in scheduler).value.getName}",
-//  (baseDirectory in Global in app).value / s"$plutoMessageIngestion/$jsTargetDir/$plutoMessageIngestion/$plutoMessageIngestion.zip" -> s"$plutoMessageIngestion/$plutoMessageIngestion.zip",
   (baseDirectory in Global in archivehunter).value / "riff-raff.yaml" -> "riff-raff.yaml",
-//  (resourceManaged in Compile in uploader).value / "media-atom-pipeline.yaml" -> "media-atom-pipeline-cloudformation/media-atom-pipeline.yaml"
 )
 
 
