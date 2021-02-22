@@ -1,9 +1,41 @@
 import React from 'react';
 import PropTypes from 'prop-types';
+import {createStyles, Typography, withStyles} from "@material-ui/core";
+
+const styles = (theme)=>createStyles({
+    errorText: {
+        color: theme.palette.error.dark
+    }
+});
+
+
+/**
+ * return a string containing text that describes the given axios error.
+ * @param error
+ * @param brief
+ * @returns {string}
+ */
+function formatError(error, brief) {
+    if (error.response) {
+        // The request was made and the server responded with a status code
+        // that falls out of the range of 2xx
+        return `Server error ${error.response.status}: ` + ErrorViewComponent.bestErrorString(error.response.data, brief);
+    } else if (error.request) {
+        // The request was made but no response was received
+        // `error.request` is an instance of XMLHttpRequest in the browser and an instance of
+        // http.ClientRequest in node.js
+        console.error("Failed request: ", error.request);
+        return brief ? "No response" : "No response from server. See console log for more details."
+    } else {
+        // Something happened in setting up the request that triggered an Error
+        console.error('Axios error setting up request: ', error.message);
+        return brief ? "Couldn't send" : "Unable to set up request. See console log for more details."
+    }
+}
 
 class ErrorViewComponent extends React.Component {
     static propTypes = {
-        error: PropTypes.object.isRequired,
+        error: PropTypes.object,
         brief: PropTypes.bool
     };
 
@@ -30,8 +62,8 @@ class ErrorViewComponent extends React.Component {
         </ul>
     }
 
-    bestErrorString(errorObj){
-        if(this.props.brief) return "See console";
+    static bestErrorString(errorObj, brief){
+        if(brief) return "See console";
         if(errorObj.hasOwnProperty("detail")) return JSON.stringify(errorObj.detail);
         return errorObj.toString();
     }
@@ -41,23 +73,13 @@ class ErrorViewComponent extends React.Component {
             return <p className="error-text"/>
         }
 
-        if (this.props.error.response) {
-            // The request was made and the server responded with a status code
-            // that falls out of the range of 2xx
-            return <p className="error-text">Server error {this.props.error.response.status}: {this.bestErrorString(this.props.error.response.data)}</p>
-        } else if (this.props.error.request) {
-            // The request was made but no response was received
-            // `error.request` is an instance of XMLHttpRequest in the browser and an instance of
-            // http.ClientRequest in node.js
-            console.error("Failed request: ", this.props.error.request);
-            return <p className="error-text">{this.props.brief ? "No response" : "No response from server. See console log for more details."}</p>
-        } else {
-            // Something happened in setting up the request that triggered an Error
-            console.error('Axios error setting up request: ', this.props.error.message);
-            return <p className="error-text">{this.props.brief ? "Couldn't send" : "Unable to set up request. See console log for more details."}</p>
-        }
-
+        return <Typography className={this.props.classes.errorText}>
+            {
+                formatError(this.props.error, this.props.brief)
+            }
+        </Typography>
     }
 }
 
-export default ErrorViewComponent;
+export {formatError};
+export default withStyles(styles)(ErrorViewComponent);

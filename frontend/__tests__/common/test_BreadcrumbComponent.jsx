@@ -1,12 +1,14 @@
 import React from 'react';
 import {shallow,mount} from 'enzyme';
-import BreadcrumbComponent from '../../app/common/BreadcrumbComponent.jsx';
+import BreadcrumbComponent from '../../app/common/BreadcrumbComponent';
 import {BrowserRouter} from 'react-router-dom';
 
 describe("BreadcrumbComponent", ()=> {
     it("should render a path to a set of clickable breadcrumbs", ()=>{
         const rendered = mount(<BrowserRouter root="/"><BreadcrumbComponent path="/path/to/some/page"/></BrowserRouter>);
-        const bc = rendered.find("span.breadcrumb");
+        console.log(rendered.html());
+
+        const bc = rendered.find("span");
         expect(bc.find("Link").at(0).props().to).toEqual("/path");
         expect(bc.find("Link").at(0).text()).toEqual("path");
         expect(bc.find("Link").at(1).props().to).toEqual("/path/to");

@@ -1,6 +1,6 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import TimestampFormatter from "../common/TimestampFormatter.jsx";
+import TimestampFormatter from "../common/TimestampFormatter";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 
 class TranscoderCheckComponent extends React.Component {

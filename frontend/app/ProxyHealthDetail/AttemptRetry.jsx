@@ -1,9 +1,7 @@
 import React from 'react';
 import axios from 'axios';
 import PropTypes from 'prop-types';
-import ErrorViewComponent from '../common/ErrorViewComponent.jsx';
 import LoadingThrobber from '../common/LoadingThrobber.jsx';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import ThreeWayIcon from "./ThreeWayIcon.jsx";
 
 class AttemptRetry extends React.Component {

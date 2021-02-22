@@ -2,16 +2,42 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import axios from 'axios';
 import EntryThumbnail from './EntryThumbnail.jsx';
-import ErrorViewComponent from '../common/ErrorViewComponent.jsx';
-import ReactTooltip from 'react-tooltip';
-import EntryPreviewSwitcher from './EntryPreviewSwitcher.jsx';
+import EntryPreviewSwitcher from './EntryPreviewSwitcher';
+import {Button, CircularProgress, createStyles, Tooltip, Typography, withStyles} from "@material-ui/core";
+import {baseStyles} from "../BaseStyles";
+import clsx from "clsx";
+
+const styles = (theme) => Object.assign(createStyles({
+    videoPreview: {
+        width: "95%",
+        marginLeft: "1em",
+        marginRight: "1em"
+    },
+    thumbnailPreview: {
+        width: "95%",
+        marginLeft: "auto",
+        marginRight: "auto",
+        display: "block"
+    },
+    partialDivider: {
+        width: "70%",
+    },
+    errorText: {
+        color: theme.palette.error.dark,
+        fontWeight: "bold"
+    },
+    processingText: {
+        color: theme.palette.success,
+        fontStyle: "italic"
+    }
+}), baseStyles);
 
 class EntryPreview extends React.Component {
     static propTypes = {
         entryId: PropTypes.string.isRequired,
-        mimeType: PropTypes.string.isRequired,
+        mimeType: PropTypes.object.isRequired,  //MimeType record
         fileExtension: PropTypes.string.isRequired,
-        autoPlay: PropTypes.boolean,
+        autoPlay: PropTypes.bool,
         hasProxy: PropTypes.bool.isRequired,
         triggeredProxyGeneration: PropTypes.func
     };
@@ -66,7 +92,7 @@ class EntryPreview extends React.Component {
         );
     }
 
-    componentWillMount(){
+    componentDidMount(){
         this.updateData();
     }
 
@@ -88,17 +114,21 @@ class EntryPreview extends React.Component {
 
     controlBody(){
         if(this.state.loading){
-            return <img style={{marginLeft:"auto",marginRight:"auto",width:"200px",display:"block"}} src="/assets/images/Spinner-1s-200px.gif"/>;
+            return <CircularProgress/>;
         }
 
         if(!this.state.previewData){
-            return <div>
-                <EntryThumbnail mimeType={this.props.mimeType} fileExtension={this.props.fileExtension} entryId={this.props.entryId}/>
+            return <div className={this.props.classes.centered}>
+                <Tooltip title={this.state.didLoad ? `There is no ${this.state.selectedType} proxy available for this item.` : ""}>
+                    <EntryThumbnail mimeType={this.props.mimeType} fileExtension={this.props.fileExtension} entryId={this.props.entryId}/>
+                </Tooltip>
                 {
-                    this.state.didLoad ? <p className="centered">There is no {this.state.selectedType} proxy available for this item.</p> : ""
-                }
-                {
-                    this.state.didLoad ? <p className="centered"><a onClick={this.initiateCreateProxy} href="#">Try to create</a> one now?</p> : ""
+                    this.state.didLoad ? <Button className={this.props.classes.centered}
+                                                 style={{marginTop: "0.4em"}}
+                                                 variant="outlined"
+                                                 onClick={this.initiateCreateProxy}>
+                        Create {this.state.selectedType}
+                    </Button> : null
                 }
             </div>;
         }
@@ -107,13 +137,13 @@ class EntryPreview extends React.Component {
 
         switch(mimeTypeMajor){
             case "video":
-                return <video className="video-preview" src={this.state.previewData.uri} controls={true} autoPlay={this.props.autoPlay}/>;
+                return <video className={this.props.classes.videoPreview} src={this.state.previewData.uri} controls={true} autoPlay={this.props.autoPlay}/>;
             case "audio":
                 return <audio src={this.state.previewData.uri} controls={true} autoPlay={this.props.autoPlay}/>;
             case "image":
-                return <img src={this.state.previewData.uri} className="thumbnail-preview"/>;
+                return <img src={this.state.previewData.uri} alt="Thumbnail" className={this.props.classes.thumbnailPreview}/>;
             default:
-                return <span className="error-text">Unrecognised MIME type: {this.state.previewData.mimeType}</span>
+                return <span className={this.props.classes.errorText}>Unrecognised MIME type: {this.state.previewData.mimeType}</span>
         }
     }
 
@@ -123,18 +153,18 @@ class EntryPreview extends React.Component {
     }
 
     render(){
-        //if(this.state.lastError) return <ErrorViewComponent error={this.state.lastError}/>;
         const tooltip = this.state.previewData ? "" : "No preview available";
 
-        return <span data-tip={tooltip}>
-            {this.controlBody()}
-            <ReactTooltip/>
-            <hr className="partial-divider"/>
-            <EntryPreviewSwitcher availableTypes={this.state.proxyTypes} typeSelected={this.switcherChanged}/>
-            {this.state.processMessage ? <p className="information">{this.state.processMessage}</p> : ""}
-            <hr className="partial-divider"/>
-        </span>
+        return <Tooltip title={tooltip}>
+            <>
+                {this.controlBody()}
+                <hr className={this.props.classes.partialDivider}/>
+                <EntryPreviewSwitcher availableTypes={this.state.proxyTypes} typeSelected={this.switcherChanged}/>
+                {this.state.processMessage ? <Typography className={clsx(this.props.classes.processingText, this.props.classes.centered)}>{this.state.processMessage}</Typography> : ""}
+                <hr className={this.props.classes.partialDivider}/>
+            </>
+        </Tooltip>
     }
 }
 
-export default EntryPreview;
+export default withStyles(styles)(EntryPreview);

@@ -31,6 +31,17 @@ class EntryJobs extends React.Component {
        this.autoRefresh = this.autoRefresh.bind(this);
     }
 
+    static getDerivedStateFromError(err) {
+        console.error(err);
+        return {
+            loading: false,
+            lastError: err.toString(),
+            jobsList: [],
+            expanded: false,
+            refreshTimer: null
+        }
+    }
+
     loadData(){
         this.setState({loading: true, lastError: null}, ()=>axios.get("/api/job/forFile/" + this.props.entryId).then(response=>{
             this.setState({loading: false, lastError: null, jobsList: response.data.entries})
@@ -76,7 +87,7 @@ class EntryJobs extends React.Component {
     }
 
     renderJobsList(){
-        return this.state.jobsList.length===0 && !this.state.loading ? <p className="informative">No jobs</p> : <ul className="job-list">
+        return this.state.jobsList && this.state.jobsList.length===0 && !this.state.loading ? <p className="informative">No jobs</p> : <ul className="job-list">
             {
                 this.state.jobsList.map(entry => <li className="job-list-entry">
                     <Link to={"/admin/jobs/" + entry.jobId}>

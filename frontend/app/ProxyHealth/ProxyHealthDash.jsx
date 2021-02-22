@@ -2,7 +2,26 @@ import React from 'react';
 import axios from 'axios';
 import {HorizontalBar} from 'react-chartjs-2';
 import ErrorViewComponent from '../common/ErrorViewComponent.jsx';
-import BreadcrumbComponent from "../common/BreadcrumbComponent.jsx";
+import AdminContainer from "../admin/AdminContainer";
+import {Snackbar, createStyles, withStyles} from "@material-ui/core";
+import MuiAlert from "@material-ui/lab/Alert";
+
+const styles = createStyles({
+    chartContainerWide: {
+        float: "left",
+        width: "50vw",
+        position: "relative",
+        overflow: "hidden"
+    },
+    chartContainer: {
+        float: "left",
+        width: "31vw",
+        position: "relative"
+    },
+    listControlLabel: {
+        marginBottom: 0
+    }
+});
 
 class ProxyHealthDash extends React.Component
 {
@@ -24,8 +43,11 @@ class ProxyHealthDash extends React.Component
             loading: false,
             proxyBreakdownData: {},
             typeBreakdownData: {},
-            lastError: null
+            lastError: null,
+            showingAlert: false
         }
+
+        this.closeAlert = this.closeAlert.bind(this);
     }
 
     embellish(data){
@@ -34,30 +56,43 @@ class ProxyHealthDash extends React.Component
         })
     }
 
-    componentWillMount(){
-        this.setState({loading: true}, ()=>axios.get("/api/search/proxyStats").then(response=>{
-            const proxyBreakdownData = response.data.entries.filter(entry=>entry.name==="hasProxy");
-            const typeBreakdownData = response.data.entries.filter(entry=>entry.name==="mediaType");
+    componentDidMount(){
+        this.setState({loading: true}, ()=>axios.get("/api/search/proxyStats")
+            .then(response=>{
+                const proxyBreakdownData = response.data.entries.filter(entry=>entry.name==="hasProxy");
+                const typeBreakdownData = response.data.entries.filter(entry=>entry.name==="mediaType");
 
-            this.setState({
-                loading: false,
-                proxyBreakdownData: proxyBreakdownData.length>0 ? this.embellish(proxyBreakdownData[0]) : {},
-                typeBreakdownData: typeBreakdownData.length>0 ? this.embellish(typeBreakdownData[0]) : {}
-             });
-            console.log(ProxyHealthDash.colourValues);
+                this.setState({
+                    loading: false,
+                    proxyBreakdownData: proxyBreakdownData.length>0 ? this.embellish(proxyBreakdownData[0]) : {},
+                    typeBreakdownData: typeBreakdownData.length>0 ? this.embellish(typeBreakdownData[0]) : {}
+                 });
+                console.log(ProxyHealthDash.colourValues);
 
-            console.log(proxyBreakdownData.length>0 ? this.embellish(proxyBreakdownData[0]) : {});
-        }))
+                console.log(proxyBreakdownData.length>0 ? this.embellish(proxyBreakdownData[0]) : {});
+            })
+            .catch(err=>{
+                console.error("could not load stats data: ", err);
+                this.setState({
+                    loading: false,
+                    lastError: err,
+                    showingAlert: true
+                });
+            })
+        )
     }
+
+    closeAlert() {
+        this.setState({showingAlert: false});
+    }
+
     render(){
-        return <div>
-            <BreadcrumbComponent path={this.props.location.pathname}/>
+        return <AdminContainer {...this.props}>
+            <Snackbar autoHideDuration={8000} onClose={this.closeAlert} open={this.state.showingAlert}>
+                <MuiAlert severity="error" onClose={this.closeAlert}>{ErrorViewComponent.formatError(this.state.lastError)}</MuiAlert>
+            </Snackbar>
 
-            <div className="chart-error-container">
-                <ErrorViewComponent error={this.state.lastError}/>
-            </div>
-
-            <div className="chart-container-wide">
+            <div className={this.props.classes.chartContainerWide}>
                 <HorizontalBar
                     data={this.state.proxyBreakdownData}
                     height={400}
@@ -96,7 +131,7 @@ class ProxyHealthDash extends React.Component
                     }}
                 />
             </div>
-            <div className="chart-container">
+            <div className={this.props.classes.chartContainer}>
                 <HorizontalBar
                     data={this.state.typeBreakdownData}
                     height={400}
@@ -135,8 +170,8 @@ class ProxyHealthDash extends React.Component
                     }}
                 />
             </div>
-        </div>
+        </AdminContainer>
     }
 }
 
-export default ProxyHealthDash;
+export default withStyles(styles)(ProxyHealthDash);

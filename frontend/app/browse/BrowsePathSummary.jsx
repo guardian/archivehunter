@@ -1,13 +1,33 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import axios from 'axios';
-import ErrorViewComponent from '../common/ErrorViewComponent.jsx';
 import BytesFormatter from "../common/BytesFormatter.jsx";
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import ReactRadioButtonGroup from 'react-radio-button-group';
-import RefreshButton from "../common/RefreshButton.jsx";
-import Expander from "../common/Expander.jsx";
+import RefreshButton from "../common/RefreshButton";
 import BulkLightboxAdd from "./BulkLightboxAdd.jsx";
+import {CircularProgress, createStyles, Grid, IconButton, Tooltip, Typography, withStyles} from "@material-ui/core";
+import {baseStyles} from "../BaseStyles";
+import {FolderRounded, HomeOutlined, HomeRounded, Storage, WarningRounded} from "@material-ui/icons";
+import {formatError} from "../common/ErrorViewComponent";
+import PathDisplayComponent from "./PathDisplayComponent";
+import clsx from "clsx";
+
+const styles=(theme)=>Object.assign(createStyles({
+    summaryIcon: {
+        marginRight: "0.1em",
+        verticalAlign: "bottom"
+    },
+    collectionNameText: {
+        fontWeight: "bold"
+    },
+    summaryBoxElement: {
+        marginTop: "auto",
+        marginBottom: "auto",
+        marginLeft: "1em"
+    },
+    warningIcon: {
+        color: theme.palette.warning.dark
+    }
+}), baseStyles);
 
 /**
  * this component is the "top banner" for the Browse view, showing the collection, path within collection, filters etc.
@@ -16,15 +36,14 @@ class BrowsePathSummary extends React.Component {
     static propTypes = {
         collectionName: PropTypes.string.isRequired,
         path: PropTypes.string,
-        onSortChanged: PropTypes.func.isRequired, //this is called when sort field or sort order is changed. First arg is new sort field, second is new sort order.
-        sortField: PropTypes.string.isRequired,
-        sortOrder: PropTypes.string.isRequired,
+        searchDoc: PropTypes.object.isRequired,
         parentIsLoading: PropTypes.bool.isRequired,
         refreshCb: PropTypes.func.isRequired,
         goToRootCb: PropTypes.func.isRequired,
         showDotFiles: PropTypes.bool.isRequired,
         showDotFilesUpdated:PropTypes.func.isRequired,
-        queryString: PropTypes.string
+        queryString: PropTypes.string,
+        onError: PropTypes.func
     };
 
     constructor(props){
@@ -33,7 +52,8 @@ class BrowsePathSummary extends React.Component {
         this.state = {
             loading: false,
             hasLoaded: false,
-            lastError: null,
+            advancedExpanded: false,
+
             //see PathInfoResponse.scala
             totalHits: -1,
             totalSize: -1,
@@ -41,21 +61,8 @@ class BrowsePathSummary extends React.Component {
             proxiedCounts: {},
             typesCount: {}
         };
-        this.sortOrderChanged = this.sortOrderChanged.bind(this);
-        this.sortFieldChanged = this.sortFieldChanged.bind(this);
+
         this.toggleAdvancedExpanded = this.toggleAdvancedExpanded.bind(this);
-    }
-
-    makeSearchJson(){
-        const pathToSearch = this.props.path ?
-            this.props.path.endsWith("/") ? this.props.path.slice(0, this.props.path.length - 1) : this.props.path : null;
-
-        return JSON.stringify({
-            hideDotFiles: ! this.props.showDotFiles,
-            q: this.props.queryString,
-            collection: this.props.collectionName,
-            path: pathToSearch
-        })
     }
 
     refreshData(){
@@ -67,8 +74,8 @@ class BrowsePathSummary extends React.Component {
         const urlsuffix = pathToSearch ? "?prefix=" + encodeURIComponent(pathToSearch) : "";
         const url = "/api/browse/" + this.props.collectionName + "/summary" + urlsuffix;
 
-        this.setState({loading:true, hasLoaded: false, lastError: null},
-            ()=>axios.put(url, this.makeSearchJson(), {headers: {"Content-Type": "application/json"}}).then(response=>{
+        this.setState({loading:true, hasLoaded: false},
+            ()=>axios.put(url, this.props.searchDoc, {headers: {"Content-Type": "application/json"}}).then(response=>{
                 this.setState({
                     loading:false, hasLoaded:true, lastError:null,
                     totalHits: response.data.totalHits,
@@ -79,24 +86,17 @@ class BrowsePathSummary extends React.Component {
                 })
         }).catch(err=>{
             console.error("Could not refresh path summary data: ", err);
-            this.setState({loading: false, hasLoaded: false, lastError: err})
+            if(this.props.onError) this.props.onError(formatError(err, false));
+            this.setState({loading: false, hasLoaded: false})
         }))
     }
 
-    componentWillMount(){
+    componentDidMount(){
         this.refreshData();
     }
 
-    componentDidUpdate(oldProps,oldState){
+    componentDidUpdate(oldProps,oldState, snapshot){
         if(oldProps.collectionName!==this.props.collectionName || oldProps.path!==this.props.path) this.refreshData();
-    }
-
-    sortFieldChanged(evt) {
-        this.props.onSortChanged(evt.target.value, this.props.sortOrder);
-    }
-
-    sortOrderChanged(newValue) {
-        this.props.onSortChanged(this.props.sortField, newValue);
     }
 
     toggleAdvancedExpanded(value){
@@ -104,57 +104,69 @@ class BrowsePathSummary extends React.Component {
     }
 
     render(){
-        if(this.state.lastError) return <ErrorViewComponent error={this.state.lastError}/>;
-
         if(this.state.loading) return <div className="path-summary">
-            <img style={{marginLeft:"auto",marginRight:"auto",width:"200px",display:"block"}} src="/assets/images/Spinner-1s-200px.gif"/>Loading...
+            <CircularProgress style={{marginRight: "2em"}}/>
+            <Typography>Loading...</Typography>
         </div>;
 
         /*TODO: add in jschart and put a horizontal bar of the filetypes breakdown*/
         if(this.state.hasLoaded) return <div className="browse-path-summary">
-            <div style={{width: "80%", display: "inline-block"}}>
-                <p className="centered"><FontAwesomeIcon style={{marginRight: "0.5em"}} icon="hdd"/>{this.props.collectionName}</p>
-                <p className="centered" style={{marginTop: "0.1em"}}>
-                    <FontAwesomeIcon icon="home" className="button-icon" style={{display: this.props.path ? "inline":"none"}} onClick={this.props.goToRootCb}/>
-                    <FontAwesomeIcon icon="folder" style={{marginRight: "0.5em", display: this.props.path ? "inline":"none"}}/>
-                    {this.props.path ? this.props.path : ""}
-                    <BulkLightboxAdd path={this.props.path} hideDotFiles={! this.props.showDotFiles} collection={this.props.collectionName}/>
-                </p>
-            </div>
-            <div style={{width: "18%", display: "inline-block"}}>
-                <label htmlFor="sort-field-selector" style={{marginRight: "0.4em"}}>Sort by</label>
-                <select id="sort-field-selector" value={this.props.sortField} onChange={this.sortFieldChanged}>
-                    <option value="path">Filename</option>
-                    <option value="last_modified">Age</option>
-                    <option value="size">Size</option>
-                </select>
-                <ReactRadioButtonGroup name="sort-order-selector"
-                                       options={["Ascending","Descending"]}
-                                       value={this.props.sortOrder}
-                                       isStateful={false} onChange={this.sortOrderChanged}/>
-            </div>
-
-            <div>
-                <Expander expanded={this.state.advancedExpanded} onChange={this.toggleAdvancedExpanded}/><h4 style={{cursor:"pointer"}} onClick={()=>this.toggleAdvancedExpanded(!this.state.advancedExpanded)}>Advanced</h4>
-                <div style={{display: this.state.advancedExpanded ? "block" : "none", marginTop: "0.5em", marginLeft: "2em" }}>
-                    <input type="checkbox" value={this.props.showDotFiles} onChange={evt=>this.props.showDotFilesUpdated(evt.target.checked)}/>Show dot-files
-                </div>
-            </div>
-
-            <div>
-            <p><RefreshButton isRunning={this.props.parentIsLoading} clickedCb={this.props.refreshCb}/>Total of {this.state.totalHits} items occupying <BytesFormatter value={this.state.totalSize}/>
-            </p>
-            </div>
-
-            <p style={{display: this.state.deletedCounts.hasOwnProperty("1") ? "inherit" : "none"}}>
+            <Grid container direction="column" alignContent="center" justify="center">
+                <Grid item className={clsx(this.props.classes.summaryBoxElement,this.props.classes.centered)}>
+                    <Grid container direction="row"  justify="center" alignContent="space-around" alignItems="center">
+                        {this.props.path ?
+                            <Grid item>
+                                <IconButton onClick={this.props.goToRootCb}>
+                                    <HomeRounded/>
+                                </IconButton>
+                            </Grid> : null
+                        }
+                        <Grid item>
+                            <Typography className={this.props.classes.collectionNameText}>
+                                <Storage className={this.props.classes.summaryIcon}/>
+                                {this.props.collectionName}
+                            </Typography>
+                        </Grid>
+                    </Grid>
+                </Grid>
                 {
-                    this.state.deletedCounts.hasOwnProperty("1") ? this.state.deletedCounts["1"] : 0
-                } tracked items have been deleted
-            </p>
+                    this.props.path ? <Grid item className={this.props.classes.summaryBoxElement}>
+                        <PathDisplayComponent path={this.props.path}/>
+                    </Grid> : null
+                }
+
+
+            <Grid item>
+                <Grid container direction="row" spacing={1} alignItems="center" >
+                    <Grid item>
+                        <RefreshButton isRunning={this.props.parentIsLoading}
+                                       clickedCb={this.props.refreshCb}/>
+                    </Grid>
+                    <Grid item>
+                        <Typography>Total of {this.state.totalHits} items occupying <BytesFormatter value={this.state.totalSize}/></Typography>
+                    </Grid>
+                    { this.state.deletedCounts.hasOwnProperty("1")  ? <Grid item>
+                        <Tooltip title={`${this.state.deletedCounts["1"]} tracked items have been deleted`}>
+                            <WarningRounded className={this.props.classes.warningIcon}/>
+                        </Tooltip>
+                    </Grid> : null }
+
+                    <Grid item>
+                        <BulkLightboxAdd path={this.props.path}
+                                         hideDotFiles={! this.props.showDotFiles}
+                                         collection={this.props.collectionName}
+                                         searchDoc={this.props.searchDoc}
+                                         onError={this.props.onError}
+                        />
+                    </Grid>
+                </Grid>
+            </Grid>
+
+            </Grid>
         </div>;
 
         return <div><i>not loaded</i></div>
     }
 }
 
-export default BrowsePathSummary;
+export default withStyles(styles)(BrowsePathSummary);
