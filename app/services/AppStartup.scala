@@ -2,7 +2,7 @@ package services
 
 import akka.actor.{ActorRef, ActorSystem, PoisonPill, Props}
 import akka.cluster.singleton.{ClusterSingletonManager, ClusterSingletonManagerSettings, ClusterSingletonProxy, ClusterSingletonProxySettings}
-import akka.management.AkkaManagement
+import akka.management.scaladsl.AkkaManagement
 import akka.management.cluster.bootstrap.ClusterBootstrap
 import javax.inject.{Inject, Named}
 import play.api.inject.{ApplicationLifecycle, Injector}
