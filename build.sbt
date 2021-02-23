@@ -162,6 +162,12 @@ lazy val autoDowningLambda = (project in file("lambda/autodowning")).settings(co
       specs2 % Test
     ),
     assemblyJarName in assembly := "autoDowningLambda.jar",
+    assemblyMergeStrategy in assembly := {
+      case PathList(ps @ _*) if ps.last=="module-info.class" => MergeStrategy.discard
+      case x=>
+        val oldStrategy = (assemblyMergeStrategy in assembly).value
+        oldStrategy(x)
+    }
   )
 
 val jsTargetDir = "target/riffraff/packages"
