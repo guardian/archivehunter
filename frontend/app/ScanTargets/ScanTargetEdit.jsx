@@ -138,7 +138,7 @@ class ScanTargetEdit extends React.Component {
             ()=>axios.post("/api/scanTarget/" + encodeURIComponent(targetId) + "/" + "checkTranscoder")
             .then(result=>{
                 console.log("Config validation has been started with job ID " + result.data.entity);
-                this.setState({loading: false, lastError: null, currentActionCaption: null}, );
+                this.setState({loading: false}, );
             }).catch(err=>{
                 console.error(err);
                 this.setState({loading: false, lastError: err, lastErrorSeverity: "error", showingAlert: "true", currentActionCaption: null});
@@ -154,7 +154,7 @@ class ScanTargetEdit extends React.Component {
             }, ()=>axios.post("/api/scanTarget/" + encodeURIComponent(targetId) + "/" + "createPipelines?force=true")
             .then(result=>{
                 console.log("Transcode setup has been started with job ID " + result.data.entity);
-                this.setState({loading: false, lastError: null, currentActionCaption: null});
+                this.setState({loading: false});
             }).catch(err=>{
                 console.error(err);
                 this.setState({loading: false, lastError: err, currentActionCaption: null});
