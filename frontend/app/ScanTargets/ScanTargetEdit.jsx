@@ -5,7 +5,6 @@ import axios from 'axios';
 import {Redirect} from 'react-router-dom';
 import ErrorViewComponent from "../common/ErrorViewComponent.jsx";
 import RegionSelector from "../common/RegionSelector.jsx";
-import {FontAwesomeIcon} from "@fortawesome/react-fontawesome";
 import TranscoderCheckComponent from "./TranscoderCheckComponent.jsx";
 import JobEntry from "../common/JobEntry.jsx";
 import MuiAlert from '@material-ui/lab/Alert';
@@ -27,6 +26,7 @@ import clsx from "clsx";
 import {baseStyles} from "../BaseStyles";
 import ScanTargetActionsBox from "./ScanTargetActionsBox";
 import {Helmet} from "react-helmet";
+import {BugReport, Tune} from "@material-ui/icons";
 
 const styles = (theme) => Object.assign(createStyles({
     formContainer: {
@@ -85,6 +85,9 @@ class ScanTargetEdit extends React.Component {
 
         this.closeAlert = this.closeAlert.bind(this);
         this.updatePendingJobs = this.updatePendingJobs.bind(this);
+
+        this.triggerValidateConfig = this.triggerValidateConfig.bind(this);
+        this.triggerTranscodeSetup = this.triggerTranscodeSetup.bind(this);
     }
 
     loadData(idToLoad){
@@ -127,6 +130,35 @@ class ScanTargetEdit extends React.Component {
         } else {
 
         }
+    }
+
+    triggerValidateConfig(){
+        const targetId = this.state.idToLoad;
+        this.setState({loading: true,  showingAlert: true, lastErrorSeverity: "info", lastError: "Checking transcoder setup, refresh the page in a few seconds"},
+            ()=>axios.post("/api/scanTarget/" + encodeURIComponent(targetId) + "/" + "checkTranscoder")
+            .then(result=>{
+                console.log("Config validation has been started with job ID " + result.data.entity);
+                this.setState({loading: false, lastError: null, currentActionCaption: null}, );
+            }).catch(err=>{
+                console.error(err);
+                this.setState({loading: false, lastError: err, lastErrorSeverity: "error", showingAlert: "true", currentActionCaption: null});
+            }))
+    }
+
+    triggerTranscodeSetup(){
+        const targetId = this.state.idToLoad;
+        this.setState({loading:true,
+                lastError:"Starting transcoder setup, this can take a minute or two",
+                lastErrorSeverity: "info",
+                showingAlert: true
+            }, ()=>axios.post("/api/scanTarget/" + encodeURIComponent(targetId) + "/" + "createPipelines?force=true")
+            .then(result=>{
+                console.log("Transcode setup has been started with job ID " + result.data.entity);
+                this.setState({loading: false, lastError: null, currentActionCaption: null});
+            }).catch(err=>{
+                console.error(err);
+                this.setState({loading: false, lastError: err, currentActionCaption: null});
+            }))
     }
 
     updateBucketname(evt){
@@ -286,11 +318,10 @@ class ScanTargetEdit extends React.Component {
                     <td style={{verticalAlign: "top"}}>Transcode Setup</td>
                     <td>
                         <Tooltip title="Validate transcode config">
-                            <FontAwesomeIcon icon="bug"  className={clsx()}
-                                             className="clickable button-row" onClick={()=>this.triggerValidateConfig()}/>
+                            <IconButton onClick={this.triggerValidateConfig}><BugReport/></IconButton>
                         </Tooltip>
                         <Tooltip title="(Redo) Transcode Setup">
-                            <FontAwesomeIcon icon="industry" className="clickable button-row" onClick={()=>this.triggerTranscodeSetup()}/>
+                            <IconButton onClick={this.triggerTranscodeSetup}><Tune/></IconButton>
                         </Tooltip>
                         {
                         this.state.entry.transcoderCheck ?
