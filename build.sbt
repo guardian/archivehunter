@@ -7,7 +7,7 @@ enablePlugins(RiffRaffArtifact, DockerPlugin, SystemdPlugin)
 
 scalaVersion := "2.12.13"
 
-val akkaVersion = "2.5.18"
+val akkaVersion = "2.5.31"
 val akkaClusterVersion = "1.0.9"
 val elastic4sVersion = "6.0.4"
 val awsSdkVersion = "1.11.959"
@@ -74,7 +74,6 @@ lazy val `archivehunter` = (project in file("."))
   )
 
 val lambdaDeps = Seq(
-  "com.amazonaws" % "aws-lambda-java-log4j2" % "1.0.0"
 )
 val circeVersion = "0.9.3"
 
@@ -106,7 +105,6 @@ lazy val inputLambda = (project in file("lambda/input"))
     "com.amazonaws" % "aws-lambda-java-events" % "2.1.0",
     "com.amazonaws" % "aws-lambda-java-core" % "1.0.0",
     "org.scala-lang.modules" %% "scala-java8-compat" % "0.8.0",
-    "com.amazonaws" % "aws-lambda-java-log4j2" % "1.0.0",
   ),
   assemblyJarName in assembly := "inputLambda.jar",
   assemblyMergeStrategy in assembly := {
@@ -132,7 +130,6 @@ lazy val proxyStatsGathering = (project in file("ProxyStatsGathering"))
       "com.amazonaws" % "aws-lambda-java-events" % "2.1.0",
       "com.amazonaws" % "aws-lambda-java-core" % "1.0.0",
       "org.scala-lang.modules" %% "scala-java8-compat" % "0.8.0",
-      "com.amazonaws" % "aws-lambda-java-log4j2" % "1.0.0",
       "com.sandinh" %% "akka-guice" % "3.2.0"
     ),
     version := sys.props.getOrElse("build.number","DEV"),
