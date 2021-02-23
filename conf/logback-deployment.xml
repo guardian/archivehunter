@@ -14,11 +14,11 @@
         </encoder>
     </appender>
 
-    <appender name="Sentry" class="io.sentry.logback.SentryAppender">
-        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
-            <level>WARN</level>
-        </filter>
-    </appender>
+<!--    <appender name="Sentry" class="io.sentry.logback.SentryAppender">-->
+<!--        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">-->
+<!--            <level>WARN</level>-->
+<!--        </filter>-->
+<!--    </appender>-->
 
     <appender name="KINESIS" class="com.gu.logback.appender.kinesis.KinesisAppender">
         <bufferSize>1000</bufferSize>
@@ -112,7 +112,6 @@
     <root level="WARN">
         <appender-ref ref="STDOUT" />
         <appender-ref ref="KINESIS"/>
-        <appender-ref ref="Sentry" />
     </root>
 
 </configuration>

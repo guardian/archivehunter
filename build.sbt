@@ -8,7 +8,7 @@ enablePlugins(RiffRaffArtifact, DockerPlugin, SystemdPlugin)
 scalaVersion := "2.12.13"
 
 val akkaVersion = "2.5.31"
-val akkaClusterVersion = "1.0.0"
+val akkaClusterVersion = "1.0.9"
 val elastic4sVersion = "6.0.4"
 val awsSdkVersion = "1.11.959"
 val jacksonVersion = "2.9.10"
