@@ -3,11 +3,12 @@ package TestFileMove
 import java.time.ZonedDateTime
 import akka.actor.Props
 import akka.stream.alpakka.dynamodb.scaladsl.DynamoClient
-import com.sksamuel.elastic4s.http.HttpClient
+import com.sksamuel.elastic4s.http.{ElasticClient, HttpClient}
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer, MimeType, ProxyLocation, ProxyLocationDAO, ProxyType, StorageClass}
 import org.specs2.mock.Mockito
 import org.specs2.mutable.Specification
 import services.FileMove.VerifySource
+
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -22,7 +23,7 @@ class VerifySourceSpec extends Specification with Mockito {
 
   "VerifySource!PerformStep" should {
     "look up the source file ID and its proxies and populate this into the transient data record" in new AkkaTestkitSpecs2Support {
-      implicit val mockedHttpClient = mock[HttpClient]
+      implicit val mockedHttpClient = mock[ElasticClient]
       implicit val mockedDynamoClient = mock[DynamoClient]
       val mockedEntry = ArchiveEntry(
         "some-entry-id",
@@ -84,7 +85,7 @@ class VerifySourceSpec extends Specification with Mockito {
     }
 
     "return StepFailed if the item could not be found" in new AkkaTestkitSpecs2Support {
-      implicit val mockedHttpClient = mock[HttpClient]
+      implicit val mockedHttpClient = mock[ElasticClient]
       implicit val mockedDynamoClient = mock[DynamoClient]
 
 
@@ -111,7 +112,7 @@ class VerifySourceSpec extends Specification with Mockito {
     }
 
     "return StepFailed if any other error occurs" in new AkkaTestkitSpecs2Support {
-      implicit val mockedHttpClient = mock[HttpClient]
+      implicit val mockedHttpClient = mock[ElasticClient]
       implicit val mockedDynamoClient = mock[DynamoClient]
 
 
@@ -138,7 +139,7 @@ class VerifySourceSpec extends Specification with Mockito {
     }
 
     "return StepFailed if any of the proxy lookups fail" in new AkkaTestkitSpecs2Support {
-      implicit val mockedHttpClient = mock[HttpClient]
+      implicit val mockedHttpClient = mock[ElasticClient]
       implicit val mockedDynamoClient = mock[DynamoClient]
       val mockedEntry = ArchiveEntry(
         "some-entry-id",
@@ -192,7 +193,7 @@ class VerifySourceSpec extends Specification with Mockito {
     }
 
     "return StepFailed if the main lookup crashes" in new AkkaTestkitSpecs2Support {
-      implicit val mockedHttpClient = mock[HttpClient]
+      implicit val mockedHttpClient = mock[ElasticClient]
       implicit val mockedDynamoClient = mock[DynamoClient]
 
 
@@ -219,7 +220,7 @@ class VerifySourceSpec extends Specification with Mockito {
     }
 
     "return StepFailed if the proxy lookup crashes" in new AkkaTestkitSpecs2Support {
-      implicit val mockedHttpClient = mock[HttpClient]
+      implicit val mockedHttpClient = mock[ElasticClient]
       implicit val mockedDynamoClient = mock[DynamoClient]
 
       val mockedEntry = ArchiveEntry(
@@ -262,7 +263,7 @@ class VerifySourceSpec extends Specification with Mockito {
     }
 
     "reply StepFailed if the entry has the deleted flag set" in new AkkaTestkitSpecs2Support {
-      implicit val mockedHttpClient = mock[HttpClient]
+      implicit val mockedHttpClient = mock[ElasticClient]
       implicit val mockedDynamoClient = mock[DynamoClient]
 
       val mockedEntry = ArchiveEntry(
@@ -305,7 +306,7 @@ class VerifySourceSpec extends Specification with Mockito {
 
   "VerifySource!RollbackStep" should {
     "always return StepSuccessful" in new AkkaTestkitSpecs2Support {
-      implicit val mockedHttpClient = mock[HttpClient]
+      implicit val mockedHttpClient = mock[ElasticClient]
       implicit val mockedDynamoClient = mock[DynamoClient]
       val mockedIndexer = mock[Indexer]
       val mockedProxyDAO = mock[ProxyLocationDAO]

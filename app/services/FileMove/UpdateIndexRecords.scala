@@ -55,9 +55,20 @@ class UpdateIndexRecords(indexer:Indexer, proxyLocationDAO: ProxyLocationDAO)(im
       }
     })
 
+  /**
+    * for the error handling in the for comprehension to work, we must fail the future with an exception
+    * @param updatedEntry data to write
+    * @return the id of the updated item or a failed future
+    */
+  private def writeRecord(updatedEntry:ArchiveEntry) = indexer.indexSingleItem(updatedEntry).map({
+    case Right(result)=>result
+    case Left(err)=>
+      logger.error(s"Could not write record: $err")
+      throw new RuntimeException(err.toString)
+  })
+
   override def receive: Receive = {
     case PerformStep(state)=>
-      //FIXME: needs a test!!!
       val originalSender = sender()
       if(state.sourceFileProxies.isEmpty || state.destFileProxy.isEmpty || state.destFileId.isEmpty){
         sender() ! StepFailed(state, "Not enough state elements were defined")
@@ -67,15 +78,21 @@ class UpdateIndexRecords(indexer:Indexer, proxyLocationDAO: ProxyLocationDAO)(im
         val updatedEntryFut = for {
           entry <- indexer.getById(state.sourceFileId)
           updatedEntry <- updateEntry(entry, state.destFileId.get, state.destBucket)
-          _ <- indexer.indexSingleItem(updatedEntry)
-          _ <- writeProxies(state.destFileProxy.getOrElse(Seq()))
-          deletionResult <- deleteOriginalProxies(state.sourceFileProxies.getOrElse(Seq()))
-        } yield (updatedEntry, deletionResult)
+          _ <- writeRecord(updatedEntry)
+          writeResult <- writeProxies(state.destFileProxy.getOrElse(Seq()))
+        } yield (updatedEntry, writeResult)
 
-        updatedEntryFut.onComplete({
+        updatedEntryFut
+          .flatMap(_=> {
+            for {
+              _ <- deleteOriginalProxies(state.sourceFileProxies.getOrElse(Seq()))
+              deletionResult <- indexer.deleteById(state.sourceFileId)
+            } yield deletionResult
+          }).onComplete({
           case Success(_)=>
             originalSender ! StepSucceeded(state)
           case Failure(err)=>
+            logger.error(s"UpdateIndexRecords failed: ${err.toString}", err)
             originalSender ! StepFailed(state, err.toString)
         })
       }

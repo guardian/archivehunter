@@ -1,11 +1,10 @@
 import java.time.ZonedDateTime
-
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Source
 import akka.stream.scaladsl.{Keep, Sink}
 import cats.data.NonEmptyList
 import com.gu.scanamo.error.{DynamoReadError, InvalidPropertiesError, PropertyReadError}
-import com.sksamuel.elastic4s.http.HttpClient
+import com.sksamuel.elastic4s.http.{ElasticClient, HttpClient}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.LightboxEntryDAO
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer, MimeType, StorageClass}
 import helpers.LightboxStreamComponents.SaveLightboxEntryFlow
@@ -26,7 +25,7 @@ class SaveLightboxEntryFlowSpec extends Specification with Mockito {
       implicit val mat = ActorMaterializer.create(system)
       implicit val ec:ExecutionContext = system.dispatcher
       implicit val lightboxEntryDAO = mock[LightboxEntryDAO]
-      implicit val esClient = mock[HttpClient]
+      implicit val esClient = mock[ElasticClient]
       implicit val indexer = mock[Indexer]
 
       lightboxEntryDAO.put(any)(any) returns Future(None)
@@ -48,7 +47,7 @@ class SaveLightboxEntryFlowSpec extends Specification with Mockito {
       implicit val mat = ActorMaterializer.create(system)
       implicit val ec:ExecutionContext = system.dispatcher
       implicit val lightboxEntryDAO = mock[LightboxEntryDAO]
-      implicit val esClient = mock[HttpClient]
+      implicit val esClient = mock[ElasticClient]
       implicit val indexer = mock[Indexer]
 
       lightboxEntryDAO.put(any)(any) returns Future(Some(Left(new InvalidPropertiesError(NonEmptyList(PropertyReadError("test",null), List())))))
