@@ -4,7 +4,7 @@ import com.amazonaws.services.lambda.runtime.events.S3Event
 import com.amazonaws.services.s3.AmazonS3
 import com.amazonaws.services.s3.event.S3EventNotification
 import com.amazonaws.services.s3.event.S3EventNotification._
-import com.sksamuel.elastic4s.http.{HttpClient, RequestSuccess}
+import com.sksamuel.elastic4s.http.{ElasticClient, HttpClient, RequestSuccess}
 import com.theguardian.multimedia.archivehunter.common._
 import org.specs2.mock.Mockito
 import org.specs2.mutable._
@@ -12,6 +12,7 @@ import com.amazonaws.services.lambda.runtime.Context
 import com.amazonaws.services.s3.model.ObjectMetadata
 import com.amazonaws.services.sqs.AmazonSQS
 import com.amazonaws.services.sqs.model.{SendMessageRequest, SendMessageResult}
+import com.sksamuel.elastic4s.embedded.LocalNode
 import com.theguardian.multimedia.archivehunter.common.cmn_models._
 import org.junit.runner.RunWith
 import org.specs2.runner.JUnitRunner
@@ -27,6 +28,7 @@ import scala.concurrent.duration._
 
 @RunWith(classOf[JUnitRunner])
 class InputLambdaMainSpec extends Specification with Mockito with ZonedDateTimeEncoder with StorageClassEncoder {
+  sequential
 
   "InputLambdaMain" should {
     "handle paths with spaces encoded to +" in {
@@ -43,14 +45,15 @@ class InputLambdaMainSpec extends Specification with Mockito with ZonedDateTimeE
 
       val fakeContext = mock[Context]
       val mockIndexer = mock[Indexer]
-      val mockESClient = mock[HttpClient]
-      mockESClient.execute[Any, Unit](any)(any) returns Future(Right(RequestSuccess[Unit](200,None,Map(), ())))
-
-      val mockSendIngestedMessage = mock[Function1[ArchiveEntry, Unit]]
+      val mockSendIngestedMessage = mock[ArchiveEntry=>Unit]
 
       mockIndexer.indexSingleItem(any,any,any)(any).returns(Future(Right("fake-entry-id")))
+
+      val mockWritePathCacheEntries = mock[Seq[PathCacheEntry]=>Future[Unit]]
+      mockWritePathCacheEntries.apply(any) returns Future( () )
+
       val test = new InputLambdaMain {
-        override protected def getElasticClient(clusterEndpoint: String): HttpClient = mockESClient
+        override protected def getElasticClient(clusterEndpoint: String): ElasticClient = mock[ElasticClient]
 
         override def sendIngestedMessage(entry:ArchiveEntry) = mockSendIngestedMessage(entry)
 
@@ -59,6 +62,9 @@ class InputLambdaMainSpec extends Specification with Mockito with ZonedDateTimeE
         override protected def getIndexName = "testIndexName"
 
         override protected def getIndexer(indexName: String): Indexer = mockIndexer
+
+        override def writePathCacheEntries(newCacheEntries: Seq[PathCacheEntry])(implicit pathCacheIndexer: PathCacheIndexer, elasticClient: ElasticClient): Future[Unit] =
+          mockWritePathCacheEntries(newCacheEntries)
 
         override protected def getS3Client: AmazonS3 = {
           val m = mock[AmazonS3]
@@ -80,7 +86,8 @@ class InputLambdaMainSpec extends Specification with Mockito with ZonedDateTimeE
           throw ex
       }
       there was one(mockSendIngestedMessage).apply(any)
-      there was two(mockESClient).execute(any)(any) //path cache update calls
+      there was one(mockWritePathCacheEntries).apply(any)
+      there was one(mockIndexer).indexSingleItem(any,any,any)(any)
     }
 
     "call to index an item delivered via an S3Event then call to dispatch a message to the main app" in {
@@ -97,13 +104,16 @@ class InputLambdaMainSpec extends Specification with Mockito with ZonedDateTimeE
 
       val fakeContext = mock[Context]
       val mockIndexer = mock[Indexer]
-      val mockSendIngestedMessage = mock[Function1[ArchiveEntry, Unit]]
-      val mockESClient = mock[HttpClient]
-      mockESClient.execute[Any, Unit](any)(any) returns Future(Right(RequestSuccess[Unit](200,None,Map(), ())))
-
       mockIndexer.indexSingleItem(any,any,any)(any).returns(Future(Right("fake-entry-id")))
+
+      val mockSendIngestedMessage = mock[ArchiveEntry=>Unit]
+      val mockESClient = mock[ElasticClient]
+
+      val mockWritePathCacheEntries = mock[Seq[PathCacheEntry]=>Future[Unit]]
+      mockWritePathCacheEntries.apply(any) returns Future( () )
+
       val test = new InputLambdaMain {
-        override protected def getElasticClient(clusterEndpoint: String): HttpClient = mockESClient
+        override protected def getElasticClient(clusterEndpoint: String): ElasticClient = mockESClient
 
         override def sendIngestedMessage(entry:ArchiveEntry) = mockSendIngestedMessage(entry)
 
@@ -112,6 +122,9 @@ class InputLambdaMainSpec extends Specification with Mockito with ZonedDateTimeE
         override protected def getIndexName = "testIndexName"
 
         override protected def getIndexer(indexName: String): Indexer = mockIndexer
+
+        override def writePathCacheEntries(newCacheEntries: Seq[PathCacheEntry])(implicit pathCacheIndexer: PathCacheIndexer, elasticClient: ElasticClient): Future[Unit] =
+          mockWritePathCacheEntries(newCacheEntries)
 
         override protected def getS3Client: AmazonS3 = {
           val m = mock[AmazonS3]
@@ -133,6 +146,8 @@ class InputLambdaMainSpec extends Specification with Mockito with ZonedDateTimeE
           throw ex
       }
       there was one(mockSendIngestedMessage).apply(any)
+      there was one(mockWritePathCacheEntries).apply(any)
+      there was one(mockIndexer).indexSingleItem(any,any,any)(any)
     }
   }
 

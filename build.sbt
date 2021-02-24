@@ -104,6 +104,13 @@ lazy val inputLambda = (project in file("lambda/input"))
   .settings(commonSettings,
   // https://mvnrepository.com/artifact/com.amazonaws/aws-java-sdk-lambda
   libraryDependencies ++= Seq(
+    "org.apache.logging.log4j" % "log4j-core" % "2.13.2",
+    "org.apache.logging.log4j" % "log4j-api" % "2.13.2",
+    "org.apache.logging.log4j" % "log4j-1.2-api" % "2.13.2",
+    "com.sksamuel.elastic4s" %% "elastic4s-http" % elastic4sVersion,
+    "com.sksamuel.elastic4s" %% "elastic4s-circe" % elastic4sVersion,
+    "com.sksamuel.elastic4s" %% "elastic4s-testkit" % elastic4sVersion % "test",
+    "com.sksamuel.elastic4s" %% "elastic4s-embedded" % elastic4sVersion % "test",
     "com.amazonaws" % "aws-java-sdk-lambda" % awsSdkVersion,
     "com.amazonaws" % "aws-lambda-java-events" % "2.1.0",
     "com.amazonaws" % "aws-lambda-java-core" % "1.0.0",
