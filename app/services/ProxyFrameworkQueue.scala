@@ -1,16 +1,16 @@
 package services
 
 import java.time.ZonedDateTime
-
 import akka.actor.{ActorRef, ActorSystem}
 import akka.stream.{ActorMaterializer, Materializer}
 import com.amazonaws.services.sqs.model.{DeleteMessageRequest, ReceiveMessageRequest}
-import com.sksamuel.elastic4s.http.HttpClient
+import com.sksamuel.elastic4s.http.{ElasticClient, HttpClient}
 import com.theguardian.multimedia.archivehunter.common._
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager, SQSClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models._
 import helpers.ProxyLocator
 import io.circe.generic.auto._
+
 import javax.inject.{Inject, Singleton}
 import models.{AwsSqsMsg, JobReportNew, JobReportStatus, JobReportStatusEncoder}
 import org.slf4j.MDC
@@ -39,7 +39,7 @@ object ProxyFrameworkQueue extends GenericSqsActorMessages {
 trait ProxyFrameworkQueueFunctions extends ProxyTypeEncoder with JobReportStatusEncoder with MediaMetadataEncoder {
   protected val indexer:Indexer
   protected val logger:Logger
-  protected implicit val esClient:HttpClient
+  protected implicit val esClient:ElasticClient
 
   def convertMessageBody(body: String) =
     AwsSqsMsg.fromJsonString(body).flatMap(snsMsg=>{

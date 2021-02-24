@@ -20,6 +20,7 @@ import play.api.libs.ws.WSClient
 import play.api.mvc.Result
 import requests.SearchRequest
 
+import scala.annotation.switch
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -120,19 +121,21 @@ extends AbstractController(controllerComponents) with PanDomainAuthActions with 
             termsAgg("typesCount", "mimeType.major.keyword")
           )
 
-          esClient.execute(search(indexName) query boolQuery().must(queries) aggregations aggs).map({
-            case Left(err)=>
-              InternalServerError(GenericErrorResponse("search_error", err.toString).asJson)
-            case Right(response)=>
-              logger.info(s"Got ${response.result.aggregations}")
+          esClient.execute(search(indexName) query boolQuery().must(queries) aggregations aggs).map(response=>{
+            (response.status: @switch) match {
+              case 200=>
+                logger.info(s"Got ${response.result.aggregations}")
 
-              Ok(PathInfoResponse("ok",
-                response.result.hits.total,
-                response.result.aggregations.sum("totalSize").value.toLong,
-                bucketsToCountMap(response.result.aggregations.terms("deletedCounts")),
-                bucketsToCountMap(response.result.aggregations.terms("proxiedCounts")),
-                bucketsToCountMap(response.result.aggregations.terms("typesCount")),
-              ).asJson)
+                Ok(PathInfoResponse("ok",
+                  response.result.hits.total,
+                  response.result.aggregations.sum("totalSize").value.toLong,
+                  bucketsToCountMap(response.result.aggregations.terms("deletedCounts")),
+                  bucketsToCountMap(response.result.aggregations.terms("proxiedCounts")),
+                  bucketsToCountMap(response.result.aggregations.terms("typesCount")),
+                ).asJson)
+              case _=>
+                InternalServerError(GenericErrorResponse("search_error", response.error.reason).asJson)
+            }
           })
       })
   }

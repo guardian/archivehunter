@@ -172,10 +172,10 @@ class BulkDownloadsController @Inject()(config:Configuration,serverTokenDAO: Ser
             case GlacierRestoreActor.RestoreNotRequested(entry)=>
               if(entry.storageClass!=StorageClass.GLACIER){ //if the file is not registered as in Glacier, then update it.
                 val updatedEntry = entry.copy(storageClass=StorageClass.GLACIER)
-                indexer.indexSingleItem(updatedEntry, Some(updatedEntry.id)).map({
-                  case Left(err)=>
+                indexer.indexSingleItem(updatedEntry, Some(updatedEntry.id)).onComplete({
+                  case Failure(err)=>
                     logger.error(s"Could not update storage class for incorrect item $entry: $err")
-                  case Right(_)=>
+                  case Success(_)=>
                     logger.info(s"Updated $entry as it had invalid storage class. Now requesting restore")
                     glacierRestoreActor ! GlacierRestoreActor.InitiateRestoreBasic(updatedEntry,None)
                 })

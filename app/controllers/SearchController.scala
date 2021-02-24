@@ -45,11 +45,11 @@ with PanDomainAuthActions {
   def getEntry(fileId:String) = HMACAuthAction.async {
     esClient.execute {
       search(indexName) query termQuery("id",fileId)
-    }.map({
-      case Left(failure)=>
-        logger.error(s"Could not look up file ID $fileId: ${failure.toString}")
-        InternalServerError(GenericErrorResponse("db_error", failure.toString).asJson)
-      case Right(response)=>
+    }.map(response=>{
+      if(response.isError) {
+        logger.error(s"Could not look up file ID $fileId: ${response.status} ${response.error.reason}")
+        InternalServerError(GenericErrorResponse("db_error", response.error.reason).asJson)
+      } else {
         val resultList = response.result.to[ArchiveEntry]
         resultList.headOption match {
           case Some(entry) =>
@@ -57,6 +57,7 @@ with PanDomainAuthActions {
           case None =>
             NotFound(GenericErrorResponse("not_found", fileId).asJson)
         }
+      }
     }).recover({
       case err:Throwable=>
         logger.error("Could not get entry: ", err)
@@ -76,12 +77,13 @@ with PanDomainAuthActions {
           search(indexName) query { boolQuery.must(searchTerms, not(regexQuery(("path.keyword",".*/+\\.[^\\.]+")))) } from actualStart size actualLength sortBy fieldSort("path.keyword")
         }
 
-        responseFuture.map({
-          case Left(failure) =>
-            InternalServerError(Json.obj("status" -> "error", "detail" -> failure.toString))
-          case Right(results) =>
-            val resultList = results.result.to[ArchiveEntry] //using the ArchiveEntryHitReader trait
-            Ok(ObjectListResponse[IndexedSeq[ArchiveEntry]]("ok","entry",resultList,results.result.totalHits.toInt).asJson)
+        responseFuture.map(response=>{
+          if(response.isError) {
+            InternalServerError(Json.obj("status" -> "error", "detail" -> response.error.reason))
+          } else {
+            val resultList = response.result.to[ArchiveEntry] //using the ArchiveEntryHitReader trait
+            Ok(ObjectListResponse[IndexedSeq[ArchiveEntry]]("ok","entry",resultList,response.result.totalHits.toInt).asJson)
+          }
         }).recover({
           case err:Throwable=>
             logger.error("Could not do browse search: ", err)
@@ -98,11 +100,12 @@ with PanDomainAuthActions {
       search(indexName) suggestions {
         sg
       }
-    }).map({
-      case Left(failure)=>
-        InternalServerError(GenericErrorResponse("search failure", failure.toString).asJson)
-      case Right(results)=>
-        Ok(BasicSuggestionsResponse.fromEsResponse(results.result.termSuggestion("sg")).asJson)
+    }).map(response=>{
+      if(response.isError) {
+        InternalServerError(GenericErrorResponse("search failure", response.error.reason).asJson)
+      } else {
+        Ok(BasicSuggestionsResponse.fromEsResponse(response.result.termSuggestion("sg")).asJson)
+      }
     }).recover({
       case err:Throwable=>
         logger.error("Could not do suggestions search: ", err)
@@ -120,12 +123,13 @@ with PanDomainAuthActions {
           search(indexName) query {
             boolQuery().must(request.toSearchParams)
           } from startAt size pageSize sortBy fieldSort(request.toSortParam).order(request.toSortOrder)
-        }.map({
-          case Left(err) =>
-            logger.error(s"Could not perform advanced search: $err")
-            InternalServerError(GenericErrorResponse("search_error", err.toString).asJson)
-          case Right(results) =>
-            Ok(ObjectListResponse("ok", "entry", results.result.to[ArchiveEntry], results.result.totalHits.toInt).asJson)
+        }.map(response=>{
+          if(response.isError) {
+            logger.error(s"Could not perform advanced search: ${response.status} ${response.error.reason}")
+            InternalServerError(GenericErrorResponse("search_error", response.error.reason).asJson)
+          } else {
+            Ok(ObjectListResponse("ok", "entry", response.result.to[ArchiveEntry], response.result.totalHits.toInt).asJson)
+          }
         })
       }
     ).recover({
@@ -165,13 +169,13 @@ with PanDomainAuthActions {
       case Some(Right(profile)) =>
         esClient.execute {
           LightboxHelper.lightboxSearch(indexName, bulkId, profile.userEmail) from startAt size pageSize sortBy fieldSort("path.keyword")
-        }.map({
-          case Left(err) =>
-            logger.error(s"Could not perform lightbox query: $err")
-            InternalServerError(GenericErrorResponse("search_error", err.toString).asJson)
-          case Right(results) =>
-            results.result.to[ArchiveEntry].foreach(x => logger.debug(x.toString))
-            Ok(ObjectListResponse("ok", "entry", results.result.to[ArchiveEntry], results.result.totalHits.toInt).asJson)
+        }.map(response=>{
+          if(response.isError) {
+            logger.error(s"Could not perform lightbox query: ${response.status} ${response.error.reason}")
+            InternalServerError(GenericErrorResponse("search_error", response.error.reason).asJson)
+          } else {
+            Ok(ObjectListResponse("ok", "entry", response.result.to[ArchiveEntry], response.result.totalHits.toInt).asJson)
+          }
         }).recover({
           case err: Throwable =>
             logger.error("Could not do browse search: ", err)
@@ -212,23 +216,24 @@ with PanDomainAuthActions {
             termsAgg("hasProxy","proxied"),
             termsAgg("mediaType", "mimeType.major.keyword")
           )
-    }.map({
-      case Left(failure)=>
-        InternalServerError(GenericErrorResponse("search failure", failure.toString).asJson)
-      case Right(results)=>
+    }.map(response=>{
+      if(response.isError) {
+        InternalServerError(GenericErrorResponse("search failure", response.error.reason).asJson)
+      } else {
         val intermediateContent = Seq(
-          chartIntermediateRepresentation[Int](results.result.aggregations.data("Collection").asInstanceOf[Map[String,Any]], "hasProxy").map(_.inverted()),
-          chartIntermediateRepresentation[Int](results.result.aggregations.data("Collection").asInstanceOf[Map[String,Any]], "mediaType").map(_.inverted())
+          chartIntermediateRepresentation[Int](response.result.aggregations.data("Collection").asInstanceOf[Map[String, Any]], "hasProxy").map(_.inverted()),
+          chartIntermediateRepresentation[Int](response.result.aggregations.data("Collection").asInstanceOf[Map[String, Any]], "mediaType").map(_.inverted())
         )
 
-        val finalContent = intermediateContent.map(_.map(entry=>ChartDataResponse.fromIntermediateRepresentation(Seq(entry))))
-        val errors = finalContent.collect({case Left(err)=>err})
+        val finalContent = intermediateContent.map(_.map(entry => ChartDataResponse.fromIntermediateRepresentation(Seq(entry))))
+        val errors = finalContent.collect({ case Left(err) => err })
 
-        if(errors.nonEmpty){
-          InternalServerError(ErrorListResponse("render_error","could not process aggregations data", errors.toList).asJson)
+        if (errors.nonEmpty) {
+          InternalServerError(ErrorListResponse("render_error", "could not process aggregations data", errors.toList).asJson)
         } else {
-          Ok(ChartDataListResponse("ok",finalContent.collect({case Right(data)=>data}).flatten).asJson)
+          Ok(ChartDataListResponse("ok", finalContent.collect({ case Right(data) => data }).flatten).asJson)
         }
+      }
     })
   }
 
@@ -245,12 +250,12 @@ with PanDomainAuthActions {
         matchQuery("bucket.keyword",collectionName),
         matchQuery("path.keyword", filePath)
       ))
-    }.map({
-      case Left(failure)=>
-        InternalServerError(GenericErrorResponse("search failure", failure.toString).asJson)
-      case Right(results)=>
-        logger.info(s"Got $results")
-        Ok(ObjectGetResponse("ok","archiveentry", results.result.to[ArchiveEntry]).asJson)
+    }.map(response=>{
+      if(response.isError) {
+        InternalServerError(GenericErrorResponse("search failure", response.error.reason).asJson)
+      } else {
+        Ok(ObjectGetResponse("ok", "archiveentry", response.result.to[ArchiveEntry]).asJson)
+      }
     })
   }
 
@@ -262,15 +267,16 @@ with PanDomainAuthActions {
   def searchByFilename(filePath:String) = HMACAuthAction.async { request=>
     esClient.execute {
       search(indexName) query matchQuery("path.keyword", filePath)
-    }.map({
-      case Left(failure)=>
-        InternalServerError(GenericErrorResponse("search failure", failure.toString).asJson)
-      case Right(results)=>
-        if(results.result.hits.total>0) {
-          Ok(ObjectListResponse("ok", "archiveentry", results.result.to[ArchiveEntry], results.result.hits.total.toInt).asJson)
-        } else {
-          NotFound(GenericErrorResponse("not_found", s"Nothing found at path $filePath").asJson)
-        }
+    }.map(response=>{
+      if(response.isError) {
+        InternalServerError(GenericErrorResponse("search failure", response.error.reason).asJson)
+      } else {
+          if (response.result.hits.total > 0) {
+            Ok(ObjectListResponse("ok", "archiveentry", response.result.to[ArchiveEntry], response.result.hits.total.toInt).asJson)
+          } else {
+            NotFound(GenericErrorResponse("not_found", s"Nothing found at path $filePath").asJson)
+          }
+      }
     })
   }
 }

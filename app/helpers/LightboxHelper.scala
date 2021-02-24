@@ -1,21 +1,21 @@
 package helpers
 
 import java.time.ZonedDateTime
-
 import akka.actor.{ActorRefFactory, ActorSystem}
 import akka.stream.{ClosedShape, Materializer}
 import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Keep, Merge, RunnableGraph, Sink, Source}
 import com.google.inject.Injector
-import com.sksamuel.elastic4s.http.{HttpClient, RequestFailure}
-import com.sksamuel.elastic4s.searches.SearchDefinition
-import com.sksamuel.elastic4s.searches.queries.QueryDefinition
+import com.sksamuel.elastic4s.http.{ElasticClient, ElasticError, HttpClient, RequestFailure}
+import com.sksamuel.elastic4s.searches.SearchRequest
+import com.sksamuel.elastic4s.searches.queries.Query
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer, LightboxIndex, StorageClass}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{LightboxBulkEntry, LightboxEntry, LightboxEntryDAO, RestoreStatus}
 import helpers.LightboxStreamComponents._
 import models.UserProfile
 import play.api.Logger
-import requests.SearchRequest
 import responses.{GenericErrorResponse, ObjectListResponse, QuotaExceededResponse}
+
+import scala.annotation.switch
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success}
 
@@ -64,7 +64,7 @@ object LightboxHelper {
     * @param ec implicitly provided Execution Context
     * @return a Future, containing Success with the updated index item's ID or a Failure if something broke.
     */
-  def updateIndexLightboxed(userProfile:UserProfile, userAvatarUrl:Option[String], indexEntry:ArchiveEntry, bulkId:Option[String])(implicit esClient:HttpClient, indexer:Indexer, ec:ExecutionContext) = {
+  def updateIndexLightboxed(userProfile:UserProfile, userAvatarUrl:Option[String], indexEntry:ArchiveEntry, bulkId:Option[String])(implicit esClient:ElasticClient, indexer:Indexer, ec:ExecutionContext) = {
     val lbIndex = LightboxIndex(userProfile.userEmail,userAvatarUrl, ZonedDateTime.now(), bulkId)
     logger.debug(s"lbIndex is $lbIndex")
     val updatedEntry = indexEntry.copy(lightboxEntries = indexEntry.lightboxEntries ++ Seq(lbIndex))
@@ -80,12 +80,12 @@ object LightboxHelper {
     * @param actorRefFactory implicitly provided ActorRefFactory, get this from an ActorSystem
     * @return a Source that yields SearchHit entries.  Connect this to SearchHitToArchiveEntryFlow to convert to domain objects.
     */
-  def getElasticSource(indexName:String, queryParams:QueryDefinition)(implicit esClient:HttpClient, actorRefFactory:ActorRefFactory) = {
+  def getElasticSource(indexName:String, queryParams:Query)(implicit esClient:ElasticClient, actorRefFactory:ActorRefFactory) = {
     val publisher = esClient.publisher(search(indexName) query queryParams scroll "5m")
     Source.fromPublisher(publisher)
   }
 
-  def getElasticSource(searchDefinition: SearchDefinition)(implicit esClient:HttpClient, actorRefFactory:ActorRefFactory) = {
+  def getElasticSource(searchDefinition: SearchRequest)(implicit esClient:ElasticClient, actorRefFactory:ActorRefFactory) = {
     val publisher = esClient.publisher(searchDefinition scroll "5m")
     Source.fromPublisher(publisher)
   }
@@ -100,7 +100,7 @@ object LightboxHelper {
     * @param materializer implicitly provided Materializer
     * @return a Future, containing a Long which is the number of bytes
     */
-  def getTotalSizeOfSearch(indexName:String, rq:SearchRequest)(implicit esClient:HttpClient, actorRefFactory:ActorRefFactory, materializer:Materializer) = {
+  def getTotalSizeOfSearch(indexName:String, rq:requests.SearchRequest)(implicit esClient:ElasticClient, actorRefFactory:ActorRefFactory, materializer:Materializer) = {
     logger.info(s"${boolQuery().must(rq.toSearchParams)}")
     val src = getElasticSource(indexName, boolQuery().must(rq.toSearchParams))
     val archiveEntryConverter = new SearchHitToArchiveEntryFlow
@@ -122,7 +122,7 @@ object LightboxHelper {
     * @param ec implicitly provided ExecutionContext
     * @return a Future, with either a QuotaExceededResponse indicating that the restore should not be allowed or a Long indicating that it should, and giving the total size in Mb of the restore.
     */
-  def testBulkAddSize(indexName:String, userProfile: UserProfile, searchReq:SearchRequest)(implicit esClient:HttpClient, actorRefFactory:ActorRefFactory, materializer:Materializer, ec:ExecutionContext) = {
+  def testBulkAddSize(indexName:String, userProfile: UserProfile, searchReq:requests.SearchRequest)(implicit esClient:ElasticClient, actorRefFactory:ActorRefFactory, materializer:Materializer, ec:ExecutionContext) = {
     logger.info(s"Checking size of $searchReq")
     LightboxHelper.getTotalSizeOfSearch(indexName,searchReq)
       .map(totalSize=>{
@@ -150,8 +150,8 @@ object LightboxHelper {
     * @param mat implicitly provided ActorMaterializer
     * @return a Future, with the LightboxBulkEntry updated to show the number of items it now has associated
     */
-  def addToBulkFromSearch(indexName:String, userProfile:UserProfile, userAvatarUrl:Option[String], rq:SearchRequest, bulk:LightboxBulkEntry)
-                         (implicit lightboxEntryDAO: LightboxEntryDAO, system:ActorSystem, esClient:HttpClient, indexer:Indexer, mat:Materializer, ec:ExecutionContext, injector:Injector) = {
+  def addToBulkFromSearch(indexName:String, userProfile:UserProfile, userAvatarUrl:Option[String], rq:requests.SearchRequest, bulk:LightboxBulkEntry)
+                         (implicit lightboxEntryDAO: LightboxEntryDAO, system:ActorSystem, esClient:ElasticClient, indexer:Indexer, mat:Materializer, ec:ExecutionContext, injector:Injector) = {
     val archiveEntryConverter = new SearchHitToArchiveEntryFlow
 
     val dynamoSaveFlow = new SaveLightboxEntryFlow(bulk.id, userProfile)
@@ -217,14 +217,16 @@ object LightboxHelper {
     * @param esClient
     * @return
     */
-  def getLooseCountForUser(indexName:String, userEmail:String)(implicit esClient:HttpClient, ec:ExecutionContext):Future[Either[RequestFailure, Int]] = {
+  def getLooseCountForUser(indexName:String, userEmail:String)(implicit esClient:ElasticClient, ec:ExecutionContext):Future[Either[ElasticError, Int]] = {
     esClient.execute {
       lightboxSearch(indexName, Some("loose"), userEmail) limit(0)
-    }.map({
-      case Left(err)=>Left(err)
-      case Right(success)=>
-        Right(success.result.hits.total.toInt)
-//        Right(success.result.aggregationsAsMap("count").asInstanceOf[Map[String, Any]].getOrElse("value",0).asInstanceOf[Int])
+    }.map(response=>{
+      (response.status: @switch) match {
+        case 200=>
+          Right(response.result.hits.total.toInt)
+        case _=>
+          Left(response.error)
+      }
     })
   }
 
@@ -242,7 +244,7 @@ object LightboxHelper {
     * @return a Future, containing an Int of the number of items removed.  If the stream errors then the future fails.
     */
   def removeBulkContents(indexName:String, userProfile:UserProfile, bulk:LightboxBulkEntry)
-                        (implicit lightboxEntryDAO: LightboxEntryDAO, system:ActorSystem, esClient:HttpClient, indexer:Indexer, mat:Materializer, ec:ExecutionContext) = {
+                        (implicit lightboxEntryDAO: LightboxEntryDAO, system:ActorSystem, esClient:ElasticClient, indexer:Indexer, mat:Materializer, ec:ExecutionContext) = {
     val dynamoSaveSink = new RemoveLightboxEntrySink(userProfile.userEmail)
     val esSaveSink = new RemoveLightboxIndexInfoSink(userProfile.userEmail)
     logger.info(s"bulkid is ${bulk.id}")

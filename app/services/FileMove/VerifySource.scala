@@ -1,7 +1,7 @@
 package services.FileMove
 
 import akka.stream.alpakka.dynamodb.scaladsl.DynamoClient
-import com.sksamuel.elastic4s.http.HttpClient
+import com.sksamuel.elastic4s.http.{ElasticClient, HttpClient}
 import com.theguardian.multimedia.archivehunter.common.{DocId, Indexer, ProxyLocationDAO}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.ItemNotFound
 
@@ -15,7 +15,7 @@ import scala.concurrent.Future
   * @param esClient implicitly provided Elastic4s HttpClient
   * @param dynamoClient implicitly provided Alpakka DynamoClient
   */
-class VerifySource(indexer:Indexer, proxyLocationDAO:ProxyLocationDAO)(implicit esClient:HttpClient, dynamoClient:DynamoClient) extends GenericMoveActor with DocId {
+class VerifySource(indexer:Indexer, proxyLocationDAO:ProxyLocationDAO)(implicit esClient:ElasticClient, dynamoClient:DynamoClient) extends GenericMoveActor with DocId {
   import GenericMoveActor._
 
   override def receive: Receive = {

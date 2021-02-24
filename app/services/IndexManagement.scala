@@ -2,12 +2,13 @@ package services
 
 
 import com.theguardian.multimedia.archivehunter.common.clientManagers.ESClientManager
+
 import javax.inject.{Inject, Singleton}
 import play.api.Configuration
 import com.sksamuel.elastic4s.http.ElasticDsl
 import com.sksamuel.elastic4s.http.index.mappings.IndexMappings
 import com.sksamuel.elastic4s.indexes.AnalysisDefinition
-import com.sksamuel.elastic4s.mappings.{BasicFieldDefinition, _}
+import com.sksamuel.elastic4s.mappings.{BasicField, MappingDefinition, NestedField}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -26,17 +27,17 @@ class IndexManagement @Inject() (config:Configuration, esClientMgr:ESClientManag
       createIndex(indexName).mappings(
         MappingDefinition("entry",
           fields=Seq(
-            BasicFieldDefinition("id","keyword"),
-            BasicFieldDefinition("etag","keyword"),
-            BasicFieldDefinition("region","keyword"),
-            NestedFieldDefinition("lightboxEntries", fields=Seq(
-              BasicFieldDefinition("owner","keyword"),
-              BasicFieldDefinition("avatarUrl","keyword"),
-              BasicFieldDefinition("addedAt","date")
+            BasicField("id","keyword"),
+            BasicField("etag","keyword"),
+            BasicField("region","keyword"),
+            NestedField("lightboxEntries", fields=Seq(
+              BasicField("owner","keyword"),
+              BasicField("avatarUrl","keyword"),
+              BasicField("addedAt","date")
             )),
-            BasicFieldDefinition("path", "text", fields=Seq(
-              BasicFieldDefinition("keyword", "keyword"),
-              BasicFieldDefinition("tokens", "text").analyzer(StandardAnalyzer)
+            BasicField("path", "text", fields=Seq(
+              BasicField("keyword", "keyword"),
+              BasicField("tokens", "text").analyzer(StandardAnalyzer)
             )).analyzer("pathAnalyzer")
           )
         )
@@ -64,8 +65,12 @@ class IndexManagement @Inject() (config:Configuration, esClientMgr:ESClientManag
   def verifyIndexStatus() = {
     esClient.execute {
       getMapping(indexName)
-    }.map(_.map(resp=>
-      resp.result.filter(indexMappings=> !verifyMappings(indexMappings.mappings))
-    ))
+    }.map(response=>{
+      if(response.isError) {
+        Left(response.error)
+      } else {
+        Right(response.result.filter(indexMappings=> !verifyMappings(indexMappings.mappings)))
+      }
+    })
   }
 }

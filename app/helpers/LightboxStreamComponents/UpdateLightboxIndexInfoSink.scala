@@ -4,7 +4,7 @@ import akka.actor.ActorSystem
 import akka.stream.scaladsl.Sink
 import akka.stream.{Attributes, Inlet, SinkShape}
 import akka.stream.stage.{AbstractInHandler, GraphStage, GraphStageLogic, GraphStageWithMaterializedValue}
-import com.sksamuel.elastic4s.http.HttpClient
+import com.sksamuel.elastic4s.http.{ElasticClient, HttpClient}
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.LightboxEntryDAO
 import helpers.LightboxHelper
@@ -14,7 +14,7 @@ import play.api.Logger
 
 import scala.concurrent.{Await, ExecutionContext, Future, Promise}
 import scala.concurrent.duration._
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
 
 /**
   * an akka Sink that adds incoming ArchiveEntry records to a bulk entry
@@ -26,7 +26,7 @@ import scala.util.{Failure, Success}
   * @param indexer implicitly provided Indexer instance
   */
 class UpdateLightboxIndexInfoSink (bulkId:String,userProfile: UserProfile, userAvatarUrl:Option[String])
-                  (implicit val lightboxEntryDAO:LightboxEntryDAO, system:ActorSystem, esClient:HttpClient, indexer:Indexer)
+                  (implicit val lightboxEntryDAO:LightboxEntryDAO, system:ActorSystem, esClient:ElasticClient, indexer:Indexer)
   extends GraphStageWithMaterializedValue[SinkShape[ArchiveEntry], Future[Int]]{
 
   private val in = Inlet.create[ArchiveEntry]("BulkAddSink.in")
@@ -46,17 +46,17 @@ class UpdateLightboxIndexInfoSink (bulkId:String,userProfile: UserProfile, userA
         override def onPush(): Unit = {
           val elem = grab(in)
 
-          Await.result(LightboxHelper.updateIndexLightboxed(userProfile, userAvatarUrl, elem, Some(bulkId)), 30 seconds) match {
-            case Right(result)=>
+          val response = Try { Await.result(LightboxHelper.updateIndexLightboxed(userProfile, userAvatarUrl, elem, Some(bulkId)), 30 seconds) }
+          response match {
+            case Success(_)=>
               logger.info("Saved lightbox entry")
               ctr+=1
               pull(in)
-            case Left(err)=>
+            case Failure(err)=>
               MDC.put("error",err.toString)
-              logger.error(s"Could not update lightbox info: ${err.toString}")
-              val excep = new RuntimeException(err.toString)
-              promise.failure(excep)
-              failStage(excep)
+              logger.error(s"Could not update lightbox info: ${err.getMessage}", err)
+              promise.failure(err)
+              failStage(err)
           }
         }
       })

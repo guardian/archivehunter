@@ -2,17 +2,17 @@ package helpers.LightboxStreamComponents
 
 import akka.stream.{Attributes, Inlet, SinkShape}
 import akka.stream.stage.{AbstractInHandler, GraphStageLogic, GraphStageWithMaterializedValue}
-import com.sksamuel.elastic4s.http.HttpClient
+import com.sksamuel.elastic4s.http.{ElasticClient, HttpClient}
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer}
 import org.slf4j.MDC
 import play.api.Logger
 
 import scala.concurrent.{Await, Future, Promise}
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
-class RemoveLightboxIndexInfoSink (userEmail:String)(implicit esClient:HttpClient, indexer:Indexer) extends GraphStageWithMaterializedValue[SinkShape[ArchiveEntry], Future[Int]]{
+class RemoveLightboxIndexInfoSink (userEmail:String)(implicit esClient:ElasticClient, indexer:Indexer) extends GraphStageWithMaterializedValue[SinkShape[ArchiveEntry], Future[Int]]{
   private final val in = Inlet[ArchiveEntry]("RemoveLightboxIndexInfoSink.in")
 
   override def shape: SinkShape[ArchiveEntry] = SinkShape.of(in)
@@ -30,16 +30,18 @@ class RemoveLightboxIndexInfoSink (userEmail:String)(implicit esClient:HttpClien
 
           val updatedElem = elem.copy(lightboxEntries = elem.lightboxEntries.filter(_.owner!=userEmail))
           //TODO: this could be improved by converting this to a Flow and then using an existing Elastic4s bulk consumer to write the index in bulk.
-          Await.ready(indexer.indexSingleItem(updatedElem).map({
-            case Right(result)=>
+          val response = Try { Await.ready(indexer.indexSingleItem(updatedElem), 30.seconds) }
+          response match {
+            case Success(result)=>
               logger.info(s"Removed lightbox entry data from $result")
               ctr+=1
-            case Left(err)=>
+            case Failure(err)=>
               MDC.put("error",err.toString)
               MDC.put("entry",elem.toString)
-              logger.error(s"Could not remove lightbox entry data: ${err.toString}")
+              logger.error(s"Could not remove lightbox entry data: ${err.getMessage}", err)
               failStage(new RuntimeException(err.toString))
-          }), 30 seconds)
+          }
+
           pull(in)
         }
       })

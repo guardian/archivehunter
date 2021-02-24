@@ -7,7 +7,7 @@ import com.sksamuel.elastic4s.http.search.SearchHit
 import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
 import scala.concurrent.ExecutionContext.Implicits.global
-import com.sksamuel.elastic4s.http.{HttpClient, RequestFailure}
+import com.sksamuel.elastic4s.http.{ElasticClient, ElasticError, HttpClient, RequestFailure}
 import com.sksamuel.elastic4s.mappings.FieldType._
 import com.theguardian.multimedia.archivehunter.common.cmn_models._
 import io.circe.generic.auto._
@@ -25,9 +25,10 @@ class Indexer(indexName:String) extends ZonedDateTimeEncoder with StorageClassEn
     * @param entryId ID of the archive entry for upsert
     * @param entry [[ArchiveEntry]] object to index
     * @param client implicitly provided elastic4s HttpClient object
-    * @return a Future containing either the ID of the new item or a RuntimeException containing the failure
+    * @return a Future containing either the ID of the new item or an IndexerError containing the failure
     */
-  def indexSingleItem(entry:ArchiveEntry, entryId: Option[String]=None, refreshPolicy: RefreshPolicy=RefreshPolicy.WAIT_UNTIL)(implicit client:HttpClient) = {
+  def indexSingleItem(entry:ArchiveEntry, entryId: Option[String]=None, refreshPolicy: RefreshPolicy=RefreshPolicy.WAIT_UNTIL)
+                     (implicit client:ElasticClient):Future[Either[IndexerError,String]] = {
     val idToUse = entryId match {
       case None => entry.id
       case Some(userSpecifiedId) => userSpecifiedId
@@ -35,7 +36,14 @@ class Indexer(indexName:String) extends ZonedDateTimeEncoder with StorageClassEn
 
     client.execute {
       update(idToUse).in(s"$indexName/entry").docAsUpsert(entry)
-    }.map(_.map(response=>response.result.id))
+    }.map(response=>{
+      (response.status: @switch) match {
+        case 200=>Right(response.result.id)
+        case 409=>Left(ConflictError(idToUse,response.error.reason))
+        case _=>Left(UnexpectedReturnCode(idToUse, response.status, Some(response.error.reason)))
+      }
+    })
+      //.map(_.result.id)
   }
 
   /**
@@ -45,12 +53,15 @@ class Indexer(indexName:String) extends ZonedDateTimeEncoder with StorageClassEn
     * @param client
     * @return a Future contianing a String with summary info.  Future will fail on error, pick this up in the usual ways.
     */
-  def removeSingleItem(entryId:String, refreshPolicy: RefreshPolicy=RefreshPolicy.WAIT_UNTIL)(implicit client:HttpClient):Future[String] = {
+  def removeSingleItem(entryId:String, refreshPolicy: RefreshPolicy=RefreshPolicy.WAIT_UNTIL)(implicit client:ElasticClient):Future[String] = {
     client.execute {
       delete(entryId).from(s"$indexName/entry")
-    }.map({
-      case Left(failure)=> throw new RuntimeException(failure.error.toString) //fail the future, this is handled by caller
-      case Right(success) => success.result.toString
+    }.map(result=>{
+      if(result.isError) {
+        throw new RuntimeException(result.error.reason) //fail the future, this is handled by caller
+      } else {
+        result.result.toString
+      }
     })
   }
 
@@ -61,11 +72,14 @@ class Indexer(indexName:String) extends ZonedDateTimeEncoder with StorageClassEn
     * @param client implicitly provided elastic4s HttpClient object
     * @return
     */
-  def newIndex(shardCount:Int, replicaCount:Int)(implicit client:HttpClient):Future[Try[CreateIndexResponse]] = client.execute {
+  def newIndex(shardCount:Int, replicaCount:Int)(implicit client:ElasticClient):Future[Try[CreateIndexResponse]] = client.execute {
       createIndex(indexName) shards shardCount replicas replicaCount
-  }.map({
-    case Left(failure)=>Failure(new RuntimeException(failure.error.toString))
-    case Right(success)=>Success(success.result)
+  }.map(result=>{
+    if(result.isError) {
+      Failure(new RuntimeException(result.error.reason))
+    } else {
+      Success(result.result)
+    }
   })
 
   /**
@@ -74,7 +88,7 @@ class Indexer(indexName:String) extends ZonedDateTimeEncoder with StorageClassEn
     * @param client implicitly provided index client
     * @return a Future containing an ArchiveEntry.  The future is cancelled if anything fails - use .recover or .recoverWith to pick this up.
     */
-  def getById(docId:String)(implicit client:HttpClient):Future[ArchiveEntry] = getByIdFull(docId).map({
+  def getById(docId:String)(implicit client:ElasticClient):Future[ArchiveEntry] = getByIdFull(docId).map({
     case Left(err)=> throw new RuntimeException(err.toString)
     case Right(entry)=>entry
   })
@@ -85,25 +99,23 @@ class Indexer(indexName:String) extends ZonedDateTimeEncoder with StorageClassEn
     * @param client implicitly provided index client
     * @return a Future containing either an ArchiveEntry or a subclass of IndexerError describing the actual error.
     */
-  def getByIdFull(docId:String)(implicit client:HttpClient):Future[Either[IndexerError,ArchiveEntry]] = client.execute {
+  def getByIdFull(docId:String)(implicit client:ElasticClient):Future[Either[IndexerError,ArchiveEntry]] = client.execute {
     get(indexName, "entry", docId)
-  }.map({
-    case Left(failure)=>Left(ESError(docId, failure))
-    case Right(success)=>
-      (success.status: @switch) match {
-        case 200 =>
-          ArchiveEntryHR.read(success.result) match {
-            case Left(err) => Left(SystemError(docId, err))
-            case Right(entry) => Right(entry)
-          }
-        case 404 =>
-          Left(ItemNotFound(docId))
-        case other =>
-          Left(UnexpectedReturnCode(docId, other))
-      }
+  }.map(result=>{
+    (result.status: @switch) match {
+      case 200 =>
+        ArchiveEntryHR.read(result.result) match {
+          case Failure(err) => Left(SystemError(docId, err))
+          case Success(entry) => Right(entry)
+        }
+      case 404 =>
+        Left(ItemNotFound(docId))
+      case other =>
+        Left(UnexpectedReturnCode(docId, other))
+    }
   })
 
-  def deleteById(docId:String)(implicit client:HttpClient) = client.execute {
+  def deleteById(docId:String)(implicit client:ElasticClient) = client.execute {
     delete(docId) from indexName / "entry"
   }
 }

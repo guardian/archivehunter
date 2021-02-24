@@ -9,7 +9,7 @@ scalaVersion := "2.12.13"
 
 val akkaVersion = "2.5.31"
 val akkaClusterVersion = "1.0.9"
-val elastic4sVersion = "6.0.4"
+val elastic4sVersion = "6.7.8"
 val awsSdkVersion = "1.11.959"
 val jacksonVersion = "2.9.10"
 val jacksonCoreVersion = "2.9.10.8"
@@ -25,7 +25,8 @@ lazy val commonSettings = Seq(
     "com.amazonaws" % "aws-java-sdk-elastictranscoder"% awsSdkVersion,
     "com.amazonaws" % "aws-java-sdk-sqs"% awsSdkVersion,
     "com.dripower" %% "play-circe" % "2610.0",
-    "com.sksamuel.elastic4s" %% "elastic4s-http" % elastic4sVersion,
+    "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.11.4",
+    "com.sksamuel.elastic4s" %% "elastic4s-http" % elastic4sVersion  exclude("com.fasterxml.jackson.module","jackson-module-scala"),
     "com.sksamuel.elastic4s" %% "elastic4s-circe" % elastic4sVersion,
     "com.sksamuel.elastic4s" %% "elastic4s-http-streams" % elastic4sVersion,
     "com.sksamuel.elastic4s" %% "elastic4s-testkit" % elastic4sVersion % "test",
@@ -47,10 +48,12 @@ lazy val `archivehunter` = (project in file("."))
       "com.typesafe.play" %% "play-guice" % "2.6.25",
       "org.scala-lang.modules" %% "scala-java8-compat" % "0.8.0",
       "com.dripower" %% "play-circe" % "2610.0",
-      "com.sksamuel.elastic4s" %% "elastic4s-http" % elastic4sVersion,
+      "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.11.4",
+      "com.sksamuel.elastic4s" %% "elastic4s-http" % elastic4sVersion exclude("com.fasterxml.jackson.module","jackson-module-scala"),
       "com.sksamuel.elastic4s" %% "elastic4s-circe" % elastic4sVersion,
       "com.sksamuel.elastic4s" %% "elastic4s-testkit" % elastic4sVersion % "test",
       "com.sksamuel.elastic4s" %% "elastic4s-embedded" % elastic4sVersion % "test",
+      "com.fasterxml.jackson.core" % "jackson-databind" % jacksonCoreVersion,
       "com.typesafe.akka" %% "akka-cluster-tools" % akkaVersion,
       "com.lightbend.akka.management" %% "akka-management-cluster-http" % akkaClusterVersion,
       "com.lightbend.akka.management" %% "akka-management-cluster-bootstrap" % akkaClusterVersion,
@@ -158,7 +161,7 @@ lazy val autoDowningLambda = (project in file("lambda/autodowning")).settings(co
       "com.amazonaws" % "aws-lambda-java-core" % "1.0.0",
       "org.scala-lang.modules" %% "scala-java8-compat" % "0.8.0",
       "ch.qos.logback"          %  "logback-classic" % "1.2.3",
-      "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.10.5",
+      "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.11.4",
       specs2 % Test
     ),
     assemblyJarName in assembly := "autoDowningLambda.jar",

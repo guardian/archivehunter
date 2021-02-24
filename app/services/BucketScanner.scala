@@ -8,9 +8,10 @@ import akka.stream._
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager}
 import com.amazonaws.regions.{Region, Regions}
 import com.google.inject.Injector
-import com.sksamuel.elastic4s.http.HttpClient
+import com.sksamuel.elastic4s.http.{ElasticClient, HttpClient}
 import com.sksamuel.elastic4s.http.bulk.BulkResponseItem
 import helpers._
+
 import javax.inject.{Inject, Singleton}
 import com.theguardian.multimedia.archivehunter.common.cmn_models._
 import play.api.{Configuration, Logger}
@@ -88,7 +89,7 @@ class BucketScanner @Inject()(override val config:Configuration, ddbClientMgr:Dy
     }
   }
 
-  protected def getElasticSearchSink(esclient:HttpClient, completionPromise:Promise[Unit]) = {
+  protected def getElasticSearchSink(esclient:ElasticClient, completionPromise:Promise[Unit]) = {
     val esSubscriberConfig = SubscriberConfig[ArchiveEntry](listener = new ResponseListener[ArchiveEntry] {
       override def onAck(resp: BulkResponseItem, original: ArchiveEntry): Unit = {
         logger.debug(s"ES subscriber ACK: ${resp.toString} for $original")

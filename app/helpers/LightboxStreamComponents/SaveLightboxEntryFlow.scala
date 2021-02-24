@@ -4,7 +4,7 @@ import akka.actor.ActorSystem
 import akka.stream.scaladsl.Sink
 import akka.stream._
 import akka.stream.stage._
-import com.sksamuel.elastic4s.http.HttpClient
+import com.sksamuel.elastic4s.http.{ElasticClient, HttpClient}
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{LightboxEntry, LightboxEntryDAO}
 import helpers.LightboxHelper
@@ -25,7 +25,7 @@ import scala.util.{Failure, Success}
   * @param indexer implicitly provided Indexer instance
   */
 class SaveLightboxEntryFlow (bulkId:String,userProfile: UserProfile)
-                  (implicit val lightboxEntryDAO:LightboxEntryDAO, system:ActorSystem, esClient:HttpClient, indexer:Indexer)
+                  (implicit val lightboxEntryDAO:LightboxEntryDAO, system:ActorSystem, esClient:ElasticClient, indexer:Indexer)
   extends GraphStageWithMaterializedValue[FlowShape[ArchiveEntry,(ArchiveEntry, LightboxEntry)], Future[Int]]{
 
   private val in = Inlet.create[ArchiveEntry]("BulkAddSink.in")

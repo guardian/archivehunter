@@ -2,24 +2,22 @@ package com.theguardian.multimedia.archivehunter.common
 
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
-
 import com.sksamuel.elastic4s.{Hit, HitReader}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{MediaMetadataMapConverters, ProblemItemCount, ProxyVerifyResult}
 import org.apache.logging.log4j.LogManager
 
-trait ProblemItemCountHitReader extends MediaMetadataMapConverters {
-  private val ownLogger = LogManager.getLogger(getClass)
+import scala.util.Try
 
+trait ProblemItemCountHitReader extends MediaMetadataMapConverters {
   /**
     * ProblemItemCount(scanStart:ZonedDateTime, scanFinish:Option[ZonedDateTime],
     * proxiedCount:Int, partialCount:Int, unProxiedCount:Int,
     * notNeededCount:Int, dotFile:Int, glacier:Int, grandTotal:Int)
     */
   implicit object ProblemItemCountHR extends HitReader[ProblemItemCount] {
-    override def read(hit: Hit): Either[Throwable, ProblemItemCount] = {
+    override def read(hit: Hit): Try[ProblemItemCount] = {
 
-      try {
-        Right(
+      Try {
           ProblemItemCount(
             ZonedDateTime.parse(hit.sourceField("scanStart").asInstanceOf[String]),
             Option(hit.sourceField("scanFinish").asInstanceOf[String]).map(scanFinish=>ZonedDateTime.parse(scanFinish)),
@@ -31,11 +29,6 @@ trait ProblemItemCountHitReader extends MediaMetadataMapConverters {
             hit.sourceField("glacier").asInstanceOf[Int],
             hit.sourceField("grandTotal").asInstanceOf[Int]
           )
-        )
-
-      } catch {
-        case ex:Throwable=>
-          Left(ex)
       }
     }
   }

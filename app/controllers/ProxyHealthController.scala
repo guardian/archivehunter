@@ -5,6 +5,7 @@ import com.theguardian.multimedia.archivehunter.common.{ProblemItemHitReader, Pr
 import com.theguardian.multimedia.archivehunter.common.clientManagers.ESClientManager
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{JobModel, JobModelDAO, ProblemItem, ProxyHealthEncoder}
 import helpers.InjectableRefresher
+
 import javax.inject.{Inject, Named, Singleton}
 import org.slf4j.MDC
 import play.api.{Configuration, Logger}
@@ -16,6 +17,7 @@ import io.circe.syntax._
 import io.circe.generic.auto._
 import services.ProblemItemRetry
 
+import scala.annotation.switch
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -52,8 +54,7 @@ class ProxyHealthController @Inject()(override val config:Configuration,
   def mostRecentStats = APIAuthAction.async {
     problemSummaryIndexer.mostRecentStats.map({
       case Left(err)=>
-        MDC.put("reason", err.error.reason)
-        MDC.put("response_body", err.body.getOrElse("(none)"))
+        MDC.put("reason", err.reason)
         logger.error(s"Could not retrieve index stats: $err")
         InternalServerError(GenericErrorResponse("db_error", err.toString).asJson)
       case Right(Some(info))=>
@@ -71,31 +72,35 @@ class ProxyHealthController @Inject()(override val config:Configuration,
 
     esCleint.execute {
       search(problemItemIndexName) query boolQuery().withMust(queries) start start limit size
-    }.map({
-      case Left(err)=>
-        MDC.put("reason", err.error.reason)
-        MDC.put("response_body", err.body.getOrElse("(none)"))
-        logger.error(s"Could not list problem items: $err")
-        InternalServerError(GenericErrorResponse("db_error", err.toString).asJson)
-      case Right(result)=>
-        Ok(ObjectListResponse("ok","ProblemItem", result.result.to[ProblemItem], result.result.totalHits.toInt).asJson)
+    }.map(response=>{
+      (response.status: @switch) match {
+        case 200=>
+          Ok(ObjectListResponse("ok","ProblemItem", response.result.to[ProblemItem], response.result.totalHits.toInt).asJson)
+        case _=>
+          MDC.put("reason", response.error.reason)
+          MDC.put("response_body", response.body.getOrElse("(none)"))
+          logger.error(s"Could not list problem items: ${response.error.reason}")
+          InternalServerError(GenericErrorResponse("db_error", response.error.reason).asJson)
+      }
     })
   }
 
   def collectionsWithProblems = APIAuthAction.async {
     esCleint.execute {
       search(problemItemIndexName) aggs termsAgg("collections","collection.keyword")
-    }.map({
-      case Left(err)=>
-        MDC.put("reason", err.error.reason)
-        MDC.put("response_body", err.body.getOrElse("(none)"))
-        logger.error(s"Could not list problem collections: $err")
-        InternalServerError(GenericErrorResponse("db_error", err.toString).asJson)
-      case Right(result)=>
-        val collectionsData = result.result.aggregationsAsMap("collections")
-        logger.debug(collectionsData.toString)
+    }.map(response=>{
+      (response.status: @switch) match {
+        case 200=>
+          val collectionsData = response.result.aggregationsAsMap("collections")
+          logger.debug(collectionsData.toString)
 
-        Ok(TermsBucketResponse.fromRawData("ok", collectionsData).asJson)
+          Ok(TermsBucketResponse.fromRawData("ok", collectionsData).asJson)
+        case _=>
+          MDC.put("reason", response.error.reason)
+          MDC.put("response_body", response.body.getOrElse("(none)"))
+          logger.error(s"Could not list problem collections: ${response.error.reason}")
+          InternalServerError(GenericErrorResponse("db_error", response.error.reason).asJson)
+      }
     })
   }
 
