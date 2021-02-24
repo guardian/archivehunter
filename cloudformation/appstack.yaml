@@ -1086,13 +1086,13 @@ Resources:
           }
 
           akka.discovery {
-            # Set the following in your application.conf if you want to use this discovery mechanism:
             method = aws-api-ec2-tag-based
             aws-api-ec2-tag-based {
-              class = akka.discovery.awsapi.ec2.Ec2TagBasedSimpleServiceDiscovery
+              class = akka.discovery.awsapi.ec2.Ec2TagBasedServiceDiscovery
               tag-key = "service"
             }
           }
+          akka.discovery.akka.discovery.aws-api-ec2-tag-based.class = akka.discovery.awsapi.ec2.Ec2TagBasedServiceDiscovery
 
           # Enable metrics extension in akka-cluster-metrics.
           akka.extensions=["akka.cluster.metrics.ClusterMetricsExtension"]

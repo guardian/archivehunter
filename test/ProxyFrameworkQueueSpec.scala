@@ -1,5 +1,4 @@
 import java.time.ZonedDateTime
-
 import akka.actor.{ActorSystem, Props}
 import akka.testkit.TestProbe
 import com.amazonaws.services.dynamodbv2.model.AttributeValue
@@ -7,7 +6,7 @@ import com.amazonaws.services.sqs.AmazonSQS
 import com.amazonaws.services.sqs.model.{DeleteMessageRequest, DeleteMessageResult, ReceiveMessageRequest}
 import com.gu.scanamo.error.{DynamoReadError, NoPropertyOfType}
 import com.sksamuel.elastic4s.http.update.UpdateResponse
-import com.sksamuel.elastic4s.http.{ElasticError, HttpClient, RequestFailure, RequestSuccess, Shards}
+import com.sksamuel.elastic4s.http.{ElasticClient, ElasticError, HttpClient, RequestFailure, RequestSuccess, Shards}
 import com.theguardian.multimedia.archivehunter.common.{ProxyType, _}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager, SQSClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models._
@@ -331,7 +330,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
       class TestClass extends ProxyFrameworkQueueFunctions {
         override protected val indexer = mock[Indexer]
         override protected val logger = mock[Logger]
-        override protected val esClient = mock[HttpClient]
+        override protected val esClient = mock[ElasticClient]
       }
 
       val toTest = new TestClass
@@ -492,7 +491,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
       mockedIndexer.getById(any)(any) returns Future(mockedEntry)
       mockedIndexer.indexSingleItem(any,any,any)(any) returns Future(Right("fake-id"))
 
-      val mockedEsClient = mock[com.sksamuel.elastic4s.http.HttpClient]
+      val mockedEsClient = mock[com.sksamuel.elastic4s.http.ElasticClient]
       val mockedEsClientManager = mock[ESClientManager]
       mockedEsClientManager.getClient() returns mockedEsClient
 
@@ -562,7 +561,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
       mockedIndexer.getById(any)(any) throws new RuntimeException("nothing existed")
       mockedIndexer.indexSingleItem(any,any,any)(any) returns Future(Right("fake-id"))
 
-      val mockedEsClient = mock[com.sksamuel.elastic4s.http.HttpClient]
+      val mockedEsClient = mock[com.sksamuel.elastic4s.http.ElasticClient]
       val mockedEsClientManager = mock[ESClientManager]
       mockedEsClientManager.getClient() returns mockedEsClient
 

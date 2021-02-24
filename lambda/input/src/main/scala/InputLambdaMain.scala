@@ -10,9 +10,9 @@ import com.amazonaws.services.sqs.model.SendMessageRequest
 import com.google.inject.Guice
 import com.theguardian.multimedia.archivehunter.common._
 import org.apache.logging.log4j.LogManager
-import com.sksamuel.elastic4s.http.{HttpClient, HttpRequestClient}
+import com.sksamuel.elastic4s.http.ElasticClient
 import com.theguardian.multimedia.archivehunter.common.cmn_helpers.PathCacheExtractor
-import com.theguardian.multimedia.archivehunter.common.cmn_models.{IngestMessage, ItemNotFound, JobModelDAO, JobStatus, PathCacheIndexer}
+import com.theguardian.multimedia.archivehunter.common.cmn_models.{IngestMessage, ItemNotFound, JobModelDAO, JobStatus, PathCacheEntry, PathCacheIndexer}
 import org.apache.http.HttpHost
 import org.elasticsearch.client.RestClient
 import io.circe.syntax._
@@ -37,14 +37,14 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
   protected def getS3Client = AmazonS3ClientBuilder.defaultClient()
   protected def getElasticClient(clusterEndpoint:String) = {
     val esClient = RestClient.builder(HttpHost.create(clusterEndpoint)).build()
-    HttpClient.fromRestClient(esClient)
+    ElasticClient.fromRestClient(esClient)
   }
 
   protected def getSqsClient() = AmazonSQSClientBuilder.defaultClient()
 
   protected def getIndexer(indexName: String) = new Indexer(indexName)
 
-  protected def getPathCacheIndexer(indexName: String, elasticClient:HttpClient) = new PathCacheIndexer(indexName, elasticClient)
+  protected def getPathCacheIndexer(indexName: String, elasticClient:ElasticClient) = new PathCacheIndexer(indexName, elasticClient)
 
   protected def getJobModelDAO = injector.getInstance(classOf[JobModelDAO])
 
@@ -85,15 +85,35 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
     }
   }
 
+  def writePathCacheEntries(newCacheEntries:Seq[PathCacheEntry])
+                           (implicit pathCacheIndexer:PathCacheIndexer,  elasticClient:ElasticClient) = {
+    import com.sksamuel.elastic4s.http.ElasticDsl._
+    import io.circe.generic.auto._
+    import com.sksamuel.elastic4s.circe._
+
+    Future.sequence(
+      newCacheEntries.map(entry=>elasticClient.execute(
+        update(entry.collection + entry.key) in s"${pathCacheIndexer.indexName}/pathcache" docAsUpsert entry
+      ))
+    ).map(responses=>{
+      val failures = responses.filter(_.isError)
+      if(failures.nonEmpty) {
+        logger.error(s"${failures.length} path cache entries failed: ")
+        failures.foreach(err=>logger.error(err.error.reason))
+      }
+      println(s"${failures.length} / ${newCacheEntries.length} path cache entries failed")
+    })
+  }
+
   /**
     * deal with an item created notification by adding it to the index
     * @param rec S3EventNotification record describing the event
     * @param i implicitly provided [[Indexer]] instance
     * @param s3Client implicitly provided AmazonS3 client instance
-    * @param elasticHttpClient implicitly provided HttpClient instance for Elastic Search
+    * @param elasticElasticClient implicitly provided ElasticClient instance for Elastic Search
     * @return a Future, containing the ID of the new/updated record as a String.  If the operation fails, the Future will fail; pick this up with .onComplete or .recover
     */
-  def handleCreated(rec:S3EventNotification.S3EventNotificationRecord,path: String)(implicit i:Indexer, pathCacheIndexer:PathCacheIndexer, s3Client:AmazonS3, elasticHttpClient:HttpClient):Future[String] = {
+  def handleCreated(rec:S3EventNotification.S3EventNotificationRecord,path: String)(implicit i:Indexer, pathCacheIndexer:PathCacheIndexer, s3Client:AmazonS3, elasticElasticClient:ElasticClient):Future[String] = {
     import com.sksamuel.elastic4s.http.ElasticDsl._
     import io.circe.generic.auto._
     import com.sksamuel.elastic4s.circe._
@@ -108,18 +128,7 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
     }
 
     println(s"going to update ${newCacheEntries.length} path cache entries")
-    Future.sequence(
-      newCacheEntries.map(entry=>elasticHttpClient.execute(
-        update(entry.collection + entry.key) in s"${pathCacheIndexer.indexName}/pathcache" docAsUpsert entry
-      ))
-    ).map(results=>{
-      val errors = results.collect({case Left(err)=>err})
-      if(errors.nonEmpty) {
-        logger.error(s"${errors.length} path cache entries failed: ")
-        errors.foreach(err=>logger.error(err.body.getOrElse(s"${err.error.reason}")))
-      }
-      println(s"${errors.length} / ${newCacheEntries.length} path cache entries failed")
-    }).flatMap(_=> {
+    writePathCacheEntries(newCacheEntries).flatMap(_=> {
       ArchiveEntry.fromS3(rec.getS3.getBucket.getName, path, s3Client.getRegionName).flatMap(entry => {
         println(s"Going to index $entry")
         i.indexSingleItem(entry).map({
@@ -140,10 +149,10 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
     * as a failure, simply note in the log.
     * @param rec S3EventNotificationRecord describing the event
     * @param i implictly provided [[Indexer]] instance
-    * @param elasticHttpClient implicitly provided HttpClient instance for ElasticSearch
+    * @param elasticElasticClient implicitly provided ElasticClient instance for ElasticSearch
     * @return a Future, containing a summary string if successful. The Future fails if the operation fails.
     */
-  def handleRemoved(rec: S3EventNotification.S3EventNotificationRecord,path: String)(implicit i:Indexer, elasticHttpClient:HttpClient):Future[String] = {
+  def handleRemoved(rec: S3EventNotification.S3EventNotificationRecord,path: String)(implicit i:Indexer, elasticElasticClient:ElasticClient):Future[String] = {
     ArchiveEntry.fromIndexFull(rec.getS3.getBucket.getName, path).flatMap({
       case Right(entry)=>
         println(s"$entry has been removed, updating record to tombstone")
@@ -246,7 +255,7 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
     val clusterEndpoint = getClusterEndpoint
 
     implicit val s3Client:AmazonS3 = getS3Client
-    implicit val elasticClient:HttpClient = getElasticClient(clusterEndpoint)
+    implicit val elasticClient:ElasticClient = getElasticClient(clusterEndpoint)
     implicit val i:Indexer = getIndexer(indexName)
     implicit val pc:PathCacheIndexer = getPathCacheIndexer(getPathCacheIndexName, elasticClient)
 

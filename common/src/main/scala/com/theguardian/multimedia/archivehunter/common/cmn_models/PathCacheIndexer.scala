@@ -3,18 +3,19 @@ package com.theguardian.multimedia.archivehunter.common.cmn_models
 import akka.actor.ActorSystem
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Keep, Sink, Source}
-import com.sksamuel.elastic4s.http.HttpClient
+import com.sksamuel.elastic4s.http.{ElasticClient, HttpClient}
 import com.sksamuel.elastic4s.http.search.SearchHit
-import com.sksamuel.elastic4s.searches.SearchDefinition
+import com.sksamuel.elastic4s.searches.SearchRequest
 import com.sksamuel.elastic4s.streams.RequestBuilder
 import com.theguardian.multimedia.archivehunter.common.cmn_helpers.PathCacheExtractor
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ArchiveEntryHitReader}
 import org.slf4j.LoggerFactory
 
+import scala.annotation.switch
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
-class PathCacheIndexer(val indexName:String, client:HttpClient, batchSize:Int=200, concurrentBatches:Int=2) extends ArchiveEntryHitReader {
+class PathCacheIndexer(val indexName:String, client:ElasticClient, batchSize:Int=200, concurrentBatches:Int=2) extends ArchiveEntryHitReader {
   import com.sksamuel.elastic4s.circe._
   import com.sksamuel.elastic4s.http.ElasticDsl._
   import com.sksamuel.elastic4s.streams.ReactiveElastic._
@@ -39,7 +40,7 @@ class PathCacheIndexer(val indexName:String, client:HttpClient, batchSize:Int=20
    * @param q
    * @return
    */
-  def getSource(q:SearchDefinition)(implicit actorSystem:ActorSystem, mat:Materializer)  = {
+  def getSource(q:SearchRequest)(implicit actorSystem:ActorSystem, mat:Materializer)  = {
     Source.fromPublisher(
       client.publisher(q)
     ).map(_.to[PathCacheEntry])
@@ -49,12 +50,13 @@ class PathCacheIndexer(val indexName:String, client:HttpClient, batchSize:Int=20
    * returns the overall size of the index
    * @return
    */
-  def size():Future[Long] = client.execute(count(indexName)).map({
-    case Left(failure)=>
-      logger.error(s"Could not perform count on $indexName: ${failure.body}")
-      throw new RuntimeException(s"Index error")  //this will manifest as a failed Future
-    case Right(response)=>
-      response.result.count
+  def size():Future[Long] = client.execute(count(indexName)).map(response=>{
+    (response.status: @switch) match {
+      case 200 => response.result.count
+      case _ =>
+        logger.error(s"Could not perform count on $indexName: ${response.error.reason}")
+        throw new RuntimeException(s"Index error") //this will manifest as a failed Future
+    }
   })
 
   protected def getArchiveItemSource(sourceIndexName:String)(implicit actorSystem:ActorSystem, mat:Materializer)  = Source.fromPublisher[SearchHit](

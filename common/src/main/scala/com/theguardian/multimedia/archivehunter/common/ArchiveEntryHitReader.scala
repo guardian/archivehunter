@@ -2,10 +2,11 @@ package com.theguardian.multimedia.archivehunter.common
 
 import java.time.format.DateTimeFormatter
 import java.time.{Instant, ZoneId, ZonedDateTime}
-
 import com.sksamuel.elastic4s.{Hit, HitReader}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{MediaMetadata, MediaMetadataMapConverters, StreamDisposition}
 import org.apache.logging.log4j.LogManager
+
+import scala.util.Try
 
 trait ArchiveEntryHitReader extends MediaMetadataMapConverters {
   private val ownLogger = LogManager.getLogger(getClass)
@@ -29,7 +30,7 @@ trait ArchiveEntryHitReader extends MediaMetadataMapConverters {
     )
 
   implicit object ArchiveEntryHR extends HitReader[ArchiveEntry] {
-    override def read(hit: Hit): Either[Throwable, ArchiveEntry] = {
+    override def read(hit: Hit): Try[ArchiveEntry] = {
       val size = try {
         hit.sourceField("size").asInstanceOf[Long]
       } catch {
@@ -37,9 +38,9 @@ trait ArchiveEntryHitReader extends MediaMetadataMapConverters {
           hit.sourceField("size").asInstanceOf[Int].toLong
       }
 
-      try {
+      Try {
         val timestamp = ZonedDateTime.parse(hit.sourceField("last_modified").asInstanceOf[String])
-        Right(ArchiveEntry(
+        ArchiveEntry(
           hit.sourceField("id").asInstanceOf[String],
           hit.sourceField("bucket").asInstanceOf[String],
           hit.sourceField("path").asInstanceOf[String],
@@ -65,10 +66,7 @@ trait ArchiveEntryHitReader extends MediaMetadataMapConverters {
                   None
               }
           }
-        ))
-      } catch {
-        case ex:Throwable=>
-          Left(ex)
+        )
       }
     }
   }

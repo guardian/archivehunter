@@ -1,12 +1,12 @@
 package com.theguardian.multimedia.archivehunter.common
 
 import java.time.{ZoneId, ZonedDateTime}
-
 import akka.stream.alpakka.dynamodb.scaladsl.DynamoClient
 import com.amazonaws.services.s3.{AmazonS3, AmazonS3Client}
-import com.sksamuel.elastic4s.http.HttpClient
+import com.sksamuel.elastic4s.http.{ElasticClient, HttpClient}
 import com.theguardian.multimedia.archivehunter.common.StorageClass.StorageClass
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{IndexerError, MediaMetadata}
+
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 import org.apache.logging.log4j.LogManager
@@ -61,10 +61,10 @@ object ArchiveEntry extends ((String, String, String, Option[String], Option[Str
     fromS3Sync(bucket, key,region)
   }
 
-  def fromIndex(bucket:String, key:String)(implicit indexer:Indexer, httpClient: HttpClient):Future[ArchiveEntry] =
+  def fromIndex(bucket:String, key:String)(implicit indexer:Indexer, httpClient: ElasticClient):Future[ArchiveEntry] =
     indexer.getById(makeDocId(bucket, key))
 
-  def fromIndexFull(bucket:String, key:String)(implicit indexer:Indexer, httpClient: HttpClient):Future[Either[IndexerError,ArchiveEntry]] =
+  def fromIndexFull(bucket:String, key:String)(implicit indexer:Indexer, httpClient: ElasticClient):Future[Either[IndexerError,ArchiveEntry]] =
     indexer.getByIdFull(makeDocId(bucket, key))
 }
 
@@ -82,7 +82,7 @@ case class ArchiveEntry(id:String, bucket: String, path: String, region:Option[S
     * @param httpClient implicitly provided elastic4s HttpClient object to allow index save access
     * @return a Future, containing an [[ArchiveEntry]] representing the updated record.  This future fails on error.
     */
-  def registerNewProxy(proxy: ProxyLocation)(implicit proxyLocationDAO: ProxyLocationDAO, indexer:Indexer, client:DynamoClient, httpClient: HttpClient):Future[ArchiveEntry] = {
+  def registerNewProxy(proxy: ProxyLocation)(implicit proxyLocationDAO: ProxyLocationDAO, indexer:Indexer, client:DynamoClient, httpClient: ElasticClient):Future[ArchiveEntry] = {
     proxyLocationDAO.saveProxy(proxy)
       .map({
         case Some(Right(result))=>

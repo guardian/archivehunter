@@ -8,7 +8,7 @@ import com.sksamuel.elastic4s.http.search.SearchHit
 import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
 import scala.concurrent.ExecutionContext.Implicits.global
-import com.sksamuel.elastic4s.http.{HttpClient, RequestFailure}
+import com.sksamuel.elastic4s.http.{ElasticClient, HttpClient, RequestFailure}
 import com.sksamuel.elastic4s.mappings.FieldType._
 import com.theguardian.multimedia.archivehunter.common.cmn_models._
 import io.circe.generic.auto._
@@ -29,7 +29,7 @@ class ProblemItemIndexer(indexName:String) extends ZonedDateTimeEncoder with Sto
   import com.sksamuel.elastic4s.streams.ReactiveElastic._
   import com.sksamuel.elastic4s.circe._
 
-  def sourceForCollection(collectionName:String)(implicit client:HttpClient, mat:Materializer, system:ActorSystem) = {
+  def sourceForCollection(collectionName:String)(implicit client:ElasticClient, mat:Materializer, system:ActorSystem) = {
     Source.fromPublisher(client.publisher(search(indexName) query termQuery("collection.keyword", collectionName) scroll "5m"))
   }
 
@@ -40,7 +40,7 @@ class ProblemItemIndexer(indexName:String) extends ZonedDateTimeEncoder with Sto
     * @param client implicitly provided elastic4s HttpClient object
     * @return a Future containing a Try with either the ID of the new item or a RuntimeException containing the failure
     */
-  def indexSingleItem(entry:ProblemItem, entryId: Option[String]=None, refreshPolicy: RefreshPolicy=RefreshPolicy.WAIT_UNTIL)(implicit client:HttpClient):Future[Try[String]] = {
+  def indexSingleItem(entry:ProblemItem, entryId: Option[String]=None, refreshPolicy: RefreshPolicy=RefreshPolicy.WAIT_UNTIL)(implicit client:ElasticClient):Future[Try[String]] = {
     val idToUse = entryId match {
       case None => entry.fileId
       case Some(userSpecifiedId)=> userSpecifiedId
@@ -48,13 +48,16 @@ class ProblemItemIndexer(indexName:String) extends ZonedDateTimeEncoder with Sto
 
     client.execute {
       update(idToUse).in(s"$indexName/problem").docAsUpsert(entry)
-    }.map({
-      case Left(failure) => Failure(new RuntimeException(failure.error.toString))
-      case Right(success) => Success(success.result.id)
+    }.map(response=>{
+      (response.status: @switch) match {
+        case 200=>Success(response.result.id)
+        case other=>Failure(new RuntimeException(s"Elasticsearch returned a $other error: ${response.error.reason}"))
+      }
     })
+
   }
 
-  def indexSummaryCount(entry:ProblemItemCount, refreshPolicy:RefreshPolicy=RefreshPolicy.WAIT_UNTIL)(implicit client:HttpClient) =
+  def indexSummaryCount(entry:ProblemItemCount, refreshPolicy:RefreshPolicy=RefreshPolicy.WAIT_UNTIL)(implicit client:ElasticClient) =
     client.execute({
       indexInto(s"$indexName/summary").doc(entry)
     })
@@ -66,12 +69,16 @@ class ProblemItemIndexer(indexName:String) extends ZonedDateTimeEncoder with Sto
     * @param client
     * @return a Future contianing a String with summary info.  Future will fail on error, pick this up in the usual ways.
     */
-  def removeSingleItem(entryId:String, refreshPolicy: RefreshPolicy=RefreshPolicy.WAIT_UNTIL)(implicit client:HttpClient):Future[String] = {
+  def removeSingleItem(entryId:String, refreshPolicy: RefreshPolicy=RefreshPolicy.WAIT_UNTIL)(implicit client:ElasticClient):Future[String] = {
     client.execute {
       delete(entryId).from(s"$indexName/problem")
-    }.map({
-      case Left(failure)=> throw new RuntimeException(failure.error.toString) //fail the future, this is handled by caller
-      case Right(success) => success.result.toString
+    }.flatMap(response=>{
+      (response.status: @switch) match {
+        case 200=>
+          Future(response.result.toString)
+        case other=>
+          Future.failed(new RuntimeException(s"Elasticsearch returned a $other error: ${response.error.reason}"))
+      }
     })
   }
 
@@ -82,11 +89,15 @@ class ProblemItemIndexer(indexName:String) extends ZonedDateTimeEncoder with Sto
     * @param client implicitly provided elastic4s HttpClient object
     * @return
     */
-  def newIndex(shardCount:Int, replicaCount:Int)(implicit client:HttpClient):Future[Try[CreateIndexResponse]] = client.execute {
+  def newIndex(shardCount:Int, replicaCount:Int)(implicit client:ElasticClient):Future[Try[CreateIndexResponse]] = client.execute {
     createIndex(indexName) shards shardCount replicas replicaCount
-  }.map({
-    case Left(failure)=>Failure(new RuntimeException(failure.error.toString))
-    case Right(success)=>Success(success.result)
+  }.map(response=>{
+    (response.status: @switch) match {
+      case 200=>
+        Success(response.result)
+      case other=>
+         Failure(new RuntimeException(s"Elasticsearch returned a $other error: ${response.error.reason}"))
+    }
   })
 
   /**
@@ -95,7 +106,7 @@ class ProblemItemIndexer(indexName:String) extends ZonedDateTimeEncoder with Sto
     * @param client implicitly provided index client
     * @return a Future containing an ProblemItem.  The future is cancelled if anything fails - use .recover or .recoverWith to pick this up.
     */
-  def getById(docId:String)(implicit client:HttpClient):Future[ProblemItem] = getByIdFull(docId).map({
+  def getById(docId:String)(implicit client:ElasticClient):Future[ProblemItem] = getByIdFull(docId).map({
     case Left(err)=> throw new RuntimeException(err.toString)
     case Right(entry)=>entry
   })
@@ -106,16 +117,14 @@ class ProblemItemIndexer(indexName:String) extends ZonedDateTimeEncoder with Sto
     * @param client implicitly provided index client
     * @return a Future containing either an ProblemItem or a subclass of IndexerError describing the actual error.
     */
-  def getByIdFull(docId:String)(implicit client:HttpClient):Future[Either[IndexerError,ProblemItem]] = client.execute {
+  def getByIdFull(docId:String)(implicit client:ElasticClient):Future[Either[IndexerError,ProblemItem]] = client.execute {
     get(indexName, "problem", docId)
-  }.map({
-    case Left(failure)=>Left(ESError(docId, failure))
-    case Right(success)=>
-      (success.status: @switch) match {
+  }.map(result=>{
+      (result.status: @switch) match {
         case 200 =>
-          ProblemItemHR.read(success.result) match {
-            case Left(err) => Left(SystemError(docId, err))
-            case Right(entry) => Right(entry)
+          ProblemItemHR.read(result.result) match {
+            case Failure(err) => Left(SystemError(docId, err))
+            case Success(entry) => Right(entry)
           }
         case 404 =>
           Left(ItemNotFound(docId))
@@ -124,11 +133,17 @@ class ProblemItemIndexer(indexName:String) extends ZonedDateTimeEncoder with Sto
       }
   })
 
-  def mostRecentStats(implicit client:HttpClient) = client.execute(
+  def mostRecentStats(implicit client:ElasticClient) = client.execute(
     search(s"$indexName/summary") sortByFieldDesc "scanStart" limit 1
-  ).map(_.map(success=>success.result.to[ProblemItemCount].headOption))
+  ).map(response=>{
+    if(response.isError) {
+      Left(response.error)
+    } else {
+      Right(response.result.to[ProblemItemCount].headOption)
+    }
+  })
 
-  def deleteEntry(entry:ProblemItem)(implicit client:HttpClient) = client.execute {
+  def deleteEntry(entry:ProblemItem)(implicit client:ElasticClient) = client.execute {
     deleteByQuery(indexName, "problem", matchQuery("fileId", entry.fileId))
   }
 }

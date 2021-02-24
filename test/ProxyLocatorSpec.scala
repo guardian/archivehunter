@@ -1,6 +1,6 @@
 import java.time.ZonedDateTime
-
-import com.sksamuel.elastic4s.http.{ElasticError, HttpClient, RequestFailure}
+import com.sksamuel.elastic4s.http.{ElasticClient, ElasticError, HttpClient, RequestFailure}
+import com.theguardian.multimedia.archivehunter.common.cmn_models.{ConflictError, UnexpectedReturnCode}
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer, MimeType, ProxyType, StorageClass}
 import helpers.ProxyLocator
 import org.specs2.mock.Mockito
@@ -71,16 +71,14 @@ class ProxyLocatorSpec extends Specification with Mockito {
         mediaMetadata = None
       )
 
-      val initialError = RequestFailure(409,None,Map(),ElasticError("version_conflict_engine_exception","something went splat",None,None,None,Seq()))
-
       implicit val mockIndexer = mock[Indexer]
-      mockIndexer.indexSingleItem(any,any,any)(any) returns Future(Left(initialError)) thenReturns Future(Left(initialError)) thenReturns Future(Right("someid"))
+      mockIndexer.indexSingleItem(any,any,any)(any) returns Future(Left(ConflictError("some-item-id","conflict"))) thenReturns Future(Left(ConflictError("some-item-id","conflict"))) thenReturns Future(Right("some-item-id"))
       mockIndexer.getById(any)(any) returns Future(fakeEntry)
 
-      implicit val mockEsClient = mock[HttpClient]
+      implicit val mockEsClient = mock[ElasticClient]
 
       val result = Await.result(ProxyLocator.setProxiedWithRetry("some-source-id"), 30 seconds)
-      result must beRight("someid")
+      result must beRight("some-item-id")
       there were three(mockIndexer).indexSingleItem(any, any, any)(any)
       there were three(mockIndexer).getById(any)(any)
     }
@@ -107,7 +105,7 @@ class ProxyLocatorSpec extends Specification with Mockito {
       implicit val mockIndexer = mock[Indexer]
       mockIndexer.indexSingleItem(any,any,any)(any) returns Future(Right("someid"))
       mockIndexer.getById(any)(any) returns Future(fakeEntry)
-      implicit val mockEsClient = mock[HttpClient]
+      implicit val mockEsClient = mock[ElasticClient]
 
       val result = Await.result(ProxyLocator.setProxiedWithRetry("some-source-id"), 30 seconds)
       result must beRight("someid")
@@ -134,13 +132,11 @@ class ProxyLocatorSpec extends Specification with Mockito {
         mediaMetadata = None
       )
 
-      val initialError = RequestFailure(500,None,Map(),ElasticError("some_other_error","something went splat",None,None,None,Seq()))
-
       implicit val mockIndexer = mock[Indexer]
-      mockIndexer.indexSingleItem(any,any,any)(any) returns Future(Left(initialError))
+      mockIndexer.indexSingleItem(any,any,any)(any) returns Future(Left(UnexpectedReturnCode("some-item-id",1234,Some("something went splat"))))
       mockIndexer.getById(any)(any) returns Future(fakeEntry)
 
-      implicit val mockEsClient = mock[HttpClient]
+      implicit val mockEsClient = mock[ElasticClient]
 
       val result = Await.result(ProxyLocator.setProxiedWithRetry("some-source-id"), 30 seconds)
       result must beLeft

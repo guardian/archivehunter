@@ -36,10 +36,12 @@ class AppStartup @Inject()(@Named("bucketScannerActor") bucketScanner:ActorRef, 
     val indexMgt = injector.instanceOf(classOf[IndexManagement])
 
     indexMgt.doIndexCreate().onComplete({
-      case Success(Left(err))=>
-        if(err.error.`type`!="resource_already_exists_exception")  logger.error(s"Index create request failed: $err")
-      case Success(Right(response))=>
-        logger.info(s"Index create successful: $response")
+      case Success(response)=>
+        if(response.isError && response.error.`type`!="resource_already_exists_exception")  {
+          logger.error(s"Index create request failed: ${response.status} ${response.error.reason}")
+        } else {
+          logger.info(s"Index create successful: $response")
+        }
       case Failure(err)=>
         logger.error(s"Index create request failed: $err")
     })

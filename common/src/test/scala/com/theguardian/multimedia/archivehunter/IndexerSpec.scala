@@ -1,9 +1,8 @@
 package com.theguardian.multimedia.archivehunter
 
 import java.time.ZonedDateTime
-
 import com.sksamuel.elastic4s.embedded.LocalNode
-import com.sksamuel.elastic4s.http.HttpClient
+import com.sksamuel.elastic4s.http.{ElasticClient, HttpClient}
 import com.sksamuel.elastic4s.http.index.CreateIndexResponse
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer, MimeType, StorageClass}
 import org.elasticsearch.client.ElasticsearchClient
@@ -17,7 +16,6 @@ import java.io._
 
 class IndexerSpec extends Specification with AfterAll {
   val localNode = LocalNode("testcluster","/tmp/ah-test-data")
-
   def recursive_delete(file: File) {
     if (file.isDirectory)
       Option(file.listFiles).map(_.toList).getOrElse(Nil).foreach(recursive_delete(_))
@@ -31,7 +29,7 @@ class IndexerSpec extends Specification with AfterAll {
 
   "Indexer.indexSingleItem" should {
     "add a single item to the index" in {
-      implicit val client:HttpClient = localNode.http(shutdownNodeOnClose = false)
+      implicit val client:ElasticClient = localNode.client(shutdownNodeOnClose = false)
 
       val entry = ArchiveEntry(
         "sfdfsdjfsdhjfsd",
@@ -59,7 +57,7 @@ class IndexerSpec extends Specification with AfterAll {
 
   "Indexer.newIndex" should {
     "error if the index already exists" in {
-      implicit val client:HttpClient = localNode.http(shutdownNodeOnClose = false)
+      implicit val client:ElasticClient = localNode.client(shutdownNodeOnClose = false)
 
       val i = new Indexer("testindexexisting")
       Await.result(i.newIndex(2,3), 3 seconds)
@@ -68,7 +66,7 @@ class IndexerSpec extends Specification with AfterAll {
     }
 
     "create a new index" in {
-      implicit val client:HttpClient = localNode.http(shutdownNodeOnClose = false)
+      implicit val client:ElasticClient = localNode.client(shutdownNodeOnClose = false)
 
       val i = new Indexer("testindexnewname")
       val result = Await.result(i.newIndex(2,3), 3 seconds)
