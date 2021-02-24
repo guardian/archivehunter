@@ -71,10 +71,7 @@ class ProxyLocatorSpec extends Specification with Mockito {
         mediaMetadata = None
       )
 
-      //val initialError = RequestFailure(409,None,Map(),ElasticError("version_conflict_engine_exception","something went splat",None,None,None,Seq()))
-
       implicit val mockIndexer = mock[Indexer]
-      //mockIndexer.indexSingleItem(any,any,any)(any) returns Future(Left(initialError)) thenReturns Future(Left(initialError)) thenReturns Future(Right("someid"))
       mockIndexer.indexSingleItem(any,any,any)(any) returns Future(Left(ConflictError("some-item-id","conflict"))) thenReturns Future(Left(ConflictError("some-item-id","conflict"))) thenReturns Future(Right("some-item-id"))
       mockIndexer.getById(any)(any) returns Future(fakeEntry)
 
@@ -135,10 +132,7 @@ class ProxyLocatorSpec extends Specification with Mockito {
         mediaMetadata = None
       )
 
-      //val initialError = RequestFailure(500,None,Map(),ElasticError("some_other_error","something went splat",None,None,None,Seq()))
-
       implicit val mockIndexer = mock[Indexer]
-      //mockIndexer.indexSingleItem(any,any,any)(any) returns Future(Left(initialError))
       mockIndexer.indexSingleItem(any,any,any)(any) returns Future(Left(UnexpectedReturnCode("some-item-id",1234,Some("something went splat"))))
       mockIndexer.getById(any)(any) returns Future(fakeEntry)
 

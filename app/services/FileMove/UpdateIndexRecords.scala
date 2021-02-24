@@ -1,8 +1,7 @@
 package services.FileMove
 
-import akka.remote.transport.ThrottlerTransportAdapter
 import akka.stream.alpakka.dynamodb.scaladsl.DynamoClient
-import com.sksamuel.elastic4s.http.{ElasticClient, HttpClient}
+import com.sksamuel.elastic4s.http.ElasticClient
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer, ProxyLocation, ProxyLocationDAO}
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -75,6 +74,9 @@ class UpdateIndexRecords(indexer:Indexer, proxyLocationDAO: ProxyLocationDAO)(im
       } else {
         logger.debug(s"Looking up ${state.sourceFileId}")
 
+        //this used to be written with a load of nested flatMaps which was so horrible as to be nearly unreadable,
+        //so the logic is now in the separate functions above and we use a for-comprehension to avoid the need for
+        //nested map/flatMap
         val updatedEntryFut = for {
           entry <- indexer.getById(state.sourceFileId)
           updatedEntry <- updateEntry(entry, state.destFileId.get, state.destBucket)
@@ -82,13 +84,12 @@ class UpdateIndexRecords(indexer:Indexer, proxyLocationDAO: ProxyLocationDAO)(im
           writeResult <- writeProxies(state.destFileProxy.getOrElse(Seq()))
         } yield (updatedEntry, writeResult)
 
-        updatedEntryFut
-          .flatMap(_=> {
-            for {
-              _ <- deleteOriginalProxies(state.sourceFileProxies.getOrElse(Seq()))
-              deletionResult <- indexer.deleteById(state.sourceFileId)
-            } yield deletionResult
-          }).onComplete({
+        updatedEntryFut.flatMap(_=> {
+          for {
+            _ <- deleteOriginalProxies(state.sourceFileProxies.getOrElse(Seq()))
+            deletionResult <- indexer.deleteById(state.sourceFileId)
+          } yield deletionResult
+        }).onComplete({
           case Success(_)=>
             originalSender ! StepSucceeded(state)
           case Failure(err)=>
@@ -96,64 +97,6 @@ class UpdateIndexRecords(indexer:Indexer, proxyLocationDAO: ProxyLocationDAO)(im
             originalSender ! StepFailed(state, err.toString)
         })
       }
-//  override def receive: Receive = {
-//    case PerformStep(state)=>
-//      val originalSender = sender()
-//      if(state.sourceFileProxies.isEmpty || state.destFileProxy.isEmpty || state.destFileId.isEmpty){
-//        sender() ! StepFailed(state, "Not enough state elements were defined")
-//      } else {
-//        logger.debug(s"Looking up ${state.sourceFileId}")
-//        indexer.getById(state.sourceFileId).flatMap(entry => {
-//          logger.debug(s"Looked up entry: $entry")
-//          val updatedEntry = entry.copy(id = state.destFileId.get,bucket=state.destBucket)
-//          indexer.indexSingleItem(updatedEntry).flatMap({
-//            val proxyUpdateFutureList = state.destFileProxy.get.map(loc => proxyLocationDAO.saveProxy(loc))
-//
-//              Future.sequence(proxyUpdateFutureList).flatMap(proxyUpdateResults => {
-//                val failures = proxyUpdateResults.collect({ case Some(Left(err)) => err })
-//                if (failures.nonEmpty) {
-//                  logger.error(s"Could not copy all proxies:")
-//                  failures.foreach(err => logger.error(err.toString))
-//
-//                  //don't do the rollback here, we will be requested to rollback by the supervisor and
-//                  //handle this in RollbackStep below
-//                  Future.failed(new RuntimeException(failures.map(_.toString).mkString(",")))
-//                } else {
-//                  logger.info("Updated entry and proxies")
-//                  val failures = proxyUpdateResults.collect({case Some(Left(err))=>err})
-//                  if(failures.nonEmpty){
-//                    logger.error(s"${failures.length} proxy copies failed: ")
-//                    failures.foreach(errMsg => logger.error(s"\t$errMsg"))
-//                    Future.failed(new RuntimeException(s"${failures.length} proxy copies failed"))
-//                  } else {
-//                    Future.sequence(state.sourceFileProxies.get.map(loc => proxyLocationDAO.deleteProxyRecord(loc.proxyId))).flatMap(results => {
-//                      val failures = results.collect({ case Left(err) => err })
-//                      if (failures.nonEmpty) {
-//                        logger.error(s"${failures.length} proxy deletes failed: ")
-//                        failures.foreach(errMsg => logger.error(s"\t$errMsg"))
-//                        Future.failed(new RuntimeException(s"${failures.length} proxy deletes failed"))
-//                      } else {
-//                        originalSender ! StepSucceeded(state)
-//                        Future(())
-//                      }
-//                    })
-//                  }
-//                }
-//              }).map(_=>indexer.deleteById(state.sourceFileId)) //with the proxies gone, now delete the original item ID
-//
-//            case Left(dbErr)=>
-//              println(dbErr.toString)
-//              Future.failed(new RuntimeException(s"Could not update index: ${dbErr.toString}"))
-//          })
-//        }).recover({
-//          case err: Throwable =>
-//            println(err.getMessage)
-//            logger.error("Could not update index records:", err)
-//            //don't do the rollback here, we will be requested to rollback by the supervisor and
-//            //handle this in RollbackStep below
-//            originalSender ! StepFailed(state, err.toString)
-//        })
-//      }
 
     case RollbackStep(state)=>
       val originalSender = sender()
@@ -163,7 +106,7 @@ class UpdateIndexRecords(indexer:Indexer, proxyLocationDAO: ProxyLocationDAO)(im
       } else {
         val resaveFuture = indexer.getById(state.destFileId.get).flatMap(destEntry => {
           val reconstitutedSource = destEntry.copy(id = state.sourceFileId, bucket = state.entry.get.bucket)
-          indexer.indexSingleItem(reconstitutedSource)
+          writeRecord(reconstitutedSource)
         })
 
         val indexDeleteFuture = resaveFuture.map(_=>{

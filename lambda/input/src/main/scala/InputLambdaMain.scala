@@ -103,14 +103,6 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
       }
       println(s"${failures.length} / ${newCacheEntries.length} path cache entries failed")
     })
-//      .map(results=>{
-//      val errors = results.collect({case Left(err)=>err})
-//      if(errors.nonEmpty) {
-//        logger.error(s"${errors.length} path cache entries failed: ")
-//        errors.foreach(err=>logger.error(err.body.getOrElse(s"${err.error.reason}")))
-//      }
-//      println(s"${errors.length} / ${newCacheEntries.length} path cache entries failed")
-//    })
   }
 
   /**
