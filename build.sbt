@@ -123,6 +123,7 @@ lazy val inputLambda = (project in file("lambda/input"))
     case "application.conf" => MergeStrategy.concat
       //META-INF/org/apache/logging/log4j/core/config/plugins/Log4j2Plugins.dat
     case PathList("META-INF","org","apache","logging","log4j","core","config","plugins","Log4j2Plugins.dat") => MergeStrategy.last
+    case PathList(ps @ _*) if ps.last == "module-info.class" => MergeStrategy.discard
     case meta(_)=>MergeStrategy.discard
     case x=>
       val oldStrategy = (assemblyMergeStrategy in assembly).value
