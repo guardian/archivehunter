@@ -108,6 +108,29 @@ const NewBrowseComponent:React.FC<RouteComponentProps> = (props) => {
         refreshCollectionNames();
     }, []);
 
+    const idXtractor = /^([^:]+):(.*)$/;
+
+    /**
+     * decode an incoming item id to extract the collection and path parts
+     * @param itemId item id to decode
+     * @returns undefined if the id is not valid, or a 2-element array consisting of (collection, path)
+     */
+    const decodeIncomingItemId = (itemId:string) => {
+        try {
+            const decoded = atob(itemId);
+            const matches = idXtractor.exec(decoded);
+
+            if (matches) {
+                return [matches[1], matches[2]]
+            } else {
+                return undefined
+            }
+        } catch(err) {
+            console.error("Could not decode incoming string: ", err);
+            return undefined;
+        }
+    }
+
     /**
      * if an item is specified on the url then open it
      */
@@ -116,7 +139,16 @@ const NewBrowseComponent:React.FC<RouteComponentProps> = (props) => {
 
         if(urlParams.hasOwnProperty("open")) {
             console.log("Requested to open file id ", urlParams.open);
-            setUrlRequestedItem(urlParams.open);
+            const maybeDecoded = decodeIncomingItemId(urlParams.open);
+            if(maybeDecoded) {
+                setCurrentCollection(maybeDecoded[0]);
+                setUrlRequestedItem(urlParams.open);
+            } else {
+                console.error("The given item ID was not valid");
+                setLastError("The given item ID was not valid");
+                setShowingAlert(true);
+            }
+
         }
 
     }, []);
