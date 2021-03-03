@@ -81,6 +81,7 @@ const NewBrowseComponent:React.FC<RouteComponentProps> = (props) => {
     const [newlyLightboxed, setNewlyLightboxed] = useState<string[]>([]);
     const [selectedEntry, setSelectedEntry] = useState<ArchiveEntry|undefined>(undefined);
     const [loading, setLoading] = useState(false);
+    const [switchToPathsEnabled, setSwitchToPathsEnabled] = useState(false);
 
     const [urlRequestedItem, setUrlRequestedItem] = useState<string|undefined>(undefined);
 
@@ -143,6 +144,7 @@ const NewBrowseComponent:React.FC<RouteComponentProps> = (props) => {
             const maybeDecoded = decodeIncomingItemId(urlParams.open);
             if(maybeDecoded) {
                 console.log("Changing collection to ", maybeDecoded[0]);
+                setSwitchToPathsEnabled(true);
                 setCurrentCollection(maybeDecoded[0]);
                 setUrlRequestedItem(urlParams.open);
             } else {
@@ -172,21 +174,23 @@ const NewBrowseComponent:React.FC<RouteComponentProps> = (props) => {
         setSearchDoc(docWithPath);
     }, [currentCollection, reloadCounter, currentPath, sortField, sortOrder]);
 
-    // const pathOnlyRegex = new RegExp("/[^/]*$");
-    //  commented out, this makes clicking on an entry lose everything else that is not in its dirs
-    // /**
-    //  * make sure that the path is open if an item is selected
-    //  */
-    // useEffect(()=>{
-    //     if(selectedEntry && currentPath!=selectedEntry.path) {
-    //         const pathOnly = selectedEntry.path.replace(pathOnlyRegex, "");
-    //         console.log("setting path to ", pathOnly);
-    //         setCurrentPath(pathOnly);
-    //     }
-    //     if(selectedEntry && currentCollection!=selectedEntry.bucket) {
-    //         setCurrentCollection(selectedEntry.bucket)
-    //     }
-    // }, [selectedEntry]);
+    const pathOnlyRegex = new RegExp("/[^/]*$");
+
+    /**
+     * make sure that the path is open if an item is selected.  We have a global enable on this, otherwise whenever you
+     * click an item everything not in that item's directory vanishes, which is quite confusing UX.
+     */
+    useEffect(()=>{
+        if(selectedEntry && switchToPathsEnabled && currentPath!=selectedEntry.path) {
+            const pathOnly = selectedEntry.path.replace(pathOnlyRegex, "");
+            console.log("setting path to ", pathOnly);
+            setCurrentPath(pathOnly);
+            setSwitchToPathsEnabled(false);
+        }
+        if(selectedEntry && currentCollection!=selectedEntry.bucket) {
+            setCurrentCollection(selectedEntry.bucket)
+        }
+    }, [selectedEntry, switchToPathsEnabled]);
 
     useEffect(()=>{
         if(selectedEntry) {
@@ -274,6 +278,7 @@ const NewBrowseComponent:React.FC<RouteComponentProps> = (props) => {
                                 advancedSearch={searchDoc}
                                 onLoadingStarted={()=>setLoading(true)}
                                 onLoadingFinished={loadingDidComplete}
+                                extraRequiredItemId={urlRequestedItem}
             />
         </div>
         <div className={classes.detailsArea} style={{gridColumnStart: rightDividerPos}}>

@@ -1,5 +1,5 @@
 import React, {useState, useEffect} from "react";
-import {AdvancedSearchDoc, ArchiveEntry, ArchiveEntryResponse, SearchResponse} from "../types";
+import {AdvancedSearchDoc, ArchiveEntry, ArchiveEntryResponse, ObjectGetResponse, SearchResponse} from "../types";
 import axios, {AxiosResponse, CancelToken} from "axios";
 import {formatError} from "./ErrorViewComponent";
 import {Grid, makeStyles, Typography} from "@material-ui/core";
@@ -17,6 +17,7 @@ interface NewSearchComponentProps {
     onErrorOccurred: (errorDescription:string)=>void;   //called when a load error occurs, parent should display the error
     onLoadingStarted?: ()=>void;
     onLoadingFinished?: (loadedData:ArchiveEntry[])=>void;
+    extraRequiredItemId?: string;         //if the container wants to be sure certain items are loaded, given that they exist, put the id here
 }
 
 const useStyles = makeStyles({
@@ -105,12 +106,36 @@ const NewSearchComponent:React.FC<NewSearchComponentProps> = (props) => {
         }
     }
 
-
     useEffect(()=>{
         if(!loadingInProgress && props.onLoadingFinished) {
             props.onLoadingFinished(entries);
         }
     }, [loadingInProgress, entries]);
+
+    /**
+     * loads in a single extra item by ID and prepends it to the content list.
+     * invokes the onErrorOccurred callback if it can't load the item for some reason
+     * @param itemId item ID to load
+     */
+    const loadExtraItem = async (itemId:string) => {
+        try {
+            const response = await axios.get<ObjectGetResponse<ArchiveEntry>>(`/api/entry/${itemId}`);
+            setEntries((prev)=>Object.assign([], response.data.entry, prev));
+        } catch(err) {
+            props.onErrorOccurred(formatError(err, false));
+        }
+    }
+    useEffect(()=>{
+        if(props.extraRequiredItemId && !loadingInProgress) {   //only load in when everything else is done
+            const matchingEntries = entries.filter(entry=>entry.id===props.extraRequiredItemId).length;
+            if(matchingEntries==0) {
+                console.log("loading in extra item from ", props.extraRequiredItemId);
+                loadExtraItem(props.extraRequiredItemId);
+            } else {
+                console.log("extra item ", props.extraRequiredItemId, " already loaded in")
+            }
+        }
+    }, [props.extraRequiredItemId, loadingInProgress]);
 
     const indexForFileid = (entryId:string)=>{
         for(let i=0;i<entries.length;++i){
