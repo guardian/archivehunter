@@ -120,7 +120,11 @@ const NewSearchComponent:React.FC<NewSearchComponentProps> = (props) => {
     const loadExtraItem = async (itemId:string) => {
         try {
             const response = await axios.get<ObjectGetResponse<ArchiveEntry>>(`/api/entry/${itemId}`);
-            setEntries((prev)=>Object.assign([], response.data.entry, prev));
+            setEntries((prev)=>{
+                const newEntries = Object.assign([], response.data.entry, prev);
+                if(props.onLoadingFinished) props.onLoadingFinished(entries);
+                return newEntries;
+            });
         } catch(err) {
             props.onErrorOccurred(formatError(err, false));
         }
