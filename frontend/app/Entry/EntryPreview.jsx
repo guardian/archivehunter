@@ -36,7 +36,7 @@ class EntryPreview extends React.Component {
     static propTypes = {
         entryId: PropTypes.string.isRequired,
         mimeType: PropTypes.object.isRequired,  //MimeType record
-        fileExtension: PropTypes.string.isRequired,
+        fileExtension: PropTypes.string,
         autoPlay: PropTypes.bool,
         hasProxy: PropTypes.bool.isRequired,
         triggeredProxyGeneration: PropTypes.func

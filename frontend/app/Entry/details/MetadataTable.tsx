@@ -5,15 +5,11 @@ import {ArchiveEntry} from "../../types";
 import {makeStyles} from "@material-ui/core";
 import clsx from "clsx";
 import PathDisplayComponent from "../../browse/PathDisplayComponent";
+import {FileInfo, extractFileInfo} from "../../common/Fileinfo";
 
 interface MetadataTableProps {
     entry: ArchiveEntry;
     tableRowsInsert?: React.ReactFragment[];
-}
-
-interface FileInfo {
-    filename: string;
-    filepath: string;
 }
 
 const useStyles = makeStyles({
@@ -40,21 +36,6 @@ const useStyles = makeStyles({
     }
 });
 
-const extractFileInfo = (fullpath:string) => {
-    const parts = fullpath.split("/");
-    const len = parts.length;
-    if(len===0){
-        return {
-            filename: parts[0],
-            filepath: ""
-        }
-    }
-
-    return {
-        filename: parts[len-1],
-        filepath: parts.slice(0,len-1).join("/")
-    }
-}
 
 const MetadataTable:React.FC<MetadataTableProps> = (props) => {
     const [firstVideoStream, setFirstVideoStream] = useState<any|undefined>(undefined);
