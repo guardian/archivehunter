@@ -78,6 +78,7 @@ const NewSearchComponent:React.FC<NewSearchComponentProps> = (props) => {
         try {
             if(startAt+props.pageSize>props.itemLimit) {
                 console.log(`Hit the item limit of ${props.itemLimit}, stopping`);
+                setLoadingInProgress(false);
                 return true;
             }
             const results = await makeSearchRequest(token, startAt);
