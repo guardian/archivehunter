@@ -132,7 +132,8 @@ const NewBrowseComponent:React.FC<RouteComponentProps> = (props) => {
     }
 
     /**
-     * if an item is specified on the url then open it
+     * if an item is specified on the url then open it.
+     * we can only do this once the collections have been loaded in
      */
     useEffect(()=>{
         const urlParams = urlParamsFromSearch(props.location.search);
@@ -141,6 +142,7 @@ const NewBrowseComponent:React.FC<RouteComponentProps> = (props) => {
             console.log("Requested to open file id ", urlParams.open);
             const maybeDecoded = decodeIncomingItemId(urlParams.open);
             if(maybeDecoded) {
+                console.log("Changing collection to ", maybeDecoded[0]);
                 setCurrentCollection(maybeDecoded[0]);
                 setUrlRequestedItem(urlParams.open);
             } else {
@@ -151,7 +153,7 @@ const NewBrowseComponent:React.FC<RouteComponentProps> = (props) => {
 
         }
 
-    }, []);
+    }, [collectionNames]);
 
     const stripTrailingSlash = (from:string)=> from.endsWith("/") ? from.slice(0,from.length-1) : from;
 
@@ -190,11 +192,11 @@ const NewBrowseComponent:React.FC<RouteComponentProps> = (props) => {
         if(selectedEntry) {
             setUrlRequestedItem(selectedEntry.id);
         }
-    });
+    }, [selectedEntry]);
 
     useEffect(()=>{
         if(urlRequestedItem) {
-            props.history.push(`?open=${urlRequestedItem}`);
+            props.history.push(`?open=${encodeURIComponent(urlRequestedItem)}`);
         } else {
             props.history.push("?");
         }
