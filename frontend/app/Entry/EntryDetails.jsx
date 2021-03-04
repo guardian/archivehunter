@@ -98,7 +98,6 @@ class EntryDetails extends React.Component {
         }
         return <div className={this.props.classes.entryDetails}>
                 <MediaPreview itemId={this.props.entry.id}
-                              //hasProxy={this.props.entry.proxied}
                               fileExtension={this.props.entry.file_extension}
                               mimeType={this.props.entry.mimeType}
                               autoPlay={this.props.autoPlay}
