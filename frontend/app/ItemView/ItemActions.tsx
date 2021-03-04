@@ -43,7 +43,6 @@ const ItemActions:React.FC<ItemActionsProps> = (props) => {
         }
     }
 
-    //FIXME: take these into a common library .ts
     const putToLightbox = async () =>{
         try {
             await axios.put("/api/lightbox/my/" + props.itemId);

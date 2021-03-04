@@ -77,7 +77,7 @@ const FlexMetadata:React.FC<FlexMetadataProps> = (props) => {
                     />
                     <FlexMetadataEntry className={classes.metadataEntry}
                                        label="Bit rate"
-                                       value={<FileSizeView rawSize={props.entry.mediaMetadata.format.bit_rate}/>}
+                                       value={<FileSizeView rawSize={props.entry.mediaMetadata.format.bit_rate} rateUnits={true}/>}
                     />
                     <FlexMetadataEntry className={classes.metadataEntry} label="Format" value={props.entry.mediaMetadata.format.format_long_name}/>
                     <FlexMetadataEntry className={classes.metadataEntry}
