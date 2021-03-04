@@ -63,20 +63,6 @@ const LightboxInsert:React.FC<LightboxInsertProps> = (props) => {
                                  small={false}
             />
     </>);
-
-    // return <Grid container spacing={1}>
-    //     <Grid item>Lightbox</Grid>
-    //     <Grid item>
-    //         {
-    //             props.isInLightbox ?
-    //                 <span>Saved <a onClick={removeFromLightbox} style={{cursor: "pointer"}}>remove</a></span> :
-    //                 <a onClick={putToLightbox} style={{cursor: "pointer"}}>Save to lightbox</a>
-    //         }
-    //     </Grid>
-    //     {
-    //         lightboxSaving ? <Grid item><CircularProgress/></Grid> : null
-    //     }
-    // </Grid>
 }
 
 export default LightboxInsert;

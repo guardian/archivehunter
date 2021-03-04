@@ -38,11 +38,11 @@ const useStyles = makeStyles((theme)=>({
     audioPlayer: {
         width: "640px",
         height: "360px",
-        backgroundSize: "cover",
+        boxSizing: "border-box",
+        display: "flex",
         "& audio": {
-            position: "absolute",
-            bottom: 0,
-            width: "100%"
+            flex: "0 1 100%",
+            objectFit: "fill"
         }
     },
     errorText: {

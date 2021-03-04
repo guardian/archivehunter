@@ -205,6 +205,7 @@ interface MediaMetadata {
     streams: any[]; //sorry but i can't be bothered to type out the MediaStreams definition
 }
 
+type StorageClasses = "STANDARD"|"STANDARD_IA"|"GLACIER"|"REDUCED_REDUNDANCY";
 /*
 id:String, bucket: String, path: String, region:Option[String], file_extension: Option[String], size: scala.Long, last_modified: ZonedDateTime,
 etag: String, mimeType: MimeType, proxied: Boolean, storageClass:StorageClass, lightboxEntries:Seq[LightboxIndex], beenDeleted:Boolean=false,
@@ -221,7 +222,7 @@ interface ArchiveEntry {
     etag: string;
     mimeType: MimeType;
     proxied: boolean;
-    storageClass: "STANDARD"|"STANDARD_IA"|"GLACIER"|"REDUCED_REDUNDANCY";
+    storageClass: StorageClasses;
     lightboxEntries: LightboxIndex[];
     beenDeleted: boolean;
     mediaMetadata?: MediaMetadata;
@@ -316,4 +317,12 @@ interface PlayableProxyResponse {
     status: string;
     uri: string;
     mimeType: {major: string, minor: string}
+}
+
+interface UserResponse {
+    firstName: string;
+    lastName: string;
+    email: string;
+    avatarUrl?: string;
+    isAdmin: boolean;
 }

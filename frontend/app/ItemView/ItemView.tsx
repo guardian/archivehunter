@@ -1,6 +1,6 @@
 import React, {useEffect, useState} from "react";
 import {RouteComponentProps} from "react-router";
-import {ArchiveEntry, ObjectGetResponse} from "../types";
+import {ArchiveEntry, ObjectGetResponse, UserResponse} from "../types";
 import axios from "axios";
 import {formatError} from "../common/ErrorViewComponent";
 import {CircularProgress, makeStyles, Paper, Snackbar} from "@material-ui/core";
@@ -9,6 +9,9 @@ import MuiAlert from "@material-ui/lab/Alert";
 import clsx from "clsx";
 import FlexMetadata from "./FlexMetadata";
 import MediaPreview from "../Entry/MediaPreview";
+import LightboxInsert from "../Entry/details/LightboxInsert";
+import ItemActions from "./ItemActions";
+import {extractFileInfo} from "../common/Fileinfo";
 
 interface ItemViewParams {
     id: string;
@@ -37,7 +40,10 @@ const useStyles = makeStyles((theme)=>({
     },
     loading: {
         verticalAlign: "baseline"
-    }
+    },
+    title: {
+        marginLeft: "0.4em"
+    },
 }));
 
 const ItemView:React.FC<RouteComponentProps<ItemViewParams>> = (props) => {
@@ -46,8 +52,23 @@ const ItemView:React.FC<RouteComponentProps<ItemViewParams>> = (props) => {
     const [lastError, setLastError] = useState<string|undefined>(undefined);
     const [lastInfo, setLastInfo] = useState<string|undefined>(undefined);
     const [showingAlert, setShowingAlert] = useState(false);
+    const [userLogin, setUserLogin] = useState<UserResponse|undefined>(undefined);
 
     const classes = useStyles();
+
+    useEffect(()=>{
+        const loadUser = async () => {
+            try {
+                const response = await axios.get<UserResponse>(`/api/loginStatus`);
+                setUserLogin(response.data);
+            } catch(err) {
+                console.error("Could not get current logged in user: ", err);
+                setLastError(formatError(err, false));
+                setShowingAlert(true);
+            }
+        }
+        loadUser();
+    }, []);
 
     const loadEntry = async (entryId:string) => {
         try {
@@ -86,10 +107,34 @@ const ItemView:React.FC<RouteComponentProps<ItemViewParams>> = (props) => {
         setShowingAlert(true);
     }
 
+    const isInLightbox = () => {
+        if(!entry) return false;
+        const matchingEntries = entry.lightboxEntries.filter(lbEntry=>lbEntry.owner===userLogin.email);
+        return matchingEntries.length>0;
+    }
+
+    const itemWasLightboxed = (itemId:string) => {
+        return new Promise<void>((resolve, reject)=> {
+            window.setTimeout(() => {
+                setLoading(true);
+                loadEntry(itemId)
+                    .then(()=>resolve())
+                    .catch((err)=>{
+                        setLastError(err);
+                        setShowingAlert(true);
+                        reject(err);
+                    })
+            }, 1000);   //if we load immediately the server may not have processed the lightboxing yet
+        });
+
+    }
+
+    const fileInfo = entry ? extractFileInfo(entry.path) : undefined;
+
     return <div className={classes.itemWindow}>
         <Helmet>
             <title>{
-                entry ? `${entry.path} - Archive Hunter` : "Archive Hunter"
+                fileInfo ? `${fileInfo.filename} - Archive Hunter` : "Archive Hunter"
             }</title>
         </Helmet>
         <Snackbar open={showingAlert} onClose={closeAlert} autoHideDuration={8000}>
@@ -115,10 +160,29 @@ const ItemView:React.FC<RouteComponentProps<ItemViewParams>> = (props) => {
                     <span className={clsx(classes.centered, classes.loading)}><CircularProgress className={classes.inlineThrobber}/>Loading...</span> :
                     undefined
             }
+            {
+                entry ? <LightboxInsert isInLightbox={isInLightbox()}
+                                        entryId={entry.id}
+                                        lightboxEntries={entry?.lightboxEntries ?? []}
+                                        onError={subComponentError}
+                                        lightboxedCb={itemWasLightboxed}
+                    /> : undefined
+            }
         </div>
 
         <div className={classes.infoArea}>
             <Paper elevation={3} style={{height: "100%"}}>
+                {
+                    fileInfo ? <h1 className={classes.title}>{fileInfo.filename}</h1> : undefined
+                }
+                {
+                    entry ? <ItemActions storageClass={entry.storageClass}
+                                         isInLightbox={isInLightbox()}
+                                         itemId={entry.id}
+                                         lightboxedCb={itemWasLightboxed}
+                                         onError={subComponentError}
+                                         /> : undefined
+                }
                 {
                     entry ? <FlexMetadata entry={entry}/> : undefined
                 }
