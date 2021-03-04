@@ -3,7 +3,6 @@ import {makeStyles} from "@material-ui/core";
 import axios from "axios";
 import {PlayableProxyResponse, ProxyType} from "../types";
 import {formatError} from "../common/ErrorViewComponent";
-import {nillComparer} from "@material-ui/data-grid";
 
 interface MediaPlayerProps {
     mimeType?: { major: string, minor: string };
