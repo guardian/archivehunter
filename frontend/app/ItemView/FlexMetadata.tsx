@@ -73,28 +73,17 @@ const FlexMetadata:React.FC<FlexMetadataProps> = (props) => {
                 props.entry.mediaMetadata ? <>
                     <FlexMetadataEntry className={classes.metadataEntry}
                                        label="Duration"
-                                       value={<MediaDurationComponent value={props.entry.mediaMetadata.format.duration.toString()}/>}
+                                       value={<MediaDurationComponent value={props.entry.mediaMetadata.format.duration}/>}
                     />
-                    <FlexMetadataEntry className={classes.metadataEntry} label="Bit rate" value={props.entry.mediaMetadata.format.bit_rate.toString()}/>
+                    <FlexMetadataEntry className={classes.metadataEntry}
+                                       label="Bit rate"
+                                       value={<FileSizeView rawSize={props.entry.mediaMetadata.format.bit_rate}/>}
+                    />
                     <FlexMetadataEntry className={classes.metadataEntry} label="Format" value={props.entry.mediaMetadata.format.format_long_name}/>
                     <FlexMetadataEntry className={classes.metadataEntry}
                                        label="File size"
                                        value={<FileSizeView rawSize={props.entry.mediaMetadata.format.size}/>}
                     />
-                    <FlexMetadataEntry className={classes.metadataEntry} label="Format tags" value={
-                        <Grid container className={classes.chipContainer}>
-                        {
-                            Object.keys(props.entry.mediaMetadata.format.tags)
-                                .map(k=><Grid item>
-                                    <Chip
-                                        label={`${k}: ${props.entry.mediaMetadata?.format.tags[k]}`}
-                                        key={k}
-                                        className={classes.chip}
-                                        />
-                                </Grid>)
-                        }
-                        </Grid>
-                    }/>
                 </> : undefined
             }
             <FlexMetadataEntry className={classes.metadataEntry}
@@ -115,10 +104,33 @@ const FlexMetadata:React.FC<FlexMetadataProps> = (props) => {
                     : undefined
             }
             {
-                firstAudioStream ?
+                firstVideoStream && firstVideoStream.display_aspect_ratio ?
+                    <FlexMetadataEntry className={classes.metadataEntry}
+                                       label="Aspect ratio"
+                                       value={firstVideoStream.display_aspect_ratio}
+                                       /> : undefined
+            }
+            {
+                firstAudioStream && firstAudioStream.channel_layout ?
                     <FlexMetadataEntry className={classes.metadataEntry}
                                        label="Audio"
                                        value={firstAudioStream.channel_layout}/> : undefined
+            }
+            {
+                props.entry.mediaMetadata ? <FlexMetadataEntry className={classes.metadataEntry} label="Format tags" value={
+                    <Grid container className={classes.chipContainer}>
+                        {
+                            Object.keys(props.entry.mediaMetadata.format.tags)
+                                .map(k=><Grid item>
+                                    <Chip
+                                        label={`${k}: ${props.entry.mediaMetadata?.format.tags[k]}`}
+                                        key={k}
+                                        className={classes.chip}
+                                    />
+                                </Grid>)
+                        }
+                    </Grid>
+                }/> : undefined
             }
         </Grid>
         </>
