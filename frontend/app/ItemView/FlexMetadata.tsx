@@ -18,7 +18,8 @@ const useStyles = makeStyles({
     title: {
         marginLeft: "0.4em"
     }
-})
+});
+
 const FlexMetadata:React.FC<FlexMetadataProps> = (props) => {
     const classes = useStyles();
 

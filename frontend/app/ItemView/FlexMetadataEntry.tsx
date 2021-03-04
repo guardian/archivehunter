@@ -34,7 +34,7 @@ const useStyles = makeStyles((theme)=> ({
  * @constructor
  */
 const FlexMetadataEntry:React.FC<FlexMetadataEntryProps> = (props) => {
-    const classes = useStyles();;
+    const classes = useStyles();
 
     return <Grid item className={props.className}>
         <p className={classes.title}>{props.label}</p>

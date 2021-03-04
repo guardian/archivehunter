@@ -8,6 +8,6 @@ object ProxyType extends Enumeration {
 }
 
 trait ProxyTypeEncoder {
-  implicit val proxyTypeEncoder = Encoder.enumEncoder(ProxyType)
-  implicit val proxyTypeDecoder = Decoder.enumDecoder(ProxyType)
+  implicit val proxyTypeEncoder = Encoder.encodeEnumeration(ProxyType)
+  implicit val proxyTypeDecoder = Decoder.decodeEnumeration(ProxyType)
 }

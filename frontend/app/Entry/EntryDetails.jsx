@@ -1,6 +1,5 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import EntryPreview from './EntryPreview.jsx';
 import EntryJobs from "./EntryJobs.jsx";
 import axios from 'axios';
 import {formatError} from "../common/ErrorViewComponent.jsx";
@@ -8,6 +7,7 @@ import {Button, createStyles, Grid, IconButton, Typography, withStyles} from "@m
 import MetadataTable from "./details/MetadataTable";
 import LightboxInsert from "./details/LightboxInsert";
 import {baseStyles} from "../BaseStyles";
+import MediaPreview from "./MediaPreview";
 
 const styles = (theme)=>Object.assign(createStyles({
     entryDetails: {
@@ -97,8 +97,8 @@ class EntryDetails extends React.Component {
             </div>
         }
         return <div className={this.props.classes.entryDetails}>
-                <EntryPreview entryId={this.props.entry.id}
-                              hasProxy={this.props.entry.proxied}
+                <MediaPreview itemId={this.props.entry.id}
+                              //hasProxy={this.props.entry.proxied}
                               fileExtension={this.props.entry.file_extension}
                               mimeType={this.props.entry.mimeType}
                               autoPlay={this.props.autoPlay}

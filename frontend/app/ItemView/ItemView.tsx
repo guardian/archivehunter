@@ -6,10 +6,9 @@ import {formatError} from "../common/ErrorViewComponent";
 import {CircularProgress, makeStyles, Paper, Snackbar} from "@material-ui/core";
 import Helmet from "react-helmet";
 import MuiAlert from "@material-ui/lab/Alert";
-import EntryPreview from "../Entry/EntryPreview";
-import LoadingThrobber from "../common/LoadingThrobber";
 import clsx from "clsx";
 import FlexMetadata from "./FlexMetadata";
+import MediaPreview from "../Entry/MediaPreview";
 
 interface ItemViewParams {
     id: string;
@@ -23,7 +22,8 @@ const useStyles = makeStyles((theme)=>({
     },
     previewArea: {
         flex: 1,
-        maxHeight: "720"
+        maxHeight: "60vh",
+        overflow: "hidden"
     },
     infoArea: {
         flex: 1,
@@ -83,6 +83,11 @@ const ItemView:React.FC<RouteComponentProps<ItemViewParams>> = (props) => {
         setShowingAlert(true);
     }
 
+    const subComponentError = (errorDesc:string) => {
+        setLastError(errorDesc);
+        setShowingAlert(true);
+    }
+
     return <div className={classes.itemWindow}>
         <Helmet>
             <title>{
@@ -101,12 +106,11 @@ const ItemView:React.FC<RouteComponentProps<ItemViewParams>> = (props) => {
         </Snackbar>
         <div className={classes.previewArea}>
             {entry ?
-                <EntryPreview entryId={entry.id}
-                              hasProxy={entry.proxied}
-                              fileExtension={entry.file_extension}
+                <MediaPreview itemId={entry.id}
                               mimeType={entry.mimeType}
-                              autoPlay={true}
+                              fileExtension={entry.file_extension ?? ".dat"}
                               triggeredProxyGeneration={proxyGenerationWasTriggered}
+                              onError={subComponentError}
                               /> : undefined }
             {
                 loading ?

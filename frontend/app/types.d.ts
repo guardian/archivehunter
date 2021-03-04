@@ -295,3 +295,25 @@ interface RestoreStatusResponse {
     expiry?: string;
     downloadLink?: string;
 }
+
+/*
+ProxyLocation(fileId: String, proxyId: String,
+proxyType: ProxyType.Value, bucketName: String, bucketPath: String, region: Option[String], storageClass: StorageClass.Value)
+ */
+type ProxyType = "VIDEO"|"AUDIO"|"THUMBNAIL"|"POSTER"|"UNKNOWN";
+interface ProxyLocation {
+    fileId: string;
+    proxyId: string;
+    proxyType: ProxyType;
+    bucketName: string;
+    bucketPath: string;
+    region?: string;
+    storageClass: string;
+}
+type ProxyLocationsResponse = ObjectListResponse<ProxyLocation>
+
+interface PlayableProxyResponse {
+    status: string;
+    uri: string;
+    mimeType: {major: string, minor: string}
+}
