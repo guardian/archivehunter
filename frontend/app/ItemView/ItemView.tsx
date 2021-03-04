@@ -21,14 +21,12 @@ const useStyles = makeStyles((theme)=>({
         height: "95vh"
     },
     previewArea: {
-        flex: 1,
-        maxHeight: "60vh",
-        overflow: "hidden"
+        flexGrow: 1,
+        flexShrink: 1,
     },
     infoArea: {
         flex: 1,
         padding: "1em",
-
     },
     centered: {
         marginLeft: "auto",

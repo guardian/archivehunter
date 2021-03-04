@@ -18,7 +18,17 @@ const useStyles = makeStyles((theme)=>({
     videoPreview: {
         marginLeft: "1em",
         marginRight: "1em",
-        objectFit: "contain"
+        minWidth: "360px",
+        maxWidth: "1920px",
+        maxHeight: "1080px",
+        minHeight: "180px",
+        height: "50%",
+        boxSizing: "border-box",
+        display: "flex",
+        "& video": {
+            flex: "0 1 100%",
+            objectFit: "fill",
+        }
     },
     thumbnailPreview: {
         width: "95%",
@@ -42,54 +52,8 @@ const useStyles = makeStyles((theme)=>({
     },
 }));
 
-interface makePlayerProps {
-    previewData?:PlayableProxyResponse;
-    autoPlay: boolean;
-}
-
-const MakePlayer:React.FC<makePlayerProps> = (props) => {
-    const classes = useStyles();
-
-    // switch (props.previewData.mimeType.major) {
-    //     case "video":
-    //         return <video className={classes.videoPreview}
-    //                       src={props.previewData.uri} controls={true}
-    //                       autoPlay={props.autoPlay}/>;
-    //     case "audio":
-    //         return <div className={classes.audioPlayer}>
-    //             <audio src={props.previewData.uri} controls={true} autoPlay={props.autoPlay} />
-    //         </div>;
-    //     case "image":
-    //         return <img src={props.previewData.uri} alt="Thumbnail"
-    //                     className={classes.thumbnailPreview}/>;
-    //     default:
-    //         return <span
-    //             className={classes.errorText}>Unrecognised MIME type: {props.previewData.mimeType.major}/{props.previewData.mimeType.minor}</span>
-    // }
-    return <>
-        {
-            props.previewData?.mimeType.major==="video" ?
-                <video className={classes.videoPreview} src={props.previewData.uri} controls={true} autoPlay={props.autoPlay}/> :
-                null
-        }
-        {
-            props.previewData?.mimeType.major==="audio" ?
-                <div className={classes.audioPlayer}>
-                    <audio src={props.previewData.uri} controls={true} autoPlay={props.autoPlay} />
-                </div> :
-                null
-        }
-        {
-            props.previewData?.mimeType.major==="image" ?
-                <img src={props.previewData.uri} alt="Thumbnail" className={classes.thumbnailPreview}/> :
-                null
-        }
-        </>
-}
-
 const MediaPlayer:React.FC<MediaPlayerProps> = (props) => {
     const [previewData, setPreviewData] = useState<PlayableProxyResponse|undefined>(undefined);
-    const mimeTypeMajor = props.mimeType ? props.mimeType.major : "application";
     const classes = useStyles();
 
     useEffect(()=>{
@@ -116,20 +80,12 @@ const MediaPlayer:React.FC<MediaPlayerProps> = (props) => {
         loadPlayableData();
     }, [props.entryId]);
 
-    // if(previewData) {
-    //     console.log(previewData);
-
-    // } else {
-    //     console.log("no previewData");
-    //     return <span className={classes.errorText}>No preview data available</span>
-    // }
-
-
-
     return previewData ? <>
         {
             previewData?.mimeType.major==="video" ?
-                <video className={classes.videoPreview} src={previewData.uri} controls={true} autoPlay={props.autoPlay}/> :
+                <div className={classes.videoPreview}>
+                    <video className={classes.videoPreview} src={previewData.uri} controls={true} autoPlay={props.autoPlay}/>
+                </div> :
                 null
         }
         {
@@ -144,7 +100,7 @@ const MediaPlayer:React.FC<MediaPlayerProps> = (props) => {
                 <img src={previewData.uri} alt="Thumbnail" className={classes.thumbnailPreview}/> :
                 null
         }
-        </> : <span>No preview data</span>
+        </> : <span className={classes.errorText}>No preview data</span>
 }
 
 export default MediaPlayer;

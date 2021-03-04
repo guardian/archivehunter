@@ -40,6 +40,20 @@ const FlexMetadata:React.FC<FlexMetadataProps> = (props) => {
             <FlexMetadataEntry className={classes.metadataEntry} label="Collection" value={props.entry.bucket} icon={<Storage/>}/>
             <FlexMetadataEntry className={classes.metadataEntry} label="Storage class" value={props.entry.storageClass}/>
             <FlexMetadataEntry className={classes.metadataEntry} label="Region" value={props.entry.region ?? "(not set)"}/>
+            {
+                props.entry.mediaMetadata ? <>
+                    <FlexMetadataEntry label="Duration" value={props.entry.mediaMetadata.format.duration.toString()}/>
+                    <FlexMetadataEntry label="Bit rate" value={props.entry.mediaMetadata.format.bit_rate.toString()}/>
+                    <FlexMetadataEntry label="Format" value={props.entry.mediaMetadata.format.format_long_name}/>
+                    <FlexMetadataEntry label="File size" value={props.entry.mediaMetadata.format.size.toString()}/>
+                    <FlexMetadataEntry label="Format tags" value={
+                        Object.keys(props.entry.mediaMetadata.format.tags)
+                            .map((k,idx)=>`${k}: ${props.entry.mediaMetadata?.format.tags[k]}`)
+                            .join(",")}
+                    />
+                </> : undefined
+            }
+
         </Grid>
         </>
 }
