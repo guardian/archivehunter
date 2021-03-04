@@ -108,7 +108,7 @@ const ItemView:React.FC<RouteComponentProps<ItemViewParams>> = (props) => {
     }
 
     const isInLightbox = () => {
-        if(!entry) return false;
+        if(!entry || !userLogin) return false;
         const matchingEntries = entry.lightboxEntries.filter(lbEntry=>lbEntry.owner===userLogin.email);
         return matchingEntries.length>0;
     }
