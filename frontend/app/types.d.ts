@@ -205,6 +205,7 @@ interface MediaMetadata {
     streams: any[]; //sorry but i can't be bothered to type out the MediaStreams definition
 }
 
+type StorageClasses = "STANDARD"|"STANDARD_IA"|"GLACIER"|"REDUCED_REDUNDANCY";
 /*
 id:String, bucket: String, path: String, region:Option[String], file_extension: Option[String], size: scala.Long, last_modified: ZonedDateTime,
 etag: String, mimeType: MimeType, proxied: Boolean, storageClass:StorageClass, lightboxEntries:Seq[LightboxIndex], beenDeleted:Boolean=false,
@@ -221,7 +222,7 @@ interface ArchiveEntry {
     etag: string;
     mimeType: MimeType;
     proxied: boolean;
-    storageClass: "STANDARD"|"STANDARD_IA"|"GLACIER"|"REDUCED_REDUNDANCY";
+    storageClass: StorageClasses;
     lightboxEntries: LightboxIndex[];
     beenDeleted: boolean;
     mediaMetadata?: MediaMetadata;
@@ -294,4 +295,34 @@ interface RestoreStatusResponse {
     restoreStatus: RestoreStatus;
     expiry?: string;
     downloadLink?: string;
+}
+
+/*
+ProxyLocation(fileId: String, proxyId: String,
+proxyType: ProxyType.Value, bucketName: String, bucketPath: String, region: Option[String], storageClass: StorageClass.Value)
+ */
+type ProxyType = "VIDEO"|"AUDIO"|"THUMBNAIL"|"POSTER"|"UNKNOWN";
+interface ProxyLocation {
+    fileId: string;
+    proxyId: string;
+    proxyType: ProxyType;
+    bucketName: string;
+    bucketPath: string;
+    region?: string;
+    storageClass: string;
+}
+type ProxyLocationsResponse = ObjectListResponse<ProxyLocation>
+
+interface PlayableProxyResponse {
+    status: string;
+    uri: string;
+    mimeType: {major: string, minor: string}
+}
+
+interface UserResponse {
+    firstName: string;
+    lastName: string;
+    email: string;
+    avatarUrl?: string;
+    isAdmin: boolean;
 }

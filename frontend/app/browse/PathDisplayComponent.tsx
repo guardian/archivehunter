@@ -30,7 +30,7 @@ const PathDisplayComponent:React.FC<PathDisplayComponentProps> = (props) => {
             parts.map((pathPart, idx)=> {
                return pathPart=="" ? null : <React.Fragment key={idx}>
                     <Grid item><Typography className={classes.pathPart}>{pathPart}</Typography></Grid>
-                   {idx==pathlen-2 ? null : <Grid item><ChevronRightRounded/></Grid>}
+                   {idx==pathlen-1 ? null : <Grid item><ChevronRightRounded/></Grid>}
                </React.Fragment>
             })
         }

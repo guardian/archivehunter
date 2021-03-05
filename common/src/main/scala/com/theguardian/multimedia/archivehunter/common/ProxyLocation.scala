@@ -118,8 +118,8 @@ object ProxyLocation extends DocId {
 
 case class ProxyLocation (fileId:String, proxyId: String, proxyType: ProxyType.Value, bucketName:String, bucketPath:String, region:Option[String], storageClass: StorageClass.Value) {}
 trait ProxyLocationEncoder extends StorageClassEncoder {
-  implicit val proxyTypeEncoder = Encoder.enumEncoder(ProxyType)
-  implicit val proxyTypeDecoder = Decoder.enumDecoder(ProxyType)
+  implicit val proxyTypeEncoder = Encoder.encodeEnumeration(ProxyType)
+  implicit val proxyTypeDecoder = Decoder.decodeEnumeration(ProxyType)
 
   implicit val proxyTypeFormat = DynamoFormat.coercedXmap[ProxyType.Value,String,IllegalArgumentException](
     input=>ProxyType.withName(input)

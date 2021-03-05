@@ -4,7 +4,8 @@ import PropTypes from 'prop-types';
 class FileSizeView extends React.Component {
     static propTypes = {
         rawSize: PropTypes.number.isRequired,
-        precision: PropTypes.number  //how many significant figures to round to.
+        precision: PropTypes.number,  //how many significant figures to round to.
+        rateUnits: PropTypes.bool       //if true show kbit/s rather than Kb etc.
     };
 
     constructor(props){
@@ -23,7 +24,10 @@ class FileSizeView extends React.Component {
     }
 
     getPostfix(thousands){
-        const postfixes = ["bytes", "Kb", "Mb", "Gb", "Tb", "Pb", "Eb"];
+        const postfixes = this.props.rateUnits ?
+            ["bps", "Kbit/s", "Mbit/s", "Gbit/s", "Tbit/s", "Ebit/s"]
+            : ["bytes", "Kb", "Mb", "Gb", "Tb", "Pb", "Eb"];
+
         if(thousands>postfixes.length) return "ridiculous";
         return postfixes[thousands];
     }

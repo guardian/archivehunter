@@ -81,6 +81,7 @@ const NewBrowseComponent:React.FC<RouteComponentProps> = (props) => {
     const [newlyLightboxed, setNewlyLightboxed] = useState<string[]>([]);
     const [selectedEntry, setSelectedEntry] = useState<ArchiveEntry|undefined>(undefined);
     const [loading, setLoading] = useState(false);
+    const [switchToPathsEnabled, setSwitchToPathsEnabled] = useState(false);
 
     const [urlRequestedItem, setUrlRequestedItem] = useState<string|undefined>(undefined);
 
@@ -108,18 +109,53 @@ const NewBrowseComponent:React.FC<RouteComponentProps> = (props) => {
         refreshCollectionNames();
     }, []);
 
+    const idXtractor = /^([^:]+):(.*)$/;
+
     /**
-     * if an item is specified on the url then open it
+     * decode an incoming item id to extract the collection and path parts
+     * @param itemId item id to decode
+     * @returns undefined if the id is not valid, or a 2-element array consisting of (collection, path)
+     */
+    const decodeIncomingItemId = (itemId:string) => {
+        try {
+            const decoded = atob(itemId);
+            const matches = idXtractor.exec(decoded);
+
+            if (matches) {
+                return [matches[1], matches[2]]
+            } else {
+                return undefined
+            }
+        } catch(err) {
+            console.error("Could not decode incoming string: ", err);
+            return undefined;
+        }
+    }
+
+    /**
+     * if an item is specified on the url then open it.
+     * we can only do this once the collections have been loaded in
      */
     useEffect(()=>{
         const urlParams = urlParamsFromSearch(props.location.search);
 
         if(urlParams.hasOwnProperty("open")) {
             console.log("Requested to open file id ", urlParams.open);
-            setUrlRequestedItem(urlParams.open);
+            const maybeDecoded = decodeIncomingItemId(urlParams.open);
+            if(maybeDecoded) {
+                console.log("Changing collection to ", maybeDecoded[0]);
+                setSwitchToPathsEnabled(true);
+                setCurrentCollection(maybeDecoded[0]);
+                setUrlRequestedItem(urlParams.open);
+            } else {
+                console.error("The given item ID was not valid");
+                setLastError("The given item ID was not valid");
+                setShowingAlert(true);
+            }
+
         }
 
-    }, []);
+    }, [collectionNames]);
 
     const stripTrailingSlash = (from:string)=> from.endsWith("/") ? from.slice(0,from.length-1) : from;
 
@@ -138,31 +174,33 @@ const NewBrowseComponent:React.FC<RouteComponentProps> = (props) => {
         setSearchDoc(docWithPath);
     }, [currentCollection, reloadCounter, currentPath, sortField, sortOrder]);
 
-    // const pathOnlyRegex = new RegExp("/[^/]*$");
-    //  commented out, this makes clicking on an entry lose everything else that is not in its dirs
-    // /**
-    //  * make sure that the path is open if an item is selected
-    //  */
-    // useEffect(()=>{
-    //     if(selectedEntry && currentPath!=selectedEntry.path) {
-    //         const pathOnly = selectedEntry.path.replace(pathOnlyRegex, "");
-    //         console.log("setting path to ", pathOnly);
-    //         setCurrentPath(pathOnly);
-    //     }
-    //     if(selectedEntry && currentCollection!=selectedEntry.bucket) {
-    //         setCurrentCollection(selectedEntry.bucket)
-    //     }
-    // }, [selectedEntry]);
+    const pathOnlyRegex = new RegExp("/[^/]*$");
+
+    /**
+     * make sure that the path is open if an item is selected.  We have a global enable on this, otherwise whenever you
+     * click an item everything not in that item's directory vanishes, which is quite confusing UX.
+     */
+    useEffect(()=>{
+        if(selectedEntry && switchToPathsEnabled && currentPath!=selectedEntry.path) {
+            const pathOnly = selectedEntry.path.replace(pathOnlyRegex, "");
+            console.log("setting path to ", pathOnly);
+            setCurrentPath(pathOnly);
+            setSwitchToPathsEnabled(false);
+        }
+        if(selectedEntry && currentCollection!=selectedEntry.bucket) {
+            setCurrentCollection(selectedEntry.bucket)
+        }
+    }, [selectedEntry, switchToPathsEnabled]);
 
     useEffect(()=>{
         if(selectedEntry) {
             setUrlRequestedItem(selectedEntry.id);
         }
-    });
+    }, [selectedEntry]);
 
     useEffect(()=>{
         if(urlRequestedItem) {
-            props.history.push(`?open=${urlRequestedItem}`);
+            props.history.push(`?open=${encodeURIComponent(urlRequestedItem)}`);
         } else {
             props.history.push("?");
         }
@@ -240,6 +278,7 @@ const NewBrowseComponent:React.FC<RouteComponentProps> = (props) => {
                                 advancedSearch={searchDoc}
                                 onLoadingStarted={()=>setLoading(true)}
                                 onLoadingFinished={loadingDidComplete}
+                                extraRequiredItemId={urlRequestedItem}
             />
         </div>
         <div className={classes.detailsArea} style={{gridColumnStart: rightDividerPos}}>

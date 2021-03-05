@@ -4,10 +4,11 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {makeStyles} from "@material-ui/core";
 import {baseStyles} from "../BaseStyles";
 import clsx from "clsx";
+import {ProxyType} from "../types";
 
 interface  EntryPreviewSwitcherProps {
     availableTypes: string;
-    typeSelected: (newType:string)=>void;
+    typeSelected: (newType:ProxyType)=>void;
 }
 
 const expectedTypes = [

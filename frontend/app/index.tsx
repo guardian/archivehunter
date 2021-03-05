@@ -40,6 +40,7 @@ import NewBrowseComponent from "./browse/NewBrowseComponent";
 import NewLightbox from "./Lightbox/NewLightbox";
 import QuickRestoreComponent from "./admin/QuickRestore.jsx";
 import PathCacheAdmin from "./admin/PathCacheAdmin.jsx";
+import ItemView from "./ItemView/ItemView";
 
 
 library.add(faStroopwafel, faCheckCircle, faCheck, faTimes, faTimesCircle, faRoad,faSearch,faThList,faWrench, faLightbulb, faChevronCircleDown, faChevronCircleRight, faTrashAlt, faFolderPlus, faFolderMinus, faFolder);
@@ -118,6 +119,7 @@ class App extends React.Component<any, AppContainerState> {
                 <Route path="/admin" exact={true} component={AdminFront}/>
                 <Route path="/lightbox" exact={true} component={NewLightbox}/>
                 <Route path="/browse" exact={true} component={NewBrowseComponent}/>
+                <Route path="/item/:id" exact={true} component={ItemView}/>
                 <Route path="/search" exact={true} component={NewBasicSearch}/>
                 <Route path="/" exact={true} render={()=><Redirect to="/search"/>}/>
                 <Route default component={NotFoundComponent}/>
