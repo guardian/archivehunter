@@ -35,7 +35,8 @@ class EntryDetails extends React.Component {
         postLightboxInsert: PropTypes.object,
         postJobsInsert: PropTypes.object,
         tableRowsInsert: PropTypes.object,
-        onError: PropTypes.func.isRequired
+        onError: PropTypes.func.isRequired,
+        openClicked: PropTypes.func
     };
 
     constructor(props){
@@ -98,10 +99,13 @@ class EntryDetails extends React.Component {
         }
         return <div className={this.props.classes.entryDetails}>
                 <MediaPreview itemId={this.props.entry.id}
+                              itemName={this.props.entry.path}
                               fileExtension={this.props.entry.file_extension}
                               mimeType={this.props.entry.mimeType}
                               autoPlay={this.props.autoPlay}
+                              relinkedCb={this.props.lightboxedCb}  //use the lightboxCb to indicate that the item needs reloading
                               triggeredProxyGeneration={this.proxyGenerationWasTriggered}
+                              itemName={this.props.entry.path}
                 />
             <div className="entry-details-insert">{ this.props.preLightboxInsert ? this.props.preLightboxInsert : "" }</div>
             <div className={this.props.classes.entryDetailsLightboxes}>
@@ -122,10 +126,10 @@ class EntryDetails extends React.Component {
             }
             <div className="entry-details-insert">{ this.props.postJobsInsert ? this.props.postJobsInsert : "" }</div>
             <div className="entry-details-insert">
-                <MetadataTable entry={this.props.entry}/>
+                <MetadataTable entry={this.props.entry} openClicked={this.props.openClicked}/>
             </div>
             <div className={this.props.classes.centered} style={{marginTop: "1em"}}>
-                <Button variant="outlined" onClick={this.triggerAnalyse}>Refresh metadata</Button>
+                <Button variant="outlined" onClick={this.triggerAnalyse}>Re-analyse metadata</Button>
             </div>
         </div>
     }

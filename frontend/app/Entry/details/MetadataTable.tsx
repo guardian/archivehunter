@@ -2,14 +2,16 @@ import React, {useState, useEffect} from "react";
 import MediaDurationComponent from "../../common/MediaDurationComponent";
 import FileSizeView from "../FileSizeView";
 import {ArchiveEntry} from "../../types";
-import {makeStyles} from "@material-ui/core";
+import {IconButton, makeStyles} from "@material-ui/core";
 import clsx from "clsx";
 import PathDisplayComponent from "../../browse/PathDisplayComponent";
 import {FileInfo, extractFileInfo} from "../../common/Fileinfo";
+import {Launch} from "@material-ui/icons";
 
 interface MetadataTableProps {
     entry: ArchiveEntry;
     tableRowsInsert?: React.ReactFragment[];
+    openClicked?: (itemId:string)=>void;
 }
 
 const useStyles = makeStyles({
@@ -68,7 +70,16 @@ const MetadataTable:React.FC<MetadataTableProps> = (props) => {
 
     return <table className={classes.metadataTable}>
         <tbody>
-
+        {
+            props.openClicked ? <tr>
+                <td className={clsx(classes.metadataHeading, classes.spaceBelow)}>Open</td>
+                <td className={classes.metadataEntry}>
+                    <IconButton onClick={()=>props.openClicked ? props.openClicked(props.entry.id) : null}>
+                        <Launch/>
+                    </IconButton>
+                </td>
+            </tr> : null
+        }
         <tr>
             <td className={clsx(classes.metadataHeading, classes.spaceBelow)}>Name</td>
             <td className={classes.metadataEntry}>{fileinfo.filename}</td>
