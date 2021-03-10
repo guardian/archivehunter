@@ -44,7 +44,7 @@ const ReconnectDialog:React.FC<ReconnectDialogProps> = (props)=>{
         try {
             setInProgress(true);
             setActionMessage("Saving...");
-            await axios.put(`/api/proxy/${encodeURIComponent(props.itemId)}/associate?id=${encodeURIComponent(selectedProxyId)}`);
+            await axios.put(`/api/proxy/${encodeURIComponent(selectedProxyId)}/associate?fileId=${encodeURIComponent(props.itemId)}`);
             setInProgress(false);
             setActionMessage("Proxy associated");
             props.onDialogClose(true);
@@ -77,10 +77,10 @@ const ReconnectDialog:React.FC<ReconnectDialogProps> = (props)=>{
                                 <Typography className={classes.selectorText}>{entry.bucketName}</Typography>
                             </Grid>
                             <Grid item>
-                                <Typography className={classes.selectorText}>{entry.bucketPath}</Typography>
+                                <Typography className={classes.selectorText}>{entry.region}</Typography>
                             </Grid>
                             <Grid item>
-                                <Typography className={classes.selectorText}>{entry.region}</Typography>
+                                <Typography className={classes.selectorText}>{entry.bucketPath}</Typography>
                             </Grid>
                         </Grid>
                     </li>)
