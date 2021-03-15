@@ -150,6 +150,7 @@ const ItemView:React.FC<RouteComponentProps<ItemViewParams>> = (props) => {
         <div className={classes.previewArea}>
             {entry ?
                 <MediaPreview itemId={entry.id}
+                              itemName={entry.path}
                               mimeType={entry.mimeType}
                               fileExtension={entry.file_extension ?? ".dat"}
                               triggeredProxyGeneration={proxyGenerationWasTriggered}

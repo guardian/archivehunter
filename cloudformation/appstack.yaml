@@ -47,7 +47,10 @@ Parameters:
     - t3.nano
     - t3.micro
     - t3.small
-    Default: t3.nano
+    - t3.medium
+    - t3.large
+    - t3.xlarge
+    Default: t3.medium
   KeyPair:
     Type: AWS::EC2::KeyPair::KeyName
     Description: Root access keypair
@@ -1072,6 +1075,7 @@ Resources:
               bind-hostname = "0.0.0.0"
               port = 8558
               bind-port = 8558
+              route-providers-read-only = false
             }
 
             cluster {

@@ -79,27 +79,53 @@ const MediaPlayer:React.FC<MediaPlayerProps> = (props) => {
         loadPlayableData();
     }, [props.entryId]);
 
-    return previewData ? <>
-        {
-            previewData?.mimeType.major==="video" ?
-                <div className={classes.videoPreview}>
-                    <video className={classes.videoPreview} src={previewData.uri} controls={true} autoPlay={props.autoPlay}/>
-                </div> :
-                null
-        }
-        {
-            previewData?.mimeType.major==="audio" ?
-                <div className={classes.audioPlayer}>
-                    <audio src={previewData.uri} controls={true} autoPlay={props.autoPlay} />
-                </div> :
-                null
-        }
-        {
-            previewData?.mimeType.major==="image" ?
-                <img src={previewData.uri} alt="Thumbnail" className={classes.thumbnailPreview}/> :
-                null
-        }
+    if(previewData?.mimeType.major!=="application") {
+        return previewData ? <>
+            {
+                previewData?.mimeType.major === "video" ?
+                    <div className={classes.videoPreview}>
+                        <video className={classes.videoPreview} src={previewData.uri} controls={true}
+                               autoPlay={props.autoPlay}/>
+                    </div> :
+                    null
+            }
+            {
+                previewData?.mimeType.major === "audio" ?
+                    <div className={classes.audioPlayer}>
+                        <audio src={previewData.uri} controls={true} autoPlay={props.autoPlay}/>
+                    </div> :
+                    null
+            }
+            {
+                previewData?.mimeType.major === "image" ?
+                    <img src={previewData.uri} alt="Thumbnail" className={classes.thumbnailPreview}/> :
+                    null
+            }
         </> : <span className={classes.errorText}>No preview data</span>
+    } else {    //if we don't have a valid MIME type fall back to using the requested playable type to determine the player
+        return <>
+            {
+                props.playableType == "VIDEO" ?
+                    <div className={classes.videoPreview}>
+                        <video className={classes.videoPreview} src={previewData.uri} controls={true}
+                               autoPlay={props.autoPlay}/>
+                    </div> :
+                    null
+            }
+            {
+                props.playableType == "AUDIO"  ?
+                    <div className={classes.audioPlayer}>
+                        <audio src={previewData.uri} controls={true} autoPlay={props.autoPlay}/>
+                    </div> :
+                    null
+            }
+            {
+                props.playableType=="THUMBNAIL" || props.playableType=="POSTER" ?
+                    <img src={previewData.uri} alt="Thumbnail" className={classes.thumbnailPreview}/> :
+                    null
+            }
+        </>
+    }
 }
 
 export default MediaPlayer;

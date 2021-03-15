@@ -107,6 +107,7 @@ const NewBasicSearch:React.FC<RouteComponentProps> = (props) => {
                                   setLastError(message);
                                   setShowingAlert(true);
                               }}
+                              openClicked={(itemId:string)=>props.history.push(`/item/${encodeURIComponent(itemId)}`)}
                               //when the user adds to lightbox we record it here. This state var is bound to the NewSearchComponent
                                 //which will then re-load data for the given entry (after a short delay)
                               lightboxedCb={(entryId:string)=>setNewlyLightboxedList((prevState) => prevState.concat(entryId))}

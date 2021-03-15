@@ -46,7 +46,8 @@ object ProxyLocator {
   }
 
   /**
-    * see if there is a proxy for the given [[ArchiveEntry]], assuming none exists in the dynamo table
+    * see if there is a proxy for the given [[ArchiveEntry]], assuming none exists in the dynamo table.
+    * exclude any .xml files as they are obviously not media
     * @param entry [[ArchiveEntry]] instance
     * @param s3Client implicitly provided AmazonS3 instance
     * @return a Future, containing a Sequence of ProxyLocation objects for each file that matches the given root
@@ -61,9 +62,15 @@ object ProxyLocator {
           .withPrefix(stripFileEnding(entry.path))
         val potentialProxies = s3Client.listObjectsV2(rq)
         logger.debug(s"findProxyLocation got ${potentialProxies.getKeyCount} keys")
-        Future.sequence(potentialProxies.getObjectSummaries.asScala.map(summary=>{
-          ProxyLocation.fromS3(summary.getBucketName,summary.getKey, entry.bucket, entry.path)
-        }))
+        Future.sequence(potentialProxies.getObjectSummaries.asScala
+          .map(summary=>{
+            if(summary.getKey.endsWith(".xml")) {
+              None
+            } else {
+              Some(ProxyLocation.fromS3(summary.getBucketName, summary.getKey, entry.bucket, entry.path))
+            }
+          }).collect({case Some(proxyLocation)=>proxyLocation})
+        )
     })
   }
 

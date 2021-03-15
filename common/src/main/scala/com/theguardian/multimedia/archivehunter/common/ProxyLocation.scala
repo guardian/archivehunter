@@ -89,19 +89,21 @@ object ProxyLocation extends DocId {
           MimeType("application", "octet-stream")
       }
 
-      val storageClass = Option(meta.getStorageClass) match {
-        case Some(sc) => sc
-        case None =>
-          logger.warn(s"s3://$proxyBucket/$key has no storage class! Assuming STANDARD.")
-          "STANDARD"
-      }
       val pt = proxyType match {
         case None =>
           proxyTypeForMime(mimeType) match {
             case Success(pt) => pt
             case Failure(err) =>
               logger.error(s"Could not determine proxy type for s3://$proxyBucket/$key: ${err.toString}")
-              ProxyType.UNKNOWN
+              if(key.endsWith(".mp4")) { //go through the obvious file extensions, as a fallback
+                ProxyType.VIDEO
+              } else if(key.endsWith(".mp3")) {
+                ProxyType.AUDIO
+              } else if(key.endsWith(".jpg") || key.endsWith(".jpeg")) {
+                ProxyType.THUMBNAIL
+              } else {
+                ProxyType.UNKNOWN
+              }
           }
         case Some(value) => value
       }

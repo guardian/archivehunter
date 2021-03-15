@@ -35,7 +35,7 @@ GET     /api/searchpath                 @controllers.SearchController.searchByFi
 GET     /api/search/proxyStats          @controllers.SearchController.getProxyFacets
 
 GET     /api/proxy/searchForFile            @controllers.ProxiesController.searchFor(id:String)
-GET     /api/proxy/:id/associate            @controllers.ProxiesController.associate(fileId:Option[String],id)
+PUT     /api/proxy/:id/associate            @controllers.ProxiesController.associate(fileId:Option[String],id)
 GET     /api/proxy/:id/playable             @controllers.ProxiesController.getPlayable(id, proxyType:Option[String])
 GET     /api/proxy/:id/all                  @controllers.ProxiesController.getAllProxyRefs(id)
 GET     /api/proxy/:id                      @controllers.ProxiesController.proxyForId(id, proxyType:Option[String])
