@@ -49,8 +49,7 @@ var config = {
                 loader: "source-map-loader",
             },
         ]
-    },
-    devtool: "source-map",
+    }
 };
 
 module.exports = config;
