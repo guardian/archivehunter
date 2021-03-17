@@ -17,6 +17,11 @@ var config = {
     optimization: {
         minimizer: [new TerserPlugin()]
     },
+    plugins: [
+        new webpack.ProvidePlugin({
+            process: 'process/browser',
+        }),
+    ],
     module : {
         rules : [
             {
