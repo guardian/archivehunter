@@ -77,6 +77,7 @@
     "moment": "^2.29.1",
     "moment-duration-format": "2.2.2",
     "panda-session": "^0.1.6",
+    "process": "^0.11.10",
     "raven-js": "^3.27.2",
     "react": "^16.14.0",
     "react-chartjs-2": "^2.11.1",
