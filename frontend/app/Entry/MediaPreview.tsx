@@ -17,6 +17,7 @@ interface MediaPreviewProps {
     itemName: string;
     fileExtension: string;
     mimeType: MimeType;
+    className?: string;
     relinkedCb?: ()=>void;
 }
 
@@ -135,11 +136,11 @@ const MediaPreview:React.FC<MediaPreviewProps> = (props) => {
         </div>
     }
 
-    return <div className={classes.centered}>
+    return <div className={props.className}>
         {
             showingCreate ? <>
                 <EntryThumbnail mimeType={props.mimeType} fileExtension={props.fileExtension} entryId={props.itemId}/>
-                <p className={classes.thumbnote}>There is no {selectedPreview} proxy available</p>
+                <p className={clsx(classes.thumbnote, classes.centered)}>There is no {selectedPreview} proxy available</p>
                 <Grid direction="row" container style={{marginTop: "0.4em"}} justify="space-around">
                     <Grid item>
                         <Button variant="outlined"
