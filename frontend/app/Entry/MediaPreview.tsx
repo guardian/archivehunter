@@ -37,6 +37,12 @@ const useStyles = makeStyles((theme)=>Object.assign({
         marginTop: 0,
         marginBottom: 0,
         fontStyle: "italic"
+    },
+    centeredMedia: {
+        marginLeft: "auto",
+        marginRight: "auto",
+        width: "100%",
+        textAlign: "center",
     }
 } as StylesMap, baseStyles));
 
