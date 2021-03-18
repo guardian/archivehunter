@@ -105,7 +105,6 @@ class EntryDetails extends React.Component {
                               autoPlay={this.props.autoPlay}
                               relinkedCb={this.props.lightboxedCb}  //use the lightboxCb to indicate that the item needs reloading
                               triggeredProxyGeneration={this.proxyGenerationWasTriggered}
-                              itemName={this.props.entry.path}
                 />
             <div className="entry-details-insert">{ this.props.preLightboxInsert ? this.props.preLightboxInsert : "" }</div>
             <div className={this.props.classes.entryDetailsLightboxes}>

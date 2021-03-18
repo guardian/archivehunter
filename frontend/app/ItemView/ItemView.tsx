@@ -1,6 +1,6 @@
 import React, {useEffect, useState} from "react";
 import {RouteComponentProps} from "react-router";
-import {ArchiveEntry, ObjectGetResponse, UserResponse} from "../types";
+import {ArchiveEntry, ObjectGetResponse, StylesMap, UserResponse} from "../types";
 import axios from "axios";
 import {formatError} from "../common/ErrorViewComponent";
 import {CircularProgress, makeStyles, Paper, Snackbar} from "@material-ui/core";
@@ -12,12 +12,13 @@ import MediaPreview from "../Entry/MediaPreview";
 import LightboxInsert from "../Entry/details/LightboxInsert";
 import ItemActions from "./ItemActions";
 import {extractFileInfo} from "../common/Fileinfo";
+import {baseStyles} from "../BaseStyles";
 
 interface ItemViewParams {
     id: string;
 }
 
-const useStyles = makeStyles((theme)=>({
+const useStyles = makeStyles((theme)=>Object.assign({
     itemWindow: {
         display: "flex",
         flexDirection: "column",
@@ -31,10 +32,6 @@ const useStyles = makeStyles((theme)=>({
         flex: 1,
         padding: "1em",
     },
-    centered: {
-        marginLeft: "auto",
-        marginRight: "auto",
-    },
     inlineThrobber: {
         marginRight: "1em"
     },
@@ -44,7 +41,7 @@ const useStyles = makeStyles((theme)=>({
     title: {
         marginLeft: "0.4em"
     },
-}));
+}, baseStyles as StylesMap));
 
 const ItemView:React.FC<RouteComponentProps<ItemViewParams>> = (props) => {
     const [entry, setEntry] = useState<ArchiveEntry|undefined>(undefined);
@@ -155,6 +152,7 @@ const ItemView:React.FC<RouteComponentProps<ItemViewParams>> = (props) => {
                               fileExtension={entry.file_extension ?? ".dat"}
                               triggeredProxyGeneration={proxyGenerationWasTriggered}
                               onError={subComponentError}
+                              className={classes.centered}
                               /> : undefined }
             {
                 loading ?
