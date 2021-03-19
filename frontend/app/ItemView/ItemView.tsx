@@ -152,7 +152,7 @@ const ItemView:React.FC<RouteComponentProps<ItemViewParams>> = (props) => {
                               fileExtension={entry.file_extension ?? ".dat"}
                               triggeredProxyGeneration={proxyGenerationWasTriggered}
                               onError={subComponentError}
-                              className={classes.centeredMedia}
+                              className={classes.centered}
                               /> : undefined }
             {
                 loading ?
