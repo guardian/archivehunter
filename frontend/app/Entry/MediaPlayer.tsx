@@ -17,16 +17,15 @@ const useStyles = makeStyles((theme)=>({
     videoPreview: {
         marginLeft: "1em",
         marginRight: "1em",
-        minWidth: "360px",
+        minWidth: "100px",
         maxWidth: "1920px",
         maxHeight: "1080px",
-        minHeight: "180px",
+        minHeight: "60px",
         height: "50%",
         boxSizing: "border-box",
         display: "flex",
         "& video": {
-            flex: "0 1 100%",
-            objectFit: "fill",
+            width: "100%"
         }
     },
     thumbnailPreview: {

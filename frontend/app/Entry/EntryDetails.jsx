@@ -19,6 +19,12 @@ const styles = (theme)=>Object.assign(createStyles({
     },
     partialDivider: {
         width: "70%"
+    },
+    centeredMedia: {
+        marginLeft: "auto",
+        marginRight: "auto",
+        width: "100%",
+        textAlign: "center",
     }
 }), baseStyles);
 
@@ -105,6 +111,7 @@ class EntryDetails extends React.Component {
                               autoPlay={this.props.autoPlay}
                               relinkedCb={this.props.lightboxedCb}  //use the lightboxCb to indicate that the item needs reloading
                               triggeredProxyGeneration={this.proxyGenerationWasTriggered}
+                              className={this.props.classes.centeredMedia}
                 />
             <div className="entry-details-insert">{ this.props.preLightboxInsert ? this.props.preLightboxInsert : "" }</div>
             <div className={this.props.classes.entryDetailsLightboxes}>
