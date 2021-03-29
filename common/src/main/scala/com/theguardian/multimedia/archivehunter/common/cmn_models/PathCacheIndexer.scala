@@ -84,7 +84,7 @@ class PathCacheIndexer(val indexName:String, client:ElasticClient, batchSize:Int
       Some(matchQuery("level", level))
     ).collect({case Some(q)=>q})
 
-    getSource(search(indexName) query boolQuery().must(queryParams) scroll "5m")
+    getSource(search(indexName) query boolQuery().must(queryParams) sortByFieldAsc "key" scroll "5m")
       .toMat(Sink.seq)(Keep.right)
       .run()
   }
