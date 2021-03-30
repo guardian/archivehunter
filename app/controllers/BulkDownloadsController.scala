@@ -1,5 +1,7 @@
 package controllers
 
+import akka.NotUsed
+
 import java.util.UUID
 import akka.actor.{ActorRef, ActorSystem}
 import akka.stream.{ActorMaterializer, Materializer}
@@ -27,7 +29,9 @@ import scala.concurrent.Future
 import scala.util.{Failure, Success}
 import akka.pattern.ask
 import akka.util.ByteString
+import com.sksamuel.elastic4s.streams.ScrollPublisher
 import play.api.http.HttpEntity
+import requests.SearchRequest
 import services.GlacierRestoreActor
 
 import scala.concurrent.duration._
@@ -96,6 +100,13 @@ class BulkDownloadsController @Inject()(config:Configuration,serverTokenDAO: Ser
       .run()
   }
 
+  protected def getSearchSource(p:ScrollPublisher):Source[ArchiveEntry,NotUsed] = {
+    val source = Source.fromPublisher(p)
+    val hitConverter = new SearchHitToArchiveEntryFlow()
+    source
+      .via(hitConverter)
+  }
+
   /**
     * creates a stream that yields ArchiveentryDownloadSynopsis objects as an NDJSON stream
     * @param bulkEntry
@@ -104,10 +115,7 @@ class BulkDownloadsController @Inject()(config:Configuration,serverTokenDAO: Ser
   protected def streamingEntriesForBulk(bulkEntry:LightboxBulkEntry) = {
     val query = LightboxHelper.lightboxSearch(indexName, Some(bulkEntry.id), bulkEntry.userEmail) sortBy fieldSort("path.keyword") scroll "5m"
 
-    val source = Source.fromPublisher(esClient.publisher(query))
-    val hitConverter = new SearchHitToArchiveEntryFlow()
-    source
-      .via(hitConverter)
+    getSearchSource(esClient.publisher(query))
       .map(entry=>ArchiveEntryDownloadSynopsis.fromArchiveEntry(entry))
       .map(_.asJson)
       .map(_.noSpaces + "\n")
@@ -181,7 +189,8 @@ class BulkDownloadsController @Inject()(config:Configuration,serverTokenDAO: Ser
     * @return
     */
   def bulkDownloadSummary(tokenValue:String) = Action.async {
-    serverTokenDAO.get(tokenValue).flatMap({
+    val tokenFut = serverTokenDAO.get(tokenValue)
+    tokenFut.flatMap({
       case None =>
         Future(Forbidden(GenericErrorResponse("forbidden", "invalid or expired token").asJson))
       case Some(Left(err)) =>
