@@ -281,6 +281,19 @@ class BulkDownloadsController @Inject()(config:Configuration,serverTokenDAO: Ser
                 })
               }
               Success(Ok(RestoreStatusResponse("not_requested", entry.id, RestoreStatus.RS_ERROR, None, None).asJson))
+            case GlacierRestoreActor.ItemLost(entry)=>
+              logger.error(s"Bulk item ${entry.bucket}:${entry.path} is lost")
+              val updatedEntry = entry.copy(beenDeleted = true)
+              indexer.indexSingleItem(updatedEntry, Some(updatedEntry.id)).onComplete({
+                case Success(_)=>
+                  logger.info(s"${entry.bucket}:${entry.path} has been updated to indicate it is lost")
+                case Failure(err)=>
+                  logger.error(s"Could not update ${entry.bucket}:${entry.path}")
+              })
+              Success(NotFound(GenericErrorResponse("not_found","item has been deleted!").asJson))
+            case GlacierRestoreActor.RestoreFailure(err)=>
+              logger.error(s"Could not check restore status: ", err)
+              InternalServerError(GenericErrorResponse("error",err.toString).asJson)
           }).map({
             case Success(httpResponse)=>httpResponse
             case Failure(err)=>
