@@ -98,6 +98,8 @@ DELETE  /api/proxyFramework/deployments/:forRegion  @controllers.ProxyFrameworkA
 GET     /api/regions                                @controllers.ProxyFrameworkAdminController.getRegions
 
 GET     /api/bulk/:codeValue                @controllers.BulkDownloadsController.initiateWithOnetimeCode(codeValue)
+GET     /api/bulkv2/:codeValue              @controllers.BulkDownloadsController.initiateWithOnetimeCodeV2(codeValue)
+GET     /api/bulkv2/:tokenValue/summary     @controllers.BulkDownloadsController.bulkDownloadSummary(tokenValue, from:Option[Int], limit:Option[Int])
 GET     /api/bulk/:tokenValue/get/:fileId   @controllers.BulkDownloadsController.getDownloadIdWithToken(tokenValue, fileId)
 
 GET     /api/pathcache/size                 @controllers.PathCacheController.pathCacheSize
