@@ -293,7 +293,7 @@ class BulkDownloadsController @Inject()(config:Configuration,serverTokenDAO: Ser
               Success(NotFound(GenericErrorResponse("not_found","item has been deleted!").asJson))
             case GlacierRestoreActor.RestoreFailure(err)=>
               logger.error(s"Could not check restore status: ", err)
-              InternalServerError(GenericErrorResponse("error",err.toString).asJson)
+              Success(InternalServerError(GenericErrorResponse("error",err.toString).asJson))
           }).map({
             case Success(httpResponse)=>httpResponse
             case Failure(err)=>
