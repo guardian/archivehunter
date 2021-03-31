@@ -2,12 +2,12 @@ package services
 
 import java.time.temporal.{ChronoField, ChronoUnit, TemporalAdjusters, TemporalField}
 import java.time.{Instant, Period, ZoneId, ZonedDateTime}
-
 import akka.actor.{Actor, ActorRef, ActorSystem}
-import com.amazonaws.services.s3.model.RestoreObjectRequest
+import com.amazonaws.services.s3.model.{ObjectMetadata, RestoreObjectRequest}
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{ESClientManager, S3ClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models._
+
 import javax.inject.{Inject, Singleton}
 import play.api.{Configuration, Logger}
 
@@ -40,6 +40,7 @@ object GlacierRestoreActor {
   case class RestoreInProgress(entry:ArchiveEntry) extends GRMsg
   case class RestoreExpired(entry:ArchiveEntry) extends GRMsg
   case class RestoreCompleted(entry:ArchiveEntry, expiresAt:ZonedDateTime) extends GRMsg
+  case class ItemLost(entry:ArchiveEntry) extends GRMsg
 }
 
 @Singleton
@@ -49,7 +50,7 @@ class GlacierRestoreActor @Inject() (config:Configuration, esClientMgr:ESClientM
   private val logger = Logger(getClass)
 
   implicit val ec:ExecutionContext = system.getDispatcher
-  val s3client = s3ClientMgr.getClient(config.getOptional[String]("externalData.awsProfile"))
+  lazy val s3client = s3ClientMgr.getClient(config.getOptional[String]("externalData.awsProfile"))
   val defaultExpiry = config.getOptional[Int]("archive.restoresExpireAfter").getOrElse(3)
   logger.info(s"Glacier restores will expire after $defaultExpiry days")
   private val indexer = new Indexer(config.get[String]("externalData.indexName"))
@@ -85,44 +86,62 @@ class GlacierRestoreActor @Inject() (config:Configuration, esClientMgr:ESClientM
     lbEntryDAO.put(updatedEntry)
   }
 
+  private def checkStatus(result:ObjectMetadata, entry: ArchiveEntry, lbEntry: Option[LightboxEntry], jobs:Option[List[JobModel]], originalSender:ActorRef) = {
+    val isRestoring = Option(result.getOngoingRestore).map(_.booleanValue()) //true, false or null; see https://forums.aws.amazon.com/thread.jspa?threadID=141678. Also map java boolean to scala.
+    isRestoring match {
+      case None =>
+        logger.info(s"s3://${entry.bucket}/${entry.path} has not had any restore requested")
+        if(result.getStorageClass!="GLACIER"){
+          originalSender ! NotInArchive(entry)
+        } else {
+          if(jobs.isDefined) jobs.get.foreach(job=>updateJob(job, JobStatus.ST_ERROR,Some("No restore record in S3")))
+          if(lbEntry.isDefined) updateLightbox(lbEntry.get,None,error=Some(new RuntimeException("No restore record in S3")))
+          originalSender ! RestoreNotRequested(entry)
+        }
+      case Some(true) => //restore is in progress
+        logger.info(s"s3://${entry.bucket}/${entry.path} is currently under restore")
+        if(jobs.isDefined) jobs.get.foreach(job=>updateJob(job, JobStatus.ST_RUNNING, None))
+        if(lbEntry.isDefined) updateLightboxFull(lbEntry.get,RestoreStatus.RS_UNDERWAY,None)
+        originalSender ! RestoreInProgress(entry)
+      case Some(false) => //restore not in progress, may be completed
+        Option(result.getRestoreExpirationTime)
+          .map(date => ZonedDateTime.ofInstant(date.toInstant, ZoneId.systemDefault())) match {
+          case None => //no restore time, so it's gone back again
+            if(lbEntry.isDefined) {
+              if (lbEntry.get.restoreStatus != RestoreStatus.RS_ERROR && lbEntry.get.restoreStatus != RestoreStatus.RS_SUCCESS) {
+                updateLightbox(lbEntry.get, None, Some(new RuntimeException("Item has already expired")))
+              }
+            }
+            originalSender ! RestoreNotRequested(entry)
+          case Some(expiry) =>
+            if(jobs.isDefined) jobs.get.foreach(job=>updateJob(job,JobStatus.ST_SUCCESS,None))
+            if(lbEntry.isDefined) updateLightboxFull(lbEntry.get, RestoreStatus.RS_SUCCESS, Some(expiry))
+            originalSender ! RestoreCompleted(entry, expiry)
+        }
+    }
+  }
+
   override def receive: Receive = {
     case InternalCheckRestoreStatus(lbEntry, entry, jobs, originalSender)=>
       logger.info(s"Checking restore status for s3://${entry.bucket}/${entry.path}")
       logger.info(s"From lightbox entry $lbEntry")
       logger.info(s"With jobs $jobs")
 
-      val result = s3client.getObjectMetadata(entry.bucket, entry.path)
-      val isRestoring = Option(result.getOngoingRestore).map(_.booleanValue()) //true, false or null; see https://forums.aws.amazon.com/thread.jspa?threadID=141678. Also map java boolean to scala.
-      isRestoring match {
-        case None =>
-          logger.info(s"s3://${entry.bucket}/${entry.path} has not had any restore requested")
-          if(result.getStorageClass!="GLACIER"){
-            originalSender ! NotInArchive(entry)
+      Try {
+        s3client.getObjectMetadata(entry.bucket, entry.path)
+      } match {
+        case Success(result)=>checkStatus(result, entry, lbEntry, jobs, originalSender)
+        case Failure(s3err:com.amazonaws.services.s3.model.AmazonS3Exception)=>
+          if(s3err.getStatusCode==404) {
+            logger.warn(s"Registered item s3://${entry.bucket}/${entry.path} does not exist any more!")
+            originalSender ! ItemLost(entry)
           } else {
-            if(jobs.isDefined) jobs.get.foreach(job=>updateJob(job, JobStatus.ST_ERROR,Some("No restore record in S3")))
-            if(lbEntry.isDefined) updateLightbox(lbEntry.get,None,error=Some(new RuntimeException("No restore record in S3")))
-            originalSender ! RestoreNotRequested(entry)
+            logger.warn(s"Could not check restore status due to an s3 error s3://${entry.bucket}/${entry.path}: ${s3err.getMessage}", s3err)
+            originalSender ! RestoreFailure(s3err)
           }
-        case Some(true) => //restore is in progress
-          logger.info(s"s3://${entry.bucket}/${entry.path} is currently under restore")
-          if(jobs.isDefined) jobs.get.foreach(job=>updateJob(job, JobStatus.ST_RUNNING, None))
-          if(lbEntry.isDefined) updateLightboxFull(lbEntry.get,RestoreStatus.RS_UNDERWAY,None)
-          originalSender ! RestoreInProgress(entry)
-        case Some(false) => //restore not in progress, may be completed
-          Option(result.getRestoreExpirationTime)
-            .map(date => ZonedDateTime.ofInstant(date.toInstant, ZoneId.systemDefault())) match {
-            case None => //no restore time, so it's gone back again
-              if(lbEntry.isDefined) {
-                if (lbEntry.get.restoreStatus != RestoreStatus.RS_ERROR && lbEntry.get.restoreStatus != RestoreStatus.RS_SUCCESS) {
-                  updateLightbox(lbEntry.get, None, Some(new RuntimeException("Item has already expired")))
-                }
-              }
-              originalSender ! RestoreNotRequested(entry)
-            case Some(expiry) =>
-              if(jobs.isDefined) jobs.get.foreach(job=>updateJob(job,JobStatus.ST_SUCCESS,None))
-              if(lbEntry.isDefined) updateLightboxFull(lbEntry.get, RestoreStatus.RS_SUCCESS, Some(expiry))
-              originalSender ! RestoreCompleted(entry, expiry)
-          }
+        case Failure(err)=>
+          logger.warn(s"Could not check restore status for s3://${entry.bucket}/${entry.path}: ${err.getMessage}", err)
+          originalSender ! RestoreFailure(err)
       }
 
     case CheckRestoreStatusBasic(archiveEntry)=>
