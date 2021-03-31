@@ -18,7 +18,7 @@ import {MenuIcon} from "@material-ui/data-grid";
 import {
     ArrowRightAlt,
     ChevronLeft,
-    ChevronRight, DirectionsRun,
+    ChevronRight, DeleteForever, DirectionsRun,
     Healing,
     PeopleAlt,
     Storage,
@@ -127,6 +127,11 @@ const menuItems = [
         uri: "/admin/proxyHealth",
         icon: <Healing/>,
         name: "Proxying Health Indicator"
+    },
+    {
+       uri: "/admin/deleteditems",
+       icon: <DeleteForever/>,
+       name: "Deleted items",
     },
     {
         uri: "/admin/quickrestore",
