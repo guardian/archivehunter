@@ -135,6 +135,9 @@ class GlacierRestoreActor @Inject() (config:Configuration, esClientMgr:ESClientM
           if(s3err.getStatusCode==404) {
             logger.warn(s"Registered item s3://${entry.bucket}/${entry.path} does not exist any more!")
             originalSender ! ItemLost(entry)
+          } else {
+            logger.warn(s"Could not check restore status due to an s3 error s3://${entry.bucket}/${entry.path}: ${s3err.getMessage}", s3err)
+            originalSender ! RestoreFailure(s3err)
           }
         case Failure(err)=>
           logger.warn(s"Could not check restore status for s3://${entry.bucket}/${entry.path}: ${err.getMessage}", err)
