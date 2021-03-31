@@ -6,7 +6,7 @@
   "scripts": {
     "test": "jest  --unhandled-rejections=strict",
     "dev": "webpack --mode development --watch",
-    "build": "webpack --mode production"
+    "build": "webpack --version; webpack --mode production"
   },
   "jest": {
     "moduleFileExtensions": [
