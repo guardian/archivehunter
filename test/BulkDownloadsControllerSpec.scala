@@ -1,4 +1,6 @@
 import akka.NotUsed
+import akka.actor.ActorSystem
+import akka.stream.Materializer
 import akka.stream.scaladsl.{Framing, Keep, Sink, Source}
 import akka.util.ByteString
 import com.sksamuel.elastic4s.streams.ScrollPublisher
@@ -6,6 +8,7 @@ import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ArchiveEnt
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{ESClientManager, S3ClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{LightboxBulkEntry, LightboxBulkEntryDAO, LightboxEntry, LightboxEntryDAO, RestoreStatusEncoder}
 import controllers.BulkDownloadsController
+import helpers.{InjectableRefresher, InjectableRefresherMock}
 import models.{ArchiveEntryDownloadSynopsis, ServerTokenDAO, ServerTokenEntry}
 import org.specs2.mock.Mockito
 import org.specs2.mutable.Specification
@@ -13,14 +16,25 @@ import play.api.Configuration
 import play.api.mvc.ControllerComponents
 import play.api.test.{FakeRequest, WithApplication}
 import io.circe.generic.auto._
+import play.api.inject.guice.GuiceApplicationBuilder
 
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.global
 import java.time.ZonedDateTime
 import scala.concurrent.{Await, ExecutionContext, Future}
+import play.api.inject.bind
 
 class BulkDownloadsControllerSpec extends Specification with Mockito with ZonedDateTimeEncoder with ArchiveEntryHitReader with StorageClassEncoder {
   sequential
+
+  /**
+    * FIXME: it would be better to initialise an Application than build a new ActorSystem here, but unfortunately
+    * Panda makes that very difficult without valid AWS credentials.
+    * Revisit once we move to oauth2 authentication
+    */
+  private implicit val actorSystem:ActorSystem = ActorSystem("BulkDownloadsControllerSpec")
+  private implicit val mat:Materializer = Materializer.matFromSystem
+  private implicit val ec:ExecutionContext = actorSystem.dispatcher
 
   def fakeStreamingSource = Source.fromIterator(()=>Seq(
     ArchiveEntry(
@@ -57,10 +71,7 @@ class BulkDownloadsControllerSpec extends Specification with Mockito with ZonedD
   ).toIterator)
 
   "BulkDownloadsController.streamingEntriesForBulk" should {
-    "yield a stream of NDJSON formatted ArchiveEntrySynopsis" in new WithApplication() {
-      implicit val actorSystem = app.actorSystem
-      implicit val mat = app.materializer
-
+    "yield a stream of NDJSON formatted ArchiveEntrySynopsis" in {
       val fakeInputData =fakeStreamingSource
 
       val fakeEntry = LightboxBulkEntry(
@@ -108,9 +119,7 @@ class BulkDownloadsControllerSpec extends Specification with Mockito with ZonedD
   }
 
   "BulkDownloadsController.saveTokenOnly" should {
-    "update the existing token in the database and create a long-lived token" in new WithApplication() {
-      implicit val actorSystem = app.actorSystem
-      implicit val ec:ExecutionContext = actorSystem.dispatcher
+    "update the existing token in the database and create a long-lived token" in {
 
       val fakeConfig = Configuration.from(Map(
         "externalData"-> Map("indexName"->"archivehunter")

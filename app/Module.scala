@@ -1,7 +1,7 @@
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{ESClientManager, ESClientManagerImpl}
 import com.google.inject.AbstractModule
 import com.theguardian.multimedia.archivehunter.common.ArchiveHunterConfiguration
-import helpers.ArchiveHunterConfigurationPlay
+import helpers.{ArchiveHunterConfigurationPlay, InjectableRefresher, InjectableRefresherImpl}
 import play.api.libs.concurrent.AkkaGuiceSupport
 import services._
 
@@ -9,6 +9,7 @@ class Module extends AbstractModule with AkkaGuiceSupport {
   override def configure() = {
     bind(classOf[ESClientManager]).to(classOf[ESClientManagerImpl])
     bind(classOf[ArchiveHunterConfiguration]).to(classOf[ArchiveHunterConfigurationPlay])
+    bind(classOf[InjectableRefresher]).to(classOf[InjectableRefresherImpl])
 
     bindActor[BucketScanner]("bucketScannerActor")
     bindActor[LegacyProxiesScanner]("legacyProxiesScannerActor")
