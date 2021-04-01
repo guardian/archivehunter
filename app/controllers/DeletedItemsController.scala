@@ -71,7 +71,10 @@ class DeletedItemsController @Inject() (override val config:Configuration,
         Future(BadRequest(GenericErrorResponse("bad_request", err.toString).asJson)),
       searchRequest=> {
         withScanTargetAsync(collectionName, scanTargetDAO) { target =>
-
+//          val correctedPrefix = prefix match {
+//            case None=>None
+//            case Some(pfx)=>if(pfx.endsWith("/")) pfx.substring(0, pfx.length-2) else pfx
+//          }
           esClient.execute(makeQuery(collectionName, prefix, searchRequest)).map(response => {
             (response.status: @switch) match {
               case 200 =>
@@ -104,8 +107,9 @@ class DeletedItemsController @Inject() (override val config:Configuration,
       err=>
         Future(BadRequest(GenericErrorResponse("bad_request", err.toString).asJson)),
       searchRequest=> {
-        withScanTarget(collectionName, scanTargetDAO) { target =>
+        withScanTarget(collectionName, scanTargetDAO) { _ =>
           val query = makeQuery(collectionName, prefix, searchRequest).scroll("2m")
+          logger.debug(query.toString)
           val source = Source.fromPublisher(esClient.publisher(query))
           val appliedLimit = limit.getOrElse(1000L)
 

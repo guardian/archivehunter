@@ -79,7 +79,7 @@ const DeletedItemsComponent:React.FC<RouteComponentProps> = (props) => {
     useEffect(()=>{
         setEntries([]);
         setLoading(true);
-        loadDeletedItemStream(currentCollection, currentPath, searchDoc, receivedNewData, undefined);
+        loadDeletedItemStream(currentCollection, currentPath, searchDoc, receivedNewData, 50);
     }, [searchDoc, currentPath]);
 
     const receivedNewData = (entry:ArchiveEntry|undefined, isDone:boolean) => {

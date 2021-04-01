@@ -23,7 +23,7 @@ case class SearchRequest (q:Option[String],
       path.map(path=>termQuery("path",path)),
       collection.map(bucket=>termQuery("bucket.keyword", bucket)),
       q.map(queryString=>query(queryString)),
-      if(hideDotFiles.getOrElse(true)){
+      if(hideDotFiles.getOrElse(false)){
         //ES regex expressions are always anchored, so we have to put a matchall on the start.
         Some(not(regexQuery(("path.keyword",".*/+\\.[^\\.]+"))))
       } else None

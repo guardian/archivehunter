@@ -115,8 +115,9 @@ const NewTreeView:React.FC<NewTreeViewProps> = (props) => {
     const [loadedPaths, setLoadedPaths] = useState<PathEntry[]>([]);
 
     const treeItemSelected = (path:PathEntry) => {
-        console.log("You selected ", path);
-        props.pathSelectionChanged(path.fullpath);
+        const newPath = path.fullpath.endsWith("/") ? path.fullpath.slice(0, path.fullpath.length-1) : path.fullpath
+        console.log("You selected ", newPath);
+        props.pathSelectionChanged(newPath);
     }
 
     useEffect(()=>{

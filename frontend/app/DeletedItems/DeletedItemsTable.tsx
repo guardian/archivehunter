@@ -76,7 +76,8 @@ const DeletedItemsTableContent:React.FC<DeletedItemsTableProps> = (props) => {
         {
             field: "id",
             headerName: " ",
-            renderCell: (params)=><Grid container direction="row">
+            width: 150,
+            renderCell: (params)=><Grid container direction="row" spacing={0}>
                 <Grid item>
                     <Tooltip title="Remove this tombstone">
                         <IconButton onClick={()=>props.requestDelete(params.value as string)}>
