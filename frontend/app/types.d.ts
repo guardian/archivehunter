@@ -326,3 +326,9 @@ interface UserResponse {
     avatarUrl?: string;
     isAdmin: boolean;
 }
+
+interface DeletionSummaryResponse {
+    status: string;
+    totalHits: number;
+    totalSize: number;
+}

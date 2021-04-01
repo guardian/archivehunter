@@ -6,16 +6,19 @@ import {makeStyles, Snackbar} from "@material-ui/core";
 import BoxSizing from "../common/BoxSizing";
 import NewTreeView from "../browse/NewTreeView";
 import axios from "axios";
-import {AdvancedSearchDoc, CollectionNamesResponse} from "../types";
+import {AdvancedSearchDoc, ArchiveEntry, CollectionNamesResponse} from "../types";
 import {formatError} from "../common/ErrorViewComponent";
 import MuiAlert from "@material-ui/lab/Alert";
 import BrowsePathSummary from "../browse/BrowsePathSummary";
+import DeletedItemSummary from "./DeletedItemSummary";
+import DeletedItemsTable from "./DeletedItemsTable";
+import {loadDeletedItemStream} from "./DeletedItemsStreamConsumer";
 
 const useStyles = makeStyles((theme)=>({
     browserWindow: {
         display: "grid",
         gridTemplateColumns: "repeat(20, 5%)",
-        gridTemplateRows: "[top] 200px [info-area] auto [bottom]",
+        gridTemplateRows: "[top] 150px [info-area] auto [bottom]",
         height: "95vh"
     },
     pathSelector: {
@@ -36,6 +39,14 @@ const useStyles = makeStyles((theme)=>({
         padding: "1em",
         overflow: "hidden"
     },
+    dataView: {
+        gridRowStart: "info-area",
+        gridRowEnd: "bottom",
+        padding: "1em",
+        overflowX: "hidden",
+        overflowY: "auto",
+        height: "95%"
+    }
 }));
 
 const DeletedItemsComponent:React.FC<RouteComponentProps> = (props) => {
@@ -43,6 +54,8 @@ const DeletedItemsComponent:React.FC<RouteComponentProps> = (props) => {
     const [collectionNames, setCollectionNames] = useState<string[]>([]);
     const [currentPath, setCurrentPath] = useState<string|undefined>(undefined);
     const [reloadCounter, setReloadCounter] = useState(0);
+    const [entries, setEntries] = useState<ArchiveEntry[]>([]);
+
     const [loading, setLoading] = useState(true);
     const [searchDoc, setSearchDoc] = useState<AdvancedSearchDoc>({collection:""});
 
@@ -58,6 +71,23 @@ const DeletedItemsComponent:React.FC<RouteComponentProps> = (props) => {
             setLoading(false);
         })
     }, [])
+
+    useEffect(()=>{
+        setSearchDoc(Object.assign({}, searchDoc, {collection: currentCollection}))
+    }, [currentCollection]);
+
+    useEffect(()=>{
+        setEntries([]);
+        loadDeletedItemStream(currentCollection, currentPath, searchDoc, receivedNewData);
+    }, [searchDoc, currentPath]);
+
+    const receivedNewData = (entry:ArchiveEntry|undefined, isDone:boolean) => {
+        console.log("Got new entry: ", entry, " stream completing: ", isDone);
+        if(entry) {
+            setEntries((prev)=>prev.concat(entry));
+        }
+        return true;
+    }
 
     const refreshCollectionNames = async () => {
         try {
@@ -78,6 +108,13 @@ const DeletedItemsComponent:React.FC<RouteComponentProps> = (props) => {
 
     const closeAlert = () => setShowingAlert(false);
 
+    const removalRequested = async (itemId:string)=> {
+        console.log("Removal requested for ", itemId);
+    }
+
+    const removeAllRequested = async ()=> {
+        console.log("Removal requested for everything here")
+    }
     return <>
         <Helmet>
             <title>Deleted items {currentCollection ? `in ${currentCollection}` : ""} - ArchiveHunter</title>
@@ -88,14 +125,13 @@ const DeletedItemsComponent:React.FC<RouteComponentProps> = (props) => {
         <AdminContainer {...props}>
             <div className={classes.browserWindow}>
                 <div className={classes.summaryInfoArea} style={{gridColumnStart: leftDividerPos+2, gridColumnEnd: -1}}>
-                    <BrowsePathSummary collectionName={currentCollection}
+                    <DeletedItemSummary collectionName={currentCollection}
                                        searchDoc={searchDoc}
                                        path={currentPath}
                                        parentIsLoading={loading}
                                        refreshCb={()=>setReloadCounter(prevState => prevState+1)}
                                        goToRootCb={()=>setCurrentPath("")}
-                                       showDotFiles={false}
-                                       showDotFilesUpdated={()=>{}}
+                                        requestRemoveAll={removeAllRequested}
                                        onError={showComponentError}
                     />
                 </div>
@@ -109,6 +145,9 @@ const DeletedItemsComponent:React.FC<RouteComponentProps> = (props) => {
                                  collectionDidChange={(newCollection)=>setCurrentCollection(newCollection)}
                                  pathSelectionChanged={(newpath)=>setCurrentPath(newpath)}
                                  onError={showComponentError}/>
+                </div>
+                <div className={classes.dataView} style={{gridColumnStart: leftDividerPos, gridColumnEnd: -1}}>
+                    <DeletedItemsTable entries={entries} requestDelete={removalRequested}/>
                 </div>
             </div>
         </AdminContainer>

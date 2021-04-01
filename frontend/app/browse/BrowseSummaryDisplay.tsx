@@ -65,12 +65,12 @@ const BrowseSummaryDisplay:React.FC<BrowseSummaryDisplayProps> = (props) =>{
                     </Grid> : null
                     }
                 </Grid>
+                {
+                    props.path ? <Grid item className={classes.summaryBoxElement}>
+                        <PathDisplayComponent path={props.path}/>
+                    </Grid> : null
+                }
             </Grid>
-            {
-                props.path ? <Grid item className={classes.summaryBoxElement}>
-                    <PathDisplayComponent path={props.path}/>
-                </Grid> : null
-            }
 
             <Grid item>
                 <Grid container direction="row" spacing={1} alignItems="center" >

@@ -112,6 +112,8 @@ class BrowsePathSummary extends React.Component {
 
         /*TODO: add in jschart and put a horizontal bar of the filetypes breakdown*/
         if(this.state.hasLoaded) return <BrowseSummaryDisplay
+            collectionName={this.props.collectionName}
+            path={this.props.path}
             goToRootCb={this.props.goToRootCb}
             parentIsLoading={this.props.parentIsLoading}
             refreshCb={this.props.refreshCb}
