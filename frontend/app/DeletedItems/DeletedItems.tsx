@@ -78,6 +78,7 @@ const DeletedItemsComponent:React.FC<RouteComponentProps> = (props) => {
 
     useEffect(()=>{
         setEntries([]);
+        setLoading(true);
         loadDeletedItemStream(currentCollection, currentPath, searchDoc, receivedNewData);
     }, [searchDoc, currentPath]);
 
@@ -85,6 +86,9 @@ const DeletedItemsComponent:React.FC<RouteComponentProps> = (props) => {
         console.log("Got new entry: ", entry, " stream completing: ", isDone);
         if(entry) {
             setEntries((prev)=>prev.concat(entry));
+        }
+        if(isDone) {
+            setLoading(false);
         }
         return true;
     }
@@ -131,7 +135,8 @@ const DeletedItemsComponent:React.FC<RouteComponentProps> = (props) => {
                                        parentIsLoading={loading}
                                        refreshCb={()=>setReloadCounter(prevState => prevState+1)}
                                        goToRootCb={()=>setCurrentPath("")}
-                                        requestRemoveAll={removeAllRequested}
+                                       requestRemoveAll={removeAllRequested}
+                                       loadingNotifiction={`Loaded ${entries.length} items`}
                                        onError={showComponentError}
                     />
                 </div>

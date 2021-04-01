@@ -3,13 +3,15 @@ import {AdvancedSearchDoc, DeletionSummaryResponse} from "../types";
 import axios from "axios";
 import {formatError} from "../common/ErrorViewComponent";
 import BrowseSummaryDisplay from "../browse/BrowseSummaryDisplay";
-import {Button, Grid} from "@material-ui/core";
+import {Button, Grid, LinearProgress, makeStyles} from "@material-ui/core";
 import {DeleteForever} from "@material-ui/icons";
+import {baseStyles} from "../BaseStyles";
 
 interface DeletedItemSummaryProps {
     collectionName:string;
     path:string|undefined;
     parentIsLoading: boolean;
+    loadingNotifiction?: string;
     searchDoc: AdvancedSearchDoc;
     onError?: (errorDesc:string)=>void;
     goToRootCb:()=>void;
@@ -17,8 +19,12 @@ interface DeletedItemSummaryProps {
     requestRemoveAll:()=>void;
 }
 
+const useStyles = makeStyles(baseStyles);
+
 const DeletedItemSummary:React.FC<DeletedItemSummaryProps> = (props) => {
     const [summaryData, setSummaryData] = useState<DeletionSummaryResponse|undefined>(undefined);
+
+    const classes = useStyles();
 
     useEffect(()=>{
         if(props.collectionName!="") {
@@ -57,6 +63,14 @@ const DeletedItemSummary:React.FC<DeletedItemSummaryProps> = (props) => {
                 Remove all tombstones
             </Button>
         </Grid>
+        <div style={{width:"100%"}}>
+            {
+                props.parentIsLoading ? <LinearProgress/> : null
+            }
+            {
+                props.parentIsLoading && props.loadingNotifiction ? <p className={classes.centered} style={{marginTop: "0.1em"}}>{props.loadingNotifiction}</p> : null
+            }
+        </div>
     </BrowseSummaryDisplay>
 
 }

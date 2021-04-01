@@ -12,6 +12,13 @@ interface DeletedItemsTableProps {
     requestDelete: (itemId:string)=>void;
 }
 
+// const DeletedItemsTable:React.FC<DeletedItemsTableProps> = (props) => {
+//     const
+//     return React.memo(DeletedItemsTableContent, (prevProps, nextProps)=>{
+//
+//     })
+// }
+
 const DeletedItemsTable:React.FC<DeletedItemsTableProps> = (props) => {
     const columns:ColDef[] = [
         {
