@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from "react";
+import React, {useState, useEffect, useRef} from "react";
 import {RouteComponentProps} from "react-router";
 import {Helmet} from "react-helmet";
 import AdminContainer from "../admin/AdminContainer";
@@ -56,22 +56,22 @@ const DeletedItemsComponent:React.FC<RouteComponentProps> = (props) => {
     const [reloadCounter, setReloadCounter] = useState(0);
     const [entries, setEntries] = useState<ArchiveEntry[]>([]);
 
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
     const [searchDoc, setSearchDoc] = useState<AdvancedSearchDoc>({collection:""});
-
     const [lastError, setLastError] = useState<string|undefined>(undefined);
     const [successMessage, setSuccessMessage] = useState<string|undefined>(undefined);
-
     const [showingAlert, setShowingAlert] = useState(false);
-
     const [leftDividerPos, setLeftDividerPos] = useState(4);
+
+    const [awaitingStopLoading, setAwaitingStopLoading] = useState(false);
+    const awaitingStopLoadingRef = useRef<boolean>();
+
+    awaitingStopLoadingRef.current = awaitingStopLoading;   //in order to access the up-to-date state var in a callback we must use a mutable ref. See https://stackoverflow.com/questions/57847594/react-hooks-accessing-up-to-date-state-from-within-a-callback
 
     const classes = useStyles();
 
     useEffect(()=>{
-        refreshCollectionNames().then(()=>{
-            setLoading(false);
-        })
+        refreshCollectionNames();
     }, [])
 
     useEffect(()=>{
@@ -79,13 +79,19 @@ const DeletedItemsComponent:React.FC<RouteComponentProps> = (props) => {
     }, [currentCollection]);
 
     const loadFromFresh = ()=>{
+        console.log("DeletedItemsTable loading in data");
         setEntries([]);
         setLoading(true);
         return loadDeletedItemStream(currentCollection, currentPath, searchDoc, receivedNewData, 50);
     }
 
     useEffect(()=>{
-        loadFromFresh();
+        console.log("searchDoc or currentPath changed, loading is ", loading, " awaitingStopLoading is ", awaitingStopLoading);
+        if(loading) {
+            setAwaitingStopLoading(true);   //an effect on this state var will cause the load to be performed after a delay
+        } else {
+            loadFromFresh();
+        }
     }, [searchDoc, currentPath]);
 
     const receivedNewData = (entry:ArchiveEntry|undefined, isDone:boolean) => {
@@ -94,15 +100,29 @@ const DeletedItemsComponent:React.FC<RouteComponentProps> = (props) => {
             setEntries((prev)=>prev.concat(entry));
         }
         if(isDone) {
+            setAwaitingStopLoading(false);
             setLoading(false);
+            return true;
         }
-        return true;
+
+        if(awaitingStopLoadingRef.current) {
+            console.log("Stopping due to reload...");
+            setAwaitingStopLoading(false);
+            setLoading(false);
+            window.setTimeout(()=>{
+                loadFromFresh()
+            }, 1000);   //schedule a reload once we have terminated the current operation
+            return false;
+        } else {
+            return true;
+        }
     }
 
     const refreshCollectionNames = async () => {
         try {
             const result = await axios.get<CollectionNamesResponse>("/api/browse/collections");
             setCollectionNames(result.data.entries);
+            setLoading(false);  //this must happen BEFORE we change the current collection, otherwise the data table won't update
             if(currentCollection=="" && result.data.entries.length>0) setCurrentCollection(result.data.entries[0]);
         } catch (err) {
             console.error("Could not refresh collection names: ", err);

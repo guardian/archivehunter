@@ -37,7 +37,9 @@ async function loadDeletedItemStream(collection, prefix, searchDoc, callback, de
                 result = await streamReader.read();
                 const shouldContinue = callback(result.value, result.done);
                 if(!shouldContinue) {
+                    console.log("DeletedItemsStreamConsumer requested early cancellation");
                     await streamReader.cancel("User cancelled loading");
+                    console.log("DeletedItemsStreamConsumer cancelletion completed");
                     return;
                 }
                 if(delay) await asyncDelay(delay);
