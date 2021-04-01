@@ -7,9 +7,11 @@ import ndjsonStream from "can-ndjson-stream";
  * @param searchDoc an AdvancedSearchDocument
  * @param callback callback to receive data.  This is called once for every row with the arguments (ArchiveEntry, isDone boolean).
  * To continue the loading operation, it should return true; to cancel an in-progress operation it should return false.
+ * @param delay optional time to wait between loads, in milliseconds. Can help prevent the page jamming/stuttering because javascript
+ * renders are taking up all the runtime
  * @returns {Promise<void>}
  */
-async function loadDeletedItemStream(collection, prefix, searchDoc, callback) {
+async function loadDeletedItemStream(collection, prefix, searchDoc, callback, delay) {
     let args = "";
     if(prefix) {
         args = `?prefix=${encodeURIComponent(prefix)}`
@@ -23,6 +25,10 @@ async function loadDeletedItemStream(collection, prefix, searchDoc, callback) {
         }
     });
 
+    const asyncDelay = (ms) => {
+        return new Promise((resolve, reject)=>window.setTimeout(()=>resolve, ms))
+    }
+
     switch(response.status) {
         case 200:
             const streamReader = ndjsonStream(response.body).getReader();
@@ -34,6 +40,7 @@ async function loadDeletedItemStream(collection, prefix, searchDoc, callback) {
                     await streamReader.cancel("User cancelled loading");
                     return;
                 }
+                if(delay) await asyncDelay(delay);
             }
             break;
         case 502|503|504:

@@ -4,9 +4,9 @@ import akka.actor.ActorSystem
 import akka.stream.Materializer
 import akka.stream.scaladsl._
 import akka.util.ByteString
-import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ArchiveEntryHitReader, StorageClassEncoder, ZonedDateTimeEncoder}
+import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ArchiveEntryHitReader, Indexer, StorageClassEncoder, ZonedDateTimeEncoder}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{ESClientManager, S3ClientManager}
-import com.theguardian.multimedia.archivehunter.common.cmn_models.{ScanTarget, ScanTargetDAO}
+import com.theguardian.multimedia.archivehunter.common.cmn_models.{ItemNotFound, ScanTarget, ScanTargetDAO}
 import helpers.{InjectableRefresher, ItemFolderHelper, WithScanTarget}
 import play.api.{Configuration, Logger}
 import play.api.libs.circe.Circe
@@ -33,15 +33,17 @@ class DeletedItemsController @Inject() (override val config:Configuration,
                                             override val refresher:InjectableRefresher)
                                            (implicit actorSystem:ActorSystem, mat:Materializer)
   extends AbstractController(controllerComponents) with PanDomainAuthActions with WithScanTarget with ArchiveEntryHitReader
-    with ZonedDateTimeEncoder with StorageClassEncoder with Circe
+    with ZonedDateTimeEncoder with StorageClassEncoder with Circe with AdminsOnly
 {
   import com.sksamuel.elastic4s.http.ElasticDsl._
   import com.sksamuel.elastic4s.streams.ReactiveElastic._
 
-  private val esClient = esClientMgr.getClient()
+  private implicit val esClient = esClientMgr.getClient()
   private val logger=Logger(getClass)
 
   private val indexName = config.get[String]("externalData.indexName")
+
+  private val indexer = new Indexer(indexName)
 
   protected def makeQuery(collectionName:String, prefix:Option[String], searchRequest: SearchRequest) = {
     val queries = Seq(
@@ -119,5 +121,44 @@ class DeletedItemsController @Inject() (override val config:Configuration,
           )
         }
       })
+  }
+
+  private def performItemDelete(collectionName:String, itemId:String) = esClient
+    .execute(deleteById(indexName, "entry", itemId))
+    .map(response=>{
+      if(response.status==200 || response.status==201) {
+        Ok(GenericErrorResponse("ok","item deleted").asJson)
+      } else {
+        logger.error(s"Could not delete item $itemId from $collectionName: ${response.status} ${response.error.reason}")
+        InternalServerError(GenericErrorResponse("db_error","index returned error").asJson)
+      }
+    })
+    .recover({
+      case err:Throwable=>
+        logger.error(s"Item delete request failed: ${err.getMessage}", err);
+        InternalServerError(GenericErrorResponse("internal_error", err.getMessage).asJson)
+    })
+
+  def removeTombstoneById(collectionName:String, itemId:String) = APIAuthAction.async { request=>
+    adminsOnlyAsync(request, true) {
+      indexer.getByIdFull(itemId).flatMap({
+        case Left(ItemNotFound(itemId))=>
+          Future(NotFound(GenericErrorResponse("not_found", itemId).asJson))
+        case Left(other)=>
+          logger.error(s"Could not look up item $itemId from $collectionName: ${other.errorDesc}")
+          Future(InternalServerError(GenericErrorResponse("error", other.errorDesc).asJson))
+        case Right(entry)=>
+          if(entry.bucket!=collectionName) {
+            logger.warn(s"Invalid tombstone removal request: $itemId exist but is not within bucket $collectionName, returning 404")
+            Future(NotFound(GenericErrorResponse("not_found", itemId).asJson))
+          } else if(!entry.beenDeleted) {
+            logger.warn(s"Invalid tombstone removal request: $itemId is not a tombstone")
+            Future(Conflict(GenericErrorResponse("conflict","this item is not a tombstone").asJson))
+          } else {
+            performItemDelete(collectionName, itemId)
+          }
+      })
+
+    }
   }
 }

@@ -32,7 +32,7 @@ const DeletedItemsTable:React.FC<DeletedItemsTableProps> = (props) => {
             field: "path",
             headerName: "Path",
             width: 500,
-            renderCell: (params)=><PathDisplayComponent path={params.getValue("path") as string}/>
+            //renderCell: (params)=><PathDisplayComponent path={params.getValue("path") as string}/>
         },
         {
             field: "size",
