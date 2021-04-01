@@ -5,6 +5,7 @@ import akka.stream.Materializer
 import akka.stream.scaladsl._
 import akka.util.ByteString
 import com.gu.pandomainauth.action.UserRequest
+import com.sksamuel.elastic4s.searches.queries.Query
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ArchiveEntryHitReader, Indexer, StorageClassEncoder, ZonedDateTimeEncoder}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{ESClientManager, S3ClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{ItemNotFound, ScanTarget, ScanTargetDAO}
@@ -57,11 +58,11 @@ class DeletedItemsController @Inject() (override val config:Configuration,
     boolQuery().must(queries)
   }
 
-  protected def makeSearchRequest(collectionName:String, prefix:Option[String], searchRequest: SearchRequest) = {
+  protected def makeSearchRequest(q:Query) = {
     val aggs = Seq(
       sumAgg("totalSize", "size"),
     )
-    search(indexName) query makeQuery(collectionName, prefix, searchRequest) aggregations aggs
+    search(indexName) query q aggregations aggs
   }
 
   /**
@@ -76,11 +77,7 @@ class DeletedItemsController @Inject() (override val config:Configuration,
         Future(BadRequest(GenericErrorResponse("bad_request", err.toString).asJson)),
       searchRequest=> {
         withScanTargetAsync(collectionName, scanTargetDAO) { target =>
-//          val correctedPrefix = prefix match {
-//            case None=>None
-//            case Some(pfx)=>if(pfx.endsWith("/")) pfx.substring(0, pfx.length-2) else pfx
-//          }
-          esClient.execute(makeSearchRequest(collectionName, prefix, searchRequest)).map(response => {
+          esClient.execute(makeSearchRequest(makeQuery(collectionName, prefix, searchRequest))).map(response => {
             (response.status: @switch) match {
               case 200 =>
                 logger.info(s"Got ${response.result.aggregations}")
@@ -121,7 +118,7 @@ class DeletedItemsController @Inject() (override val config:Configuration,
     */
   def deletedItemsListStreaming(collectionName:String, prefix:Option[String], limit:Option[Long]) = APIAuthAction.async(circe.json(2048)) { request=>
     withQueryFromSearchdoc(collectionName, prefix, request) { query=>
-      val source = Source.fromPublisher(esClient.publisher(query))
+      val source = Source.fromPublisher(esClient.publisher(makeSearchRequest(query).scroll("5m")))
       val appliedLimit = limit.getOrElse(1000L)
 
       val contentStream = source

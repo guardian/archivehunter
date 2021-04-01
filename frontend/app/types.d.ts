@@ -332,3 +332,9 @@ interface DeletionSummaryResponse {
     totalHits: number;
     totalSize: number;
 }
+
+interface BulkDeleteConfirmationResponse {
+    status: string;
+    deletedCount: number;
+    timeTaken: number;
+}

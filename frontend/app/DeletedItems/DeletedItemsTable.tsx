@@ -23,7 +23,7 @@ const DeletedItemsTable:React.FC<DeletedItemsTableProps> = (props:DeletedItemsTa
     const [unrenderedItemCount, setUnrenderedItemCount] = useState(0);
 
     const WrappedComponent = React.memo(DeletedItemsTableContent, (prevProps, nextProps)=>{
-        if(prevProps.currentlyLoading && !nextProps.currentlyLoading) {
+        if(!nextProps.currentlyLoading) {   //perform the update always if the state we are moving to is not a loading state
             return false
         }
         if(unrenderedItemCount>30) {

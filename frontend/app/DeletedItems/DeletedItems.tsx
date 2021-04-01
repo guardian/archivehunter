@@ -6,7 +6,7 @@ import {makeStyles, Snackbar} from "@material-ui/core";
 import BoxSizing from "../common/BoxSizing";
 import NewTreeView from "../browse/NewTreeView";
 import axios from "axios";
-import {AdvancedSearchDoc, ArchiveEntry, CollectionNamesResponse} from "../types";
+import {AdvancedSearchDoc, ArchiveEntry, BulkDeleteConfirmationResponse, CollectionNamesResponse} from "../types";
 import {formatError} from "../common/ErrorViewComponent";
 import MuiAlert from "@material-ui/lab/Alert";
 import BrowsePathSummary from "../browse/BrowsePathSummary";
@@ -60,6 +60,8 @@ const DeletedItemsComponent:React.FC<RouteComponentProps> = (props) => {
     const [searchDoc, setSearchDoc] = useState<AdvancedSearchDoc>({collection:""});
 
     const [lastError, setLastError] = useState<string|undefined>(undefined);
+    const [successMessage, setSuccessMessage] = useState<string|undefined>(undefined);
+
     const [showingAlert, setShowingAlert] = useState(false);
 
     const [leftDividerPos, setLeftDividerPos] = useState(4);
@@ -76,10 +78,14 @@ const DeletedItemsComponent:React.FC<RouteComponentProps> = (props) => {
         setSearchDoc(Object.assign({}, searchDoc, {collection: currentCollection}))
     }, [currentCollection]);
 
-    useEffect(()=>{
+    const loadFromFresh = ()=>{
         setEntries([]);
         setLoading(true);
-        loadDeletedItemStream(currentCollection, currentPath, searchDoc, receivedNewData, 50);
+        return loadDeletedItemStream(currentCollection, currentPath, searchDoc, receivedNewData, 50);
+    }
+
+    useEffect(()=>{
+        loadFromFresh();
     }, [searchDoc, currentPath]);
 
     const receivedNewData = (entry:ArchiveEntry|undefined, isDone:boolean) => {
@@ -110,21 +116,59 @@ const DeletedItemsComponent:React.FC<RouteComponentProps> = (props) => {
         setShowingAlert(true);
     }
 
-    const closeAlert = () => setShowingAlert(false);
+    const closeAlert = () => {
+        setSuccessMessage(undefined);
+        setLastError(undefined);
+        setShowingAlert(false);
+    }
 
     const removalRequested = async (itemId:string)=> {
         console.log("Removal requested for ", itemId);
+        try {
+            await axios.delete(`/api/deleted/${encodeURIComponent(currentCollection)}/${encodeURIComponent(itemId)}`)
+            setEntries((prev)=>prev.filter(entry=>entry.id!==itemId));
+            setSuccessMessage("Removed tombstone");
+            setShowingAlert(true);
+        } catch(err) {
+            console.error("Could not perform item deletion: ", err);
+            setLastError(formatError(err, false));
+            setShowingAlert(true);
+        }
     }
 
     const removeAllRequested = async ()=> {
         console.log("Removal requested for everything here")
+        let args = "";
+        if(currentPath) {
+            args = `?prefix=${encodeURIComponent(currentPath)}`;
+        }
+
+        try {
+            const response = await axios.delete<BulkDeleteConfirmationResponse>(`/api/deleted/${encodeURIComponent(currentCollection)}${args}`, {
+                data: searchDoc,
+                headers: {
+                    "Content-Type": "application/json"
+                }
+            });
+            setSuccessMessage(`Removed ${response.data.deletedCount} tombstones in ${response.data.timeTaken} ms`);
+            setShowingAlert(true);
+            loadFromFresh();
+        } catch(err) {
+            console.error("Bulk removal failed: ", err);
+            setLastError(formatError(err, false));
+            setShowingAlert(true);
+        }
     }
+
     return <>
         <Helmet>
             <title>Deleted items {currentCollection ? `in ${currentCollection}` : ""} - ArchiveHunter</title>
         </Helmet>
-        <Snackbar open={showingAlert} onClose={closeAlert} autoHideDuration={8000}>
-            <MuiAlert severity="error" onClose={closeAlert}>{lastError}</MuiAlert>
+        <Snackbar open={showingAlert && (lastError!=undefined|| successMessage!=undefined)} onClose={closeAlert} autoHideDuration={8000}>
+            <>
+                <MuiAlert severity="error" onClose={closeAlert} style={{display: lastError ? "inherit" : "none"}}>{lastError}</MuiAlert>
+                <MuiAlert severity="info" onClose={closeAlert} style={{display: successMessage ? "inherit" : "none"}}>{successMessage}</MuiAlert>
+            </>
         </Snackbar>
         <AdminContainer {...props}>
             <div className={classes.browserWindow}>
