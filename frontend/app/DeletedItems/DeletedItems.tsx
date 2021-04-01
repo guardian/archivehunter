@@ -152,7 +152,7 @@ const DeletedItemsComponent:React.FC<RouteComponentProps> = (props) => {
                                  onError={showComponentError}/>
                 </div>
                 <div className={classes.dataView} style={{gridColumnStart: leftDividerPos, gridColumnEnd: -1}}>
-                    <DeletedItemsTable entries={entries} requestDelete={removalRequested}/>
+                    <DeletedItemsTable entries={entries} requestDelete={removalRequested} currentlyLoading={loading}/>
                 </div>
             </div>
         </AdminContainer>

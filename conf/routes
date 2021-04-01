@@ -67,6 +67,7 @@ PUT     /api/browse/:collection/summary @controllers.BrowseCollectionController.
 
 PUT     /api/deleted/:collection/summary @controllers.DeletedItemsController.deletedItemsSummary(collection, prefix:Option[String])
 PUT     /api/deleted/:collection/search  @controllers.DeletedItemsController.deletedItemsListStreaming(collection, prefix:Option[String], limit:Option[Long])
+DELETE  /api/deleted/:collection/:id      @controllers.DeletedItemsController.removeTombstoneById(collection, id)
 
 GET     /api/user                       @controllers.UserController.allUsers
 PUT     /api/user/update                @controllers.UserController.updateUserProfileField

@@ -10,13 +10,31 @@ import {DeleteForever} from "@material-ui/icons";
 interface DeletedItemsTableProps {
     entries: ArchiveEntry[];
     requestDelete: (itemId:string)=>void;
+    currentlyLoading: boolean;
 }
 
-// const DeletedItemsTable:React.FC<DeletedItemsTableProps> = (props) => {
-//     const
-//     return React.memo(DeletedItemsTableContent, (prevProps, nextProps)=>{
+// /**
+//  * wrapper that only re-renders the table every 30 updates, to prevent slowing down the browser
+//  * @param props
+//  * @constructor
+//  */
+// const DeletedItemsTable:React.FC<DeletedItemsTableProps> = (props:DeletedItemsTableProps) => {
+//     const [unrenderedItemCount, setUnrenderedItemCount] = useState(0);
 //
+//     const WrappedComponent = React.memo(DeletedItemsTableContent, (prevProps, nextProps)=>{
+//         if(prevProps.currentlyLoading && !nextProps.currentlyLoading) {
+//             return false
+//         }
+//         if(unrenderedItemCount>30) {
+//             setUnrenderedItemCount(0);
+//             return false;
+//         } else {
+//             setUnrenderedItemCount((prev)=>prev+1);
+//             return true;
+//         }
 //     })
+//
+//     return <WrappedComponent {...props}/>
 // }
 
 const DeletedItemsTable:React.FC<DeletedItemsTableProps> = (props) => {

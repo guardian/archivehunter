@@ -26,7 +26,7 @@ async function loadDeletedItemStream(collection, prefix, searchDoc, callback, de
     });
 
     const asyncDelay = (ms) => {
-        return new Promise((resolve, reject)=>window.setTimeout(()=>resolve, ms))
+        return new Promise((resolve, reject)=>window.setTimeout(resolve, ms))
     }
 
     switch(response.status) {
