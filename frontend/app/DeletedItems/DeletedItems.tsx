@@ -79,7 +79,7 @@ const DeletedItemsComponent:React.FC<RouteComponentProps> = (props) => {
     useEffect(()=>{
         setEntries([]);
         setLoading(true);
-        loadDeletedItemStream(currentCollection, currentPath, searchDoc, receivedNewData, 10);
+        loadDeletedItemStream(currentCollection, currentPath, searchDoc, receivedNewData, undefined);
     }, [searchDoc, currentPath]);
 
     const receivedNewData = (entry:ArchiveEntry|undefined, isDone:boolean) => {
@@ -139,6 +139,7 @@ const DeletedItemsComponent:React.FC<RouteComponentProps> = (props) => {
                                        loadingNotifiction={`Loaded ${entries.length} items`}
                                        onError={showComponentError}
                     />
+
                 </div>
                 <div className={classes.pathSelector} style={{gridColumnEnd: leftDividerPos}}>
                     <BoxSizing justify="right"
@@ -152,7 +153,11 @@ const DeletedItemsComponent:React.FC<RouteComponentProps> = (props) => {
                                  onError={showComponentError}/>
                 </div>
                 <div className={classes.dataView} style={{gridColumnStart: leftDividerPos, gridColumnEnd: -1}}>
-                    <DeletedItemsTable entries={entries} requestDelete={removalRequested} currentlyLoading={loading}/>
+                    <DeletedItemsTable entries={entries}
+                                       requestDelete={removalRequested}
+                                       currentlyLoading={loading}
+                                       requestOpen={(itemId)=>props.history.push(`/item/${encodeURIComponent(itemId)}`)}
+                    />
                 </div>
             </div>
         </AdminContainer>

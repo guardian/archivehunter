@@ -5,39 +5,40 @@ import {ArchiveEntry} from "../types";
 import FileSizeView from "../Entry/FileSizeView";
 import TimestampFormatter from "../common/TimestampFormatter";
 import {Grid, IconButton, Tooltip} from "@material-ui/core";
-import {DeleteForever} from "@material-ui/icons";
+import {DeleteForever, Launch} from "@material-ui/icons";
 
 interface DeletedItemsTableProps {
     entries: ArchiveEntry[];
     requestDelete: (itemId:string)=>void;
     currentlyLoading: boolean;
+    requestOpen: (itemId:string)=>void;
 }
 
-// /**
-//  * wrapper that only re-renders the table every 30 updates, to prevent slowing down the browser
-//  * @param props
-//  * @constructor
-//  */
-// const DeletedItemsTable:React.FC<DeletedItemsTableProps> = (props:DeletedItemsTableProps) => {
-//     const [unrenderedItemCount, setUnrenderedItemCount] = useState(0);
-//
-//     const WrappedComponent = React.memo(DeletedItemsTableContent, (prevProps, nextProps)=>{
-//         if(prevProps.currentlyLoading && !nextProps.currentlyLoading) {
-//             return false
-//         }
-//         if(unrenderedItemCount>30) {
-//             setUnrenderedItemCount(0);
-//             return false;
-//         } else {
-//             setUnrenderedItemCount((prev)=>prev+1);
-//             return true;
-//         }
-//     })
-//
-//     return <WrappedComponent {...props}/>
-// }
+/**
+ * wrapper that only re-renders the table every 30 updates, to prevent slowing down the browser
+ * @param props
+ * @constructor
+ */
+const DeletedItemsTable:React.FC<DeletedItemsTableProps> = (props:DeletedItemsTableProps) => {
+    const [unrenderedItemCount, setUnrenderedItemCount] = useState(0);
 
-const DeletedItemsTable:React.FC<DeletedItemsTableProps> = (props) => {
+    const WrappedComponent = React.memo(DeletedItemsTableContent, (prevProps, nextProps)=>{
+        if(prevProps.currentlyLoading && !nextProps.currentlyLoading) {
+            return false
+        }
+        if(unrenderedItemCount>30) {
+            setUnrenderedItemCount(0);
+            return false;
+        } else {
+            setUnrenderedItemCount((prev)=>prev+1);
+            return true;
+        }
+    })
+
+    return <WrappedComponent {...props}/>
+}
+
+const DeletedItemsTableContent:React.FC<DeletedItemsTableProps> = (props) => {
     const columns:ColDef[] = [
         {
             field: "bucket",
@@ -80,6 +81,13 @@ const DeletedItemsTable:React.FC<DeletedItemsTableProps> = (props) => {
                     <Tooltip title="Remove this tombstone">
                         <IconButton onClick={()=>props.requestDelete(params.value as string)}>
                             <DeleteForever/>
+                        </IconButton>
+                    </Tooltip>
+                </Grid>
+                <Grid item>
+                    <Tooltip title="View the item">
+                        <IconButton onClick={()=>props.requestOpen(params.value as string)}>
+                            <Launch/>
                         </IconButton>
                     </Tooltip>
                 </Grid>
