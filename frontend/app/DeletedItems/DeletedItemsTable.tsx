@@ -44,6 +44,10 @@ const DeletedItemsTable:React.FC<DeletedItemsTableProps> = (props) => {
             width: 250
         },
         {
+            field: "proxied",
+            headerName: "Proxied?",
+        },
+        {
             field: "id",
             headerName: " ",
             renderCell: (params)=><Grid container direction="row">
