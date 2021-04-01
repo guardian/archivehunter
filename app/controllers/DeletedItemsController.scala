@@ -4,15 +4,17 @@ import akka.actor.ActorSystem
 import akka.stream.Materializer
 import akka.stream.scaladsl._
 import akka.util.ByteString
+import com.gu.pandomainauth.action.UserRequest
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ArchiveEntryHitReader, Indexer, StorageClassEncoder, ZonedDateTimeEncoder}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{ESClientManager, S3ClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{ItemNotFound, ScanTarget, ScanTargetDAO}
 import helpers.{InjectableRefresher, ItemFolderHelper, WithScanTarget}
+import io.circe.Json
 import play.api.{Configuration, Logger}
 import play.api.libs.circe.Circe
 import play.api.libs.ws.WSClient
-import play.api.mvc.{AbstractController, ControllerComponents, ResponseHeader, Result}
-import responses.{DeletionSummaryResponse, GenericErrorResponse, ObjectListResponse, PathInfoResponse}
+import play.api.mvc.{AbstractController, ControllerComponents, Request, ResponseHeader, Result}
+import responses.{BulkDeleteConfirmationResponse, DeletionSummaryResponse, GenericErrorResponse, ObjectListResponse, PathInfoResponse}
 
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.Future
@@ -52,11 +54,14 @@ class DeletedItemsController @Inject() (override val config:Configuration,
       Some(matchQuery("beenDeleted", true))
     ).collect({ case Some(x) => x }) ++ searchRequest.toSearchParams
 
+    boolQuery().must(queries)
+  }
+
+  protected def makeSearchRequest(collectionName:String, prefix:Option[String], searchRequest: SearchRequest) = {
     val aggs = Seq(
       sumAgg("totalSize", "size"),
     )
-
-    search(indexName) query boolQuery().must(queries) aggregations aggs
+    search(indexName) query makeQuery(collectionName, prefix, searchRequest) aggregations aggs
   }
 
   /**
@@ -75,7 +80,7 @@ class DeletedItemsController @Inject() (override val config:Configuration,
 //            case None=>None
 //            case Some(pfx)=>if(pfx.endsWith("/")) pfx.substring(0, pfx.length-2) else pfx
 //          }
-          esClient.execute(makeQuery(collectionName, prefix, searchRequest)).map(response => {
+          esClient.execute(makeSearchRequest(collectionName, prefix, searchRequest)).map(response => {
             (response.status: @switch) match {
               case 200 =>
                 logger.info(s"Got ${response.result.aggregations}")
@@ -96,6 +101,18 @@ class DeletedItemsController @Inject() (override val config:Configuration,
       })
   }
 
+  private def withQueryFromSearchdoc[T<:io.circe.Json](collectionName:String, prefix:Option[String], request:Request[T])
+                                    (cb:com.sksamuel.elastic4s.searches.queries.Query=>Future[Result]) =
+    request.body.as[SearchRequest].fold(
+      err=>
+        Future(BadRequest(GenericErrorResponse("bad_request", err.toString).asJson)),
+      searchRequest=>
+        withScanTargetAsync(collectionName, scanTargetDAO) { _ =>
+          val query = makeQuery(collectionName, prefix, searchRequest)
+          cb(query)
+        }
+    )
+
   /**
     * sends an NDJSON stream of items marked as deleted from the given collection and prefix
     * @param collectionName collection name to scan
@@ -103,28 +120,43 @@ class DeletedItemsController @Inject() (override val config:Configuration,
     * @return
     */
   def deletedItemsListStreaming(collectionName:String, prefix:Option[String], limit:Option[Long]) = APIAuthAction.async(circe.json(2048)) { request=>
-    request.body.as[SearchRequest].fold(
-      err=>
-        Future(BadRequest(GenericErrorResponse("bad_request", err.toString).asJson)),
-      searchRequest=> {
-        withScanTarget(collectionName, scanTargetDAO) { _ =>
-          val query = makeQuery(collectionName, prefix, searchRequest).scroll("2m")
-          logger.debug(query.toString)
-          val source = Source.fromPublisher(esClient.publisher(query))
-          val appliedLimit = limit.getOrElse(1000L)
+    withQueryFromSearchdoc(collectionName, prefix, request) { query=>
+      val source = Source.fromPublisher(esClient.publisher(query))
+      val appliedLimit = limit.getOrElse(1000L)
 
-          val contentStream = source
-            .limit(appliedLimit)
-            .map(_.to[ArchiveEntry])
-            .map(_.asJson)
-            .map(_.noSpaces + "\n")
-            .map(ByteString.apply)
-          Result(
-            header = ResponseHeader(status=200),
-            body = HttpEntity.Streamed(contentStream,contentType=Some("application/x-ndjson"), contentLength=None)
-          )
-        }
-      })
+      val contentStream = source
+        .limit(appliedLimit)
+        .map(_.to[ArchiveEntry])
+        .map(_.asJson)
+        .map(_.noSpaces + "\n")
+        .map(ByteString.apply)
+      Future(Result(
+        header = ResponseHeader(status=200),
+        body = HttpEntity.Streamed(contentStream,contentType=Some("application/x-ndjson"), contentLength=None)
+      ))
+    }
+  }
+
+  def bulkDeleteBySearch(collectionName:String, prefix:Option[String]) = APIAuthAction.async(circe.json(2048)) { request=>
+    adminsOnlyAsync(request, true) {
+      withQueryFromSearchdoc(collectionName, prefix, request) { query=>
+        esClient
+          .execute(deleteByQuery(indexName, "entry", query))
+          .map(response=>{
+            if(response.status>=200 && response.status<=299) {
+              Ok(BulkDeleteConfirmationResponse("ok",response.result.deleted, response.result.took).asJson)
+            } else {
+              logger.error(s"Could not perform bulk deletion of tombstones for $collectionName at $prefix: ${response.status} ${response.error}")
+              InternalServerError(GenericErrorResponse("db_error", response.error.toString).asJson)
+            }
+          })
+          .recover({
+            case err:Throwable=>
+              logger.error(s"Bulk delete thread for $collectionName at $prefix crashed: ${err.getMessage}",err)
+              InternalServerError(GenericErrorResponse("db_error", err.toString).asJson)
+          })
+      }
+    }
   }
 
   private def performItemDelete(collectionName:String, itemId:String) = esClient
