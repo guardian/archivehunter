@@ -12,9 +12,9 @@ import ndjsonStream from "can-ndjson-stream";
  * @returns {Promise<void>}
  */
 async function loadDeletedItemStream(collection, prefix, searchDoc, callback, delay) {
-    let args = "";
+    let args = "?limit=200";
     if(prefix) {
-        args = `?prefix=${encodeURIComponent(prefix)}`
+        args = `?prefix=${encodeURIComponent(prefix)}&limit=200`
     }
 
     const response = await fetch(`/api/deleted/${collection}/search${args}`,{

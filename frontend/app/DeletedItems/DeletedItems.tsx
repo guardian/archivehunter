@@ -64,6 +64,8 @@ const DeletedItemsComponent:React.FC<RouteComponentProps> = (props) => {
     const [leftDividerPos, setLeftDividerPos] = useState(4);
 
     const [awaitingStopLoading, setAwaitingStopLoading] = useState(false);
+    const [awaitingRefresh, setAwaitingRefresh] = useState(false);
+
     const awaitingStopLoadingRef = useRef<boolean>();
 
     awaitingStopLoadingRef.current = awaitingStopLoading;   //in order to access the up-to-date state var in a callback we must use a mutable ref. See https://stackoverflow.com/questions/57847594/react-hooks-accessing-up-to-date-state-from-within-a-callback
@@ -88,11 +90,24 @@ const DeletedItemsComponent:React.FC<RouteComponentProps> = (props) => {
     useEffect(()=>{
         console.log("searchDoc or currentPath changed, loading is ", loading, " awaitingStopLoading is ", awaitingStopLoading);
         if(loading) {
-            setAwaitingStopLoading(true);   //an effect on this state var will cause the load to be performed after a delay
+            setAwaitingStopLoading(true);
+            setAwaitingRefresh(true);
         } else {
             loadFromFresh();
         }
     }, [searchDoc, currentPath]);
+
+    /**
+     * if awaitingStopLoading goes to false, then we should trigger a reload
+     */
+    useEffect(()=>{
+        if(!awaitingStopLoading && awaitingRefresh) {
+            setAwaitingRefresh(false);
+            window.setTimeout(()=>{
+                loadFromFresh();
+            }, 1000);   //schedule a reload once we have terminated the current operation
+        }
+    }, [awaitingStopLoading]);
 
     const receivedNewData = (entry:ArchiveEntry|undefined, isDone:boolean) => {
         console.log("Got new entry: ", entry, " stream completing: ", isDone);
@@ -109,9 +124,6 @@ const DeletedItemsComponent:React.FC<RouteComponentProps> = (props) => {
             console.log("Stopping due to reload...");
             setAwaitingStopLoading(false);
             setLoading(false);
-            window.setTimeout(()=>{
-                loadFromFresh()
-            }, 1000);   //schedule a reload once we have terminated the current operation
             return false;
         } else {
             return true;
