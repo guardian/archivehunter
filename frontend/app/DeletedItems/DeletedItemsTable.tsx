@@ -1,10 +1,10 @@
-import React, {useEffect, useState} from "react";
+import React, {useEffect, useRef, useState} from "react";
 import {ColDef, DataGrid} from "@material-ui/data-grid";
 import PathDisplayComponent from "../browse/PathDisplayComponent";
 import {ArchiveEntry} from "../types";
 import FileSizeView from "../Entry/FileSizeView";
 import TimestampFormatter from "../common/TimestampFormatter";
-import {Grid, IconButton, Tooltip} from "@material-ui/core";
+import {Grid, IconButton, makeStyles, Tooltip} from "@material-ui/core";
 import {DeleteForever, Launch} from "@material-ui/icons";
 
 interface DeletedItemsTableProps {
@@ -21,12 +21,15 @@ interface DeletedItemsTableProps {
  */
 const DeletedItemsTable:React.FC<DeletedItemsTableProps> = (props:DeletedItemsTableProps) => {
     const [unrenderedItemCount, setUnrenderedItemCount] = useState(0);
+    const unrenderedItemCountRef = useRef<number>();
+    unrenderedItemCountRef.current = unrenderedItemCount;
 
     const WrappedComponent = React.memo(DeletedItemsTableContent, (prevProps, nextProps)=>{
         if(!nextProps.currentlyLoading) {   //perform the update always if the state we are moving to is not a loading state
             return false
         }
-        if(unrenderedItemCount>30) {
+
+        if(unrenderedItemCountRef.current && unrenderedItemCountRef.current>30) {
             setUnrenderedItemCount(0);
             return false;
         } else {
@@ -38,20 +41,29 @@ const DeletedItemsTable:React.FC<DeletedItemsTableProps> = (props:DeletedItemsTa
     return <WrappedComponent {...props}/>
 }
 
+const useStyles = makeStyles({
+    ellipsizedText: {
+        overflow: "hidden",
+        textOverflow: "ellipsis"
+    }
+});
+
 const DeletedItemsTableContent:React.FC<DeletedItemsTableProps> = (props) => {
+    const classes = useStyles();
+
     const columns:ColDef[] = [
         {
             field: "bucket",
             headerName: "Collection",
             renderCell: (params)=><Tooltip title={params.value as string}>
-                <p>{params.value as string}</p>
+                <p className={classes.ellipsizedText}>{params.value as string}</p>
             </Tooltip>
         },
         {
             field: "path",
             headerName: "Path",
             width: 500,
-            //renderCell: (params)=><PathDisplayComponent path={params.getValue("path") as string}/>
+            renderCell: (params)=><Tooltip title={params.value as string}><p className={classes.ellipsizedText}>{params.value as string}</p></Tooltip>
         },
         {
             field: "size",
@@ -66,7 +78,10 @@ const DeletedItemsTableContent:React.FC<DeletedItemsTableProps> = (props) => {
         {
             field: "last_modified",
             headerName: "Last Modified",
-            renderCell: (params)=><TimestampFormatter relative={false} value={params.getValue("last_modified") as string}/>,
+            renderCell: (params)=><TimestampFormatter relative={false}
+                                                      value={params.getValue("last_modified") as string}
+                                                      formatString={"HH:mm ddd Do MMM YYYY Z"}
+            />,
             width: 250
         },
         {

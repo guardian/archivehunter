@@ -110,7 +110,6 @@ const DeletedItemsComponent:React.FC<RouteComponentProps> = (props) => {
     }, [awaitingStopLoading]);
 
     const receivedNewData = (entry:ArchiveEntry|undefined, isDone:boolean) => {
-        console.log("Got new entry: ", entry, " stream completing: ", isDone);
         if(entry) {
             setEntries((prev)=>prev.concat(entry));
         }
@@ -155,7 +154,6 @@ const DeletedItemsComponent:React.FC<RouteComponentProps> = (props) => {
     }
 
     const removalRequested = async (itemId:string)=> {
-        console.log("Removal requested for ", itemId);
         try {
             await axios.delete(`/api/deleted/${encodeURIComponent(currentCollection)}/${encodeURIComponent(itemId)}`)
             setEntries((prev)=>prev.filter(entry=>entry.id!==itemId));
@@ -169,7 +167,6 @@ const DeletedItemsComponent:React.FC<RouteComponentProps> = (props) => {
     }
 
     const removeAllRequested = async ()=> {
-        console.log("Removal requested for everything here")
         let args = "";
         if(currentPath) {
             args = `?prefix=${encodeURIComponent(currentPath)}`;
