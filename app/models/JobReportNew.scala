@@ -12,8 +12,8 @@ object JobReportStatus extends Enumeration {
 }
 
 trait JobReportStatusEncoder {
-  implicit val jobReportStatusEncoder = Encoder.enumEncoder(JobReportStatus)
-  implicit val jobReportStatusDecoder = Decoder.enumDecoder(JobReportStatus)
+  implicit val jobReportStatusEncoder = Encoder.encodeEnumeration(JobReportStatus)
+  implicit val jobReportStatusDecoder = Decoder.decodeEnumeration(JobReportStatus)
 }
 
 case class JobReportNew(status:JobReportStatus.Value, log:Option[String], jobId:String, input:Option[String], output:Option[String], proxyType:Option[ProxyType.Value], metadata:Option[MediaMetadata], timestamp:Option[ZonedDateTime]) {

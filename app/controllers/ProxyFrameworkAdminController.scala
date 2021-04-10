@@ -254,6 +254,9 @@ class ProxyFrameworkAdminController @Inject() (override val config:Configuration
                       logger.error("Could not remove reference from database: ", err)
                       Future(InternalServerError(GenericErrorResponse("db_error",err.toString).asJson))
                   })
+              case Failure(err)=>
+                logger.error(s"Could not detech framework instance ${frameworks.head}: ${err.getMessage}", err)
+                Future(InternalServerError(GenericErrorResponse("error", err.toString).asJson))
             })
           }
         }

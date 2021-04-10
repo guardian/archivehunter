@@ -3,7 +3,7 @@ package helpers
 import com.amazonaws.services.s3.AmazonS3
 import com.amazonaws.services.s3.model.ListObjectsV2Request
 import com.sksamuel.elastic4s.http.{ElasticClient, HttpClient}
-import com.theguardian.multimedia.archivehunter.common.cmn_models.{ConflictError, ScanTargetDAO, UnexpectedReturnCode}
+import com.theguardian.multimedia.archivehunter.common.cmn_models.{ConflictError, ItemNotFound, ScanTargetDAO, UnexpectedReturnCode}
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer, ProxyLocation, ProxyType}
 import org.slf4j.MDC
 import play.api.Logger
@@ -113,6 +113,12 @@ object ProxyLocator {
         if(maybeReason.isDefined) MDC.put("error", maybeReason.get)
         logger.error(s"Could not set proxied flag for $sourceId: ${maybeReason.getOrElse("no reason given")}")
         Future(Left(err.toString))
+      case Left(ItemNotFound(itemId))=>
+        logger.warn(s"Item $itemId could not be found, been deleted already?!")
+        Future(Left("Item not found"))
+      case Left(otherError)=>
+        logger.error(s"Could not set proxied flag: $otherError")
+        Future(Left(otherError.toString))
     }).recoverWith({
       case err:Throwable=>
         logger.error(s"Could not set proxied flag on $sourceId: ${err.getMessage}", err)

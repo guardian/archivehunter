@@ -25,7 +25,7 @@ case class SearchRequest (q:Option[String],
       q.map(queryString=>query(queryString)),
       if(hideDotFiles.getOrElse(false)){
         //ES regex expressions are always anchored, so we have to put a matchall on the start.
-        Some(not(regexQuery(("path.keyword",".*/+\\.[^\\.]+"))))
+        Some(not(regexQuery("path.keyword",".*/+\\.[^\\.]+")))
       } else None
     ).collect({case Some(param)=>param})
   }

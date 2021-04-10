@@ -111,6 +111,8 @@ class ProxiesRelinker @Inject() (config:Configuration,
           case Some(Right(jobModel))=>
             val updatedJob = jobModel.copy(completedAt = Some(ZonedDateTime.now()),jobStatus = JobStatus.ST_SUCCESS)
             jobModelDAO.putJob(updatedJob)
+          case Some(Left(dynamoErr))=>
+            logger.error(s"Could not get job record: $dynamoErr")
         })
         originalSender ! RelinkSuccess(IndexUpdateCounter(-1,-1))
       case Failure(err)=>
@@ -118,6 +120,8 @@ class ProxiesRelinker @Inject() (config:Configuration,
         jobModelDAO.jobForId(jobId).map({
           case None=>
             logger.error(s"Proxy relink job record must have been deleted while we were running! Job completed but can't record.")
+          case Some(Left(err))=>
+            logger.error(s"Could not get job record: ${err}")
           case Some(Right(jobModel))=>
             val updatedJob = jobModel.copy(completedAt = Some(ZonedDateTime.now()),jobStatus = JobStatus.ST_ERROR, log = Some(err.toString))
             jobModelDAO.putJob(updatedJob)
@@ -134,6 +138,8 @@ class ProxiesRelinker @Inject() (config:Configuration,
           case Some(Right(jobModel))=>
             val updatedJob = jobModel.copy(completedAt = Some(ZonedDateTime.now()),jobStatus = JobStatus.ST_SUCCESS)
             jobModelDAO.putJob(updatedJob)
+          case Some(Left(err))=>
+            logger.error(s"Could not get job record: $err")
         })
         originalSender ! RelinkSuccess(counter)
       case Failure(err)=>
@@ -144,6 +150,8 @@ class ProxiesRelinker @Inject() (config:Configuration,
           case Some(Right(jobModel))=>
             val updatedJob = jobModel.copy(completedAt = Some(ZonedDateTime.now()),jobStatus = JobStatus.ST_ERROR, log = Some(err.toString))
             jobModelDAO.putJob(updatedJob)
+          case Some(Left(err))=>
+            logger.error(s"Could not get job record: $err")
         })
         originalSender ! RelinkError(err)
     })

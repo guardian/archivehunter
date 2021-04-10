@@ -139,6 +139,8 @@ class GlacierRestoreActor @Inject() (config:Configuration, esClientMgr:ESClientM
               indexer.indexSingleItem(updatedEntry, Some(updatedEntry.id)).onComplete({
                 case Success(Right(_))=>
                   logger.info(s"Item for s3://${entry.bucket}/${entry.path} marked as deleted")
+                case Success(Left(indexerErr))=>
+                  logger.error(s"Could not mark s3://${entry.bucket}/${entry.path} as deleted: $indexerErr")
                 case Failure(err)=>
                   logger.error(s"Could not mark item for s3://${entry.bucket}/${entry.path} as deleted: ${err.getMessage}", err)
               })

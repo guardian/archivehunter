@@ -19,8 +19,8 @@ object TranscoderState extends Enumeration {
 }
 
 trait TranscoderMessageDecoder {
-  implicit val transcoderStateEncoder = Encoder.enumEncoder(TranscoderState)
-  implicit val transcoderStateDecoder = Decoder.enumDecoder(TranscoderState)
+  implicit val transcoderStateEncoder = Encoder.encodeEnumeration(TranscoderState)
+  implicit val transcoderStateDecoder = Decoder.decodeEnumeration(TranscoderState)
 }
 
 case class ETSOutput(id:String, presetId:String, status:String,duration:Option[Long],fileSize:Option[Long],width:Option[Int],height:Option[Int],key:String)

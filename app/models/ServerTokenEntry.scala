@@ -16,6 +16,8 @@ case class ServerTokenEntry (value:String, createdAt:ZonedDateTime, createdForUs
         } else {
           this
         }
+      case None=>
+        this
     }
 
     if(firstCheck==this){

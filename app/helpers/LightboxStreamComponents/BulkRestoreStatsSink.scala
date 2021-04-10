@@ -44,21 +44,27 @@ class BulkRestoreStatsSink @Inject() (@Named("glacierRestoreActor") glacierResto
             case Failure(err)=>
               logger.error(s"Could not check archive status on ${elem.fileId}", err)
               failStage(err)
-            case Success(NotInArchive(entry))=>
+            case Success(ItemLost(_))=>
+              logger.warn(s"${elem.fileId} has been lost!")
+              currentStats = currentStats.copy(lost = currentStats.lost+1)
+            case Success(NotInArchive(_))=>
               logger.info(s"${elem.fileId} is not in Glacier")
               currentStats = currentStats.copy(unneeded = currentStats.unneeded+1)
-            case Success(RestoreNotRequested(entry))=>
+            case Success(RestoreNotRequested(_))=>
               logger.info(s"${elem.fileId} was not requested")
               currentStats = currentStats.copy(notRequested = currentStats.notRequested+1)
-            case Success(RestoreInProgress(entry))=>
+            case Success(RestoreInProgress(_))=>
               logger.info(s"${elem.fileId} is currently restoring")
               currentStats = currentStats.copy(inProgress = currentStats.inProgress+1)
-            case Success(RestoreCompleted(entry, expiry))=>
+            case Success(RestoreCompleted(_, _))=>
               logger.info(s"${elem.fileId} is available")
               currentStats = currentStats.copy(available = currentStats.available+1)
             case Success(RestoreFailure(err))=>
               logger.error(s"Could not check archive status on ${elem.fileId}", err)
               failStage(err)
+            case Success(other)=>
+              logger.error(s"Got unexpected message $other")
+              failStage(new RuntimeException(s"Got unexpected message $other"))
           }
 
           pull(in)

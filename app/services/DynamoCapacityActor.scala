@@ -144,6 +144,8 @@ class DynamoCapacityActor @Inject() (ddbClientMgr:DynamoClientManager, config:Ar
         }
       case Some(msg:UpdateCapacityIndex)=>
         throw new RuntimeException("UpdateCapacityIndex is not implemented yet")
+      case Some(otherMsg)=>
+        throw new RuntimeException(s"$otherMsg is not implemented")
       case None=>
         notReady
     }
