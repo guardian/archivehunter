@@ -10,6 +10,7 @@ import {FolderRounded, HomeOutlined, HomeRounded, Storage, WarningRounded} from 
 import {formatError} from "../common/ErrorViewComponent";
 import PathDisplayComponent from "./PathDisplayComponent";
 import clsx from "clsx";
+import BrowseSummaryDisplay from "./BrowseSummaryDisplay";
 
 const styles=(theme)=>Object.assign(createStyles({
     summaryIcon: {
@@ -110,60 +111,30 @@ class BrowsePathSummary extends React.Component {
         </div>;
 
         /*TODO: add in jschart and put a horizontal bar of the filetypes breakdown*/
-        if(this.state.hasLoaded) return <div className="browse-path-summary">
-            <Grid container direction="column" alignContent="center" justify="center">
-                <Grid item className={clsx(this.props.classes.summaryBoxElement,this.props.classes.centered)}>
-                    <Grid container direction="row"  justify="center" alignContent="space-around" alignItems="center">
-                        {this.props.path ?
-                            <Grid item>
-                                <IconButton onClick={this.props.goToRootCb}>
-                                    <HomeRounded/>
-                                </IconButton>
-                            </Grid> : null
-                        }
-                        <Grid item>
-                            <Typography className={this.props.classes.collectionNameText}>
-                                <Storage className={this.props.classes.summaryIcon}/>
-                                {this.props.collectionName}
-                            </Typography>
-                        </Grid>
-                    </Grid>
-                </Grid>
-                {
-                    this.props.path ? <Grid item className={this.props.classes.summaryBoxElement}>
-                        <PathDisplayComponent path={this.props.path}/>
-                    </Grid> : null
-                }
-
+        if(this.state.hasLoaded) return <BrowseSummaryDisplay
+            collectionName={this.props.collectionName}
+            path={this.props.path}
+            goToRootCb={this.props.goToRootCb}
+            parentIsLoading={this.props.parentIsLoading}
+            refreshCb={this.props.refreshCb}
+            totalHits={this.state.totalHits}
+            totalSize={this.state.totalSize}
+        >
+            { this.state.deletedCounts.hasOwnProperty("1")  ? <Grid item>
+                <Tooltip title={`${this.state.deletedCounts["1"]} tracked items have been deleted`}>
+                    <WarningRounded className={this.props.classes.warningIcon}/>
+                </Tooltip>
+            </Grid> : null }
 
             <Grid item>
-                <Grid container direction="row" spacing={1} alignItems="center" >
-                    <Grid item>
-                        <RefreshButton isRunning={this.props.parentIsLoading}
-                                       clickedCb={this.props.refreshCb}/>
-                    </Grid>
-                    <Grid item>
-                        <Typography>Total of {this.state.totalHits} items occupying <BytesFormatter value={this.state.totalSize}/></Typography>
-                    </Grid>
-                    { this.state.deletedCounts.hasOwnProperty("1")  ? <Grid item>
-                        <Tooltip title={`${this.state.deletedCounts["1"]} tracked items have been deleted`}>
-                            <WarningRounded className={this.props.classes.warningIcon}/>
-                        </Tooltip>
-                    </Grid> : null }
-
-                    <Grid item>
-                        <BulkLightboxAdd path={this.props.path}
-                                         hideDotFiles={! this.props.showDotFiles}
-                                         collection={this.props.collectionName}
-                                         searchDoc={this.props.searchDoc}
-                                         onError={this.props.onError}
-                        />
-                    </Grid>
-                </Grid>
+                <BulkLightboxAdd path={this.props.path}
+                                 hideDotFiles={! this.props.showDotFiles}
+                                 collection={this.props.collectionName}
+                                 searchDoc={this.props.searchDoc}
+                                 onError={this.props.onError}
+                />
             </Grid>
-
-            </Grid>
-        </div>;
+        </BrowseSummaryDisplay>;
 
         return <div><i>not loaded</i></div>
     }

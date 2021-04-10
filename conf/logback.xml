@@ -56,6 +56,7 @@
     <logger name="controllers.ScanTargetController" level="INFO"/>
     <logger name="controllers.JobController" level="INFO"/>
     <logger name="controllers.BrowseCollectionController" level="INFO"/>
+    <logger name="controllers.DeletedItemsController" level="DEBUG"/>
 
     <logger name="controllers.UserController" level="INFO"/>
     <logger name="controllers.LightboxController" level="INFO"/>

@@ -7,7 +7,7 @@ import com.amazonaws.services.s3.model.{ListObjectsRequest, S3ObjectSummary}
 import com.sksamuel.elastic4s.http.search.TermsAggResult
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{ESClientManager, S3ClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{PathCacheIndexer, ScanTarget, ScanTargetDAO}
-import helpers.{InjectableRefresher, ItemFolderHelper}
+import helpers.{InjectableRefresher, ItemFolderHelper, WithScanTarget}
 
 import javax.inject.{Inject, Singleton}
 import play.api.libs.circe.Circe
@@ -36,7 +36,7 @@ class BrowseCollectionController @Inject() (override val config:Configuration,
                                             override val refresher:InjectableRefresher,
                                             folderHelper:ItemFolderHelper)
                                            (implicit actorSystem:ActorSystem, mat:Materializer)
-extends AbstractController(controllerComponents) with PanDomainAuthActions with Circe{
+extends AbstractController(controllerComponents) with PanDomainAuthActions with WithScanTarget with Circe{
   import com.sksamuel.elastic4s.http.ElasticDsl._
 
   private val logger=Logger(getClass)
@@ -47,26 +47,6 @@ extends AbstractController(controllerComponents) with PanDomainAuthActions with 
 
   private val indexName = config.get[String]("externalData.indexName")
   private val pathCacheIndexer = new PathCacheIndexer(config.getOptional[String]("externalData.pathCacheIndex").getOrElse("pathcache"), esClient)
-
-  /**
-    * execute the provided body with a looked-up ScanTarget.
-    * automatically return an error if the ScanTarget cannot be found.
-    * @param collectionName bucket to look up
-    * @param block function that takes a ScanTarget instance and returns an HTTP result
-    */
-  def withScanTargetAsync(collectionName:String)(block: ScanTarget=>Future[Result]):Future[Result] = scanTargetDAO.targetForBucket(collectionName).flatMap({
-    case Some(Left(err)) =>
-      logger.error(s"Could not verify bucket name $collectionName: $err")
-      Future(InternalServerError(GenericErrorResponse("db_error", err.toString).asJson))
-    case None =>
-      logger.error(s"Bucket $collectionName is not managed by us")
-      Future(BadRequest(GenericErrorResponse("not_registered", s"$collectionName is not a registered collection").asJson))
-    case Some(Right(target)) =>
-      block(target)
-  })
-
-  def withScanTarget(collectionName:String)(block: ScanTarget=>Result):Future[Result] =
-    withScanTargetAsync(collectionName){ target=> Future(block(target)) }
 
   /**
     * get all of the "subfolders" ("common prefix" in s3 parlance) for the provided bucket, but only if it
@@ -108,7 +88,7 @@ extends AbstractController(controllerComponents) with PanDomainAuthActions with 
       err=>
         Future(BadRequest(GenericErrorResponse("bad_request", err.toString).asJson)),
       searchRequest=>
-        withScanTargetAsync(collectionName) { target=>
+        withScanTargetAsync(collectionName, scanTargetDAO) { target=>
           val queries = Seq(
             Some(matchQuery("bucket.keyword", collectionName)),
             prefix.map(pfx=>termQuery("path", pfx))

@@ -41,6 +41,7 @@ import NewLightbox from "./Lightbox/NewLightbox";
 import QuickRestoreComponent from "./admin/QuickRestore.jsx";
 import PathCacheAdmin from "./admin/PathCacheAdmin.jsx";
 import ItemView from "./ItemView/ItemView";
+import DeletedItemsComponent from "./DeletedItems/DeletedItems";
 
 
 library.add(faStroopwafel, faCheckCircle, faCheck, faTimes, faTimesCircle, faRoad,faSearch,faThList,faWrench, faLightbulb, faChevronCircleDown, faChevronCircleRight, faTrashAlt, faFolderPlus, faFolderMinus, faFolder);
@@ -107,6 +108,7 @@ class App extends React.Component<any, AppContainerState> {
                 <Route path="/test/419" component={Test419Component}/>
                 <Route path="/admin/pathcache" component={PathCacheAdmin}/>
                 <Route path="/admin/proxyHealth" component={ProxyHealthDetail}/>
+                <Route path="/admin/deleteditems" component={DeletedItemsComponent}/>
                 <Route path="/admin/proxyFramework/new" component={ProxyFrameworkAdd}/>
                 <Route path="/admin/proxyFramework" component={ProxyFrameworkList}/>
                 <Route path="/admin/about" component={AboutComponent}/>
