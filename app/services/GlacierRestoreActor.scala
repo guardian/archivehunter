@@ -134,7 +134,9 @@ class GlacierRestoreActor @Inject() (config:Configuration, esClientMgr:ESClientM
         case Failure(s3err:com.amazonaws.services.s3.model.AmazonS3Exception)=>
           if(s3err.getStatusCode==404) {
             logger.warn(s"Registered item s3://${entry.bucket}/${entry.path} does not exist any more!")
-            if(!entry.beenDeleted) {
+            if(entry.beenDeleted) {
+              originalSender ! ItemLost(entry)
+            } else {
               val updatedEntry = entry.copy(beenDeleted = true)
               indexer.indexSingleItem(updatedEntry, Some(updatedEntry.id)).onComplete({
                 case Success(Right(_))=>
@@ -144,9 +146,8 @@ class GlacierRestoreActor @Inject() (config:Configuration, esClientMgr:ESClientM
                 case Failure(err)=>
                   logger.error(s"Could not mark item for s3://${entry.bucket}/${entry.path} as deleted: ${err.getMessage}", err)
               })
+              originalSender ! ItemLost(updatedEntry)
             }
-
-            originalSender ! ItemLost(entry)
           } else {
             logger.warn(s"Could not check restore status due to an s3 error s3://${entry.bucket}/${entry.path}: ${s3err.getMessage}", s3err)
             originalSender ! RestoreFailure(s3err)
