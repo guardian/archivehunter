@@ -260,6 +260,8 @@ class LightboxController @Inject() (override val config:Configuration,
         case Some(Right(lbEntry))=>
           val response = (glacierRestoreActor ? GlacierRestoreActor.CheckRestoreStatus(lbEntry)).mapTo[GlacierRestoreActor.GRMsg]
           response.map({
+            case GlacierRestoreActor.ItemLost(_)=>
+              NotFound(GenericErrorResponse("not_found","Item must have gone away").asJson)
             case GlacierRestoreActor.NotInArchive(entry)=>
               Ok(RestoreStatusResponse("ok",entry.id, RestoreStatus.RS_UNNEEDED, None, None).asJson)
             case GlacierRestoreActor.RestoreCompleted(entry, expiry)=>

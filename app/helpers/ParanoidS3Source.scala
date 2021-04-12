@@ -104,7 +104,7 @@ class ParanoidS3Source(bucketName:String, region:Region, credsProvider: AWSCrede
         val qParams = continuationToken match {
           case Some(token)=>
             logger.debug(s"continuation token is $token")
-            baseParams + s"&continuation-token=${URLEncoder.encode(token)}"
+            baseParams + s"&continuation-token=${URLEncoder.encode(token, "UTF-8")}"
           case None=>
             logger.debug("no continuation token")
             baseParams

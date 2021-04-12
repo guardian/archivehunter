@@ -56,11 +56,12 @@ object DockerMain extends MainContent {
     val finalResult = Await.result(resultFuture, 8 hours)
     println(s"Final result is: $finalResult")
 
-    problemsSummaryIndexer.indexSummaryCount(finalResult).map({
-      case Right(success)=>
-        println(s"Successfully output summary: ${success.body}")
-      case Left(err)=>
-        println(s"Could not output the summary count: $err")
+    problemsSummaryIndexer.indexSummaryCount(finalResult).map(response=>{
+          if(response.isError) {
+            println(s"Could not output the summary count: ${response.error.`type`} ${response.error.reason}")
+          } else {
+            println(s"Successfully output summary: ${response.body}")
+          }
     })
   }
 

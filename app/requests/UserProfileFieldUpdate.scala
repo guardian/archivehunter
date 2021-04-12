@@ -25,8 +25,8 @@ case class UserProfileFieldUpdate (user:String, fieldName:UserProfileField.Value
   * mix in this trait to allow Circe to automatically marshall and unmarshall these requests into Jaon
   */
 trait UserProfileFieldUpdateEncoder {
-  implicit val fieldUpdateOperationEncoder = Encoder.enumEncoder(FieldUpdateOperation)
-  implicit val fieldUpdateOperationDecoder = Decoder.enumDecoder(FieldUpdateOperation)
-  implicit val userProfileFieldEncoder = Encoder.enumEncoder(UserProfileField)
-  implicit val userProfileFieldDecoder = Decoder.enumDecoder(UserProfileField)
+  implicit val fieldUpdateOperationEncoder = Encoder.encodeEnumeration(FieldUpdateOperation)
+  implicit val fieldUpdateOperationDecoder = Decoder.decodeEnumeration(FieldUpdateOperation)
+  implicit val userProfileFieldEncoder = Encoder.encodeEnumeration(UserProfileField)
+  implicit val userProfileFieldDecoder = Decoder.decodeEnumeration(UserProfileField)
 }
