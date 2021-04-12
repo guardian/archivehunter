@@ -190,15 +190,7 @@ class GlacierRestoreActor @Inject() (config:Configuration, esClientMgr:ESClientM
 
       //completion is detected by the inputLambda, and the job status will be updated there.
       jobModelDAO.putJob(newJob).onComplete({
-        case Success(None)=>
-          logger.debug(s"${entry.location}: initiating restore")
-          Try { s3client.restoreObjectV2(rq) } match {
-            case Success(_)=>originalSender ! RestoreInProgress
-            case Failure(err)=>
-              logger.error("S3 restore request failed: ", err)
-              originalSender ! RestoreFailure(err)
-          }
-        case Success(Some(Right(record)))=>
+        case Success(None) | Success(Some(Right(_)))=>
           logger.debug(s"${entry.location}: initiating restore")
           Try { s3client.restoreObjectV2(rq) } match {
             case Success(_)=>originalSender ! RestoreInProgress
