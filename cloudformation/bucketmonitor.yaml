@@ -72,6 +72,7 @@ Resources:
       Action: lambda:InvokeFunction
       FunctionName: !Ref BucketMonitorLambda
       Principal: s3.amazonaws.com
+      SourceAccount: !Ref AWS::AccountId
       ###This InvokePermission used to have the SourceArn specified. But if you want to monitor lots of buckets,
       ###you have to set BucketName to * for the policy below.  And that then means that including SourceArn here
       ###breaks the lambda by not allowing it to trigger.
