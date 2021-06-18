@@ -3,7 +3,7 @@ import axios from "axios";
 import MuiAlert from "@material-ui/lab/Alert";
 import {formatError} from "../common/ErrorViewComponent.jsx";
 import AdminContainer from "./AdminContainer";
-import {Button, createStyles, withStyles, Paper, Snackbar, Typography} from "@material-ui/core";
+import {Button, createStyles, withStyles, Paper, Snackbar, Typography, FormControlLabel, Switch} from "@material-ui/core";
 import {LibraryBooks} from "@material-ui/icons";
 import {Helmet} from "react-helmet";
 
@@ -23,7 +23,8 @@ class PathCacheAdmin extends React.Component {
             showingError:false,
             cachedPathCount: 0,
             reindexWaiting: false,
-            reindexSuccessful: false
+            reindexSuccessful: false,
+            shouldBlank: false,
         };
 
         this.requestReindex = this.requestReindex.bind(this);
@@ -47,7 +48,9 @@ class PathCacheAdmin extends React.Component {
     }
 
     requestReindex() {
-        this.setState({reindexWaiting: true, reindexSuccessful: false}, ()=>axios.put("/api/pathcache/rebuild")
+        const args = this.state.shouldBlank ? "?blankFirst=true" : "?blankFirst=false";
+
+        this.setState({reindexWaiting: true, reindexSuccessful: false}, ()=>axios.put("/api/pathcache/rebuild" + args)
             .then(response=>{
                 this.setState({reindexWaiting: false, reindexSuccessful: true})
             })
@@ -77,7 +80,14 @@ class PathCacheAdmin extends React.Component {
                         <Typography>Loading...</Typography> :
                         <Typography>There are currently {this.state.cachedPathCount} cached path fragments</Typography>
                     }
-                    <Typography>You can rebuild the index here. It's not blanked before use.  The process should take less than half an hour.</Typography>
+                    <Typography>You can rebuild the index here. The process should take less than half an hour.</Typography>
+                    <FormControlLabel
+                        control={
+                            <Switch checked={this.state.shouldBlank} onChange={(evt)=>this.setState({shouldBlank: evt.target.checked})}/>
+                        }
+                        label="Blank index before rebuild"
+                    />
+
                     <Button variant="outlined"
                             startIcon={<LibraryBooks/>}
                             onClick={this.requestReindex}

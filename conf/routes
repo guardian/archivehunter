@@ -108,7 +108,7 @@ GET     /api/bulkv2/:tokenValue/summarystream     @controllers.BulkDownloadsCont
 GET     /api/bulk/:tokenValue/get/:fileId   @controllers.BulkDownloadsController.getDownloadIdWithToken(tokenValue, fileId)
 
 GET     /api/pathcache/size                 @controllers.PathCacheController.pathCacheSize
-PUT     /api/pathcache/rebuild              @controllers.PathCacheController.startCacheBuild
+PUT     /api/pathcache/rebuild              @controllers.PathCacheController.startCacheBuild(blankFirst:Boolean ?= false)
 
 # Map static resources from the /public folder to the /assets URL path
 GET     /assets/*file               controllers.Assets.at(path="/public", file)

@@ -16,6 +16,7 @@ import io.circe.generic.auto._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import javax.inject.{Inject, Named, Singleton}
+import scala.concurrent.Future
 
 @Singleton
 class PathCacheController @Inject()(override val config:Configuration,
@@ -40,18 +41,21 @@ class PathCacheController @Inject()(override val config:Configuration,
       })
   }
 
-  def startCacheBuild = APIAuthAction { request=>
-    adminsOnlySync(request) {
+  def startCacheBuild(blankFirst: Boolean) = APIAuthAction.async { request=>
+    adminsOnlyAsync(request) {
       val indexName = config.getOptional[String]("externalData.indexName").getOrElse("archivehunter")
-      try {
-        indexer.buildIndex(indexName)
-        Ok(GenericErrorResponse("ok", "index build started").asJson)
-      } catch {
-        case err: Throwable =>
+
+        val removalFut = if(blankFirst) { indexer.removeIndex } else { Future( () ) }
+
+        removalFut.map(_=>{
+          indexer.buildIndex(indexName)
+          Ok(GenericErrorResponse("ok", "index build started").asJson)
+        }).recover({
+          case err:Throwable=>
           logger.error(s"could not start index cache build: ${err.getMessage}", err)
           InternalServerError(GenericErrorResponse("error", err.getMessage).asJson)
+        })
       }
     }
-  }
 }
 

@@ -70,6 +70,15 @@ class PathCacheIndexer(val indexName:String, client:ElasticClient, batchSize:Int
       .run()
   }
 
+  def removeIndex(implicit actorSystem:ActorSystem, mat:Materializer) = {
+    client.execute { deleteIndex(indexName) }
+  } flatMap { response=>
+    if(response.status>299 || response.status<200) {
+      Future.failed(new RuntimeException(s"Delete index failed with a ${response.status} error: ${response.error.toString}"))
+    } else {
+      Future(response)
+    }
+  }
   /**
    * returns a list of the paths that match the given query list
    * @param collectionName collection to check
