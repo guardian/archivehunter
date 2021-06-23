@@ -42,7 +42,6 @@ extends AbstractController(controllerComponents) with PanDomainAuthActions with 
   private val logger=Logger(getClass)
 
   private val awsProfile = config.getOptional[String]("externalData.awsProfile")
-  private val s3Client = s3ClientMgr.getClient(awsProfile)
   private val esClient = esClientMgr.getClient()
 
   private val indexName = config.get[String]("externalData.indexName")
