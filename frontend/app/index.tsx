@@ -42,6 +42,7 @@ import QuickRestoreComponent from "./admin/QuickRestore.jsx";
 import PathCacheAdmin from "./admin/PathCacheAdmin.jsx";
 import ItemView from "./ItemView/ItemView";
 import DeletedItemsComponent from "./DeletedItems/DeletedItems";
+import ManualImporter from "./admin/ManualImporter";
 
 
 library.add(faStroopwafel, faCheckCircle, faCheck, faTimes, faTimesCircle, faRoad,faSearch,faThList,faWrench, faLightbulb, faChevronCircleDown, faChevronCircleRight, faTrashAlt, faFolderPlus, faFolderMinus, faFolder);
@@ -118,6 +119,7 @@ class App extends React.Component<any, AppContainerState> {
                 <Route path="/admin/scanTargets/:id" component={ScanTargetEdit}/> /*this also handles "new" */
                 <Route path="/admin/scanTargets" component={ScanTargetsList}/>
                 <Route path="/admin/quickrestore" component={QuickRestoreComponent}/>
+                <Route path="/admin/manualimport" component={ManualImporter}/>
                 <Route path="/admin" exact={true} component={AdminFront}/>
                 <Route path="/lightbox" exact={true} component={NewLightbox}/>
                 <Route path="/browse" exact={true} component={NewBrowseComponent}/>
