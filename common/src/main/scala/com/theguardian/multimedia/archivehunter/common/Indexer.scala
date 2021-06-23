@@ -38,7 +38,7 @@ class Indexer(indexName:String) extends ZonedDateTimeEncoder with StorageClassEn
       update(idToUse).in(s"$indexName/entry").docAsUpsert(entry)
     }.map(response=>{
       (response.status: @switch) match {
-        case 200=>Right(response.result.id)
+        case 200|201|204=>Right(response.result.id)
         case 409=>Left(ConflictError(idToUse,response.error.reason))
         case _=>Left(UnexpectedReturnCode(idToUse, response.status, Some(response.error.reason)))
       }
