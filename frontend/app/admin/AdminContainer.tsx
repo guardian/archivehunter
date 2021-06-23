@@ -19,7 +19,7 @@ import {
     ArrowRightAlt,
     ChevronLeft,
     ChevronRight, DeleteForever, DirectionsRun,
-    Healing,
+    Healing, ImportExport,
     PeopleAlt,
     Storage,
     TrackChanges,
@@ -141,6 +141,11 @@ const menuItems = [
         uri: "/admin/pathcache",
         icon: <ArrowRightAlt/>,
         name: "Paths caching"
+    },
+    {
+        uri: "/admin/manualimport",
+        icon: <ImportExport/>,
+        name: "Manual path import"
     }
 ]
 

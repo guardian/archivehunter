@@ -44,6 +44,7 @@ import DeletedItemsComponent from "./DeletedItems/DeletedItems";
 import {UserContextProvider} from "./Context/UserContext";
 import {GenericResponse, InvalidLoginResponse, UserDetails} from "./types";
 import LoginComponent from "./LoginComponent";
+import ManualImporter from "./admin/ManualImporter";
 
 
 library.add(faStroopwafel, faCheckCircle, faCheck, faTimes, faTimesCircle, faRoad,faSearch,faThList,faWrench, faLightbulb, faChevronCircleDown, faChevronCircleRight, faTrashAlt, faFolderPlus, faFolderMinus, faFolder);
@@ -161,6 +162,7 @@ const App:React.FC = ()=> {
                         <Route path="/admin/scanTargets/:id" component={ScanTargetEdit}/>
                         <Route path="/admin/scanTargets" component={ScanTargetsList}/>
                         <Route path="/admin/quickrestore" component={QuickRestoreComponent}/>
+                        <Route path="/admin/manualimport" component={ManualImporter}/>
                         <Route path="/admin" exact={true} component={AdminFront}/>
                         <Route path="/lightbox" exact={true} component={NewLightbox}/>
                         <Route path="/browse" exact={true} component={NewBrowseComponent}/>
