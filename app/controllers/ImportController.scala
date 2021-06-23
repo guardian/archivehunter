@@ -17,6 +17,7 @@ import io.circe.generic.auto._
 import io.circe.syntax._
 import org.slf4j.LoggerFactory
 import responses.{GenericErrorResponse, ObjectCreatedResponse}
+import services.IngestProxyQueue
 
 import javax.inject.{Inject, Named}
 import scala.concurrent.Future
@@ -29,7 +30,7 @@ class ImportController @Inject()(override val config:Configuration,
                                    scanTargetDAO:ScanTargetDAO,
                                    s3ClientMgr: S3ClientManager,
                                    esClientMgr: ESClientManager,
-                                   @Named("fileMoveActor") fileMoveActor:ActorRef)
+                                   @Named("ingestProxyQueue") ingestProxyQueue:ActorRef)
                                   (implicit actorSystem:ActorSystem)
   extends AbstractController(controllerComponents) with PanDomainAuthActions with Circe {
 
@@ -98,6 +99,9 @@ class ImportController @Inject()(override val config:Configuration,
                     Future(InternalServerError(GenericErrorResponse("index_error","Could not index new item, see server logs").asJson))
                   case Right(newId)=>
                     logger.info(s"Registered new item with ID $newId, adding to path cache")
+                    ingestProxyQueue ! IngestProxyQueue.CheckRegisteredProxy
+                    ingestProxyQueue ! IngestProxyQueue.CheckRegisteredThumb
+                    ingestProxyQueue ! IngestProxyQueue.StartAnalyse
                     addToPathCache(importRequest).map(_=>{
                       Ok(ObjectCreatedResponse("ok","item",newId).asJson)
                     }).recover({
