@@ -1,7 +1,7 @@
 package controllers
 
-import com.gu.pandomainauth.PanDomainAuthSettingsRefresher
-import helpers.InjectableRefresher
+import auth.Security
+
 import javax.inject.{Inject, Singleton}
 import play.api._
 import play.api.libs.ws.WSClient
@@ -10,23 +10,22 @@ import play.api.mvc._
 @Singleton
 class Application @Inject() (override val controllerComponents:ControllerComponents,
                              override val wsClient: WSClient,
-                             override val config: Configuration,
-                             override val refresher:InjectableRefresher)
-  extends AbstractController(controllerComponents) with PanDomainAuthActions  {
+                             override val config: Configuration)
+  extends AbstractController(controllerComponents) with Security  {
 
 
   def rootIndex() = index("")
 
-  def index(path:String) = AuthAction {
+  def index(path:String) = IsAuthenticated { request=> uid=>
     Ok(views.html.index("Archive Hunter")("fake-cachebuster"))
   }
 
   /**
     * provides a standard html page behind google auth.  The frontend passes this to the panda-session library to refresh
-    * credentials; the refresh is all done by AuthAction, then the content is loaded into an invisible iframe which is deleted again.
+    * credentials; the refresh is all done by IsAuthenticated, then the content is loaded into an invisible iframe which is deleted again.
     * @return
     */
-  def authstub = AuthAction {
+  def authstub = IsAuthenticated { request=> uid=>
     Ok(views.html.authstub())
   }
 
@@ -35,7 +34,7 @@ class Application @Inject() (override val controllerComponents:ControllerCompone
     Ok("online")
   }
 
-  def test419 = APIAuthAction {
+  def test419 = IsAuthenticated { request=> uid=>
     new Status(419)
   }
 }

@@ -2,12 +2,13 @@ package controllers
 
 import java.time.ZonedDateTime
 import java.util.UUID
-
 import akka.actor.{ActorRef, ActorSystem}
 import akka.stream.{ActorMaterializer, Materializer}
+import auth.{BearerTokenAuth, Security}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager}
 import com.gu.scanamo.error.DynamoReadError
 import com.theguardian.multimedia.archivehunter.common._
+
 import javax.inject.{Inject, Named, Singleton}
 import play.api.{Configuration, Logger}
 import play.api.libs.circe.Circe
@@ -15,8 +16,6 @@ import play.api.mvc.{AbstractController, ControllerComponents}
 import io.circe.generic.auto._
 import io.circe.syntax._
 import com.theguardian.multimedia.archivehunter.common.cmn_models._
-import helpers.InjectableRefresher
-import play.api.libs.ws.WSClient
 import requests.JobSearchRequest
 import responses._
 
@@ -25,6 +24,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.Future
 import com.theguardian.multimedia.archivehunter.common.ProxyTranscodeFramework.ProxyGenerators
+import play.api.cache.SyncCacheApi
 
 @Singleton
 class JobController @Inject() (override val config:Configuration,
@@ -33,12 +33,12 @@ class JobController @Inject() (override val config:Configuration,
                                esClientManager: ESClientManager,
                                s3ClientManager: S3ClientManager,
                                ddbClientManager:DynamoClientManager,
-                               override val refresher:InjectableRefresher,
-                               override val wsClient:WSClient,
+                               override val bearerTokenAuth: BearerTokenAuth,
+                               override val cache:SyncCacheApi,
                                proxyLocationDAO:ProxyLocationDAO,
                                proxyGenerators:ProxyGenerators)
                               (implicit actorSystem:ActorSystem)
-  extends AbstractController(controllerComponents) with Circe with JobModelEncoder with ZonedDateTimeEncoder with PanDomainAuthActions with QueryRemaps {
+  extends AbstractController(controllerComponents) with Circe with JobModelEncoder with ZonedDateTimeEncoder with Security with QueryRemaps {
 
   private val logger = Logger(getClass)
 
@@ -49,7 +49,7 @@ class JobController @Inject() (override val config:Configuration,
 
   protected implicit val indexer = new Indexer(indexName)
 
-  def renderListAction(block: ()=>Future[List[Either[DynamoReadError, JobModel]]]) = APIAuthAction.async {
+  def renderListAction(block: ()=>Future[List[Either[DynamoReadError, JobModel]]]) = IsAuthenticatedAsync { uid=> request=>
       val resultFuture = block()
       resultFuture.recover({
         case ex:Throwable=>
@@ -72,7 +72,7 @@ class JobController @Inject() (override val config:Configuration,
 
   def jobsFor(fileId:String) = renderListAction(()=>jobModelDAO.jobsForSource(fileId))
 
-  def getJob(jobId:String) = APIAuthAction.async { request=>
+  def getJob(jobId:String) = IsAuthenticatedAsync { uid=> request=>
     jobModelDAO.jobForId(jobId).map({
       case None=>
         NotFound(GenericErrorResponse("not_found", "Job ID is not found").asJson)
@@ -84,7 +84,7 @@ class JobController @Inject() (override val config:Configuration,
     })
   }
 
-  def jobSearch(clientLimit:Int) = Action.async(circe.json(2048)) { request=>
+  def jobSearch(clientLimit:Int) = IsAuthenticatedAsync(circe.json(2048)) { uid=> request=>
     implicit val daoImplicit = jobModelDAO
     request.body.as[JobSearchRequest] match {
       case Left(err)=>
@@ -105,7 +105,7 @@ class JobController @Inject() (override val config:Configuration,
     }
   }
 
-  def rerunProxy(jobId:String) = APIAuthAction.async { request=>
+  def rerunProxy(jobId:String) = IsAuthenticatedAsync { uid=> request=>
     Try { UUID.fromString(jobId) } match {
       case Success(jobUuid) =>
         proxyGenerators.rerunProxyJob(jobUuid).map({
@@ -119,7 +119,7 @@ class JobController @Inject() (override val config:Configuration,
     }
   }
 
-  def refreshTranscodeInfo(jobId:String) = APIAuthAction.async { request=>
+  def refreshTranscodeInfo(jobId:String) = IsAuthenticatedAsync { _=> _=>
     implicit val timeout:akka.util.Timeout = 30 seconds
 
 //    jobModelDAO.jobForId(jobId).flatMap({
@@ -141,7 +141,7 @@ class JobController @Inject() (override val config:Configuration,
     Future(InternalServerError(GenericErrorResponse("not_implemented","Not currently implemented").asJson))
   }
 
-  def reRunJobsForCollection(collectionName:String) = APIAuthAction.async {
+  def reRunJobsForCollection(collectionName:String) = IsAuthenticatedAsync { _=> _=>
     jobModelDAO.jobsForType("ProblemItemRerun").map(resultList=>{
       val failures = resultList.collect({case Left(err)=>err})
       if(failures.nonEmpty){

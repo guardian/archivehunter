@@ -2,30 +2,28 @@ package controllers
 
 import java.time.ZonedDateTime
 import java.util.UUID
-
 import akka.pattern.ask
 import akka.actor.{ActorRef, ActorSystem}
 import akka.stream.scaladsl.{Flow, GraphDSL, RunnableGraph}
 import akka.stream.{ActorMaterializer, ClosedShape, Materializer}
+import auth.{BearerTokenAuth, Security, UserRequest}
 import com.amazonaws.HttpMethod
 import com.amazonaws.services.s3.model.{GeneratePresignedUrlRequest, ResponseHeaderOverrides}
 import com.google.inject.Injector
-import com.gu.pandomainauth.action.UserRequest
 import com.gu.scanamo.error.DynamoReadError
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer, StorageClass, ZonedDateTimeEncoder}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models._
 import helpers.LightboxStreamComponents.{BulkRestoreStatsSink, ExtractArchiveEntry, InitiateRestoreSink, LightboxDynamoSource, LookupArchiveEntryFromLBEntryFlow, LookupLightboxEntryFlow, UpdateLightboxIndexInfoSink}
-import helpers.{InjectableRefresher, LightboxHelper}
+import helpers.{LightboxHelper}
 import javax.inject.{Inject, Named, Singleton}
 import play.api.{Configuration, Logger}
 import play.api.libs.circe.Circe
-import play.api.mvc.{AbstractController, ControllerComponents, Result}
+import play.api.mvc.{AbstractController, ControllerComponents, Request, Result}
 import responses._
 import io.circe.syntax._
 import io.circe.generic.auto._
 import models.{ServerTokenDAO, ServerTokenEntry, UserProfile, UserProfileDAO}
-import play.api.libs.ws.WSClient
 import requests.SearchRequest
 import services.GlacierRestoreActor
 import services.GlacierRestoreActor.GRMsg
@@ -34,20 +32,26 @@ import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 import helpers.S3Helper.getPresignedURL
+import play.api.cache.SyncCacheApi
+
+import auth.ClaimsSetExtensions._
+
 @Singleton
 class LightboxController @Inject() (override val config:Configuration,
                                     override val controllerComponents:ControllerComponents,
-                                    override val wsClient:WSClient,
-                                    override val refresher:InjectableRefresher,
+                                    override val bearerTokenAuth: BearerTokenAuth,
+                                    override val cache:SyncCacheApi,
                                     esClientMgr:ESClientManager,
                                     s3ClientMgr:S3ClientManager,
                                     @Named("glacierRestoreActor") glacierRestoreActor:ActorRef,
                                     lightboxBulkEntryDAO: LightboxBulkEntryDAO,
                                     serverTokenDAO: ServerTokenDAO,
-                                    userProfileDAO: UserProfileDAO,
                                     dynamoClientManager:DynamoClientManager)
-                                   (implicit val system:ActorSystem, injector:Injector, lightboxEntryDAO: LightboxEntryDAO)
-  extends AbstractController(controllerComponents) with PanDomainAuthActions with Circe with ZonedDateTimeEncoder with RestoreStatusEncoder with AdminsOnly {
+                                   (implicit val system:ActorSystem,
+                                    injector:Injector,
+                                    lightboxEntryDAO: LightboxEntryDAO,
+                                    userProfileDAO: UserProfileDAO)
+  extends AbstractController(controllerComponents) with Security with Circe with ZonedDateTimeEncoder with RestoreStatusEncoder {
   private val logger=Logger(getClass)
   private implicit val indexer = new Indexer(config.get[String]("externalData.indexName"))
   private val awsProfile = config.getOptional[String]("externalData.awsProfile")
@@ -61,28 +65,7 @@ class LightboxController @Inject() (override val config:Configuration,
 
   val tokenShortDuration = config.getOptional[Int]("serverToken.shortLivedDuration").getOrElse(10)  //default value is 2 hours
 
-  def targetUserProfile[T](request:UserRequest[T], targetUser:String) = {
-    val actualUserProfile = userProfileFromSession(request.session)
-    if(targetUser=="my"){
-      Future(actualUserProfile)
-    } else {
-      actualUserProfile match {
-        case Some(Left(err))=>
-          Future(Some(Left(err)))
-        case Some(Right(someUserProfile))=>
-          if(!someUserProfile.isAdmin){
-            logger.error(s"Non-admin user is trying to access lightbox of $targetUser")
-            Future(None)
-          } else {
-            userProfileDAO.userProfileForEmail(targetUser)
-          }
-        case None=>
-          Future(None)
-      }
-    }
-  }
-
-  def withTargetUserProfile[T](request:UserRequest[T], user:String)(block: (UserProfile=>Future[Result])) =
+  def withTargetUserProfile[T](request:Request[T], user:String)(block: (UserProfile=>Future[Result])) =
     targetUserProfile(request, user).flatMap({
       case None => Future(BadRequest(GenericErrorResponse("session_error", "no session present").asJson))
       case Some(Left(err)) =>
@@ -92,14 +75,14 @@ class LightboxController @Inject() (override val config:Configuration,
         block(profile)
     })
 
-  def removeFromLightbox(user:String, fileId:String) = APIAuthAction.async { request=>
+  def removeFromLightbox(user:String, fileId:String) = IsAuthenticatedAsync { claims=> request=>
     withTargetUserProfile(request, user) { profile=>
         val indexUpdateFuture = indexer.getById(fileId).flatMap(indexEntry => {
-          val updatedEntry = indexEntry.copy(lightboxEntries = indexEntry.lightboxEntries.filter(_.owner!=request.user.email))
+          val updatedEntry = indexEntry.copy(lightboxEntries = indexEntry.lightboxEntries.filter(_.owner!=claims.getEmail.getOrElse("")))
           indexer.indexSingleItem(updatedEntry, Some(updatedEntry.id))
         })
 
-        val lbUpdateFuture = lightboxEntryDAO.delete(request.user.email, fileId)
+        val lbUpdateFuture = lightboxEntryDAO.delete(claims.getEmail, fileId)
           .map(result=>Success(result.toString))
           .recoverWith({
             case err:Throwable=>Future(Failure(err))
@@ -117,7 +100,7 @@ class LightboxController @Inject() (override val config:Configuration,
     }
   }
 
-  def addFromSearch(user:String) = APIAuthAction.async(circe.json(2048)) { request=>
+  def addFromSearch(user:String) = IsAuthenticatedAsync(circe.json(2048)) { claims=> request=>
     request.body.as[SearchRequest].fold(
       err=> Future(BadRequest(GenericErrorResponse("bad_request", err.toString).asJson)),
       searchReq=>
@@ -150,7 +133,7 @@ class LightboxController @Inject() (override val config:Configuration,
 
                   saveFuture.flatMap({
                     case Right(savedEntry)=>
-                      LightboxHelper.addToBulkFromSearch(indexName,userProfile,request.user.avatarUrl,searchReq,savedEntry).flatMap(updatedBulkEntry=>{
+                      LightboxHelper.addToBulkFromSearch(indexName,userProfile, request.user.avatarUrl,searchReq,savedEntry).flatMap(updatedBulkEntry=>{
                         lightboxBulkEntryDAO.put(updatedBulkEntry).map({
                           case None=>
                             Ok(ObjectCreatedResponse("ok","bulkLightboxEntry", updatedBulkEntry.id).asJson)
@@ -181,7 +164,7 @@ class LightboxController @Inject() (override val config:Configuration,
     )
   }
 
-  def addToLightbox(user:String, fileId:String) = APIAuthAction.async { request=>
+  def addToLightbox(user:String, fileId:String) = IsAuthenticatedAsync { uid=> request=>
     withTargetUserProfile(request, user) { userProfile=>
         indexer.getById(fileId).flatMap(indexEntry =>
           Future.sequence(Seq(
@@ -204,7 +187,7 @@ class LightboxController @Inject() (override val config:Configuration,
     }
   }
 
-  def lightboxDetails(user:String) = APIAuthAction.async { request=>
+  def lightboxDetails(user:String) = IsAuthenticatedAsync { uid=> request=>
     withTargetUserProfile(request, user) { userProfile=>
         lightboxEntryDAO.allForUser(userProfile.userEmail).map(results => {
           val errors = results.collect({ case Left(err) => err })
@@ -225,7 +208,7 @@ class LightboxController @Inject() (override val config:Configuration,
     * @param fileId
     * @return
     */
-  def getDownloadLink(fileId:String) = APIAuthAction.async { request=>
+  def getDownloadLink(fileId:String) = IsAuthenticatedAsync { claims=> request=>
     userProfileFromSession(request.session) match {
       case None=>Future(BadRequest(GenericErrorResponse("session_error","no session present").asJson))
       case Some(Left(err))=>
@@ -248,7 +231,7 @@ class LightboxController @Inject() (override val config:Configuration,
     }
   }
 
-  def checkRestoreStatus(user:String, fileId:String) = APIAuthAction.async { request=>
+  def checkRestoreStatus(user:String, fileId:String) = IsAuthenticatedAsync { claims=> request=>
     implicit val timeout:akka.util.Timeout = 60 seconds
 
     withTargetUserProfile(request, user) { userProfile=>
@@ -281,7 +264,7 @@ class LightboxController @Inject() (override val config:Configuration,
     * @param bulkId bulk ID we are checking
     * @return
     */
-  def bulkCheckRestoreStatus(user:String, bulkId:String) = APIAuthAction.async { request=>
+  def bulkCheckRestoreStatus(user:String, bulkId:String) = IsAuthenticatedAsync { claims=> request=>
     withTargetUserProfile(request, user) { userProfile=>
       import akka.stream.scaladsl.GraphDSL.Implicits._
       val sinkFactory = injector.getInstance(classOf[BulkRestoreStatsSink])
@@ -309,21 +292,27 @@ class LightboxController @Inject() (override val config:Configuration,
     * returns bulk entries for the current user
     * @return
     */
-  def myBulks(user:String) = APIAuthAction.async { request=>
+  def myBulks(user:String) = IsAuthenticatedAsync { claims=> request=>
+    import cats.implicits._
     withTargetUserProfile(request, user) { profile=>
         lightboxBulkEntryDAO.entriesForUser(profile.userEmail).flatMap(results=>{
           val failures = results.collect({ case Left(err)=>err })
           if(failures.nonEmpty){
             Future(InternalServerError(GenericErrorResponse("error",failures.map(_.toString).mkString(",")).asJson))
           } else {
-            LightboxHelper.getLooseCountForUser(indexName, request.user.email).map({
-              case Left(err)=>
+            claims.getEmail
+              .map(userEmail=>LightboxHelper.getLooseCountForUser(indexName, userEmail))
+              .sequence
+              .map({
+              case Some(Left(err))=>
                 logger.error(s"Could not look up count for loose lightbox items: $err")
                 val successes = results.collect({ case Right(value)=>value }) ++ List(LightboxBulkEntry.forLoose(profile.userEmail, 0))
                 Ok(ObjectListResponse("ok","lightboxBulk",successes,successes.length).asJson)
-              case Right(count)=>
+              case Some(Right(count))=>
                 val successes = results.collect({ case Right(value)=>value }) ++ List(LightboxBulkEntry.forLoose(profile.userEmail, count))
                 Ok(ObjectListResponse("ok","lightboxBulk",successes,successes.length).asJson)
+              case None=>
+                BadRequest(GenericErrorResponse("auth_problem", "User information has no email address"))
             })
 
           }
@@ -331,7 +320,7 @@ class LightboxController @Inject() (override val config:Configuration,
     }
   }
 
-  def deleteBulk(user:String, entryId:String) = APIAuthAction.async { request=>
+  def deleteBulk(user:String, entryId:String) = IsAuthenticatedAsync { claims=> request=>
     withTargetUserProfile(request, user) { profile=>
         lightboxBulkEntryDAO.entryForId(UUID.fromString(entryId)).flatMap({
           case None=>
@@ -364,13 +353,13 @@ class LightboxController @Inject() (override val config:Configuration,
     * if nothing is found, a 200 response is still returned, but with a null in the entry field.
     * @return
     */
-  def haveBulkEntryFor(user:String) = APIAuthAction.async(circe.json(2048)) { request=>
+  def haveBulkEntryFor(user:String) = IsAuthenticatedAsync(circe.json(2048)) { claims=> request=>
     request.body.as[SearchRequest].fold(
       err=>Future(BadRequest(GenericErrorResponse("bad_request", err.toString).asJson)),
       rq=>{
         if(rq.path.isDefined && rq.collection.isDefined) {
           val desc = s"${rq.collection.get}:${rq.path.get}"
-          lightboxBulkEntryDAO.entryForDescAndUser(request.user.email,desc).map({
+          lightboxBulkEntryDAO.entryForDescAndUser(claims.getEmail.getOrElse(claims.getUsername),desc).map({
             case Left(err)=>InternalServerError(GenericErrorResponse("db_error", err.toString).asJson)
             case Right(Some(entry))=>Ok(ObjectGetResponse("ok","lightboxbulk",entry.id).asJson)
             case Right(None)=>Ok(ObjectGetResponseEmpty("notfound","lightboxbulk").asJson)
@@ -395,7 +384,7 @@ class LightboxController @Inject() (override val config:Configuration,
     })
   }
 
-  def bulkDownloadInApp(entryId:String) = APIAuthAction.async { request=>
+  def bulkDownloadInApp(entryId:String) = IsAuthenticatedAsync { claims=> request=>
     implicit val lightboxEntryDAOImpl = lightboxEntryDAO
     userProfileFromSession(request.session) match {
       case None=>Future(BadRequest(GenericErrorResponse("session_error","no session present").asJson))
@@ -404,14 +393,14 @@ class LightboxController @Inject() (override val config:Configuration,
         Future(InternalServerError(GenericErrorResponse("session_error","session is corrupted, log out and log in again").asJson))
       case Some(Right(profile))=>
         if(entryId=="loose"){
-          makeDownloadToken(entryId, request.user.email)
+          makeDownloadToken(entryId, claims.getUserID)
         } else {
           lightboxBulkEntryDAO.entryForId(UUID.fromString(entryId)).flatMap({
             case None =>
               Future(NotFound(GenericErrorResponse("not_found", "No bulk with that ID is present").asJson))
             case Some(Right(_)) =>
               //create a token that is valid for 10 seconds
-              makeDownloadToken(entryId, request.user.email)
+              makeDownloadToken(entryId, claims.getUserID)
             case Some(Left(err)) =>
               logger.error(s"Could not look up bulk entry in dynamo: ${err.toString}")
               Future(InternalServerError(GenericErrorResponse("db_error", err.toString).asJson))
@@ -420,7 +409,7 @@ class LightboxController @Inject() (override val config:Configuration,
     }
   }
 
-  def redoRestore(user:String, fileId:String) = APIAuthAction.async { request=>
+  def redoRestore(user:String, fileId:String) = IsAuthenticatedAsync { claims=> request=>
     targetUserProfile(request, user).flatMap({
       case None=>Future(BadRequest(GenericErrorResponse("session_error","no session present").asJson))
       case Some(Left(err))=>
@@ -459,7 +448,7 @@ class LightboxController @Inject() (override val config:Configuration,
     })
   }
 
-  def verifyBulkLightbox(user:String, bulkId:String) = APIAuthAction.async { request=>
+  def verifyBulkLightbox(user:String, bulkId:String) = IsAuthenticatedAsync { claims=> request=>
     withTargetUserProfile(request, user) { userProfile =>
       val sinkFactory = new UpdateLightboxIndexInfoSink(bulkId, userProfile, request.user.avatarUrl)
 
@@ -490,9 +479,7 @@ class LightboxController @Inject() (override val config:Configuration,
   }
 
   //this is temporary and will be replaced in the update that brings in the new approval workflow
-  def redoBulk(user:String, bulkId:String) = APIAuthAction.async { request =>
-
-    adminsOnlyAsync(request, allowHmac = true) {
+  def redoBulk(user:String, bulkId:String) = IsAdminAsync { claims=> request =>
       logger.info("in redoBulk")
       targetUserProfile(request, user).flatMap({
         case None => Future(BadRequest(GenericErrorResponse("session_error", "no session present").asJson))
@@ -522,6 +509,5 @@ class LightboxController @Inject() (override val config:Configuration,
             Ok(CountResponse("ok", "triggered re-restore of items", processedCount).asJson)
           })
       })
-    }
   }
 }

@@ -2,23 +2,22 @@ package controllers
 
 import java.time.{Instant, ZoneId, ZonedDateTime}
 import java.util.Date
-
 import akka.actor.{ActorRef, ActorSystem}
+import auth.{BearerTokenAuth, Security}
 import com.amazonaws.auth.profile.ProfileCredentialsProvider
 import com.amazonaws.auth.{AWSCredentialsProviderChain, ContainerCredentialsProvider, InstanceProfileCredentialsProvider}
 import com.amazonaws.regions.{Region, Regions}
 import com.amazonaws.services.cloudformation.AmazonCloudFormationClientBuilder
 import com.amazonaws.services.cloudformation.model._
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{ProxyFrameworkInstance, ProxyFrameworkInstanceDAO}
-import com.typesafe.config.ConfigException.Generic
-import helpers.InjectableRefresher
-import javax.inject.{Inject, Named, Singleton}
+
+import javax.inject.{Inject, Singleton}
 import play.api.{Configuration, Logger}
 import play.api.libs.circe.Circe
-import play.api.libs.ws.WSClient
 import play.api.mvc.{AbstractController, ControllerComponents}
 import io.circe.syntax._
 import io.circe.generic.auto._
+import play.api.cache.SyncCacheApi
 import requests.AddPFDeploymentRequest
 import responses.{GenericErrorResponse, MultiResultResponse, ObjectListResponse, ProxyFrameworkDeploymentInfo}
 
@@ -29,20 +28,19 @@ import scala.util.{Failure, Success, Try}
 @Singleton
 class ProxyFrameworkAdminController @Inject() (override val config:Configuration,
                                                override val controllerComponents:ControllerComponents,
-                                               override val refresher:InjectableRefresher,
-                                               override val wsClient:WSClient,
+                                               override val bearerTokenAuth:BearerTokenAuth,
+                                               override val cache:SyncCacheApi,
                                                proxyFrameworkInstanceDAO: ProxyFrameworkInstanceDAO,
                                                proxyFrameworkHelper: helpers.ProxyFramework)
                                               (implicit actorSystem:ActorSystem)
-  extends AbstractController(controllerComponents) with Circe with PanDomainAuthActions with AdminsOnly {
+  extends AbstractController(controllerComponents) with Circe with Security {
 
   private val logger = Logger(getClass)
   implicit val ec:ExecutionContext = controllerComponents.executionContext
 
   private val awsProfile = config.getOptional[String]("externalData.awsProfile")
 
-  def existingDeployments = APIAuthAction.async { request=>
-    adminsOnlyAsync(request) {
+  def existingDeployments = IsAdminAsync { _=> request=>
       proxyFrameworkInstanceDAO.allRecords.map(result=>{
         val failures = result.collect({case Left(err)=>err})
         if(failures.nonEmpty){
@@ -52,7 +50,6 @@ class ProxyFrameworkAdminController @Inject() (override val config:Configuration
           Ok(ObjectListResponse("ok","ProxyFrameworkInstance",records,records.length).asJson)
         }
       })
-    }
   }
 
   def credentialsProvider(profileName:Option[String]=None) = new AWSCredentialsProviderChain(
@@ -125,7 +122,7 @@ class ProxyFrameworkAdminController @Inject() (override val config:Configuration
     * endpoint that returns the known valid regions
     * @return
     */
-  def getRegions = APIAuthAction { request=>
+  def getRegions = IsAuthenticated { _=> _=>
     Ok(ObjectListResponse("ok","regions",Regions.values().map(_.toString.replace("_","-").toLowerCase),Regions.values().length).asJson)
   }
 
@@ -134,134 +131,125 @@ class ProxyFrameworkAdminController @Inject() (override val config:Configuration
     * scans for anything that looks like a deployment of the Proxy Framework in the running AWS account
     * @return
     */
-  def lookupPotentialDeployments = APIAuthAction.async { request=>
-    adminsOnlyAsync(request) {
-      val lookupFutures = Regions.values().map(rgn=>scanRegionForDeployments(rgn.getName)).toSeq
+  def lookupPotentialDeployments = IsAdminAsync { _=> request=>
+    val lookupFutures = Regions.values().map(rgn=>scanRegionForDeployments(rgn.getName)).toSeq
 
-      val resultsFuture = Future.sequence(lookupFutures).map(resultList=>{
-        resultList.map(resultTuple=>{
-          resultTuple._2 match {
-            case Success(summarySeq)=>
-              Right(summarySeq.map(summ=>
-                ProxyFrameworkDeploymentInfo(
-                  resultTuple._1, summ.getStackId,summ.getStackName,summ.getStackStatus, summ.getTemplateDescription,convertJavaDate(summ.getCreationTime))
-                ))
-            case Failure(err)=>
-              Left((resultTuple._1, err.toString))
-          }
-        })
-      })
-
-      resultsFuture.map(results=>{
-        val successes = results.collect({ case Right(info) => info })
-        val failures = results.collect({ case Left(err) => err })
-
-        val statusString = if(successes.isEmpty){
-          "failure"
-        } else if(failures.isEmpty){
-          "success"
-        } else {
-          "partial"
+    val resultsFuture = Future.sequence(lookupFutures).map(resultList=>{
+      resultList.map(resultTuple=>{
+        resultTuple._2 match {
+          case Success(summarySeq)=>
+            Right(summarySeq.map(summ=>
+              ProxyFrameworkDeploymentInfo(
+                resultTuple._1, summ.getStackId,summ.getStackName,summ.getStackStatus, summ.getTemplateDescription,convertJavaDate(summ.getCreationTime))
+              ))
+          case Failure(err)=>
+            Left((resultTuple._1, err.toString))
         }
-
-        Ok(MultiResultResponse(statusString, "proxyFrameworkDeploymentInfo", successes, failures).asJson)
       })
-    }
+    })
+
+    resultsFuture.map(results=>{
+      val successes = results.collect({ case Right(info) => info })
+      val failures = results.collect({ case Left(err) => err })
+
+      val statusString = if(successes.isEmpty){
+        "failure"
+      } else if(failures.isEmpty){
+        "success"
+      } else {
+        "partial"
+      }
+
+      Ok(MultiResultResponse(statusString, "proxyFrameworkDeploymentInfo", successes, failures).asJson)
+    })
   }
 
-  def addDeployment = APIAuthAction.async(circe.json(2048)) { request=>
-    adminsOnlyAsync(request) {
-      request.body.as[AddPFDeploymentRequest].fold(
-        err=>Future(BadRequest(GenericErrorResponse("bad_request",err.toString).asJson)),
-        clientRequest=> {
-          val client = getCfClient(clientRequest.region)
-          val rq = new DescribeStacksRequest().withStackName(clientRequest.stackName)
-          val result = client.describeStacks(rq)
-          val stacks = result.getStacks.asScala
-          if(stacks.isEmpty){
-            Future(NotFound(GenericErrorResponse("not_found","No stack by that name in that region").asJson))
-          } else if(stacks.length>1){
-            Future(BadRequest(GenericErrorResponse("too_many","Multiple stacks found by that name").asJson))
-          } else {
-            ProxyFrameworkInstance.fromStackSummary(clientRequest.region, stacks.head) match {
-              case Some(rec) =>
-                //setupDeployment saves the created record to the DB and performs subscriptions/security policy updates
-                proxyFrameworkHelper.setupDeployment(rec).map({
-                  case Success(results) =>
-                    Ok(GenericErrorResponse("ok", "Record saved").asJson)
-                  case Failure(err) =>
-                    InternalServerError(GenericErrorResponse("db_error", err.toString).asJson)
+  def addDeployment = IsAdminAsync(circe.json(2048)) { _=> request=>
+    request.body.as[AddPFDeploymentRequest].fold(
+      err=>Future(BadRequest(GenericErrorResponse("bad_request",err.toString).asJson)),
+      clientRequest=> {
+        val client = getCfClient(clientRequest.region)
+        val rq = new DescribeStacksRequest().withStackName(clientRequest.stackName)
+        val result = client.describeStacks(rq)
+        val stacks = result.getStacks.asScala
+        if(stacks.isEmpty){
+          Future(NotFound(GenericErrorResponse("not_found","No stack by that name in that region").asJson))
+        } else if(stacks.length>1){
+          Future(BadRequest(GenericErrorResponse("too_many","Multiple stacks found by that name").asJson))
+        } else {
+          ProxyFrameworkInstance.fromStackSummary(clientRequest.region, stacks.head) match {
+            case Some(rec) =>
+              //setupDeployment saves the created record to the DB and performs subscriptions/security policy updates
+              proxyFrameworkHelper.setupDeployment(rec).map({
+                case Success(results) =>
+                  Ok(GenericErrorResponse("ok", "Record saved").asJson)
+                case Failure(err) =>
+                  InternalServerError(GenericErrorResponse("db_error", err.toString).asJson)
+              })
+            case None =>
+              Future(BadRequest(GenericErrorResponse("invalid_request", "Stack did not have the right outputs defined").asJson))
+          }
+        }
+      }.recover({
+        case err:Throwable=>
+          logger.error("Could not add new deployment from CF stack: ", err)
+          InternalServerError(GenericErrorResponse("error", err.toString).asJson)
+      })
+    )
+  }
+
+  def addDeploymentDirect = IsAdminAsync(circe.json(2048)) { _=> request=>
+    request.body.as[ProxyFrameworkInstance].fold(
+      err=>Future(BadRequest(GenericErrorResponse("bad_request", err.toString).asJson)),
+      rec=>proxyFrameworkInstanceDAO.recordsForRegion(rec.region).flatMap(results=>{
+        if(results.nonEmpty){
+          Future(Conflict(GenericErrorResponse("already_exists", "A record already exists for this region").asJson))
+        } else {
+          proxyFrameworkInstanceDAO.put(rec).map({
+            case None=>
+              Ok(GenericErrorResponse("ok","Record saved").asJson)
+            case Some(Right(updatedRecord))=>
+              Ok(GenericErrorResponse("ok","Record saved").asJson)
+            case Some(Left(err))=>
+              InternalServerError(GenericErrorResponse("db_error",err.toString).asJson)
+          })
+        }
+      })
+    )
+  }
+
+  def removeDeployment(forRegion:String) = IsAdminAsync { request=>
+    proxyFrameworkInstanceDAO.recordsForRegion(forRegion).flatMap(results=>{
+      val failures = results.collect({case Left(err)=>err})
+      if(failures.nonEmpty){
+        logger.error(s"Could not locate deployment to remove: $failures")
+        Future(InternalServerError(GenericErrorResponse("error", failures.head.toString).asJson))
+      } else {
+        val frameworks = results.collect({case Right(pt)=>pt})
+        if(frameworks.isEmpty){
+          logger.error(s"Could not find any frameworks for region $forRegion")
+          Future(NotFound(GenericErrorResponse("error", s"Could not find any frameworks for region $forRegion").asJson))
+        } else {
+          logger.info(s"Attempting to detach framework instance ${frameworks.head}...")
+          proxyFrameworkHelper.detachFramework(frameworks.head).flatMap({
+            case Success(_)=>
+              logger.info(s"Detach succeeded. Deleting reference...")
+              proxyFrameworkInstanceDAO.remove(forRegion)
+                .map(result=> {
+                  logger.info("Reference deleted from database; remove deployment complete")
+                  Ok(GenericErrorResponse("ok", "Record deleted").asJson)
                 })
-              case None =>
-                Future(BadRequest(GenericErrorResponse("invalid_request", "Stack did not have the right outputs defined").asJson))
-            }
-          }
-        }.recover({
-          case err:Throwable=>
-            logger.error("Could not add new deployment from CF stack: ", err)
-            InternalServerError(GenericErrorResponse("error", err.toString).asJson)
-        })
-      )
-    }
-  }
-
-  def addDeploymentDirect = APIAuthAction.async(circe.json(2048)) { request=>
-    adminsOnlyAsync(request) {
-      request.body.as[ProxyFrameworkInstance].fold(
-        err=>Future(BadRequest(GenericErrorResponse("bad_request", err.toString).asJson)),
-        rec=>proxyFrameworkInstanceDAO.recordsForRegion(rec.region).flatMap(results=>{
-          if(results.nonEmpty){
-            Future(Conflict(GenericErrorResponse("already_exists", "A record already exists for this region").asJson))
-          } else {
-            proxyFrameworkInstanceDAO.put(rec).map({
-              case None=>
-                Ok(GenericErrorResponse("ok","Record saved").asJson)
-              case Some(Right(updatedRecord))=>
-                Ok(GenericErrorResponse("ok","Record saved").asJson)
-              case Some(Left(err))=>
-                InternalServerError(GenericErrorResponse("db_error",err.toString).asJson)
-            })
-          }
-        })
-      )
-    }
-  }
-
-  def removeDeployment(forRegion:String) = APIAuthAction.async { request=>
-    adminsOnlyAsync(request) {
-      proxyFrameworkInstanceDAO.recordsForRegion(forRegion).flatMap(results=>{
-        val failures = results.collect({case Left(err)=>err})
-        if(failures.nonEmpty){
-          logger.error(s"Could not locate deployment to remove: $failures")
-          Future(InternalServerError(GenericErrorResponse("error", failures.head.toString).asJson))
-        } else {
-          val frameworks = results.collect({case Right(pt)=>pt})
-          if(frameworks.isEmpty){
-            logger.error(s"Could not find any frameworks for region $forRegion")
-            Future(NotFound(GenericErrorResponse("error", s"Could not find any frameworks for region $forRegion").asJson))
-          } else {
-            logger.info(s"Attempting to detach framework instance ${frameworks.head}...")
-            proxyFrameworkHelper.detachFramework(frameworks.head).flatMap({
-              case Success(_)=>
-                logger.info(s"Detach succeeded. Deleting reference...")
-                proxyFrameworkInstanceDAO.remove(forRegion)
-                  .map(result=> {
-                    logger.info("Reference deleted from database; remove deployment complete")
-                    Ok(GenericErrorResponse("ok", "Record deleted").asJson)
-                  })
-                  .recoverWith({
-                    case err:Throwable=>
-                      logger.error("Could not remove reference from database: ", err)
-                      Future(InternalServerError(GenericErrorResponse("db_error",err.toString).asJson))
-                  })
-              case Failure(err)=>
-                logger.error(s"Could not detech framework instance ${frameworks.head}: ${err.getMessage}", err)
-                Future(InternalServerError(GenericErrorResponse("error", err.toString).asJson))
-            })
-          }
+                .recoverWith({
+                  case err:Throwable=>
+                    logger.error("Could not remove reference from database: ", err)
+                    Future(InternalServerError(GenericErrorResponse("db_error",err.toString).asJson))
+                })
+            case Failure(err)=>
+              logger.error(s"Could not detech framework instance ${frameworks.head}: ${err.getMessage}", err)
+              Future(InternalServerError(GenericErrorResponse("error", err.toString).asJson))
+          })
         }
-      })
-
-    }
+      }
+    })
   }
 }
