@@ -15,7 +15,8 @@ import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer, S
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models._
 import helpers.LightboxStreamComponents.{BulkRestoreStatsSink, ExtractArchiveEntry, InitiateRestoreSink, LightboxDynamoSource, LookupArchiveEntryFromLBEntryFlow, LookupLightboxEntryFlow, UpdateLightboxIndexInfoSink}
-import helpers.{LightboxHelper}
+import helpers.LightboxHelper
+
 import javax.inject.{Inject, Named, Singleton}
 import play.api.{Configuration, Logger}
 import play.api.libs.circe.Circe
@@ -33,8 +34,8 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 import helpers.S3Helper.getPresignedURL
 import play.api.cache.SyncCacheApi
-
 import auth.ClaimsSetExtensions._
+import org.slf4j.LoggerFactory
 
 @Singleton
 class LightboxController @Inject() (override val config:Configuration,
@@ -52,7 +53,7 @@ class LightboxController @Inject() (override val config:Configuration,
                                     lightboxEntryDAO: LightboxEntryDAO,
                                     userProfileDAO: UserProfileDAO)
   extends AbstractController(controllerComponents) with Security with Circe with ZonedDateTimeEncoder with RestoreStatusEncoder {
-  private val logger=Logger(getClass)
+  private val logger=LoggerFactory.getLogger(getClass)
   private implicit val indexer = new Indexer(config.get[String]("externalData.indexName"))
   private val awsProfile = config.getOptional[String]("externalData.awsProfile")
   private implicit val esClient = esClientMgr.getClient()

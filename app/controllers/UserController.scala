@@ -1,52 +1,52 @@
 package controllers
 
-import helpers.InjectableRefresher
+import auth.{BearerTokenAuth, Security}
+
 import javax.inject.{Inject, Singleton}
 import play.api.{Configuration, Logger}
 import play.api.libs.circe.Circe
-import play.api.libs.ws.WSClient
 import play.api.mvc.{AbstractController, ControllerComponents}
 import responses._
 import io.circe.syntax._
 import io.circe.generic.auto._
 import models.{UserProfile, UserProfileDAO, UserProfileField}
+import play.api.cache.SyncCacheApi
 import requests.{FieldUpdateOperation, UserProfileFieldUpdate, UserProfileFieldUpdateEncoder}
 
 import scala.concurrent.Future
+import auth.ClaimsSetExtensions._
+import org.slf4j.LoggerFactory
 
 @Singleton
 class UserController @Inject()(override val controllerComponents:ControllerComponents,
-                               override val wsClient: WSClient,
                                override val config: Configuration,
-                               override val refresher:InjectableRefresher,
+                               override val bearerTokenAuth:BearerTokenAuth,
+                               override val cache:SyncCacheApi,
                                userProfileDAO:UserProfileDAO)
-  extends AbstractController(controllerComponents) with PanDomainAuthActions with AdminsOnly with UserProfileFieldUpdateEncoder with Circe {
+  extends AbstractController(controllerComponents) with Security with UserProfileFieldUpdateEncoder with Circe {
   implicit val ec = controllerComponents.executionContext
 
-  private val logger = Logger(getClass)
-  def loginStatus = APIAuthAction { request =>
-    val user = request.user
+  private val logger=LoggerFactory.getLogger(getClass)
+  def loginStatus = IsAuthenticated { claims=> request =>
     userProfileFromSession(request.session) match {
-      case None=>Ok(UserResponse.fromUser(user, false).asJson)
+      case None=>Ok(UserResponse.fromClaims(claims, false).asJson)
       case Some(Left(err))=>
         logger.error(err.toString)
         InternalServerError(GenericErrorResponse("profile_error", err.toString).asJson)
       case Some(Right(profile))=>
-        Ok(UserResponse.fromUser(user, profile.isAdmin).asJson)
+        Ok(UserResponse.fromClaims(claims, profile.isAdmin).asJson)
     }
   }
 
-  def allUsers = APIAuthAction.async {request=>
-    adminsOnlyAsync(request) {
-      userProfileDAO.allUsers().map(resultList=>{
-        val errors = resultList.collect({case Left(err)=>err})
-        if(errors.nonEmpty){
-          InternalServerError(ErrorListResponse("db_error", "Could not look up users", errors.map(_.toString)).asJson)
-        } else {
-          Ok(ObjectListResponse("ok","user",resultList.collect({case Right(up)=>up}), resultList.length).asJson)
-        }
-      })
-    }
+  def allUsers = IsAdminAsync { _=> request=>
+    userProfileDAO.allUsers().map(resultList=>{
+      val errors = resultList.collect({case Left(err)=>err})
+      if(errors.nonEmpty){
+        InternalServerError(ErrorListResponse("db_error", "Could not look up users", errors.map(_.toString)).asJson)
+      } else {
+        Ok(ObjectListResponse("ok","user",resultList.collect({case Right(up)=>up}), resultList.length).asJson)
+      }
+    })
   }
 
   /**
@@ -143,41 +143,38 @@ class UserController @Inject()(override val controllerComponents:ControllerCompo
     * handle a frontend request to update a user profile
     * @return
     */
-  def updateUserProfileField = APIAuthAction.async(circe.json(2048)) {request=>
-    adminsOnlyAsync(request) {
-      request.body.as[UserProfileFieldUpdate] match {
-        case Left(err)=>
-          logger.error(err.toString)
-          Future(BadRequest(GenericErrorResponse("bad_request", err.toString).asJson))
-        case Right(updateRq)=>
-          userProfileDAO.userProfileForEmail(updateRq.user).flatMap({
-            case None=>
-              Future(BadRequest(GenericErrorResponse("not_found", s"user ${updateRq.user} not found").asJson))
-            case Some(Left(err))=>
-              logger.error(err.toString)
-              Future(InternalServerError(GenericErrorResponse("db_error", err.toString).asJson))
-            case Some(Right(originalProfile))=>
-              performUpdate(originalProfile, updateRq) match {
-                case Right(updatedProfile) =>
-                  logger.info(s"updatedProfile is $updatedProfile")
-                  userProfileDAO.put(updatedProfile).map({
-                    case None =>
-                      Ok(ObjectGetResponse("updated","profile",updatedProfile).asJson)
-                    case Some(Left(err)) =>
-                      InternalServerError(GenericErrorResponse("db_error", err.toString).asJson)
-                    case Some(Right(previousValue))=>
-                      Ok(ObjectGetResponse("updated","userProfile", updatedProfile).asJson)
-                  })
-                case Left(err)=>
-                  Future(BadRequest(GenericErrorResponse("bad_request", err).asJson))
-              }
-          })
-      }
-
+  def updateUserProfileField = IsAdminAsync(circe.json(2048)) { _=> request=>
+    request.body.as[UserProfileFieldUpdate] match {
+      case Left(err)=>
+        logger.error(err.toString)
+        Future(BadRequest(GenericErrorResponse("bad_request", err.toString).asJson))
+      case Right(updateRq)=>
+        userProfileDAO.userProfileForEmail(updateRq.user).flatMap({
+          case None=>
+            Future(BadRequest(GenericErrorResponse("not_found", s"user ${updateRq.user} not found").asJson))
+          case Some(Left(err))=>
+            logger.error(err.toString)
+            Future(InternalServerError(GenericErrorResponse("db_error", err.toString).asJson))
+          case Some(Right(originalProfile))=>
+            performUpdate(originalProfile, updateRq) match {
+              case Right(updatedProfile) =>
+                logger.info(s"updatedProfile is $updatedProfile")
+                userProfileDAO.put(updatedProfile).map({
+                  case None =>
+                    Ok(ObjectGetResponse("updated","profile",updatedProfile).asJson)
+                  case Some(Left(err)) =>
+                    InternalServerError(GenericErrorResponse("db_error", err.toString).asJson)
+                  case Some(Right(previousValue))=>
+                    Ok(ObjectGetResponse("updated","userProfile", updatedProfile).asJson)
+                })
+              case Left(err)=>
+                Future(BadRequest(GenericErrorResponse("bad_request", err).asJson))
+            }
+        })
     }
   }
 
-  def myProfile = APIAuthAction {request=>
+  def myProfile = IsAuthenticated { _=> request=>
     userProfileFromSession(request.session) match {
       case Some(Left(err))=>
         InternalServerError(GenericErrorResponse("error", err.toString).asJson)

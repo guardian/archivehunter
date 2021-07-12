@@ -15,6 +15,8 @@ import play.api.mvc.{AbstractController, ControllerComponents}
 import responses.{ErrorListResponse, GenericErrorResponse, ObjectListResponse, PathInfoResponse}
 import io.circe.syntax._
 import io.circe.generic.auto._
+import org.slf4j.LoggerFactory
+import play.api.cache.SyncCacheApi
 import requests.SearchRequest
 
 import scala.annotation.switch
@@ -28,12 +30,13 @@ class BrowseCollectionController @Inject() (override val config:Configuration,
                                             override val controllerComponents: ControllerComponents,
                                             esClientMgr:ESClientManager,
                                             override val bearerTokenAuth:BearerTokenAuth,
-                                            folderHelper:ItemFolderHelper)
+                                            folderHelper:ItemFolderHelper,
+                                            override val cache:SyncCacheApi)
                                            (implicit actorSystem:ActorSystem, mat:Materializer)
 extends AbstractController(controllerComponents) with Security with WithScanTarget with Circe{
   import com.sksamuel.elastic4s.http.ElasticDsl._
 
-  private val logger=Logger(getClass)
+  private val logger=LoggerFactory.getLogger(getClass)
 
   private val awsProfile = config.getOptional[String]("externalData.awsProfile")
   private val s3Client = s3ClientMgr.getClient(awsProfile)

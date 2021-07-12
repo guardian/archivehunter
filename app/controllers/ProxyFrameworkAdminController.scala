@@ -17,6 +17,7 @@ import play.api.libs.circe.Circe
 import play.api.mvc.{AbstractController, ControllerComponents}
 import io.circe.syntax._
 import io.circe.generic.auto._
+import org.slf4j.LoggerFactory
 import play.api.cache.SyncCacheApi
 import requests.AddPFDeploymentRequest
 import responses.{GenericErrorResponse, MultiResultResponse, ObjectListResponse, ProxyFrameworkDeploymentInfo}
@@ -35,7 +36,7 @@ class ProxyFrameworkAdminController @Inject() (override val config:Configuration
                                               (implicit actorSystem:ActorSystem)
   extends AbstractController(controllerComponents) with Circe with Security {
 
-  private val logger = Logger(getClass)
+  private val logger=LoggerFactory.getLogger(getClass)
   implicit val ec:ExecutionContext = controllerComponents.executionContext
 
   private val awsProfile = config.getOptional[String]("externalData.awsProfile")
@@ -218,7 +219,7 @@ class ProxyFrameworkAdminController @Inject() (override val config:Configuration
     )
   }
 
-  def removeDeployment(forRegion:String) = IsAdminAsync { request=>
+  def removeDeployment(forRegion:String) = IsAdminAsync { _=> request=>
     proxyFrameworkInstanceDAO.recordsForRegion(forRegion).flatMap(results=>{
       val failures = results.collect({case Left(err)=>err})
       if(failures.nonEmpty){

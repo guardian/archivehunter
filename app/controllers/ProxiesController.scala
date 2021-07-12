@@ -29,6 +29,7 @@ import com.theguardian.multimedia.archivehunter.common.cmn_models.{JobModelDAO, 
 import helpers.ProxyLocator
 import services.ProxiesRelinker
 import com.theguardian.multimedia.archivehunter.common.ProxyTranscodeFramework.{ProxyGenerators, RequestType}
+import org.slf4j.LoggerFactory
 import play.api.cache.SyncCacheApi
 import play.api.libs.ws.WSClient
 import requests.ManualProxySet
@@ -51,7 +52,7 @@ class ProxiesController @Inject()(override val config:Configuration,
   extends AbstractController(controllerComponents) with Circe with ProxyLocationEncoder with Security {
   import akka.pattern.ask
   implicit private val mat:Materializer = ActorMaterializer.create(actorSystem)
-  private val logger=Logger(getClass)
+  private val logger=LoggerFactory.getLogger(getClass)
 
   private val indexName = config.getOptional[String]("elasticsearch.index").getOrElse("archivehunter")
   private val awsProfile = config.getOptional[String]("externalData.awsProfile")
