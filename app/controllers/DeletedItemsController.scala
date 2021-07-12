@@ -19,6 +19,7 @@ import javax.inject.{Inject, Singleton}
 import scala.concurrent.Future
 import io.circe.syntax._
 import io.circe.generic.auto._
+import org.slf4j.LoggerFactory
 import play.api.cache.SyncCacheApi
 import play.api.http.HttpEntity
 import requests.SearchRequest
@@ -41,7 +42,7 @@ class DeletedItemsController @Inject() (override val config:Configuration,
   import com.sksamuel.elastic4s.streams.ReactiveElastic._
 
   private implicit val esClient = esClientMgr.getClient()
-  private val logger=Logger(getClass)
+  private val logger=LoggerFactory.getLogger(getClass)
 
   private val indexName = config.get[String]("externalData.indexName")
 

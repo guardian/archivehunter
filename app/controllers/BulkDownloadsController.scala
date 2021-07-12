@@ -31,6 +31,7 @@ import akka.pattern.ask
 import akka.util.ByteString
 import auth.{BearerTokenAuth, Security}
 import com.sksamuel.elastic4s.streams.ScrollPublisher
+import org.slf4j.LoggerFactory
 import play.api.cache.SyncCacheApi
 import play.api.http.HttpEntity
 import requests.SearchRequest
@@ -52,7 +53,7 @@ class BulkDownloadsController @Inject()(override val config:Configuration,
                                        )(implicit system:ActorSystem)
   extends AbstractController(cc) with Security with Circe with ArchiveEntryHitReader with ZonedDateTimeEncoder with RestoreStatusEncoder {
 
-  private val logger = Logger(getClass)
+  private val logger=LoggerFactory.getLogger(getClass)
 
   import com.sksamuel.elastic4s.http.ElasticDsl._
   import com.sksamuel.elastic4s.streams.ReactiveElastic._

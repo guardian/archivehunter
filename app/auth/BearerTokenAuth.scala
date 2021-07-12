@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory
 import play.api.mvc.RequestHeader
 import play.api.Configuration
 import play.api.libs.typedmap.TypedKey
+import scala.collection.JavaConverters._
 
 import scala.io.Source
 import scala.util.{Failure, Success, Try}

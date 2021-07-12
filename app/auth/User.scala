@@ -18,21 +18,9 @@
 
 package auth
 
-import com.unboundid.ldap.sdk.LDAPConnectionPool
 import play.api.cache.SyncCacheApi
 
 import scala.util.{Failure, Success, Try}
 
 case class User(uid: String, name: String)
 
-object User {
-
-  def authenticate(uid: String, pass: String)(implicit cache:SyncCacheApi): Try[Option[User]] = {
-    LDAP.bind(uid,pass) match {
-        case Success(0) => Success(Some(User(uid,LDAP.getFullName(uid))))
-        case Success(_) => Success(None)
-        case Failure(error)=>Failure(error)
-    }
-  }
-
-}

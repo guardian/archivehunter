@@ -214,7 +214,15 @@ trait Security extends BaseController {
       logger.warn(s"Admin request rejected for $uid to ${request.uri}")
       Forbidden(Json.obj("status"->"forbidden","detail"->"You need admin rights to perform this action"))
     }
+  }
 
+  def IsAdmin[A](b: BodyParser[A])(f: => JWTClaimsSet => Request[A] => Result) = IsAuthenticated(b) { uid=> request=>
+    if(checkAdmin(uid, request)){
+      f(uid)(request)
+    } else {
+      logger.warn(s"Admin request rejected for $uid to ${request.uri}")
+      Forbidden(Json.obj("status"->"forbidden","detail"->"You need admin rights to perform this action"))
+    }
   }
 
   def IsAdminAsync[A](b: BodyParser[A])(f: => JWTClaimsSet => Request[A] => Future[Result]) = IsAuthenticatedAsync(b) { uid=> request=>

@@ -24,6 +24,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.Future
 import com.theguardian.multimedia.archivehunter.common.ProxyTranscodeFramework.ProxyGenerators
+import org.slf4j.LoggerFactory
 import play.api.cache.SyncCacheApi
 
 @Singleton
@@ -40,7 +41,7 @@ class JobController @Inject() (override val config:Configuration,
                               (implicit actorSystem:ActorSystem)
   extends AbstractController(controllerComponents) with Circe with JobModelEncoder with ZonedDateTimeEncoder with Security with QueryRemaps {
 
-  private val logger = Logger(getClass)
+  private val logger=LoggerFactory.getLogger(getClass)
 
   private implicit val mat:Materializer = ActorMaterializer.create(actorSystem)
   private val awsProfile = config.getOptional[String]("externalData.awsProfile")

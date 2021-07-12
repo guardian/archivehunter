@@ -1,20 +1,20 @@
 package controllers
 
 import akka.actor.ActorRef
+import auth.{BearerTokenAuth, Security}
 import com.theguardian.multimedia.archivehunter.common.{ProblemItemHitReader, ProblemItemIndexer, ProxyTypeEncoder}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.ESClientManager
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{JobModel, JobModelDAO, ProblemItem, ProxyHealthEncoder}
-import helpers.InjectableRefresher
 
 import javax.inject.{Inject, Named, Singleton}
-import org.slf4j.MDC
+import org.slf4j.{LoggerFactory, MDC}
 import play.api.{Configuration, Logger}
 import play.api.libs.circe.Circe
-import play.api.libs.ws.WSClient
 import play.api.mvc.{AbstractController, ControllerComponents}
 import responses._
 import io.circe.syntax._
 import io.circe.generic.auto._
+import play.api.cache.SyncCacheApi
 import services.ProblemItemRetry
 
 import scala.annotation.switch
@@ -34,24 +34,24 @@ import scala.concurrent.duration._
 class ProxyHealthController @Inject()(override val config:Configuration,
                                      override val controllerComponents:ControllerComponents,
                                      esClientMgr:ESClientManager,
-                                     override val wsClient:WSClient,
-                                     override val refresher:InjectableRefresher,
+                                      override val bearerTokenAuth:BearerTokenAuth,
+                                      override val cache:SyncCacheApi,
                                       @Named("problemItemRetry") problemItemRetry:ActorRef)
-  extends AbstractController(controllerComponents) with Circe with PanDomainAuthActions with ProblemItemHitReader with ProxyTypeEncoder with ProxyHealthEncoder
+  extends AbstractController(controllerComponents) with Circe with Security with ProblemItemHitReader with ProxyTypeEncoder with ProxyHealthEncoder
 {
   import com.sksamuel.elastic4s.http.ElasticDsl._
   import com.sksamuel.elastic4s.circe._
   import akka.pattern.ask
 
   private implicit val esCleint = esClientMgr.getClient()
-  private val logger = Logger(getClass)
+  private val logger=LoggerFactory.getLogger(getClass)
 
   private val problemItemIndexName = config.get[String]("externalData.problemItemsIndex")
   private val problemItemIndexer = new ProblemItemIndexer(problemItemIndexName)
 
   private val problemSummaryIndexer = new ProblemItemIndexer(config.get[String]("externalData.problemSummaryIndex"))
 
-  def mostRecentStats = APIAuthAction.async {
+  def mostRecentStats = IsAuthenticatedAsync { _=> _=>
     problemSummaryIndexer.mostRecentStats.map({
       case Left(err)=>
         MDC.put("reason", err.reason)
@@ -64,7 +64,7 @@ class ProxyHealthController @Inject()(override val config:Configuration,
     })
   }
 
-  def itemsList(collection:Option[String], pathRegex:Option[String], start:Int, size:Int) = APIAuthAction.async {
+  def itemsList(collection:Option[String], pathRegex:Option[String], start:Int, size:Int) = IsAuthenticatedAsync { _=> _=>
     val queries = Seq(
       collection.map(collectionFilter=>termsQuery("collection.keyword", collectionFilter))
 
@@ -85,7 +85,7 @@ class ProxyHealthController @Inject()(override val config:Configuration,
     })
   }
 
-  def collectionsWithProblems = APIAuthAction.async {
+  def collectionsWithProblems = IsAuthenticatedAsync { _=> _=>
     esCleint.execute {
       search(problemItemIndexName) aggs termsAgg("collections","collection.keyword")
     }.map(response=>{
@@ -104,7 +104,7 @@ class ProxyHealthController @Inject()(override val config:Configuration,
     })
   }
 
-  def triggerProblemItemsFor(collectionName:String) = APIAuthAction.async {
+  def triggerProblemItemsFor(collectionName:String) = IsAuthenticatedAsync { _=> _=>
     implicit val timeout:akka.util.Timeout = 10.seconds
 
     try {
