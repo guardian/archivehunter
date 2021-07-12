@@ -29,7 +29,9 @@ import scala.concurrent.Future
 import scala.util.{Failure, Success}
 import akka.pattern.ask
 import akka.util.ByteString
+import auth.{BearerTokenAuth, Security}
 import com.sksamuel.elastic4s.streams.ScrollPublisher
+import play.api.cache.SyncCacheApi
 import play.api.http.HttpEntity
 import requests.SearchRequest
 import services.GlacierRestoreActor
@@ -37,15 +39,18 @@ import services.GlacierRestoreActor
 import scala.concurrent.duration._
 
 @Singleton
-class BulkDownloadsController @Inject()(config:Configuration,serverTokenDAO: ServerTokenDAO,
+class BulkDownloadsController @Inject()(override val config:Configuration,
+                                        override val cache:SyncCacheApi,
+                                        serverTokenDAO: ServerTokenDAO,
                                         lightboxBulkEntryDAO: LightboxBulkEntryDAO,
                                         lightboxEntryDAO: LightboxEntryDAO,
                                         esClientManager: ESClientManager,
                                         s3ClientManager: S3ClientManager,
                                         cc:ControllerComponents,
+                                        override val bearerTokenAuth:BearerTokenAuth,
                                         @Named("glacierRestoreActor") glacierRestoreActor:ActorRef,
                                        )(implicit system:ActorSystem)
-  extends AbstractController(cc) with Circe with ArchiveEntryHitReader with ZonedDateTimeEncoder with RestoreStatusEncoder {
+  extends AbstractController(cc) with Security with Circe with ArchiveEntryHitReader with ZonedDateTimeEncoder with RestoreStatusEncoder {
 
   private val logger = Logger(getClass)
 

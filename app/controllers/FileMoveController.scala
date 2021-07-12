@@ -2,7 +2,7 @@ package controllers
 
 import akka.actor.{ActorRef, ActorSystem}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{JobModelDAO, ScanTargetDAO}
-import helpers.InjectableRefresher
+
 import javax.inject.{Inject, Named}
 import org.slf4j.LoggerFactory
 import play.api.Configuration
@@ -11,6 +11,7 @@ import play.api.libs.ws.WSClient
 import play.api.mvc.{AbstractController, ControllerComponents}
 import responses.{GenericErrorResponse, ObjectGetResponse}
 import akka.pattern.ask
+import auth.{BearerTokenAuth, Security}
 import services.FileMove.GenericMoveActor.MoveActorMessage
 import services.FileMoveActor
 
@@ -19,15 +20,16 @@ import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 import io.circe.generic.auto._
 import io.circe.syntax._
+import play.api.cache.SyncCacheApi
 
 class FileMoveController @Inject()(override val config:Configuration,
                                    override val controllerComponents:ControllerComponents,
-                                   override val refresher:InjectableRefresher,
-                                   override val wsClient:WSClient,
+                                   override val bearerTokenAuth: BearerTokenAuth,
+                                   override val cache:SyncCacheApi,
                                    scanTargetDAO:ScanTargetDAO,
                                    @Named("fileMoveActor") fileMoveActor:ActorRef)
                                   (implicit actorSystem:ActorSystem)
-  extends AbstractController(controllerComponents) with PanDomainAuthActions with Circe {
+  extends AbstractController(controllerComponents) with Security with Circe {
 
   private val logger = LoggerFactory.getLogger(getClass)
   private implicit val akkaTimeout:akka.util.Timeout = 60 seconds
@@ -38,7 +40,7 @@ class FileMoveController @Inject()(override val config:Configuration,
     * @param to name of the Scan Target to move it to
     * @return 404 if the scan target does not exist, 500 if the move failed or 200 if it succeeded
     */
-  def moveFile(fileId:String, to:String) = APIAuthAction.async {
+  def moveFile(fileId:String, to:String) = IsAuthenticatedAsync { uid=> request=>
     scanTargetDAO.targetForBucket(to).flatMap({
       case None=>
         Future(NotFound(GenericErrorResponse("not_found","No scan target with that name").asJson))
