@@ -41,7 +41,7 @@ class JobController @Inject() (override val config:Configuration,
                               (implicit actorSystem:ActorSystem)
   extends AbstractController(controllerComponents) with Circe with JobModelEncoder with ZonedDateTimeEncoder with Security with QueryRemaps {
 
-  private val logger=LoggerFactory.getLogger(getClass)
+  override protected val logger=LoggerFactory.getLogger(getClass)
 
   private implicit val mat:Materializer = ActorMaterializer.create(actorSystem)
   private val awsProfile = config.getOptional[String]("externalData.awsProfile")

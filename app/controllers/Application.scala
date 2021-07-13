@@ -1,15 +1,17 @@
 package controllers
 
-import auth.Security
+import auth.{BearerTokenAuth, Security}
 
 import javax.inject.{Inject, Singleton}
 import play.api._
+import play.api.cache.SyncCacheApi
 import play.api.libs.ws.WSClient
 import play.api.mvc._
 
 @Singleton
 class Application @Inject() (override val controllerComponents:ControllerComponents,
-                             override val wsClient: WSClient,
+                             override val bearerTokenAuth: BearerTokenAuth,
+                             override val cache:SyncCacheApi,
                              override val config: Configuration)
   extends AbstractController(controllerComponents) with Security  {
 

@@ -42,7 +42,7 @@ class DeletedItemsController @Inject() (override val config:Configuration,
   import com.sksamuel.elastic4s.streams.ReactiveElastic._
 
   private implicit val esClient = esClientMgr.getClient()
-  private val logger=LoggerFactory.getLogger(getClass)
+  override protected val logger=LoggerFactory.getLogger(getClass)
 
   private val indexName = config.get[String]("externalData.indexName")
 

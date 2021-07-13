@@ -26,7 +26,7 @@ class UserController @Inject()(override val controllerComponents:ControllerCompo
   extends AbstractController(controllerComponents) with Security with UserProfileFieldUpdateEncoder with Circe {
   implicit val ec = controllerComponents.executionContext
 
-  private val logger=LoggerFactory.getLogger(getClass)
+  override protected val logger=LoggerFactory.getLogger(getClass)
   def loginStatus = IsAuthenticated { claims=> request =>
     userProfileFromSession(request.session) match {
       case None=>Ok(UserResponse.fromClaims(claims, false).asJson)

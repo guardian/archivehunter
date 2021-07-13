@@ -52,7 +52,7 @@ class ProxiesController @Inject()(override val config:Configuration,
   extends AbstractController(controllerComponents) with Circe with ProxyLocationEncoder with Security {
   import akka.pattern.ask
   implicit private val mat:Materializer = ActorMaterializer.create(actorSystem)
-  private val logger=LoggerFactory.getLogger(getClass)
+  override protected val logger=LoggerFactory.getLogger(getClass)
 
   private val indexName = config.getOptional[String]("elasticsearch.index").getOrElse("archivehunter")
   private val awsProfile = config.getOptional[String]("externalData.awsProfile")

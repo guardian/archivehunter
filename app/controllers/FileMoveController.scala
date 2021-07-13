@@ -31,7 +31,7 @@ class FileMoveController @Inject()(override val config:Configuration,
                                   (implicit actorSystem:ActorSystem)
   extends AbstractController(controllerComponents) with Security with Circe {
 
-  private val logger=LoggerFactory.getLogger(getClass)
+  override protected val logger=LoggerFactory.getLogger(getClass)
   private implicit val akkaTimeout:akka.util.Timeout = 60 seconds
 
   /**

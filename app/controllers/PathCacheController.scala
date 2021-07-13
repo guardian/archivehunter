@@ -27,7 +27,7 @@ class PathCacheController @Inject()(override val config:Configuration,
                                     esClientMgr:ESClientManager)
                                  (implicit actorSystem:ActorSystem, mat:Materializer)
   extends AbstractController(controllerComponents) with Circe with Security  {
-  private val logger=LoggerFactory.getLogger(getClass)
+  override protected val logger=LoggerFactory.getLogger(getClass)
   private lazy val esClient = esClientMgr.getClient()
 
   private lazy val indexer = new PathCacheIndexer(config.getOptional[String]("externalData.pathCacheIndex").getOrElse("pathcache"), esClient)

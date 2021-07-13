@@ -35,7 +35,7 @@ class SearchController @Inject()(override val config:Configuration,
                                 (implicit val userProfileDAO:UserProfileDAO)
   extends AbstractController(controllerComponents) with Security with ArchiveEntryHitReader with ZonedDateTimeEncoder with StorageClassEncoder with Circe {
 
-  private val logger=LoggerFactory.getLogger(getClass)
+  override protected val logger=LoggerFactory.getLogger(getClass)
   val indexName = config.getOptional[String]("externalData.indexName").getOrElse("archivehunter")
 
   private val esClient = esClientManager.getClient()
