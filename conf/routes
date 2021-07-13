@@ -5,8 +5,10 @@
 GET     /is-online                  controllers.Application.healthcheck
 GET     /                           @controllers.Application.rootIndex()
 
+GET     /login                      @controllers.Auth.login(state:Option[String])
+
 GET     /test/api419                @controllers.Application.test419
-GET     /oauthCallback              @controllers.Auth.oauthCallback
+GET     /oauthCallback              @controllers.Auth.oauthCallback(state:Option[String],code:Option[String],error:Option[String])
 POST    /api/logout                 @controllers.Auth.logout
 GET     /api/loginStatus            @controllers.UserController.loginStatus
 GET     /loginAuthStub              @controllers.Application.authstub

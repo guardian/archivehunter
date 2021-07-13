@@ -123,7 +123,7 @@ class BearerTokenAuth @Inject() (config:Configuration) {
    * @return
    */
   def isAdminClaimName():String = {
-    config.get[String]("auth.adminClaim")
+    config.get[String]("oAuth.adminClaimName")
   }
 
   /**
@@ -146,7 +146,7 @@ class BearerTokenAuth @Inject() (config:Configuration) {
    * @return either the passed JWK object or a Failure indicating why it would not load.
    */
   def loadInKey() = Try {
-    val pemCertLocation = config.get[String]("auth.tokenSigningCertPath")
+    val pemCertLocation = config.get[String]("oAuth.tokenSigningCertPath")
     val s = Source.fromFile(pemCertLocation, "UTF-8")
     try {
       val pemCertData = s.getLines().reduce(_ + _)
@@ -159,9 +159,9 @@ class BearerTokenAuth @Inject() (config:Configuration) {
   def checkAudience(claimsSet:JWTClaimsSet) = {
     val audiences = claimsSet.getAudience.asScala ++ claimsSet.getAzp
     logger.debug(s"JWT audiences: $audiences")
-    config.getOptional[Seq[String]]("auth.validAudiences") match {
+    config.getOptional[Seq[String]]("oAuth.validAudiences") match {
       case None=>
-        logger.error(s"No valid audiences configured. Set auth.validAudiences. Token audiences were $audiences")
+        logger.error(s"No valid audiences configured. Set oAuth.validAudiences. Token audiences were $audiences")
         Left(LoginResultMisconfigured("Server configuration problem"))
       case Some(audienceList)=>
         if(audiences.intersect(audienceList).nonEmpty) {
@@ -218,6 +218,7 @@ class BearerTokenAuth @Inject() (config:Configuration) {
               Left(LoginResultInvalid(token.content))
             }
           case None =>
+            logger.error("No signing cert has been configured so it's impossible to validate any logins")
             Left(LoginResultMisconfigured("No signing cert configured"))
         }
       case Failure(err) =>
@@ -248,15 +249,19 @@ class BearerTokenAuth @Inject() (config:Configuration) {
    * @return a LoginResult subclass, as a Left if something failed or a Right if it succeeded
    */
   def apply(rh: RequestHeader): Either[LoginResult,LoginResultOK[JWTClaimsSet]] = {
-    rh.headers.get("Authorization") match {
-      case Some(authValue)=>
-        extractAuthorization(authValue)
-          .flatMap(validateToken)
-          .flatMap(result=>checkExpiry(result.content))
-          .map(result=>{
-            rh.addAttr(BearerTokenAuth.ClaimsAttributeKey, result.content)
-            result
-          })
+    rh.cookies.get(config.get[String]("oAuth.authCookieName")) match {
+      case Some(authCookie)=>
+        if(!authCookie.httpOnly) {
+          logger.error("Got an auth cookie but will only accept httpOnly cookies")
+          Left(LoginResultNotPresent)
+        } else {
+          validateToken(LoginResultOK(authCookie.value))
+            .flatMap(result => checkExpiry(result.content))
+            .map(result => {
+              rh.addAttr(BearerTokenAuth.ClaimsAttributeKey, result.content)
+              result
+            })
+        }
       case None=>
         logger.error("Attempt to access without authorization")
         Left(LoginResultNotPresent)
