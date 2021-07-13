@@ -15,6 +15,7 @@ import requests.{FieldUpdateOperation, UserProfileFieldUpdate, UserProfileFieldU
 
 import scala.concurrent.Future
 import auth.ClaimsSetExtensions._
+import helpers.UserAvatarHelper
 import org.slf4j.LoggerFactory
 
 @Singleton
@@ -22,14 +23,19 @@ class UserController @Inject()(override val controllerComponents:ControllerCompo
                                override val config: Configuration,
                                override val bearerTokenAuth:BearerTokenAuth,
                                override val cache:SyncCacheApi,
-                               userProfileDAO:UserProfileDAO)
+                               userProfileDAO:UserProfileDAO,
+                               userAvatarHelper: UserAvatarHelper)
   extends AbstractController(controllerComponents) with Security with UserProfileFieldUpdateEncoder with Circe {
   implicit val ec = controllerComponents.executionContext
 
   override protected val logger=LoggerFactory.getLogger(getClass)
+
   def loginStatus = IsAuthenticated { claims=> request =>
     userProfileFromSession(request.session) match {
-      case None=>Ok(UserResponse.fromClaims(claims, false).asJson)
+      case None=>
+        val userData = UserResponse.fromClaims(claims, claims.getIsMMAdmin)
+        val maybeWithPicture = userData.copy(avatarUrl=userAvatarHelper.getAvatarUrl(claims.getUserID).map(_.toString))
+        Ok(maybeWithPicture.asJson)
       case Some(Left(err))=>
         logger.error(err.toString)
         InternalServerError(GenericErrorResponse("profile_error", err.toString).asJson)

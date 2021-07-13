@@ -18,7 +18,7 @@ class Application @Inject() (override val controllerComponents:ControllerCompone
 
   def rootIndex() = index("")
 
-  def index(path:String) = IsAuthenticated { request=> uid=>
+  def index(path:String) = Action { request=>
     Ok(views.html.index("Archive Hunter")("fake-cachebuster"))
   }
 

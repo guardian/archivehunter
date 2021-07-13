@@ -14,4 +14,5 @@ object UserResponse extends ((String,String,String,Option[String],Boolean)=>User
     )
   }
 }
+
 case class UserResponse (firstName: String, lastName: String, email: String, avatarUrl: Option[String], isAdmin: Boolean)

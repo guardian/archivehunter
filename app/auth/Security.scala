@@ -113,13 +113,13 @@ trait Security extends BaseController {
    * @param claim the `JwtClaimsSet` to inspect
    * @return a string the gives the user id for the given claims set
    */
-  private def usernameFromClaim(claim:JWTClaimsSet) = {
-    val possibleFields = Array("preferred_username","username")
-    val possibleNames = possibleFields.map(name=>Try {Option(claim.getStringClaim(name))})
-    val successfulNames = possibleNames.collect({case Success(Some(username))=>username})
-
-    successfulNames.headOption.getOrElse(claim.getSubject)
-  }
+//  private def usernameFromClaim(claim:JWTClaimsSet) = {
+//    val possibleFields = Array("preferred_username","username")
+//    val possibleNames = possibleFields.map(name=>Try {Option(claim.getStringClaim(name))})
+//    val successfulNames = possibleNames.collect({case Success(Some(username))=>username})
+//
+//    successfulNames.headOption.getOrElse(claim.getSubject)
+//  }
 
   //if this returns something, then we are logged in
   private def username(request:RequestHeader):Either[LoginResult, LoginResultOK[JWTClaimsSet]] = request.headers.get("Authorization") match {
@@ -129,13 +129,13 @@ trait Security extends BaseController {
         val updatedRequest = request.addAttr(AuthTypeKey, AuthType.AuthHmac)
         hmacUsername(updatedRequest, auth)
       } else {
-        logger.debug("got Authorization header, doing bearer auth")
-        bearerTokenAuth(request).map(result => {
-          LoginResultOK(result.content)
-        })
+        logger.warn("got request with Authorization header that is not HMAC")
+        Left(LoginResultNotPresent)
       }
     case None=>
-      Left(LoginResultNotPresent)
+      bearerTokenAuth(request).map(result => {
+        LoginResultOK(result.content)
+      })
   }
 
   private def onUnauthorized(request: RequestHeader, loginResult: LoginResult) = loginResult match {
@@ -172,11 +172,7 @@ trait Security extends BaseController {
     uid => Action(b)(request => f(uid)(request))
   }
 
-  def checkAdmin[A](claims:JWTClaimsSet, request:Request[A]) = Seq("X-Hmac-Authorization","Authorization").map(request.headers.get) match {
-    case Seq(Some(hmac),_)=>
-      logger.warn("hmac auth is never admin")
-      false //server-server never requires admin
-    case Seq(None,Some(bearer))=>
+  def checkAdmin[A](claims:JWTClaimsSet, request:Request[A]) = {
       val adminClaimContent = for {
         maybeAdminClaim <- Option(claims.getStringClaim(bearerTokenAuth.isAdminClaimName())) match {
           case Some(str)=>Right(LoginResultOK(str))
@@ -193,8 +189,6 @@ trait Security extends BaseController {
           logger.debug(s"got nothing for isAdminClaim ${bearerTokenAuth.isAdminClaimName()}")
           false
       }
-    case _=>
-      false
   }
 
   /**

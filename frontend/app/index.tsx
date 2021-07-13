@@ -42,6 +42,9 @@ import QuickRestoreComponent from "./admin/QuickRestore.jsx";
 import PathCacheAdmin from "./admin/PathCacheAdmin.jsx";
 import ItemView from "./ItemView/ItemView";
 import DeletedItemsComponent from "./DeletedItems/DeletedItems";
+import RootComponent from "./RootComponent";
+import {UserContextProvider} from "./Context/UserContext";
+import {JwtDataShape} from "./Context/DecodedProfile";
 
 
 library.add(faStroopwafel, faCheckCircle, faCheck, faTimes, faTimesCircle, faRoad,faSearch,faThList,faWrench, faLightbulb, faChevronCircleDown, faChevronCircleRight, faTrashAlt, faFolderPlus, faFolderMinus, faFolder);
@@ -55,7 +58,7 @@ library.add(faExclamation, faUnlink);
 setupInterceptor();
 
 interface AppContainerState {
-    userLogin?: any;
+    userLogin?: JwtDataShape;
     lastError?: any;
     loading?:boolean;
 }
@@ -67,8 +70,8 @@ class App extends React.Component<any, AppContainerState> {
         super(props);
 
         this.state = {
-            userLogin: null,
-            lastError: null,
+            userLogin: undefined,
+            lastError: undefined,
             loading: false
         };
 
@@ -81,8 +84,12 @@ class App extends React.Component<any, AppContainerState> {
             console.error("Could not intialise sentry", error);
         });
         this.userLoggedOut = this.userLoggedOut.bind(this);
-
+        this.updateProfile = this.updateProfile.bind(this);
         this.theme = createMuiTheme(customisedTheme);
+    }
+
+    updateProfile(newValue: JwtDataShape|undefined, maybeCb?:()=>void) {
+        this.setState({userLogin: newValue}, maybeCb);
     }
 
     componentDidMount(){
@@ -96,36 +103,38 @@ class App extends React.Component<any, AppContainerState> {
     }
 
     userLoggedOut(){
-        this.setState({userLogin: null}, ()=>location.reload(true));
+        this.updateProfile(undefined, ()=>window.location.reload());
     }
 
     render(){
         return <ThemeProvider theme={this.theme}>
-            <CssBaseline/>
-            <TopMenu visible={true} isAdmin={this.state.userLogin ? this.state.userLogin.isAdmin : false}/>
-            <LoginStatusComponent userData={this.state.userLogin} userLoggedOutCb={this.userLoggedOut}/>
-            <Switch>
-                <Route path="/test/419" component={Test419Component}/>
-                <Route path="/admin/pathcache" component={PathCacheAdmin}/>
-                <Route path="/admin/proxyHealth" component={ProxyHealthDetail}/>
-                <Route path="/admin/deleteditems" component={DeletedItemsComponent}/>
-                <Route path="/admin/proxyFramework/new" component={ProxyFrameworkAdd}/>
-                <Route path="/admin/proxyFramework" component={ProxyFrameworkList}/>
-                <Route path="/admin/about" component={AboutComponent}/>
-                <Route path="/admin/users" component={UserList}/>
-                <Route path="/admin/jobs/:jobid" component={JobsList}/>
-                <Route path="/admin/jobs" component={JobsList}/>
-                <Route path="/admin/scanTargets/:id" component={ScanTargetEdit}/> /*this also handles "new" */
-                <Route path="/admin/scanTargets" component={ScanTargetsList}/>
-                <Route path="/admin/quickrestore" component={QuickRestoreComponent}/>
-                <Route path="/admin" exact={true} component={AdminFront}/>
-                <Route path="/lightbox" exact={true} component={NewLightbox}/>
-                <Route path="/browse" exact={true} component={NewBrowseComponent}/>
-                <Route path="/item/:id" exact={true} component={ItemView}/>
-                <Route path="/search" exact={true} component={NewBasicSearch}/>
-                <Route path="/" exact={true} render={()=><Redirect to="/search"/>}/>
-                <Route default component={NotFoundComponent}/>
-            </Switch>
+            <UserContextProvider value={{profile: this.state.userLogin, updateProfile: this.updateProfile}}>
+                <CssBaseline/>
+                <TopMenu visible={true} isAdmin={true}/>
+                <LoginStatusComponent userData={this.state.userLogin} userLoggedOutCb={this.userLoggedOut}/>
+                <Switch>
+                    <Route path="/test/419" component={Test419Component}/>
+                    <Route path="/admin/pathcache" component={PathCacheAdmin}/>
+                    <Route path="/admin/proxyHealth" component={ProxyHealthDetail}/>
+                    <Route path="/admin/deleteditems" component={DeletedItemsComponent}/>
+                    <Route path="/admin/proxyFramework/new" component={ProxyFrameworkAdd}/>
+                    <Route path="/admin/proxyFramework" component={ProxyFrameworkList}/>
+                    <Route path="/admin/about" component={AboutComponent}/>
+                    <Route path="/admin/users" component={UserList}/>
+                    <Route path="/admin/jobs/:jobid" component={JobsList}/>
+                    <Route path="/admin/jobs" component={JobsList}/>
+                    <Route path="/admin/scanTargets/:id" component={ScanTargetEdit}/> /*this also handles "new" */
+                    <Route path="/admin/scanTargets" component={ScanTargetsList}/>
+                    <Route path="/admin/quickrestore" component={QuickRestoreComponent}/>
+                    <Route path="/admin" exact={true} component={AdminFront}/>
+                    <Route path="/lightbox" exact={true} component={NewLightbox}/>
+                    <Route path="/browse" exact={true} component={NewBrowseComponent}/>
+                    <Route path="/item/:id" exact={true} component={ItemView}/>
+                    <Route path="/search" exact={true} component={NewBasicSearch}/>
+                    <Route path="/" exact={true} component={RootComponent}/>
+                    <Route default component={NotFoundComponent}/>
+                </Switch>
+            </UserContextProvider>
         </ThemeProvider>
     }
 }
