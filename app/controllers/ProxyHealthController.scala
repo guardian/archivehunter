@@ -44,7 +44,7 @@ class ProxyHealthController @Inject()(override val config:Configuration,
   import akka.pattern.ask
 
   private implicit val esCleint = esClientMgr.getClient()
-  private val logger=LoggerFactory.getLogger(getClass)
+  override protected val logger=LoggerFactory.getLogger(getClass)
 
   private val problemItemIndexName = config.get[String]("externalData.problemItemsIndex")
   private val problemItemIndexer = new ProblemItemIndexer(problemItemIndexName)

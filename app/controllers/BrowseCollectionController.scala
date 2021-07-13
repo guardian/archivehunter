@@ -36,7 +36,7 @@ class BrowseCollectionController @Inject() (override val config:Configuration,
 extends AbstractController(controllerComponents) with Security with WithScanTarget with Circe{
   import com.sksamuel.elastic4s.http.ElasticDsl._
 
-  private val logger=LoggerFactory.getLogger(getClass)
+  override protected val logger=LoggerFactory.getLogger(getClass)
 
   private val awsProfile = config.getOptional[String]("externalData.awsProfile")
   private val s3Client = s3ClientMgr.getClient(awsProfile)

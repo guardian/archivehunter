@@ -2,17 +2,18 @@ package auth
 
 import java.time.Instant
 import java.util.Date
-
 import com.nimbusds.jose.crypto.RSASSAVerifier
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jwt.{JWTClaimsSet, SignedJWT}
+
 import javax.inject.{Inject, Singleton}
 import org.slf4j.LoggerFactory
 import play.api.mvc.RequestHeader
 import play.api.Configuration
 import play.api.libs.typedmap.TypedKey
-import scala.collection.JavaConverters._
 
+import java.nio.ByteBuffer
+import scala.collection.JavaConverters._
 import scala.io.Source
 import scala.util.{Failure, Success, Try}
 
@@ -21,6 +22,7 @@ object BearerTokenAuth {
 }
 
 object ClaimsSetExtensions {
+  private val logger = LoggerFactory.getLogger(getClass)
   implicit class ExtendedClaimsSet(val s:JWTClaimsSet) extends AnyVal {
     def scalaSafeGetClaim[T](name:String):Option[T] = Option(s.getClaim(name)).map(_.asInstanceOf[T])
 
@@ -31,12 +33,29 @@ object ClaimsSetExtensions {
       */
     def getAzp:Option[String] = scalaSafeGetClaim[String]("azp")
 
+    /**
+      * returns a boolean indicating if the multimedia_admin field is set and is true
+      * @return
+      */
     def getIsMMAdmin:Boolean = scalaSafeGetClaim[String]("multimedia_admin").exists(value => value.toLowerCase == "true")
 
+    /**
+      * returns a boolean indicating if the multimedia_creator field is set and is true
+      * @return
+      */
     def getIsMMCreator:Boolean = scalaSafeGetClaim[String]("multimedia_creator").exists(value => value.toLowerCase == "true")
 
+    /**
+      * returns the user email field, if present, or None if not
+      * @return
+      */
     def getEmail:Option[String] = scalaSafeGetClaim[String]("email")
 
+    /**
+      * try to get the username field.  It tries the `preferred_username`, `username` and `sub` fields in that order.
+      * any valid JWT should have a `sub` field, if it does not then a RuntimeException is raised (this should not happen)
+      * @return a String with the field contents
+      */
     def getUsername:String = {
       Seq(
         scalaSafeGetClaim[String]("preferred_username"), //used by keycloak
@@ -53,6 +72,16 @@ object ClaimsSetExtensions {
       * @return
       */
     def getUserID:String = getEmail.getOrElse(getUsername)
+
+    /**
+      * extract and decode the base64 avatar data (if present)
+      * TODO: not implemented pending getting test data
+      * @return either a ByteBuffer with the decoded data or None
+      */
+    def extractAvatar:Option[ByteBuffer] = {
+      logger.error("extractAvatar is not implemented yet")
+      None
+    }
   }
 }
 

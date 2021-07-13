@@ -36,7 +36,7 @@ class ProxyFrameworkAdminController @Inject() (override val config:Configuration
                                               (implicit actorSystem:ActorSystem)
   extends AbstractController(controllerComponents) with Circe with Security {
 
-  private val logger=LoggerFactory.getLogger(getClass)
+  override protected val logger=LoggerFactory.getLogger(getClass)
   implicit val ec:ExecutionContext = controllerComponents.executionContext
 
   private val awsProfile = config.getOptional[String]("externalData.awsProfile")
