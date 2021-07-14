@@ -338,3 +338,14 @@ interface BulkDeleteConfirmationResponse {
     deletedCount: number;
     timeTaken: number;
 }
+
+interface InvalidLoginResponse {
+    status: string;
+    detail: string;
+    username: string;
+}
+
+interface GenericResponse {
+    status: string;
+    detail: string;
+}
