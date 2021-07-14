@@ -184,9 +184,10 @@ class BearerTokenAuth @Inject() (config:Configuration) {
   protected def parseTokenContent(content:String) = Try {
     SignedJWT.parse(content)
   }
+
   /**
-   * try to validate the given token with the key provided
-   * returns a JWTClaimsSet if successful
+   * try to validate the given token with the key provided.
+   * Returns a JWTClaimsSet if successful
    * @param token JWT token to verify
    * @return a Try, containing a JWTClaimsSet or an error
    */

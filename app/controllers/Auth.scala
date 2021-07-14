@@ -2,9 +2,10 @@ package controllers
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.headers.{Accept, `Content-Type`}
-import akka.http.scaladsl.model.{ContentType, HttpEntity, HttpHeader, HttpMethods, HttpRequest, MediaRange, MediaTypes, ResponseEntity, StatusCode, StatusCodes}
+import akka.http.scaladsl.model.headers.Accept
+import akka.http.scaladsl.model.{ContentType, ContentTypes, HttpEntity, HttpMethods, HttpRequest, MediaRange, MediaTypes, ResponseEntity, StatusCodes}
 import akka.stream.scaladsl.{Keep, Sink}
+import akka.util.ByteString
 import auth.{BearerTokenAuth, LoginResultOK}
 import com.nimbusds.jwt.JWTClaimsSet
 import org.slf4j.LoggerFactory
@@ -23,6 +24,9 @@ import play.api.mvc.Cookie.SameSite
 import responses.GenericErrorResponse
 import auth.ClaimsSetExtensions._
 
+import java.time.{Duration, Instant, ZonedDateTime}
+import scala.util.Try
+
 @Singleton
 class Auth @Inject() (config:Configuration, bearerTokenAuth: BearerTokenAuth, userProfileDAO:UserProfileDAO, cc:ControllerComponents)(implicit actorSystem: ActorSystem)
   extends AbstractController(cc) with Circe {
@@ -30,6 +34,12 @@ class Auth @Inject() (config:Configuration, bearerTokenAuth: BearerTokenAuth, us
   private val logger = LoggerFactory.getLogger(getClass)
 
   case class OAuthResponse(access_token:Option[String], refresh_token:Option[String], error:Option[String])
+
+  /**
+    * allow overriding of the Http() object for testing
+    * @return
+    */
+  protected def http = Http()
 
   def redirectUri[T](request:Request[T]) = "http://" + request.host + "/oauthCallback"
   /**
@@ -148,10 +158,14 @@ class Auth @Inject() (config:Configuration, bearerTokenAuth: BearerTokenAuth, us
     * formulate a response for the client
     * @param maybeOAuthResponse result from `stageTwo`
     * @param maybeUserProfile result from `userProfileFromJWT`
-    * @param state optional `state` parameter indicating the URL to redirect to when login is complete
+    * @param header ResponseHeader entitiy that is sent to the client on success
+    * @param entity HttpEntitiy indicating the body of the response that is sent to the client on success
     * @return a Future containing a Play response
     */
-  private def finalCallbackResponse(maybeOAuthResponse:Either[String, OAuthResponse], maybeUserProfile:Either[String, UserProfile], state:Option[String]) = Future(
+  private def finalCallbackResponse(maybeOAuthResponse:Either[String, OAuthResponse],
+                                    maybeUserProfile:Either[String, UserProfile],
+                                    header:ResponseHeader,
+                                    entity: play.api.http.HttpEntity) = Future(
     maybeOAuthResponse match {
       case Left(err)=>
         logger.error(s"Could not perform oauth exchange: $err")
@@ -177,8 +191,8 @@ class Auth @Inject() (config:Configuration, bearerTokenAuth: BearerTokenAuth, us
           .collect({case Some(value)=>value})
 
         Result(
-          ResponseHeader(StatusCodes.TemporaryRedirect.intValue, headers=Map("Location"->state.getOrElse("/"))),
-          play.api.http.HttpEntity.NoEntity,
+          header,
+          entity,
           newCookies = cookies.toList
         ).withSession(Session(sessionValues))
     }
@@ -191,7 +205,11 @@ class Auth @Inject() (config:Configuration, bearerTokenAuth: BearerTokenAuth, us
           maybeOauthResponse    <- stageTwo(actualCode, redirectUri(request))
           maybeValidatedContent <- validateContent(maybeOauthResponse)
           maybeUserProfile      <- userProfileFromJWT(maybeValidatedContent)
-          result                <- finalCallbackResponse(maybeOauthResponse, maybeUserProfile, state)
+          result                <- finalCallbackResponse(maybeOauthResponse,
+                                      maybeUserProfile,
+                                      ResponseHeader(StatusCodes.TemporaryRedirect.intValue, headers=Map("Location"->state.getOrElse("/"))),
+                                      play.api.http.HttpEntity.NoEntity
+                                  )
         } yield result
 
       case (_, Some(error))=>
@@ -204,9 +222,10 @@ class Auth @Inject() (config:Configuration, bearerTokenAuth: BearerTokenAuth, us
   /**
     * internal method to read in the content of the ResponseEntity and parse it as JSON
     * @param body the ResponseEntity
+    * @tparam T   data type to unmarshal the response into. A Left is returned if this unmarshalling fails.
     * @return a Future containing either a parser/decoder error or an OAuthResponse model
     */
-  def consumeBody(body:ResponseEntity):Future[Either[io.circe.Error, OAuthResponse]] = {
+  def consumeBody[T:io.circe.Decoder](body:ResponseEntity):Future[Either[io.circe.Error, T]] = {
     body.dataBytes
       .map(_.decodeString(StandardCharsets.UTF_8))
       .toMat(Sink.reduce[String](_ + _))(Keep.right)
@@ -216,10 +235,10 @@ class Auth @Inject() (config:Configuration, bearerTokenAuth: BearerTokenAuth, us
         content
       })
       .map(io.circe.parser.parse)
-      .map(_.flatMap(_.as[OAuthResponse]))
+      .map(_.flatMap(_.as[T]))
   }
 
-  def stageTwo(code:String, redirectUri:String) = {
+  protected def stageTwo(code:String, redirectUri:String) = {
     val postdata = Map(
       "grant_type"->"authorization_code",
       "client_id"->config.get[String]("oAuth.clientId"),
@@ -237,8 +256,8 @@ class Auth @Inject() (config:Configuration, bearerTokenAuth: BearerTokenAuth, us
     val rq = HttpRequest(HttpMethods.POST, uri=config.get[String]("oAuth.tokenUrl"), headers=headers, entity=contentBody)
 
     ( for {
-      response <- Http().singleRequest(rq)
-      bodyContent <- consumeBody(response.entity)
+      response <- http.singleRequest(rq)
+      bodyContent <- consumeBody[OAuthResponse](response.entity)
       } yield (response, bodyContent)
     ).map({
       case (response, Right(oAuthResponse))=>
@@ -255,5 +274,101 @@ class Auth @Inject() (config:Configuration, bearerTokenAuth: BearerTokenAuth, us
 
   def logout() = Action {
     TemporaryRedirect("/").withSession(Session.emptyCookie)
+  }
+
+  private def safeGetCookie[A](request:Request[A], configPathToName:String):Option[Cookie] = Try {
+    request.cookies.get(config.get[String](configPathToName))
+  }.toOption.flatten
+
+  protected def requestRefresh(refreshToken:String) = {
+    val params = Map(
+      "grant_type"->"refresh_token",
+      "refresh_token"->refreshToken
+    )
+    val encodedParams = assembleFromMap(params)
+    val contentBody = HttpEntity(ContentTypes.`application/x-www-form-urlencoded`, encodedParams)
+    val headers = scala.collection.immutable.Seq(
+      Accept(MediaRange(MediaTypes.`application/json`))
+    )
+    val req = HttpRequest(HttpMethods.POST, config.get[String]("oAuth.tokenUrl"), headers, contentBody)
+
+    (for {
+      response <- http.singleRequest(req)
+      responseBody <- consumeBody[OAuthResponse](response.entity)
+    } yield (response, responseBody) ).map({
+      case (response, Right(oAuthResponse))=>
+        response.status match {
+          case StatusCodes.OK=>
+            Right(oAuthResponse)
+          case StatusCodes.BadGateway | StatusCodes.ServiceUnavailable=>
+            Left("Authorization server is not available at the moment, hopefully refresh will work next time")
+          case _=>
+            Left(s"Server returned ${response.status}")
+        }
+      case (response, Left(err))=>
+        logger.error(s"Could not parse response from server: $err")
+        response.status match {
+          case StatusCodes.BadGateway | StatusCodes.ServiceUnavailable=>
+            Left("Authorization server is not available at the moment, hopefully refresh will work next time")
+          case StatusCodes.BadRequest=>
+            Left("Internal error, server rejected our request")
+          case StatusCodes.InternalServerError=>
+            Left("Authorization server failed trying to process our request, contact Infrastructure")
+          case _=>
+            Left(s"Server returned ${response.status}")
+        }
+    })
+
+  }
+
+  def refreshIfRequired = Action.async { request =>
+    (safeGetCookie(request, "oAuth.authCookieName"), safeGetCookie(request, "oAuth.refreshCookieName")) match {
+      case (Some(authCookie), Some(refreshCookie)) =>
+        bearerTokenAuth.validateToken(LoginResultOK(authCookie.value)) match {
+          case Left(loginProblem) =>
+            logger.error(s"Invalid access token presented for refresh: $loginProblem")
+            Future(BadRequest(GenericErrorResponse("error","access token not valid").asJson))
+          case Right(LoginResultOK(claimsSet))=>
+            if(Auth.claimIsExpired(claimsSet)) {
+              for {
+                maybeOauthResponse <- requestRefresh(refreshCookie.value)
+                maybeValidatedContent <- validateContent(maybeOauthResponse)
+                maybeUserProfile <- userProfileFromJWT(maybeValidatedContent)
+                result <- finalCallbackResponse(maybeOauthResponse,
+                  maybeUserProfile,
+                  ResponseHeader(200),
+                  play.api.http.HttpEntity.Strict(
+                    ByteString(GenericErrorResponse("ok","token refreshed").asJson.noSpaces),
+                    Some("application/json")
+                  )
+                )
+              } yield result
+            } else {
+              logger.info(s"No token refresh required for ${claimsSet.getUserID}")
+              Future(Ok(GenericErrorResponse("not_needed","no refresh required").asJson))
+            }
+        }
+      case (_, None) =>
+        logger.error("Could not refresh login, either there was no refresh cookie or `oAuth.refreshCookieName` is not set in the config")
+        Future(BadRequest(GenericErrorResponse("error", "either no refresh cookie or server misconfigured").asJson))
+      case (None, _) =>
+        logger.error("Could not refresh login because no access cookie was presented, not evan an expired one")
+        Future(BadRequest(GenericErrorResponse("error", "An access token must be presented even if it's expired").asJson))
+    }
+  }
+}
+
+object Auth {
+  private val logger = LoggerFactory.getLogger(getClass)
+  /**
+    * returns a booolean indicating if the given claims set either has expired or is about to
+    * @param claimsSet JWTClaimsSet from the given token
+    * @return true if the claims set is expired or shortly will be
+    */
+  def claimIsExpired(claimsSet:JWTClaimsSet) = {
+    val expiryWindow = Duration.ofMinutes(2)  //attempt a refresh if the token is valid for less than this
+    val expiresIn = Duration.between(Instant.now(), claimsSet.getExpirationTime.toInstant)
+    logger.debug(s"${claimsSet.getUserID} refresh check - access token expiry at ${claimsSet.getExpirationTime} which expires in $expiresIn")
+    expiresIn.isNegative||expiresIn.isZero||expiryWindow.compareTo(expiresIn)>=0  //compareTo - if window>expiresIn result =1, if == result=0 if < result=-1
   }
 }
