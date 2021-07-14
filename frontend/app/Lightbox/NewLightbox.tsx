@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from "react";
+import React, {useContext, useEffect, useState} from "react";
 import {RouteComponentProps} from "react-router";
 import {makeStyles, Snackbar, Typography} from "@material-ui/core";
 import {
@@ -17,6 +17,7 @@ import NewSearchComponent from "../common/NewSearchComponent";
 import MuiAlert from "@material-ui/lab/Alert";
 import EntryDetails from "../Entry/EntryDetails";
 import LightboxDetailsInsert from "./LightboxDetailsInsert";
+import {UserContext} from "../Context/UserContext";
 
 const useStyles = makeStyles({
     browserWindow: {
@@ -69,7 +70,6 @@ const useStyles = makeStyles({
 
 const NewLightbox:React.FC<RouteComponentProps> = (props) => {
     const classes = useStyles();
-    const [userDetails, setUserDetails] = useState<UserDetails|undefined>(undefined);
     //bulk selector related state
     const [selectedUser, setSelectedUser] = useState<string>("my");
     const [selectedBulk, setSelectedBulk] = useState<string|undefined>(undefined);
@@ -90,18 +90,18 @@ const NewLightbox:React.FC<RouteComponentProps> = (props) => {
     const [basicSearchUrl, setBasicSearchUrl] = useState<string|undefined>(undefined);
     const [showingArchiveSpinner, setShowingArchiveSpinner] = useState(false);
 
+    const userContext = useContext(UserContext);
+
     const userDisplayName = ()=>{
         if(selectedUser!=="my") return selectedUser;
-        if(userDetails) return userDetails.firstName + " " + userDetails.lastName;
+        if(userContext.profile) return userContext.profile.firstName + " " + userContext.profile.lastName;
         return undefined;
     }
 
     const performLoad = () => {
         const detailsRequest = axios.get<LightboxDetailsResponse>("/api/lightbox/" + selectedUser+"/details");
-        const loginDetailsRequest = axios.get<UserDetailsResponse>("/api/loginStatus");
-
         const configRequest = axios.get<ObjectListResponse<string>>("/api/config");
-        return Promise.all([detailsRequest, loginDetailsRequest, configRequest]);
+        return Promise.all([detailsRequest, configRequest]);
     }
 
     const refreshData = async () => {
@@ -110,10 +110,8 @@ const NewLightbox:React.FC<RouteComponentProps> = (props) => {
             const results = await performLoad();
 
             const detailsResult = results[0].data as LightboxDetailsResponse;
-            const loginDetailsResult = results[1].data as UserDetailsResponse;
-            const configResult = results[2].data as ObjectListResponse<string>;
+            const configResult = results[1].data as ObjectListResponse<string>;
             setLightboxDetails(detailsResult.entries)
-            setUserDetails(loginDetailsResult);
             setExpiryDays(configResult.entries.length>0 ? parseInt(configResult.entries[0]) : 10);
 
         } catch(err) {
@@ -205,7 +203,7 @@ const NewLightbox:React.FC<RouteComponentProps> = (props) => {
             <Typography className={classes.userNameText}>{userDisplayName() ? `${userDisplayName()}'s Lightbox` : "Lightbox"}</Typography>
         </div>
 
-        { userDetails?.isAdmin ? <div className={classes.userSelectorBox}>
+        { userContext.profile?.isAdmin ? <div className={classes.userSelectorBox}>
             <UserSelector onChange={(newUser)=>setSelectedUser(newUser)} selectedUser={selectedUser}/>
         </div> : null }
 
@@ -213,7 +211,7 @@ const NewLightbox:React.FC<RouteComponentProps> = (props) => {
             <BulkSelectionsScroll onSelected={(newId:string|undefined)=>setSelectedBulk(newId)}
                                   currentSelection={selectedBulk}
                                   forUser={selectedUser}
-                                  isAdmin={userDetails?.isAdmin ?? false}
+                                  isAdmin={userContext.profile?.isAdmin ?? false}
                                   expiryDays={expiryDays}
                                   onError={handleComponentError}
             />
@@ -231,12 +229,12 @@ const NewLightbox:React.FC<RouteComponentProps> = (props) => {
         </div>
 
         <div className={classes.detailsArea}>
-            <EntryDetails entry={selectedEntry}
+            {selectedEntry ? <EntryDetails entry={selectedEntry}
                           autoPlay={true}
                           showJobs={true}
                           loadJobs={false}
                           lightboxedCb={(entryId:string)=>setNewlyLightboxed((prevState) => prevState.concat(entryId))}
-                          preLightboxInsert={selectedEntry ?
+                          preLightboxInsert={
                               <LightboxDetailsInsert
                                   checkArchiveStatusClicked={()=>checkArchiveStatus(selectedEntry.id)}
                                   redoRestoreClicked={redoRestore}
@@ -245,9 +243,9 @@ const NewLightbox:React.FC<RouteComponentProps> = (props) => {
                                   lightboxEntry={lightboxDetails[selectedEntry.id]}
                                   user={selectedUser}
                                   showingArchiveSpinner={showingArchiveSpinner}
-                              /> : null
+                              />
                           }
-            />
+            /> : undefined }
         </div>
     </div>
 }

@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from "react";
+import React, {useContext, useEffect, useState} from "react";
 import {RouteComponentProps} from "react-router";
 import {ArchiveEntry, ObjectGetResponse, StylesMap, UserResponse} from "../types";
 import axios from "axios";
@@ -13,6 +13,7 @@ import LightboxInsert from "../Entry/details/LightboxInsert";
 import ItemActions from "./ItemActions";
 import {extractFileInfo} from "../common/Fileinfo";
 import {baseStyles} from "../BaseStyles";
+import {UserContext} from "../Context/UserContext";
 
 interface ItemViewParams {
     id: string;
@@ -49,23 +50,10 @@ const ItemView:React.FC<RouteComponentProps<ItemViewParams>> = (props) => {
     const [lastError, setLastError] = useState<string|undefined>(undefined);
     const [lastInfo, setLastInfo] = useState<string|undefined>(undefined);
     const [showingAlert, setShowingAlert] = useState(false);
-    const [userLogin, setUserLogin] = useState<UserResponse|undefined>(undefined);
 
     const classes = useStyles();
 
-    useEffect(()=>{
-        const loadUser = async () => {
-            try {
-                const response = await axios.get<UserResponse>(`/api/loginStatus`);
-                setUserLogin(response.data);
-            } catch(err) {
-                console.error("Could not get current logged in user: ", err);
-                setLastError(formatError(err, false));
-                setShowingAlert(true);
-            }
-        }
-        loadUser();
-    }, []);
+    const userContext = useContext(UserContext);
 
     const loadEntry = async (entryId:string) => {
         try {
@@ -105,8 +93,8 @@ const ItemView:React.FC<RouteComponentProps<ItemViewParams>> = (props) => {
     }
 
     const isInLightbox = () => {
-        if(!entry || !userLogin) return false;
-        const matchingEntries = entry.lightboxEntries.filter(lbEntry=>lbEntry.owner===userLogin.email);
+        if(!entry || !userContext.profile) return false;
+        const matchingEntries = entry.lightboxEntries.filter(lbEntry=>lbEntry.owner===userContext.profile?.email);
         return matchingEntries.length>0;
     }
 

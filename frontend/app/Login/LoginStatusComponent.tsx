@@ -1,11 +1,10 @@
-import React from 'react';
+import React, {useContext, useState} from 'react';
 import {Redirect} from "react-router-dom";
 import axios from 'axios';
 import {createStyles, makeStyles, withStyles} from "@material-ui/core";
+import {UserContext} from "../Context/UserContext";
 
 interface LoginStatusComponentProps {
-    userData: any;
-    classes: Record<string, string>;
     userLoggedOutCb: ()=>void;
 }
 
@@ -14,7 +13,7 @@ interface LoginStatusComponentState {
     redirecting?: boolean;
 }
 
-const styles = createStyles({
+const useStyles = makeStyles({
     loginInfoContainer: {
         float: "right",
         position: "absolute",
@@ -39,60 +38,53 @@ const styles = createStyles({
     }
 });
 
-class LoginStatusComponent extends React.Component<LoginStatusComponentProps, LoginStatusComponentState> {
-    classes: Record<string,string>;
+const LoginStatusComponent:React.FC<LoginStatusComponentProps> = (props) => {
+    const classes = useStyles();
+    const [opened, setOpened] = useState(false);
+    const [redirecting, setRedirecting] = useState(false);
 
-    constructor(props:LoginStatusComponentProps){
-        super(props);
+    const userContext = useContext(UserContext);
 
-        this.state = {
-            opened: false,
-            redirecting: false
-        };
-
-        this.classes = props.classes;
-        this.trackedOut = this.trackedOut.bind(this);
-        this.doLogout = this.doLogout.bind(this);
+    const trackedOut = () => {
+        window.setTimeout(()=>setOpened(false), 200);
     }
 
-    trackedOut(){
-        window.setTimeout(()=>this.setState({opened: false}), 200);
-    }
-
-    doLogout(){
-        axios.post("/api/logout").then(response=>{
-            if(this.props.userLoggedOutCb) {
-                this.props.userLoggedOutCb();
+    const doLogout = async () => {
+        try {
+            const response = await axios.post("/api/logout")
+            if(props.userLoggedOutCb) {
+                props.userLoggedOutCb();
             } else {
-                this.setState({opened: false, redirecting: true});
+                setOpened(false);
+                setRedirecting(true);
             }
-        }).catch(err=>{
+        } catch(err) {
             console.error(err);
-        })
+        }
     }
-    render(){
-        if(this.state.redirecting) return <Redirect to="/"/>;
 
-        return <div className={this.classes.loginInfoContainer}
-                    onMouseEnter={()=>this.setState({opened: true})}
-                    onMouseLeave={this.trackedOut}>
-            {
-                this.props.userData ?
-                    <span className={this.classes.loginInfoText}>{this.props.userData.firstName} {this.props.userData.lastName}</span> :
-                    <span className={`${this.classes.loginInfoText}`}>Not logged in</span>
-            }
-            {
-                this.props.userData ?
-                    <img className={this.classes.loginUserAvatar} src={this.props.userData.avatarUrl}/> :
-                    <img className={this.classes.loginUserAvatar} src="/public/images/nobody.png"/>
-            }
-            <div style={{width: "100%", display: this.state.opened ? "block" : "none"}}>
-                <ul className={this.classes.discreetList}>
-                    <li onClick={this.doLogout}>Log out</li>
-                </ul>
-            </div>
+    if(redirecting) return <Redirect to="/"/>;
+
+    return <div className={classes.loginInfoContainer}
+                onMouseEnter={()=>setOpened(true)}
+                onMouseLeave={trackedOut}>
+        {
+            userContext.profile ?
+                <span className={classes.loginInfoText}>{userContext.profile.firstName} {userContext.profile.lastName}</span> :
+                <span className={classes.loginInfoText}>Not logged in</span>
+        }
+        {
+            userContext.profile ?
+                <img className={classes.loginUserAvatar} src={userContext.profile.avatarUrl}/> :
+                <img className={classes.loginUserAvatar} src="/public/images/nobody.png"/>
+        }
+        <div style={{width: "100%", display: opened ? "block" : "none"}}>
+            <ul className={classes.discreetList}>
+                <li onClick={doLogout}>Log out</li>
+            </ul>
         </div>
-    }
+    </div>
+
 }
 
-export default withStyles(styles)(LoginStatusComponent);
+export default LoginStatusComponent;

@@ -1,9 +1,9 @@
 import React from "react";
-import { JwtDataShape } from "./DecodedProfile";
+import {UserDetails} from "../types";
 
 interface UserContext {
-  profile?: JwtDataShape;
-  updateProfile: (newValue?: JwtDataShape) => void;
+  profile?: UserDetails;
+  updateProfile: (newValue?: UserDetails) => void;
 }
 
 const UserContext = React.createContext<UserContext>({

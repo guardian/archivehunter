@@ -99,7 +99,7 @@ const NewBasicSearch:React.FC<RouteComponentProps> = (props) => {
                 />
             </div>
             <div style={{gridColumnStart: dividerLocation, gridColumnEnd: -1}}>
-                <EntryDetails entry={selectedEntry}
+                { selectedEntry ? <EntryDetails entry={selectedEntry}
                               autoPlay={true}
                               showJobs={true}
                               loadJobs={false}
@@ -111,7 +111,7 @@ const NewBasicSearch:React.FC<RouteComponentProps> = (props) => {
                               //when the user adds to lightbox we record it here. This state var is bound to the NewSearchComponent
                                 //which will then re-load data for the given entry (after a short delay)
                               lightboxedCb={(entryId:string)=>setNewlyLightboxedList((prevState) => prevState.concat(entryId))}
-                />
+                /> : undefined }
             </div>
         </div>
     </>

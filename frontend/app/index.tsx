@@ -44,7 +44,7 @@ import ItemView from "./ItemView/ItemView";
 import DeletedItemsComponent from "./DeletedItems/DeletedItems";
 import RootComponent from "./RootComponent";
 import {UserContextProvider} from "./Context/UserContext";
-import {JwtDataShape} from "./Context/DecodedProfile";
+import {UserDetails} from "./types";
 
 
 library.add(faStroopwafel, faCheckCircle, faCheck, faTimes, faTimesCircle, faRoad,faSearch,faThList,faWrench, faLightbulb, faChevronCircleDown, faChevronCircleRight, faTrashAlt, faFolderPlus, faFolderMinus, faFolder);
@@ -58,7 +58,7 @@ library.add(faExclamation, faUnlink);
 setupInterceptor();
 
 interface AppContainerState {
-    userLogin?: JwtDataShape;
+    userLogin?: UserDetails;
     lastError?: any;
     loading?:boolean;
 }
@@ -88,7 +88,7 @@ class App extends React.Component<any, AppContainerState> {
         this.theme = createMuiTheme(customisedTheme);
     }
 
-    updateProfile(newValue: JwtDataShape|undefined, maybeCb?:()=>void) {
+    updateProfile(newValue: UserDetails|undefined, maybeCb?:()=>void) {
         this.setState({userLogin: newValue}, maybeCb);
     }
 
@@ -111,7 +111,7 @@ class App extends React.Component<any, AppContainerState> {
             <UserContextProvider value={{profile: this.state.userLogin, updateProfile: this.updateProfile}}>
                 <CssBaseline/>
                 <TopMenu visible={true} isAdmin={true}/>
-                <LoginStatusComponent userData={this.state.userLogin} userLoggedOutCb={this.userLoggedOut}/>
+                <LoginStatusComponent userLoggedOutCb={this.userLoggedOut}/>
                 <Switch>
                     <Route path="/test/419" component={Test419Component}/>
                     <Route path="/admin/pathcache" component={PathCacheAdmin}/>
