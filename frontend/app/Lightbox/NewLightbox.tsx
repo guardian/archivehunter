@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from "react";
+import React, {useContext, useEffect, useState} from "react";
 import {RouteComponentProps} from "react-router";
 import {makeStyles, Snackbar, Typography} from "@material-ui/core";
 import {
@@ -17,6 +17,7 @@ import NewSearchComponent from "../common/NewSearchComponent";
 import MuiAlert from "@material-ui/lab/Alert";
 import EntryDetails from "../Entry/EntryDetails";
 import LightboxDetailsInsert from "./LightboxDetailsInsert";
+import {UserContext} from "../Context/UserContext";
 
 const useStyles = makeStyles({
     browserWindow: {
@@ -67,7 +68,6 @@ const useStyles = makeStyles({
 
 const NewLightbox:React.FC<RouteComponentProps> = (props) => {
     const classes = useStyles();
-    const [userDetails, setUserDetails] = useState<UserDetails|undefined>(undefined);
     //bulk selector related state
     const [selectedUser, setSelectedUser] = useState<string>("my");
     const [bulkSelections, setBulkSelections] = useState<LightboxBulk[]>([]);
@@ -89,9 +89,11 @@ const NewLightbox:React.FC<RouteComponentProps> = (props) => {
     const [basicSearchUrl, setBasicSearchUrl] = useState<string|undefined>(undefined);
     const [showingArchiveSpinner, setShowingArchiveSpinner] = useState(false);
 
+    const userContext = useContext(UserContext);
+
     const userDisplayName = ()=>{
         if(selectedUser!=="my") return selectedUser;
-        if(userDetails) return userDetails.firstName + " " + userDetails.lastName;
+        if(userContext.profile) return userContext.profile.firstName + " " + userContext.profile.lastName;
         return undefined;
     }
 
@@ -100,7 +102,7 @@ const NewLightbox:React.FC<RouteComponentProps> = (props) => {
             await axios.delete("/api/lightbox/"+selectedUser+"/bulk/" + entryId);
             console.log("lightbox entry " + entryId + " deleted.");
             //if we are deleting the current selection, the update the selection to undefined otherwise do a no-op update
-            //to trugger reload
+            //to trigger reload
             const updatedSelected = selectedBulk===entryId ? undefined : selectedBulk;
 
             setBulkSelections((prevState) => prevState.filter(entry=>entry.id!==entryId));
@@ -114,10 +116,9 @@ const NewLightbox:React.FC<RouteComponentProps> = (props) => {
 
     const performLoad = () => {
         const detailsRequest = axios.get<LightboxDetailsResponse>("/api/lightbox/" + selectedUser+"/details");
-        const loginDetailsRequest = axios.get<UserDetailsResponse>("/api/loginStatus");
         const bulkSelectionsRequest = axios.get<LightboxBulkResponse>("/api/lightbox/" + selectedUser+"/bulks");
         const configRequest = axios.get<ObjectListResponse<string>>("/api/config");
-        return Promise.all([detailsRequest, loginDetailsRequest, bulkSelectionsRequest, configRequest]);
+        return Promise.all([detailsRequest, bulkSelectionsRequest, configRequest]);
     }
 
     const refreshData = async () => {
@@ -126,11 +127,9 @@ const NewLightbox:React.FC<RouteComponentProps> = (props) => {
             const results = await performLoad();
 
             const detailsResult = results[0].data as LightboxDetailsResponse;
-            const loginDetailsResult = results[1].data as UserDetailsResponse;
-            const bulkSelectionsResult = results[2].data as LightboxBulkResponse;
-            const configResult = results[3].data as ObjectListResponse<string>;
+            const bulkSelectionsResult = results[1].data as LightboxBulkResponse;
+            const configResult = results[2].data as ObjectListResponse<string>;
             setLightboxDetails(detailsResult.entries)
-            setUserDetails(loginDetailsResult);
             setBulkSelections(bulkSelectionsResult.entries);
             setBulkSelectionsCount(bulkSelectionsResult.entryCount);
             setExpiryDays(configResult.entries.length>0 ? parseInt(configResult.entries[0]) : 10);
@@ -228,7 +227,7 @@ const NewLightbox:React.FC<RouteComponentProps> = (props) => {
             <Typography className={classes.userNameText}>{userDisplayName() ? `${userDisplayName()}'s Lightbox` : "Lightbox"}</Typography>
         </div>
 
-        { userDetails?.isAdmin ? <div className={classes.userSelectorBox}>
+        { userContext.profile?.isAdmin ? <div className={classes.userSelectorBox}>
             <UserSelector onChange={(newUser)=>setSelectedUser(newUser)} selectedUser={selectedUser}/>
         </div> : null }
 
@@ -238,7 +237,7 @@ const NewLightbox:React.FC<RouteComponentProps> = (props) => {
                                   onDeleteClicked={bulkSearchDeleteRequested}
                                   currentSelection={selectedBulk}
                                   forUser={selectedUser}
-                                  isAdmin={userDetails?.isAdmin ?? false}
+                                  isAdmin={userContext.profile?.isAdmin ?? false}
                                   expiryDays={expiryDays}
                                   onError={handleComponentError}
             />
@@ -256,12 +255,12 @@ const NewLightbox:React.FC<RouteComponentProps> = (props) => {
         </div>
 
         <div className={classes.detailsArea}>
-            <EntryDetails entry={selectedEntry}
+            {selectedEntry ? <EntryDetails entry={selectedEntry}
                           autoPlay={true}
                           showJobs={true}
                           loadJobs={false}
                           lightboxedCb={(entryId:string)=>setNewlyLightboxed((prevState) => prevState.concat(entryId))}
-                          preLightboxInsert={selectedEntry ?
+                          preLightboxInsert={
                               <LightboxDetailsInsert
                                   checkArchiveStatusClicked={()=>checkArchiveStatus(selectedEntry.id)}
                                   redoRestoreClicked={redoRestore}
@@ -270,9 +269,9 @@ const NewLightbox:React.FC<RouteComponentProps> = (props) => {
                                   lightboxEntry={lightboxDetails[selectedEntry.id]}
                                   user={selectedUser}
                                   showingArchiveSpinner={showingArchiveSpinner}
-                              /> : null
+                              />
                           }
-            />
+            /> : undefined }
         </div>
     </div>
 }
