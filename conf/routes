@@ -9,10 +9,9 @@ GET     /login                      @controllers.Auth.login(state:Option[String]
 
 GET     /test/api419                @controllers.Application.test419
 GET     /oauthCallback              @controllers.Auth.oauthCallback(state:Option[String],code:Option[String],error:Option[String])
-POST    /api/logout                 @controllers.Auth.logout
+GET     /logout                     @controllers.Auth.logout
 GET     /api/loginStatus            @controllers.UserController.loginStatus
 POST    /api/loginRefresh           @controllers.Auth.refreshIfRequired
-GET     /loginAuthStub              @controllers.Application.authstub
 
 POST    /api/scanTarget                 @controllers.ScanTargetController.newTarget
 DELETE  /api/scanTarget/:id             @controllers.ScanTargetController.removeTarget(id)

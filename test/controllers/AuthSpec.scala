@@ -5,6 +5,7 @@ import akka.http.scaladsl.model.{HttpEntity, HttpRequest, HttpResponse, StatusCo
 import auth.{BearerTokenAuth, LoginResultOK}
 import com.google.inject.AbstractModule
 import com.nimbusds.jwt.JWTClaimsSet
+import com.theguardian.multimedia.archivehunter.common.clientManagers.DynamoClientManager
 import controllers.Auth.OAuthResponse
 import helpers.HttpClientFactory
 import models.{UserProfile, UserProfileDAO}
@@ -66,6 +67,7 @@ class AuthSpec extends Specification with Mockito {
     import play.api.inject.bind
     val builder = GuiceApplicationBuilder()
       .overrides(bind[UserProfileDAO].toInstance(mockUserProfileDAO))
+      .overrides(bind[DynamoClientManager].toInstance(mock[DynamoClientManager])) //we don't need this so remove it because it tries to set up a connection pool
       .configure(authTestConfig)
 
     val builderWithHttp = maybeHttpOverride.map(http=>builder.overrides(bind[HttpClientFactory].toInstance(http))).getOrElse(builder)
@@ -252,6 +254,112 @@ class AuthSpec extends Specification with Mockito {
         there was no(mockUserProfileDAO).userProfileForEmail(any)
         there was no(mockUserProfileDAO).put(any)
       }
+    }
+  }
+
+  "Auth.refreshIfRequired" should {
+    "send a refresh request to the IdP if access and refresh tokens are present, and the access token is expired" in {
+      val mockHttp = mock[HttpExt]
+      val mockClientFactory = new HttpClientFactory {
+        override def build: HttpExt = mockHttp
+      }
+      val mockUserProfileDAO = mock[UserProfileDAO]
+      val mockBearerToken = mock[BearerTokenAuth]
+
+      val returnedContent = OAuthResponse(Some("new-access-token"),Some("new-refresh-token"),None).asJson.noSpaces
+      val entity = HttpEntity(returnedContent)
+      mockHttp.singleRequest(any,any,any,any) returns Future(HttpResponse(StatusCodes.OK, entity=entity))
+
+      val mockClaims = new JWTClaimsSet.Builder()
+        .audience("archivehunter")
+        .subject("testuser")
+        .expirationTime(Date.from(Instant.now().minusSeconds(300)))
+        .build()
+
+      val fakeUserProfile = UserProfile("testuser@org.int",false,Seq(),true,None,None,None,None,None,None)
+
+      mockBearerToken.validateToken(any) returns Right(LoginResultOK(mockClaims))
+      mockUserProfileDAO.userProfileForEmail(any) returns Future(Some(Right(fakeUserProfile)))
+      new WithApplication(buildMyApp(Some(mockClientFactory), mockUserProfileDAO, Some(mockBearerToken))) {
+        val result = route(app,
+          FakeRequest(POST, "/api/loginRefresh")
+            .withCookies(
+              Cookie("authtoken","auth-token",Some(3600),"/",None,secure = true,httpOnly = true,Some(Cookie.SameSite.Strict)),
+              Cookie("refreshtoken","refresh-token",Some(3600),"/",None,secure = true,httpOnly = true,Some(Cookie.SameSite.Strict)),
+            )
+        )
+        result must beSome
+
+        contentAsString(result.get) mustEqual("""{"status":"ok","detail":"token refreshed"}""")
+        status(result.get) mustEqual OK
+
+        val resultCookies = cookies(result.get)
+        resultCookies.get("authtoken") must beSome(Cookie("authtoken","new-access-token",Some(28800),"/",None,secure = true,httpOnly = true,Some(Cookie.SameSite.Strict)))
+        resultCookies.get("refreshtoken") must beSome(Cookie("refreshtoken","new-refresh-token",Some(28800),"/",None,secure = true,httpOnly = true,Some(Cookie.SameSite.Strict)))
+        session(result.get).get("userProfile") must beSome
+
+        there was one(mockHttp).singleRequest(any, any, any, any)
+        there was one(mockUserProfileDAO).userProfileForEmail("testuser")
+        there was no(mockUserProfileDAO).put(any)
+      }
+    }
+
+    "not send a refresh request to the IdP if access and refresh tokens are present, and the access token is not expired" in {
+      val mockHttp = mock[HttpExt]
+      val mockClientFactory = new HttpClientFactory {
+        override def build: HttpExt = mockHttp
+      }
+      val mockUserProfileDAO = mock[UserProfileDAO]
+      val mockBearerToken = mock[BearerTokenAuth]
+
+      val returnedContent = OAuthResponse(Some("new-access-token"),Some("new-refresh-token"),None).asJson.noSpaces
+      val entity = HttpEntity(returnedContent)
+      mockHttp.singleRequest(any,any,any,any) returns Future(HttpResponse(StatusCodes.OK, entity=entity))
+
+      val mockClaims = new JWTClaimsSet.Builder()
+        .audience("archivehunter")
+        .subject("testuser")
+        .expirationTime(Date.from(Instant.now().plusSeconds(300)))
+        .build()
+
+      val fakeUserProfile = UserProfile("testuser@org.int",isAdmin = false,Seq(),allCollectionsVisible = true,None,None,None,None,None,None)
+
+      mockBearerToken.validateToken(any) returns Right(LoginResultOK(mockClaims))
+      mockUserProfileDAO.userProfileForEmail(any) returns Future(Some(Right(fakeUserProfile)))
+      new WithApplication(buildMyApp(Some(mockClientFactory), mockUserProfileDAO, Some(mockBearerToken))) {
+        val result = route(app,
+          FakeRequest(POST, "/api/loginRefresh")
+            .withCookies(
+              Cookie("authtoken","auth-token",Some(3600),"/",None,secure = true,httpOnly = true,Some(Cookie.SameSite.Strict)),
+              Cookie("refreshtoken","refresh-token",Some(3600),"/",None,secure = true,httpOnly = true,Some(Cookie.SameSite.Strict)),
+            )
+        )
+        result must beSome
+
+        contentAsString(result.get) mustEqual("""{"status":"not_needed","detail":"no refresh required"}""")
+        status(result.get) mustEqual OK
+
+        val resultCookies = cookies(result.get)
+        //if no refresh is required we set no extra cookies
+        resultCookies.get("authtoken") must beNone
+        resultCookies.get("refreshtoken") must beNone
+        session(result.get).get("userProfile") must beNone
+
+        there was no(mockHttp).singleRequest(any, any, any, any)
+        there was no(mockUserProfileDAO).userProfileForEmail("testuser")
+        there was no(mockUserProfileDAO).put(any)
+      }
+    }
+  }
+
+  "Auth.logout" should {
+    "discard user cookies and reset the session" in new WithApplication() {
+      val result = route(app, FakeRequest(GET, "/logout"))
+
+      result must beSome
+      status(result.get) mustEqual TEMPORARY_REDIRECT
+      session(result.get).get("userProfile") must beNone
+      header("Location", result.get) must beSome("/")
     }
   }
 }

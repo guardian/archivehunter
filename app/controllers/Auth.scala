@@ -10,7 +10,7 @@ import auth.{BearerTokenAuth, LoginResultOK}
 import com.nimbusds.jwt.JWTClaimsSet
 import org.slf4j.LoggerFactory
 import play.api.Configuration
-import play.api.mvc.{AbstractController, ControllerComponents, Cookie, Request, ResponseHeader, Result, Session}
+import play.api.mvc.{AbstractController, ControllerComponents, Cookie, DiscardingCookie, Request, ResponseHeader, Result, Session}
 
 import java.net.{URL, URLEncoder}
 import java.nio.charset.StandardCharsets
@@ -280,7 +280,14 @@ class Auth @Inject() (config:Configuration,
   }
 
   def logout() = Action {
-    TemporaryRedirect("/").withSession(Session.emptyCookie)
+    TemporaryRedirect("/")
+      .withSession(Session.emptyCookie)
+      .discardingCookies(
+        DiscardingCookie(
+          config.get[String]("oAuth.authCookieName"),
+          config.get[String]("oAuth.refreshCookieName"),
+        )
+      )
   }
 
   private def safeGetCookie[A](request:Request[A], configPathToName:String):Option[Cookie] = Try {
@@ -331,29 +338,34 @@ class Auth @Inject() (config:Configuration,
   def refreshIfRequired = Action.async { request =>
     (safeGetCookie(request, "oAuth.authCookieName"), safeGetCookie(request, "oAuth.refreshCookieName")) match {
       case (Some(authCookie), Some(refreshCookie)) =>
-        bearerTokenAuth.validateToken(LoginResultOK(authCookie.value)) match {
-          case Left(loginProblem) =>
-            logger.error(s"Invalid access token presented for refresh: $loginProblem")
-            Future(BadRequest(GenericErrorResponse("error","access token not valid").asJson))
-          case Right(LoginResultOK(claimsSet))=>
-            if(Auth.claimIsExpired(claimsSet)) {
-              for {
-                maybeOauthResponse <- requestRefresh(refreshCookie.value)
-                maybeValidatedContent <- validateContent(maybeOauthResponse)
-                maybeUserProfile <- userProfileFromJWT(maybeValidatedContent)
-                result <- finalCallbackResponse(maybeOauthResponse,
-                  maybeUserProfile,
-                  ResponseHeader(200),
-                  play.api.http.HttpEntity.Strict(
-                    ByteString(GenericErrorResponse("ok","token refreshed").asJson.noSpaces),
-                    Some("application/json")
+        if(!authCookie.httpOnly || !refreshCookie.httpOnly) {
+          logger.error(s"Client presented cookies for refresh that are not httpOnly: $authCookie $refreshCookie")
+          Future(BadRequest(GenericErrorResponse("security_problem", "only httpOnly cookies are trusted for auth").asJson))
+        } else {
+          bearerTokenAuth.validateToken(LoginResultOK(authCookie.value)) match {
+            case Left(loginProblem) =>
+              logger.error(s"Invalid access token presented for refresh: $loginProblem")
+              Future(BadRequest(GenericErrorResponse("error", "access token not valid").asJson))
+            case Right(LoginResultOK(claimsSet)) =>
+              if (Auth.claimIsExpired(claimsSet)) {
+                for {
+                  maybeOauthResponse <- requestRefresh(refreshCookie.value)
+                  maybeValidatedContent <- validateContent(maybeOauthResponse)
+                  maybeUserProfile <- userProfileFromJWT(maybeValidatedContent)
+                  result <- finalCallbackResponse(maybeOauthResponse,
+                    maybeUserProfile,
+                    ResponseHeader(200),
+                    play.api.http.HttpEntity.Strict(
+                      ByteString(GenericErrorResponse("ok", "token refreshed").asJson.noSpaces),
+                      Some("application/json")
+                    )
                   )
-                )
-              } yield result
-            } else {
-              logger.info(s"No token refresh required for ${claimsSet.getUserID}")
-              Future(Ok(GenericErrorResponse("not_needed","no refresh required").asJson))
-            }
+                } yield result
+              } else {
+                logger.info(s"No token refresh required for ${claimsSet.getUserID}")
+                Future(Ok(GenericErrorResponse("not_needed", "no refresh required").asJson))
+              }
+          }
         }
       case (_, None) =>
         logger.error("Could not refresh login, either there was no refresh cookie or `oAuth.refreshCookieName` is not set in the config")

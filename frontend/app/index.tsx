@@ -50,12 +50,6 @@ library.add(faStroopwafel, faCheckCircle, faCheck, faTimes, faTimesCircle, faRoa
 library.add(faFilm, faVolumeUp, faImage, faFile, faClock, faRunning, faExclamationTriangle, faHdd, faBalanceScale, faSyncAlt, faBookReader, faBug, faCompressArrowsAlt, faIndustry, faRedoAlt, faHome, faListOl,);
 library.add(faExclamation, faUnlink);
 
-interface AppContainerState {
-    userLogin?: UserDetails;
-    lastError?: any;
-    loading?:boolean;
-}
-
 const maxLoginAttempts = 5;
 
 const App:React.FC = ()=> {
