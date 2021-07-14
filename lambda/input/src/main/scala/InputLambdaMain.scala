@@ -126,7 +126,7 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
     } else {
       PathCacheExtractor.recursiveGenerateEntries(pathParts.init, pathParts.last, pathParts.length, rec.getS3.getBucket.getName)
     }
-    rec.
+
     println(s"going to update ${newCacheEntries.length} path cache entries")
     writePathCacheEntries(newCacheEntries).flatMap(_=> {
       ArchiveEntry.fromS3(rec.getS3.getBucket.getName, path, s3Client.getRegionName).flatMap(entry => {
