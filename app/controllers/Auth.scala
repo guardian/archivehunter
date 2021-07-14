@@ -23,31 +23,38 @@ import play.api.libs.circe.Circe
 import play.api.mvc.Cookie.SameSite
 import responses.GenericErrorResponse
 import auth.ClaimsSetExtensions._
+import helpers.HttpClientFactory
 
 import java.time.{Duration, Instant, ZonedDateTime}
 import scala.util.Try
 
 @Singleton
-class Auth @Inject() (config:Configuration, bearerTokenAuth: BearerTokenAuth, userProfileDAO:UserProfileDAO, cc:ControllerComponents)(implicit actorSystem: ActorSystem)
+class Auth @Inject() (config:Configuration,
+                      bearerTokenAuth: BearerTokenAuth,
+                      userProfileDAO:UserProfileDAO,
+                      cc:ControllerComponents,
+                      httpFactory:HttpClientFactory)
+                     (implicit actorSystem: ActorSystem)
   extends AbstractController(cc) with Circe {
   private implicit val ec:ExecutionContext = cc.executionContext
   private val logger = LoggerFactory.getLogger(getClass)
-
-  case class OAuthResponse(access_token:Option[String], refresh_token:Option[String], error:Option[String])
+  import Auth._
 
   /**
     * allow overriding of the Http() object for testing
     * @return
     */
-  protected def http = Http()
+  protected def http = httpFactory.build
 
-  def redirectUri[T](request:Request[T]) = "http://" + request.host + "/oauthCallback"
+  //sometimes in development it's easier to run without https, this is indicated by the `enforceSecure` parameter in the config
+  private def redirectProto = if(config.getOptional[Boolean]("oAuth.enforceSecure").getOrElse(true)) "https://" else "http://"
+  def redirectUri[T](request:Request[T]) = redirectProto + request.host + "/oauthCallback"
+
   /**
     * builds a URL to the oauth IdP and redirects the user there
     * @return
     */
   def login(state:Option[String]) = Action { request=>
-
     val args = Map(
       "response_type"->"code",
       "client_id"->config.get[String]("oAuth.clientId"),
@@ -360,6 +367,9 @@ class Auth @Inject() (config:Configuration, bearerTokenAuth: BearerTokenAuth, us
 
 object Auth {
   private val logger = LoggerFactory.getLogger(getClass)
+
+  case class OAuthResponse(access_token:Option[String], refresh_token:Option[String], error:Option[String])
+
   /**
     * returns a booolean indicating if the given claims set either has expired or is about to
     * @param claimsSet JWTClaimsSet from the given token

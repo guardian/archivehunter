@@ -2,27 +2,25 @@ import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Framing, Keep, Sink, Source}
+import akka.testkit.TestProbe
 import akka.util.ByteString
+import auth.BearerTokenAuth
 import com.sksamuel.elastic4s.streams.ScrollPublisher
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ArchiveEntryHitReader, MimeType, StorageClass, StorageClassEncoder, ZonedDateTimeEncoder}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{ESClientManager, S3ClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{LightboxBulkEntry, LightboxBulkEntryDAO, LightboxEntry, LightboxEntryDAO, RestoreStatusEncoder}
 import controllers.BulkDownloadsController
-import helpers.{InjectableRefresher, InjectableRefresherMock}
 import models.{ArchiveEntryDownloadSynopsis, ServerTokenDAO, ServerTokenEntry}
 import org.specs2.mock.Mockito
 import org.specs2.mutable.Specification
 import play.api.Configuration
 import play.api.mvc.ControllerComponents
-import play.api.test.{FakeRequest, WithApplication}
 import io.circe.generic.auto._
-import play.api.inject.guice.GuiceApplicationBuilder
+import play.api.cache.SyncCacheApi
 
 import scala.concurrent.duration._
-import scala.concurrent.ExecutionContext.global
 import java.time.ZonedDateTime
 import scala.concurrent.{Await, ExecutionContext, Future}
-import play.api.inject.bind
 
 class BulkDownloadsControllerSpec extends Specification with Mockito with ZonedDateTimeEncoder with ArchiveEntryHitReader with StorageClassEncoder {
   sequential
@@ -87,8 +85,8 @@ class BulkDownloadsControllerSpec extends Specification with Mockito with ZonedD
       val fakeConfig = Configuration.from(Map(
         "externalData"-> Map("indexName"->"archivehunter")
       ))
-      val toTest = new BulkDownloadsController(fakeConfig, mock[ServerTokenDAO], mock[LightboxBulkEntryDAO],
-        mock[LightboxEntryDAO], mock[ESClientManager], mock[S3ClientManager], mock[ControllerComponents], null) {
+      val toTest = new BulkDownloadsController(fakeConfig, mock[SyncCacheApi], mock[ServerTokenDAO], mock[LightboxBulkEntryDAO],
+        mock[LightboxEntryDAO], mock[ESClientManager], mock[S3ClientManager], mock[ControllerComponents], mock[BearerTokenAuth], TestProbe().ref) {
         override protected def getSearchSource(p: ScrollPublisher): Source[ArchiveEntry, NotUsed] = fakeInputData
 
         def callFunc(bulkEntry:LightboxBulkEntry) =  streamingEntriesForBulk(bulkEntry)
@@ -129,8 +127,8 @@ class BulkDownloadsControllerSpec extends Specification with Mockito with ZonedD
 
       mockServerTokenDAO.put(any) returns Future(None)
 
-      val toTest = new BulkDownloadsController(fakeConfig, mockServerTokenDAO, mock[LightboxBulkEntryDAO],
-        mock[LightboxEntryDAO], mock[ESClientManager], mock[S3ClientManager], mock[ControllerComponents], null) {
+      val toTest = new BulkDownloadsController(fakeConfig, mock[SyncCacheApi], mockServerTokenDAO, mock[LightboxBulkEntryDAO],
+        mock[LightboxEntryDAO], mock[ESClientManager], mock[S3ClientManager], mock[ControllerComponents], mock[BearerTokenAuth], TestProbe().ref)  {
         def callFunc(updatedToken:ServerTokenEntry, bulkEntry:LightboxBulkEntry) = saveTokenOnly(updatedToken, bulkEntry)
       }
 
