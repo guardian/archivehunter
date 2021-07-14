@@ -5,6 +5,7 @@ import com.typesafe.sbt.packager.docker._
 
 enablePlugins(RiffRaffArtifact, DockerPlugin, SystemdPlugin)
 
+scalacOptions := Seq("-unchecked", "-deprecation")
 scalaVersion := "2.12.13"
 
 val akkaVersion = "2.5.31"

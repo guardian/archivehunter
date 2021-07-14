@@ -12,8 +12,7 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
-class AppStartup @Inject()(@Named("bucketScannerActor") bucketScanner:ActorRef, actorSystem:ActorSystem,
-                            config:Configuration, injector:Injector, lifecycle: ApplicationLifecycle)(implicit system:ActorSystem){
+class AppStartup @Inject()(injector:Injector)(implicit system:ActorSystem){
   private val logger = Logger(getClass)
 
   implicit val ec:ExecutionContext = system.dispatcher
