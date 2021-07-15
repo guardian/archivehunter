@@ -25,7 +25,11 @@ import responses.GenericErrorResponse
 import auth.ClaimsSetExtensions._
 import helpers.HttpClientFactory
 
-import java.time.{Duration, Instant, ZonedDateTime}
+import java.time.format.DateTimeFormatter
+import scala.collection.JavaConverters._
+import java.time.{Duration, Instant, ZoneId, ZonedDateTime}
+import java.util.Date
+import scala.collection.mutable
 import scala.util.Try
 
 @Singleton
@@ -158,6 +162,21 @@ class Auth @Inject() (config:Configuration,
       })
   )
 
+  private def filteredClaims(from:mutable.Map[String, AnyRef], keysToOmit:Seq[String]=Seq("thumbnailPhoto","jpegPhoto")) = {
+    from
+      .filter(kv => !keysToOmit.contains(kv._1))
+      .map({
+        case (k, v:String)=>if(v.length<36) Some(k->v) else None
+//        case (k, v:Int)=>Some(k->v.toString)
+//        case (k, v:Float)=>Some(k->v.toString)
+//        case (k, v:Long)=>Some(k->v.toString)
+        case (k, v:Date)=>Some(k->ZonedDateTime.ofInstant(v.toInstant, ZoneId.systemDefault()).format(DateTimeFormatter.ISO_ZONED_DATE_TIME))
+        case _=>None
+      })
+      .collect({case Some(value)=>value})
+      .toMap
+  }
+
   /**
     * internal method, part of the step two exchange.
     *
@@ -170,6 +189,7 @@ class Auth @Inject() (config:Configuration,
     * @return a Future containing a Play response
     */
   private def finalCallbackResponse(maybeOAuthResponse:Either[String, OAuthResponse],
+                                    maybeOAuthClaims:Either[String, JWTClaimsSet],
                                     maybeUserProfile:Either[String, UserProfile],
                                     header:ResponseHeader,
                                     entity: play.api.http.HttpEntity) = Future(
@@ -182,16 +202,24 @@ class Auth @Inject() (config:Configuration,
 
         val baseSessionValues = Map[String,String]()
 
+        val claimsSessionValues = maybeOAuthClaims match {
+          case Left(err)=>
+            logger.warn(s"Could not get claims: $err")
+            baseSessionValues
+          case Right(claims)=>
+            baseSessionValues ++ Map("claims"->filteredClaims(claims.getClaims.asScala).asJson.noSpaces)
+        }
+
         val sessionValues = maybeUserProfile match {
           case Left(err)=>
             logger.warn(s"Could not load user profile: $err")
-            baseSessionValues
+            claimsSessionValues
           case Right(profile)=>
-            baseSessionValues ++ Map("userProfile"->profile.asJson.noSpaces)
+            claimsSessionValues ++ Map("userProfile"->profile.asJson.noSpaces)
         }
 
         val cookies = Map(
-          config.get[String]("oAuth.authCookieName") -> oAuthResponse.access_token,
+          //config.get[String]("oAuth.authCookieName") -> oAuthResponse.access_token,
           config.get[String]("oAuth.refreshCookieName") -> oAuthResponse.refresh_token
         )
           .map(kv=>kv._2.map(makeAuthCookie(kv._1, _)))
@@ -213,6 +241,7 @@ class Auth @Inject() (config:Configuration,
           maybeValidatedContent <- validateContent(maybeOauthResponse)
           maybeUserProfile      <- userProfileFromJWT(maybeValidatedContent)
           result                <- finalCallbackResponse(maybeOauthResponse,
+                                      maybeValidatedContent,
                                       maybeUserProfile,
                                       ResponseHeader(StatusCodes.TemporaryRedirect.intValue, headers=Map("Location"->state.getOrElse("/"))),
                                       play.api.http.HttpEntity.NoEntity
@@ -336,8 +365,8 @@ class Auth @Inject() (config:Configuration,
   }
 
   def refreshIfRequired = Action.async { request =>
-    (safeGetCookie(request, "oAuth.authCookieName"), safeGetCookie(request, "oAuth.refreshCookieName")) match {
-      case (Some(authCookie), Some(refreshCookie)) =>
+    (safeGetCookie(request, "oAuth.refreshCookieName")) match {
+      case Some(refreshCookie) =>
         if(!authCookie.httpOnly || !refreshCookie.httpOnly) {
           logger.error(s"Client presented cookies for refresh that are not httpOnly: $authCookie $refreshCookie")
           Future(BadRequest(GenericErrorResponse("security_problem", "only httpOnly cookies are trusted for auth").asJson))
@@ -353,6 +382,7 @@ class Auth @Inject() (config:Configuration,
                   maybeValidatedContent <- validateContent(maybeOauthResponse)
                   maybeUserProfile <- userProfileFromJWT(maybeValidatedContent)
                   result <- finalCallbackResponse(maybeOauthResponse,
+                    maybeValidatedContent,
                     maybeUserProfile,
                     ResponseHeader(200),
                     play.api.http.HttpEntity.Strict(
