@@ -31,9 +31,29 @@ Parameters:
   DeploymentDomain:
     Type: String
     Description: DNS domain that this is going to be deployed into.  This is needed for pan-domain authentication to work (see readme).  Assumption is that the access URL is at https://${App}.${DeploymentDomain}
-  PandaBucket:
+  OAuthConfigBucket:
     Type: String
-    Description: S3 bucket that contains the Pan-domain auth settings
+    Description: S3 bucket that contains the signing cert, which must be called `oauth-signing.pem`
+  OAuthClientId:
+    Type: String
+    Description: Client ID provided by the OAuth IdP
+  OAuthClientName:
+    Type: String
+    Description: Client Name provided by the OAuth IdP
+  OAuthLoginUri:
+    Type: String
+    Description: Login endpoint provided by the OAuth IdP
+  OAuthTokenUri:
+    Type: String
+    Description: Token endpoint provided by the OAuth IdP
+  OAuthAdminClaimName:
+    Type: String
+    Description: Name of a claim which, if present and a string 'true' will indicate that the user is an administrator
+    Default: multimedia_admin
+  OAuthValidAudiences:
+    Type: String
+    Description: JSON style list of audience names, one of which must be the current "aud" field in a token in order for it to be considered valid
+    Default: "[\"archivehunter\"]"
   OfficeIpRange:
     Type: String
     Description: CIDR block of ip addresses to be allowed SSH access
@@ -789,7 +809,7 @@ Resources:
               - s3:GetObject
               - s3:ListObjects
             Resource:
-              - !Sub arn:aws:s3:::${PandaBucket}/*
+              - !Sub arn:aws:s3:::${OAuthConfigBucket}/*
       - PolicyName: MessageQueueRead
         PolicyDocument:
           Version: 2012-10-17
@@ -952,6 +972,8 @@ Resources:
 
           echo "$LOCAL_IP  $HOSTNAME" >> /etc/hosts
 
+          aws s3 cp s3://${OAuthConfigBucket}/oauth-signing.pem /usr/share/archivehunter/conf/oauth-signing.pem
+
           cat > /usr/share/archivehunter/conf/application.conf << EOF
           play.http.secret.key = "${AppSecretString}"
           play.filters {
@@ -1021,10 +1043,22 @@ Resources:
           }
 
           auth {
-             panDomainBucket = "${PandaBucket}"
              deployedUrl = "https://${App}.${DeploymentDomain}"
              domain = "${DeploymentDomain}"
              userProfileTable = "${UserProfileTable}"
+          }
+
+          oAuth {
+            clientId: "${OAuthClientId}"
+            resource: "${OAuthClientName}"
+            oAuthUri: "${OAuthLoginUri}"
+            tokenUrl: "${OAuthTokenUri}"
+            adminClaimName: "${OAuthAdminClaimName}"
+            authCookieName: "archivehunter-auth"
+            refreshCookieName: "archivehunter-refresh"
+            enforceSecure: true    //You can turn this off to make development simpler but always turn it on for production!
+            tokenSigningCertPath: "/usr/share/archivehunter/conf/oauth-signing.pem"
+            validAudiences: ${OAuthValidAudiences}
           }
 
           serverToken {
