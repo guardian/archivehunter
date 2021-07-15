@@ -27,7 +27,8 @@ import play.api.cache.SyncCacheApi
 import play.api.libs.json._
 import play.api.libs.streams.Accumulator
 import play.api.libs.typedmap.TypedKey
-
+import io.circe.generic.auto._
+import io.circe.syntax._
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success, Try}
@@ -107,36 +108,34 @@ trait Security extends BaseController {
   }
   final val AuthTypeKey = TypedKey[AuthType.Value]("auth_type")
 
-  /**
-   * get a username from the claim.  This is determined from the first string entry of a list of claim fields.
-   * if none of them match (wrong data type or not present) then `subject` is used as a fallback
-   * @param claim the `JwtClaimsSet` to inspect
-   * @return a string the gives the user id for the given claims set
-   */
-//  private def usernameFromClaim(claim:JWTClaimsSet) = {
-//    val possibleFields = Array("preferred_username","username")
-//    val possibleNames = possibleFields.map(name=>Try {Option(claim.getStringClaim(name))})
-//    val successfulNames = possibleNames.collect({case Success(Some(username))=>username})
-//
-//    successfulNames.headOption.getOrElse(claim.getSubject)
-//  }
-
   //if this returns something, then we are logged in
-  private def username(request:RequestHeader):Either[LoginResult, LoginResultOK[JWTClaimsSet]] = request.headers.get("Authorization") match {
-    case Some(auth)=>
-      if(auth.contains("HMAC")) {
-        logger.debug("got HMAC Authorization header, doing hmac auth")
-        val updatedRequest = request.addAttr(AuthTypeKey, AuthType.AuthHmac)
-        hmacUsername(updatedRequest, auth)
-      } else {
-        logger.warn("got request with Authorization header that is not HMAC")
-        Left(LoginResultNotPresent)
-      }
-    case None=>
-      bearerTokenAuth(request).map(result => {
-        LoginResultOK(result.content)
-      })
-  }
+  private def username(request:RequestHeader):Either[LoginResult, LoginResultOK[JWTClaimsSet]] =
+    (request.headers.get("Authorization"), request.session.get("claims")) match {
+      case (Some(auth), _)=>
+        if(auth.contains("HMAC")) {
+          logger.debug("got HMAC Authorization header, doing hmac auth")
+          val updatedRequest = request.addAttr(AuthTypeKey, AuthType.AuthHmac)
+          hmacUsername(updatedRequest, auth)
+        } else {
+          logger.warn("got request with Authorization header that is not HMAC")
+          Left(LoginResultNotPresent)
+        }
+      case (None, Some(claims))=>
+        io.circe.parser.parse(claims).flatMap(_.as[Map[String,String]]) match {
+          case Right(json)=>
+            val claims = json
+              .foldLeft(new JWTClaimsSet.Builder())((builder, kv)=>builder.claim(kv._1, kv._2))
+              .build()
+            logger.debug(s"reconstituted claims: ${claims}")
+            Right(LoginResultOK(claims))
+          case Left(err)=>
+            Left(LoginResultInvalid(err.toString))
+        }
+      case (None, None)=>
+        bearerTokenAuth(request).map(result => {
+          LoginResultOK(result.content)
+        })
+    }
 
   private def onUnauthorized(request: RequestHeader, loginResult: LoginResult) = loginResult match {
     case LoginResultInvalid(detailString:String)=>
