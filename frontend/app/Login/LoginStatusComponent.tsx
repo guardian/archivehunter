@@ -18,13 +18,14 @@ const useStyles = makeStyles({
         float: "right",
         position: "absolute",
         top: 0,
-        right: 0,
+        right: "1em",
+        height: "max-content",
         padding: "0.4em",
         overflow: "hidden",
         cursor: "pointer"
     },
     loginUserAvatar: {
-        height: "48px",
+        height: "40px",
         borderRadius: "8px",
         verticalAlign: "middle",
     },
@@ -55,12 +56,22 @@ const LoginStatusComponent:React.FC<LoginStatusComponentProps> = (props) => {
 
     if(redirecting) return <Redirect to="/"/>;
 
+    const displayName = ()=>{
+        if(userContext.profile && userContext.profile?.firstName!="" && userContext.profile?.lastName!="") {
+            return `${userContext.profile?.firstName} ${userContext.profile?.lastName}`;
+        } else if(userContext.profile) {
+            return userContext.profile.email;
+        } else {
+            return "unknown user";
+        }
+    }
+
     return <div className={classes.loginInfoContainer}
                 onMouseEnter={()=>setOpened(true)}
                 onMouseLeave={trackedOut}>
         {
             userContext.profile ?
-                <span className={classes.loginInfoText}>{userContext.profile.firstName} {userContext.profile.lastName}</span> :
+                <span className={classes.loginInfoText}>{displayName()}</span> :
                 <span className={classes.loginInfoText}>Not logged in</span>
         }
         {
