@@ -207,7 +207,12 @@ class Auth @Inject() (config:Configuration,
             logger.warn(s"Could not get claims: $err")
             baseSessionValues
           case Right(claims)=>
-            baseSessionValues ++ Map("claims"->filteredClaims(claims.getClaims.asScala).asJson.noSpaces)
+            baseSessionValues ++ Map(
+              "username"->claims.getUserID,
+              "claimExpiry"->ZonedDateTime
+                .ofInstant(claims.getExpirationTime.toInstant, ZoneId.systemDefault())
+                .format(DateTimeFormatter.ISO_DATE_TIME)
+            )
         }
 
         val sessionValues = maybeUserProfile match {
@@ -364,45 +369,47 @@ class Auth @Inject() (config:Configuration,
 
   }
 
+  private def expiryFromSession(request:Request[Any]) =
+    request
+      .session
+      .get("claimExpiry")
+      .flatMap(expiryString=>Try { ZonedDateTime.parse(expiryString, DateTimeFormatter.ISO_DATE_TIME) }.toOption)
+
   def refreshIfRequired = Action.async { request =>
-    (safeGetCookie(request, "oAuth.refreshCookieName")) match {
+    safeGetCookie(request, "oAuth.refreshCookieName") match {
       case Some(refreshCookie) =>
-        if(!authCookie.httpOnly || !refreshCookie.httpOnly) {
-          logger.error(s"Client presented cookies for refresh that are not httpOnly: $authCookie $refreshCookie")
+        if(!refreshCookie.httpOnly) {
+          logger.error(s"Client presented cookies for refresh that are not httpOnly: $refreshCookie")
           Future(BadRequest(GenericErrorResponse("security_problem", "only httpOnly cookies are trusted for auth").asJson))
         } else {
-          bearerTokenAuth.validateToken(LoginResultOK(authCookie.value)) match {
-            case Left(loginProblem) =>
-              logger.error(s"Invalid access token presented for refresh: $loginProblem")
-              Future(BadRequest(GenericErrorResponse("error", "access token not valid").asJson))
-            case Right(LoginResultOK(claimsSet)) =>
-              if (Auth.claimIsExpired(claimsSet)) {
-                for {
-                  maybeOauthResponse <- requestRefresh(refreshCookie.value)
-                  maybeValidatedContent <- validateContent(maybeOauthResponse)
-                  maybeUserProfile <- userProfileFromJWT(maybeValidatedContent)
-                  result <- finalCallbackResponse(maybeOauthResponse,
-                    maybeValidatedContent,
-                    maybeUserProfile,
-                    ResponseHeader(200),
-                    play.api.http.HttpEntity.Strict(
-                      ByteString(GenericErrorResponse("ok", "token refreshed").asJson.noSpaces),
-                      Some("application/json")
-                    )
-                  )
-                } yield result
-              } else {
-                logger.info(s"No token refresh required for ${claimsSet.getUserID}")
-                Future(Ok(GenericErrorResponse("not_needed", "no refresh required").asJson))
-              }
-          }
+          expiryFromSession(request) match {
+           case Some(expiry) =>
+             if (Auth.claimIsExpired(expiry)) {
+               for {
+                 maybeOauthResponse <- requestRefresh(refreshCookie.value)
+                 maybeValidatedContent <- validateContent(maybeOauthResponse)
+                 maybeUserProfile <- userProfileFromJWT(maybeValidatedContent)
+                 result <- finalCallbackResponse(maybeOauthResponse,
+                   maybeValidatedContent,
+                   maybeUserProfile,
+                   ResponseHeader(200),
+                   play.api.http.HttpEntity.Strict(
+                     ByteString(GenericErrorResponse("ok", "token refreshed").asJson.noSpaces),
+                     Some("application/json")
+                   )
+                 )
+               } yield result
+             } else {
+               logger.info(s"No token refresh required")
+               Future(Ok(GenericErrorResponse("not_needed", "no refresh required").asJson))
+             }
+           case None =>
+             Future(InternalServerError(GenericErrorResponse("session_problem", "claim expiry not present or malformed").asJson))
+         }
         }
-      case (_, None) =>
+      case None =>
         logger.error("Could not refresh login, either there was no refresh cookie or `oAuth.refreshCookieName` is not set in the config")
         Future(BadRequest(GenericErrorResponse("error", "either no refresh cookie or server misconfigured").asJson))
-      case (None, _) =>
-        logger.error("Could not refresh login because no access cookie was presented, not evan an expired one")
-        Future(BadRequest(GenericErrorResponse("error", "An access token must be presented even if it's expired").asJson))
     }
   }
 }
@@ -413,14 +420,14 @@ object Auth {
   case class OAuthResponse(access_token:Option[String], refresh_token:Option[String], error:Option[String])
 
   /**
-    * returns a booolean indicating if the given claims set either has expired or is about to
-    * @param claimsSet JWTClaimsSet from the given token
+    * returns a boolean indicating if the given claims set either has expired or is about to
+    * @param expiryTime ZonedDateTime indicating the token expiry
     * @return true if the claims set is expired or shortly will be
     */
-  def claimIsExpired(claimsSet:JWTClaimsSet) = {
+  def claimIsExpired(expiryTime:ZonedDateTime) = {
     val expiryWindow = Duration.ofMinutes(2)  //attempt a refresh if the token is valid for less than this
-    val expiresIn = Duration.between(Instant.now(), claimsSet.getExpirationTime.toInstant)
-    logger.debug(s"${claimsSet.getUserID} refresh check - access token expiry at ${claimsSet.getExpirationTime} which expires in $expiresIn")
+    val expiresIn = Duration.between(Instant.now(), expiryTime)
+    logger.debug(s"refresh check - access token expiry at ${expiryTime} which expires in $expiresIn")
     expiresIn.isNegative||expiresIn.isZero||expiryWindow.compareTo(expiresIn)>=0  //compareTo - if window>expiresIn result =1, if == result=0 if < result=-1
   }
 }

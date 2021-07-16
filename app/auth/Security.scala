@@ -32,7 +32,7 @@ import io.circe.syntax._
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success, Try}
-
+import ClaimsSetExtensions._
 sealed trait LoginResult
 
 final case class LoginResultOK[A](content:A) extends LoginResult
@@ -82,22 +82,22 @@ trait Security extends BaseController {
    * @param header HTTP request object
    * @param auth Authorization token as passed from the client
    */
-  private def hmacUsername(header: RequestHeader, auth: String):Either[LoginResult, LoginResultOK[JWTClaimsSet]] = {
+  private def hmacUsername(header: RequestHeader, auth: String):Either[LoginResult, LoginResultOK[String]] = {
     logger.debug(s"headers: ${header.headers.toSimpleMap.toString}")
     if(Conf.sharedSecret.isEmpty){
       logger.error("Unable to process server->server request, shared_secret is not set in application.conf")
       Left(LoginResultMisconfigured(auth))
     } else {
-      val claimBuilder = new JWTClaimsSet.Builder
-      val hmacClaim = claimBuilder
-        .issuer("hmac")
-        .audience("archivehunter")
-        .subject(auth)
-        .build()
+//      val claimBuilder = new JWTClaimsSet.Builder
+//      val hmacClaim = claimBuilder
+//        .issuer("hmac")
+//        .audience("archivehunter")
+//        .subject(auth)
+//        .build()
       HMAC
         .calculateHmac(header, Conf.sharedSecret)
         .map(calculatedSig => {
-          if ("HMAC "+calculatedSig == auth) Right(LoginResultOK(hmacClaim)) else Left(LoginResultInvalid("hmac"))
+          if ("HMAC "+calculatedSig == auth) Right(LoginResultOK("hmac-auth")) else Left(LoginResultInvalid("hmac"))
         })
         .getOrElse(Left(LoginResultInvalid("")))
     }
@@ -109,8 +109,8 @@ trait Security extends BaseController {
   final val AuthTypeKey = TypedKey[AuthType.Value]("auth_type")
 
   //if this returns something, then we are logged in
-  private def username(request:RequestHeader):Either[LoginResult, LoginResultOK[JWTClaimsSet]] =
-    (request.headers.get("Authorization"), request.session.get("claims")) match {
+  private def username(request:RequestHeader):Either[LoginResult, LoginResultOK[String]] =
+    (request.headers.get("Authorization"), request.session.get("username")) match {
       case (Some(auth), _)=>
         if(auth.contains("HMAC")) {
           logger.debug("got HMAC Authorization header, doing hmac auth")
@@ -120,20 +120,21 @@ trait Security extends BaseController {
           logger.warn("got request with Authorization header that is not HMAC")
           Left(LoginResultNotPresent)
         }
-      case (None, Some(claims))=>
-        io.circe.parser.parse(claims).flatMap(_.as[Map[String,String]]) match {
-          case Right(json)=>
-            val claims = json
-              .foldLeft(new JWTClaimsSet.Builder())((builder, kv)=>builder.claim(kv._1, kv._2))
-              .build()
-            logger.debug(s"reconstituted claims: ${claims}")
-            Right(LoginResultOK(claims))
-          case Left(err)=>
-            Left(LoginResultInvalid(err.toString))
-        }
+      case (None, Some(username))=>
+        Right(LoginResultOK(username))
+//        io.circe.parser.parse(claims).flatMap(_.as[Map[String,String]]) match {
+//          case Right(json)=>
+//            val claims = json
+//              .foldLeft(new JWTClaimsSet.Builder())((builder, kv)=>builder.claim(kv._1, kv._2))
+//              .build()
+//            logger.debug(s"reconstituted claims: ${claims}")
+//            Right(LoginResultOK(claims))
+//          case Left(err)=>
+//            Left(LoginResultInvalid(err.toString))
+//        }
       case (None, None)=>
         bearerTokenAuth(request).map(result => {
-          LoginResultOK(result.content)
+          LoginResultOK(result.content.getUserID)
         })
     }
 
@@ -155,39 +156,51 @@ trait Security extends BaseController {
       Results.InternalServerError(Json.obj("status"->"logic_error","detail"->"Login should have succeeded but error handler called. This is a server bug."))
   }
 
-  def IsAuthenticated(f: => JWTClaimsSet => Request[AnyContent] => Result) = Security.MyAuthenticated(username, onUnauthorized) {
+  def IsAuthenticated(f: => String => Request[AnyContent] => Result) = Security.MyAuthenticated(username, onUnauthorized) {
     uid => Action(request => f(uid)(request))
   }
 
-  def IsAuthenticatedAsync(f: => JWTClaimsSet => Request[AnyContent] => Future[Result]) = Security.MyAuthenticated(username, onUnauthorized) {
+  def IsAuthenticatedAsync(f: => String => Request[AnyContent] => Future[Result]) = Security.MyAuthenticated(username, onUnauthorized) {
     uid => Action.async(request => f(uid)(request))
   }
 
-  def IsAuthenticatedAsync[A](b: BodyParser[A])(f: => JWTClaimsSet => Request[A] => Future[Result]) = Security.MyAuthenticated(username, onUnauthorized) {
+  def IsAuthenticatedAsync[A](b: BodyParser[A])(f: => String => Request[A] => Future[Result]) = Security.MyAuthenticated(username, onUnauthorized) {
     uid=> Action.async(b)(request => f(uid)(request))
   }
 
-  def IsAuthenticated[A](b: BodyParser[A])(f: => JWTClaimsSet => Request[A] => Result) = Security.MyAuthenticated(username, onUnauthorized) {
+  def IsAuthenticated[A](b: BodyParser[A])(f: => String => Request[A] => Result) = Security.MyAuthenticated(username, onUnauthorized) {
     uid => Action(b)(request => f(uid)(request))
   }
 
-  def checkAdmin[A](claims:JWTClaimsSet, request:Request[A]) = {
-      val adminClaimContent = for {
-        maybeAdminClaim <- Option(claims.getStringClaim(bearerTokenAuth.isAdminClaimName())) match {
-          case Some(str)=>Right(LoginResultOK(str))
-          case None=>Left(LoginResultNotPresent)
-        }
-      } yield maybeAdminClaim
-
-      adminClaimContent match {
-        case Right(LoginResultOK(stringValue))=>
-          logger.debug(s"got value for isAdminClaim ${bearerTokenAuth.isAdminClaimName()}: $stringValue, downcasing and testing for 'true' or 'yes'")
-          val downcased = stringValue.toLowerCase()
-          downcased == "true" || downcased == "yes"
-        case Left(_)=>
-          logger.debug(s"got nothing for isAdminClaim ${bearerTokenAuth.isAdminClaimName()}")
-          false
-      }
+//  def checkAdmin[A](claims:JWTClaimsSet, request:Request[A]) = {
+//      val adminClaimContent = for {
+//        maybeAdminClaim <- Option(claims.getStringClaim(bearerTokenAuth.isAdminClaimName())) match {
+//          case Some(str)=>Right(LoginResultOK(str))
+//          case None=>Left(LoginResultNotPresent)
+//        }
+//      } yield maybeAdminClaim
+//
+//      adminClaimContent match {
+//        case Right(LoginResultOK(stringValue))=>
+//          logger.debug(s"got value for isAdminClaim ${bearerTokenAuth.isAdminClaimName()}: $stringValue, downcasing and testing for 'true' or 'yes'")
+//          val downcased = stringValue.toLowerCase()
+//          downcased == "true" || downcased == "yes"
+//        case Left(_)=>
+//          logger.debug(s"got nothing for isAdminClaim ${bearerTokenAuth.isAdminClaimName()}")
+//          false
+//      }
+//  }
+  def checkAdmin[A](request:Request[A]) = {
+    userProfileFromSession(request.session) match {
+      case Some(Right(profile))=>
+        profile.isAdmin
+      case Some(Left(err))=>
+        logger.error(s"Could not check admin for ${request.session.get("username")}: $err")
+        false
+      case None=>
+        logger.error(s"Could not get profile from session for ${request.session.get("username")}")
+        false
+    }
   }
 
   /**
@@ -200,8 +213,8 @@ trait Security extends BaseController {
    * @param f the action function
    * @return the result of the action function or Forbidden
    */
-  def IsAdmin(f: => JWTClaimsSet => Request[AnyContent] => Result) = IsAuthenticated { uid=> request=>
-    if(checkAdmin(uid, request)){
+  def IsAdmin(f: => String => Request[AnyContent] => Result) = IsAuthenticated { uid=> request=>
+    if(checkAdmin(request)){
       f(uid)(request)
     } else {
       logger.warn(s"Admin request rejected for $uid to ${request.uri}")
@@ -209,8 +222,8 @@ trait Security extends BaseController {
     }
   }
 
-  def IsAdmin[A](b: BodyParser[A])(f: => JWTClaimsSet => Request[A] => Result) = IsAuthenticated(b) { uid=> request=>
-    if(checkAdmin(uid, request)){
+  def IsAdmin[A](b: BodyParser[A])(f: => String => Request[A] => Result) = IsAuthenticated(b) { uid=> request=>
+    if(checkAdmin(request)){
       f(uid)(request)
     } else {
       logger.warn(s"Admin request rejected for $uid to ${request.uri}")
@@ -218,8 +231,8 @@ trait Security extends BaseController {
     }
   }
 
-  def IsAdminAsync[A](b: BodyParser[A])(f: => JWTClaimsSet => Request[A] => Future[Result]) = IsAuthenticatedAsync(b) { uid=> request=>
-    if(checkAdmin(uid,request)) {
+  def IsAdminAsync[A](b: BodyParser[A])(f: => String => Request[A] => Future[Result]) = IsAuthenticatedAsync(b) { uid=> request=>
+    if(checkAdmin(request)) {
       f(uid)(request)
     } else {
       logger.warn(s"Admin request rejected for $uid to ${request.uri}")
@@ -227,8 +240,8 @@ trait Security extends BaseController {
     }
   }
 
-  def IsAdminAsync(f: => JWTClaimsSet => Request[AnyContent] => Future[Result]) = IsAuthenticatedAsync { uid=> request=>
-    if(checkAdmin(uid,request)) {
+  def IsAdminAsync(f: => String => Request[AnyContent] => Future[Result]) = IsAuthenticatedAsync { uid=> request=>
+    if(checkAdmin(request)) {
       f(uid)(request)
     } else {
       logger.warn(s"Admin request rejected for $uid to ${request.uri}")
