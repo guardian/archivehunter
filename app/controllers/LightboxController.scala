@@ -180,7 +180,7 @@ class LightboxController @Inject() (override val config:Configuration,
         indexer.getById(fileId).flatMap(indexEntry =>
           Future.sequence(Seq(
             LightboxHelper.saveLightboxEntry(userProfile, indexEntry, None),
-            LightboxHelper.updateIndexLightboxed(userProfile, userAvatarHelper.getAvatarLocationString(user), indexEntry, None)
+            LightboxHelper.updateIndexLightboxed(userProfile, userAvatarHelper.getAvatarLocationString(userProfile.userEmail), indexEntry, None)
           )).map(results=>{
             val errors = results.collect({case Failure(err)=>err})
             if(errors.nonEmpty){
