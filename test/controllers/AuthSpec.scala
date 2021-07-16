@@ -21,7 +21,8 @@ import io.circe.syntax._
 import io.circe.generic.auto._
 import play.api.mvc.Cookie
 
-import java.time.Instant
+import java.time.format.DateTimeFormatter
+import java.time.{Instant, ZoneId, ZonedDateTime}
 import java.util.Date
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
@@ -35,14 +36,16 @@ class AuthSpec extends Specification with Mockito {
   "Auth.claimIsExpired" should {
     "return true if presented with an expiry time in the past" in {
       val now = Instant.now()
-      val claims = fakeClaimBuilder.expirationTime(Date.from(now.minusSeconds(500))).build();
-      Auth.claimIsExpired(claims) must beTrue
+      val testTime = ZonedDateTime.ofInstant(now.minusSeconds(500), ZoneId.systemDefault())
+      //val claims = fakeClaimBuilder.expirationTime(Date.from(now.minusSeconds(500))).build();
+      Auth.claimIsExpired(testTime) must beTrue
     }
 
     "return false if presented with an expiry time in the future" in {
       val now = Instant.now()
-      val claims = fakeClaimBuilder.expirationTime(Date.from(now.plusSeconds(500))).build();
-      Auth.claimIsExpired(claims) must beFalse
+      val testTime = ZonedDateTime.ofInstant(now.plusSeconds(500), ZoneId.systemDefault())
+      //val claims = fakeClaimBuilder.expirationTime(Date.from(now.plusSeconds(500))).build();
+      Auth.claimIsExpired(testTime) must beFalse
     }
   }
 
@@ -170,10 +173,10 @@ class AuthSpec extends Specification with Mockito {
         header("Location",result.get) must beSome("/path/you/were/at")
 
         val resultCookies = cookies(result.get)
-        resultCookies.get("authtoken") must beSome(Cookie("authtoken","access-token",Some(28800),"/",None,secure = true,httpOnly = true,Some(Cookie.SameSite.Strict)))
+        //resultCookies.get("authtoken") must beSome(Cookie("authtoken","access-token",Some(28800),"/",None,secure = true,httpOnly = true,Some(Cookie.SameSite.Strict)))
         resultCookies.get("refreshtoken") must beSome(Cookie("refreshtoken","refresh-token",Some(28800),"/",None,secure = true,httpOnly = true,Some(Cookie.SameSite.Strict)))
-        session(result.get).get("userProfile") must beSome(fakeUserProfile.asJson.noSpaces)
-
+        //session(result.get).get("userProfile") must beSome(fakeUserProfile.asJson.noSpaces)
+        session(result.get).get("username") must beSome("testuser")
         there was one(mockHttp).singleRequest(any, any, any, any)
         there was one(mockUserProfileDAO).userProfileForEmail("testuser")
         there was no(mockUserProfileDAO).put(any)
@@ -206,9 +209,10 @@ class AuthSpec extends Specification with Mockito {
         header("Location",result.get) must beSome("/path/you/were/at")
 
         val resultCookies = cookies(result.get)
-        resultCookies.get("authtoken") must beSome(Cookie("authtoken","access-token",Some(28800),"/",None,secure = true,httpOnly = true,Some(Cookie.SameSite.Strict)))
+        //resultCookies.get("authtoken") must beSome(Cookie("authtoken","access-token",Some(28800),"/",None,secure = true,httpOnly = true,Some(Cookie.SameSite.Strict)))
         resultCookies.get("refreshtoken") must beSome(Cookie("refreshtoken","refresh-token",Some(28800),"/",None,secure = true,httpOnly = true,Some(Cookie.SameSite.Strict)))
-        session(result.get).get("userProfile") must beSome
+        //session(result.get).get("userProfile") must beSome(fakeUserProfile.asJson.noSpaces)
+        session(result.get).get("username") must beSome("testuser")
 
         there was one(mockHttp).singleRequest(any, any, any, any)
         there was one(mockUserProfileDAO).userProfileForEmail("testuser")
@@ -284,8 +288,11 @@ class AuthSpec extends Specification with Mockito {
         val result = route(app,
           FakeRequest(POST, "/api/loginRefresh")
             .withCookies(
-              Cookie("authtoken","auth-token",Some(3600),"/",None,secure = true,httpOnly = true,Some(Cookie.SameSite.Strict)),
               Cookie("refreshtoken","refresh-token",Some(3600),"/",None,secure = true,httpOnly = true,Some(Cookie.SameSite.Strict)),
+            )
+            .withSession(
+              "username"->"testuser",
+              "claimExpiry"->ZonedDateTime.ofInstant(Instant.now().minusSeconds(500),ZoneId.systemDefault()).format(DateTimeFormatter.ISO_DATE_TIME)
             )
         )
         result must beSome
@@ -294,9 +301,9 @@ class AuthSpec extends Specification with Mockito {
         status(result.get) mustEqual OK
 
         val resultCookies = cookies(result.get)
-        resultCookies.get("authtoken") must beSome(Cookie("authtoken","new-access-token",Some(28800),"/",None,secure = true,httpOnly = true,Some(Cookie.SameSite.Strict)))
         resultCookies.get("refreshtoken") must beSome(Cookie("refreshtoken","new-refresh-token",Some(28800),"/",None,secure = true,httpOnly = true,Some(Cookie.SameSite.Strict)))
-        session(result.get).get("userProfile") must beSome
+        session(result.get).get("username") must beSome("testuser")
+        session(result.get).get("claimExpiry") must beSome
 
         there was one(mockHttp).singleRequest(any, any, any, any)
         there was one(mockUserProfileDAO).userProfileForEmail("testuser")
@@ -330,9 +337,12 @@ class AuthSpec extends Specification with Mockito {
         val result = route(app,
           FakeRequest(POST, "/api/loginRefresh")
             .withCookies(
-              Cookie("authtoken","auth-token",Some(3600),"/",None,secure = true,httpOnly = true,Some(Cookie.SameSite.Strict)),
               Cookie("refreshtoken","refresh-token",Some(3600),"/",None,secure = true,httpOnly = true,Some(Cookie.SameSite.Strict)),
             )
+            .withSession(
+            "username"->"testuser",
+            "claimExpiry"->ZonedDateTime.ofInstant(Instant.now().plusSeconds(500),ZoneId.systemDefault()).format(DateTimeFormatter.ISO_DATE_TIME)
+          )
         )
         result must beSome
 
@@ -343,7 +353,53 @@ class AuthSpec extends Specification with Mockito {
         //if no refresh is required we set no extra cookies
         resultCookies.get("authtoken") must beNone
         resultCookies.get("refreshtoken") must beNone
-        session(result.get).get("userProfile") must beNone
+        session(result.get).get("username") must beNone
+
+        there was no(mockHttp).singleRequest(any, any, any, any)
+        there was no(mockUserProfileDAO).userProfileForEmail("testuser")
+        there was no(mockUserProfileDAO).put(any)
+      }
+    }
+
+    "error if claimExpiry is not present in the session" in {
+      val mockHttp = mock[HttpExt]
+      val mockClientFactory = new HttpClientFactory {
+        override def build: HttpExt = mockHttp
+      }
+      val mockUserProfileDAO = mock[UserProfileDAO]
+      val mockBearerToken = mock[BearerTokenAuth]
+
+      val returnedContent = OAuthResponse(Some("new-access-token"),Some("new-refresh-token"),None).asJson.noSpaces
+      val entity = HttpEntity(returnedContent)
+      mockHttp.singleRequest(any,any,any,any) returns Future(HttpResponse(StatusCodes.OK, entity=entity))
+
+      val mockClaims = new JWTClaimsSet.Builder()
+        .audience("archivehunter")
+        .subject("testuser")
+        .expirationTime(Date.from(Instant.now().plusSeconds(300)))
+        .build()
+
+      val fakeUserProfile = UserProfile("testuser@org.int",isAdmin = false,Seq(),allCollectionsVisible = true,None,None,None,None,None,None)
+
+      mockBearerToken.validateToken(any) returns Right(LoginResultOK(mockClaims))
+      mockUserProfileDAO.userProfileForEmail(any) returns Future(Some(Right(fakeUserProfile)))
+      new WithApplication(buildMyApp(Some(mockClientFactory), mockUserProfileDAO, Some(mockBearerToken))) {
+        val result = route(app,
+          FakeRequest(POST, "/api/loginRefresh")
+            .withCookies(
+              Cookie("refreshtoken","refresh-token",Some(3600),"/",None,secure = true,httpOnly = true,Some(Cookie.SameSite.Strict)),
+            )
+        )
+        result must beSome
+
+        contentAsString(result.get) mustEqual("""{"status":"session_problem","detail":"claim expiry not present or malformed"}""")
+        status(result.get) mustEqual INTERNAL_SERVER_ERROR
+
+        val resultCookies = cookies(result.get)
+        //if no refresh is required we set no extra cookies
+        resultCookies.get("authtoken") must beNone
+        resultCookies.get("refreshtoken") must beNone
+        session(result.get).get("username") must beNone
 
         there was no(mockHttp).singleRequest(any, any, any, any)
         there was no(mockUserProfileDAO).userProfileForEmail("testuser")

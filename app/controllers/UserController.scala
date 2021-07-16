@@ -30,17 +30,20 @@ class UserController @Inject()(override val controllerComponents:ControllerCompo
 
   override protected val logger=LoggerFactory.getLogger(getClass)
 
-  def loginStatus = IsAuthenticated { claims=> request =>
+  def loginStatus = IsAuthenticated { username=> request =>
     userProfileFromSession(request.session) match {
       case None=>
-        val userData = UserResponse.fromClaims(claims, claims.getIsMMAdmin)
-        val maybeWithPicture = userData.copy(avatarUrl=userAvatarHelper.getAvatarUrl(claims.getUserID).map(_.toString))
-        Ok(maybeWithPicture.asJson)
+//        val userData = UserResponse.fromClaims(claims, claims.getIsMMAdmin)
+//        val maybeWithPicture = userData.copy(avatarUrl=userAvatarHelper.getAvatarUrl(claims.getUserID).map(_.toString))
+//        Ok(maybeWithPicture.asJson)
+        BadRequest(GenericErrorResponse("profile_error","no profile in session").asJson)
       case Some(Left(err))=>
         logger.error(err.toString)
         InternalServerError(GenericErrorResponse("profile_error", err.toString).asJson)
       case Some(Right(profile))=>
-        Ok(UserResponse.fromClaims(claims, profile.isAdmin).asJson)
+        val userData = UserResponse.fromProfile(profile)
+        val maybeWithPicture = userData.copy(avatarUrl=userAvatarHelper.getAvatarUrl(profile.userEmail).map(_.toString))
+        Ok(maybeWithPicture.asJson)
     }
   }
 

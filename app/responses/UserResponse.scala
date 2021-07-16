@@ -2,6 +2,7 @@ package responses
 
 import com.nimbusds.jwt.JWTClaimsSet
 import auth.ClaimsSetExtensions._
+import models.UserProfile
 
 object UserResponse extends ((String,String,String,Option[String],Boolean)=>UserResponse) {
   def fromClaims(claims:JWTClaimsSet, isAdmin:Boolean):UserResponse = {
@@ -11,6 +12,16 @@ object UserResponse extends ((String,String,String,Option[String],Boolean)=>User
       claims.getEmail.getOrElse(""),
       None,
       isAdmin
+    )
+  }
+
+  def fromProfile(userProfile: UserProfile):UserResponse = {
+    new UserResponse(
+      userProfile.userEmail,
+      "",
+      userProfile.userEmail,
+      None,
+      userProfile.isAdmin
     )
   }
 }

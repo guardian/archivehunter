@@ -80,11 +80,11 @@ class LightboxController @Inject() (override val config:Configuration,
   def removeFromLightbox(user:String, fileId:String) = IsAuthenticatedAsync { claims=> request=>
     withTargetUserProfile(request, user) { profile=>
         val indexUpdateFuture = indexer.getById(fileId).flatMap(indexEntry => {
-          val updatedEntry = indexEntry.copy(lightboxEntries = indexEntry.lightboxEntries.filter(_.owner!=claims.getEmail.getOrElse("")))
+          val updatedEntry = indexEntry.copy(lightboxEntries = indexEntry.lightboxEntries.filter(_.owner!=profile.userEmail))
           indexer.indexSingleItem(updatedEntry, Some(updatedEntry.id))
         })
 
-        val lbUpdateFuture = lightboxEntryDAO.delete(claims.getUserID, fileId)
+        val lbUpdateFuture = lightboxEntryDAO.delete(profile.userEmail, fileId)
           .map(result=>Success(result.toString))
           .recoverWith({
             case err:Throwable=>Future(Failure(err))
@@ -303,7 +303,7 @@ class LightboxController @Inject() (override val config:Configuration,
     * returns bulk entries for the current user
     * @return
     */
-  def myBulks(user:String) = IsAuthenticatedAsync { claims=> request=>
+  def myBulks(user:String) = IsAuthenticatedAsync { username=> request=>
     import cats.implicits._
     withTargetUserProfile(request, user) { profile=>
         lightboxBulkEntryDAO.entriesForUser(profile.userEmail).flatMap(results=>{
@@ -311,7 +311,7 @@ class LightboxController @Inject() (override val config:Configuration,
           if(failures.nonEmpty){
             Future(InternalServerError(GenericErrorResponse("error",failures.map(_.toString).mkString(",")).asJson))
           } else {
-            claims.getEmail
+            request.session.get("username")
               .map(userEmail=>LightboxHelper.getLooseCountForUser(indexName, userEmail))
               .sequence
               .map({
@@ -364,13 +364,13 @@ class LightboxController @Inject() (override val config:Configuration,
     * if nothing is found, a 200 response is still returned, but with a null in the entry field.
     * @return
     */
-  def haveBulkEntryFor(user:String) = IsAuthenticatedAsync(circe.json(2048)) { claims=> request=>
+  def haveBulkEntryFor(user:String) = IsAuthenticatedAsync(circe.json(2048)) { username=> request=>
     request.body.as[SearchRequest].fold(
       err=>Future(BadRequest(GenericErrorResponse("bad_request", err.toString).asJson)),
       rq=>{
         if(rq.path.isDefined && rq.collection.isDefined) {
           val desc = s"${rq.collection.get}:${rq.path.get}"
-          lightboxBulkEntryDAO.entryForDescAndUser(claims.getEmail.getOrElse(claims.getUsername),desc).map({
+          lightboxBulkEntryDAO.entryForDescAndUser(username,desc).map({
             case Left(err)=>InternalServerError(GenericErrorResponse("db_error", err.toString).asJson)
             case Right(Some(entry))=>Ok(ObjectGetResponse("ok","lightboxbulk",entry.id).asJson)
             case Right(None)=>Ok(ObjectGetResponseEmpty("notfound","lightboxbulk").asJson)
@@ -395,7 +395,7 @@ class LightboxController @Inject() (override val config:Configuration,
     })
   }
 
-  def bulkDownloadInApp(entryId:String) = IsAuthenticatedAsync { claims=> request=>
+  def bulkDownloadInApp(entryId:String) = IsAuthenticatedAsync { username=> request=>
     implicit val lightboxEntryDAOImpl = lightboxEntryDAO
     userProfileFromSession(request.session) match {
       case None=>Future(BadRequest(GenericErrorResponse("session_error","no session present").asJson))
@@ -404,14 +404,14 @@ class LightboxController @Inject() (override val config:Configuration,
         Future(InternalServerError(GenericErrorResponse("session_error","session is corrupted, log out and log in again").asJson))
       case Some(Right(profile))=>
         if(entryId=="loose"){
-          makeDownloadToken(entryId, claims.getUserID)
+          makeDownloadToken(entryId, username)
         } else {
           lightboxBulkEntryDAO.entryForId(UUID.fromString(entryId)).flatMap({
             case None =>
               Future(NotFound(GenericErrorResponse("not_found", "No bulk with that ID is present").asJson))
             case Some(Right(_)) =>
               //create a token that is valid for 10 seconds
-              makeDownloadToken(entryId, claims.getUserID)
+              makeDownloadToken(entryId, username)
             case Some(Left(err)) =>
               logger.error(s"Could not look up bulk entry in dynamo: ${err.toString}")
               Future(InternalServerError(GenericErrorResponse("db_error", err.toString).asJson))
