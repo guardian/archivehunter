@@ -17,8 +17,8 @@ object UserResponse extends ((String,String,String,Option[String],Boolean)=>User
 
   def fromProfile(userProfile: UserProfile):UserResponse = {
     new UserResponse(
-      userProfile.userEmail,
-      "",
+      userProfile.firstName.getOrElse(""),
+      userProfile.lastName.getOrElse(""),
       userProfile.userEmail,
       None,
       userProfile.isAdmin

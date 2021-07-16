@@ -24,8 +24,8 @@ const useStyles = makeStyles({
         cursor: "pointer"
     },
     loginUserAvatar: {
-        height: "24px",
-        borderRadius: "24px",
+        height: "48px",
+        borderRadius: "8px",
         verticalAlign: "middle",
     },
     loginInfoText: {
@@ -50,17 +50,7 @@ const LoginStatusComponent:React.FC<LoginStatusComponentProps> = (props) => {
     }
 
     const doLogout = async () => {
-        try {
-            const response = await axios.post("/api/logout")
-            if(props.userLoggedOutCb) {
-                props.userLoggedOutCb();
-            } else {
-                setOpened(false);
-                setRedirecting(true);
-            }
-        } catch(err) {
-            console.error(err);
-        }
+        window.location.href = "/logout";
     }
 
     if(redirecting) return <Redirect to="/"/>;
@@ -76,7 +66,7 @@ const LoginStatusComponent:React.FC<LoginStatusComponentProps> = (props) => {
         {
             userContext.profile ?
                 <img className={classes.loginUserAvatar} src={userContext.profile.avatarUrl}/> :
-                <img className={classes.loginUserAvatar} src="/public/images/nobody.png"/>
+                undefined
         }
         <div style={{width: "100%", display: opened ? "block" : "none"}}>
             <ul className={classes.discreetList}>

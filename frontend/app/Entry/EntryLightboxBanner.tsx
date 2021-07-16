@@ -19,13 +19,11 @@ const useStyles = makeStyles({
         marginRight: "0.1em",
     },
     entryLightboxBannerSmall: {
-        width: "16px",
         height: "16px",
         marginRight: "0.2em",
         borderRadius: "16px"
     },
     entryLightboxBannerLarge: {
-        width: "26px",
         height: "26px",
         marginRight: "0.4em",
         marginBottom: "0.6em",
