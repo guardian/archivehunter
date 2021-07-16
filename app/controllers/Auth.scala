@@ -111,18 +111,23 @@ class Auth @Inject() (config:Configuration,
   private def profilePicFromJWT(response: Either[String, JWTClaimsSet]) = {
     import cats.implicits._
     response match {
-      case Left(err)=>Future(Left(err))
+      case Left(err)=>
+        logger.debug(s"Can't get user avatar because login attempt was not successful: ${err}")
+        Future(Left(err))
       case Right(claims)=>
         Future.fromTry(Try {
           Seq("thumbnailPhoto", "jpegPhoto")
             .map(key => Option(claims.getStringClaim(key)))
             .collectFirst { case Some(content) => content }
             .map(Base64.getDecoder.decode)
+            .map(content=>{
+              logger.debug(s"Got ${content.length} bytes of picture data for ${claims.getUserID}")
+              content
+            })
             .map(ByteBuffer.wrap)
             .map(buffer=>userAvatarHelper.writeAvatarData(claims.getUserID, buffer))
             .sequence
-        })
-          .flatten
+        }).flatten
         .map(Right.apply)
         .recover({
           case err:Throwable=>
