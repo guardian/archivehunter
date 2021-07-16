@@ -62,7 +62,7 @@ const useStyles = makeStyles({
         gridColumnEnd: -1,
         gridRowStart: "top",
         gridRowEnd: "bottom",
-        overflow: "auto",
+        overflow: "hidden", //scrollbars are displayed by the child component
     }
 });
 
