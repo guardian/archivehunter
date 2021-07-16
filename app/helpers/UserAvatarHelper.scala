@@ -48,6 +48,7 @@ class UserAvatarHelper @Inject() (config:Configuration, s3ClientManager: S3Clien
     *         catch this with .recover() or .onComplete()
     */
   def writeAvatarData(username: String, content:ByteBuffer) = {
+    logger.debug(s"buffer current position ${content.position()} length ${content.remaining()} filename ${sanitisedKey(username)}")
     if(content.position()!=0) content.flip()
 
     val dataSource = Source
