@@ -161,7 +161,7 @@ class AuthSpec extends Specification with Mockito {
 
       val mockClaims = new JWTClaimsSet.Builder().audience("archivehunter").subject("testuser").expirationTime(Date.from(Instant.now().plusSeconds(300))).build()
 
-      val fakeUserProfile = UserProfile("testuser@org.int",false,Seq(),true,None,None,None,None,None,None)
+      val fakeUserProfile = UserProfile("userEmail@company.org",false,Some("test"),Some("test"),Seq(),true,None,None,Some(12345678L),None,None,None)
 
       mockBearerToken.validateToken(any) returns Right(LoginResultOK(mockClaims))
       mockUserProfileDAO.userProfileForEmail(any) returns Future(Some(Right(fakeUserProfile)))
@@ -238,7 +238,7 @@ class AuthSpec extends Specification with Mockito {
         .expirationTime(Date.from(Instant.now().plusSeconds(300)))
         .build()
 
-      val fakeUserProfile = UserProfile("testuser@org.int",false,Seq(),true,None,None,None,None,None,None)
+      val fakeUserProfile = UserProfile("userEmail@company.org",false,Some("test"),Some("test"),Seq(),true,None,None,Some(12345678L),None,None,None)
 
       mockBearerToken.validateToken(any) returns Right(LoginResultOK(mockClaims))
       mockUserProfileDAO.userProfileForEmail(any) returns Future(Some(Right(fakeUserProfile)))
@@ -280,7 +280,7 @@ class AuthSpec extends Specification with Mockito {
         .expirationTime(Date.from(Instant.now().minusSeconds(300)))
         .build()
 
-      val fakeUserProfile = UserProfile("testuser@org.int",false,Seq(),true,None,None,None,None,None,None)
+      val fakeUserProfile = UserProfile("userEmail@company.org",false,Some("test"),Some("test"),Seq(),true,None,None,Some(12345678L),None,None,None)
 
       mockBearerToken.validateToken(any) returns Right(LoginResultOK(mockClaims))
       mockUserProfileDAO.userProfileForEmail(any) returns Future(Some(Right(fakeUserProfile)))
@@ -329,7 +329,7 @@ class AuthSpec extends Specification with Mockito {
         .expirationTime(Date.from(Instant.now().plusSeconds(300)))
         .build()
 
-      val fakeUserProfile = UserProfile("testuser@org.int",isAdmin = false,Seq(),allCollectionsVisible = true,None,None,None,None,None,None)
+      val fakeUserProfile = UserProfile("userEmail@company.org",false,Some("test"),Some("test"),Seq(),true,None,None,Some(12345678L),None,None,None)
 
       mockBearerToken.validateToken(any) returns Right(LoginResultOK(mockClaims))
       mockUserProfileDAO.userProfileForEmail(any) returns Future(Some(Right(fakeUserProfile)))
@@ -379,7 +379,7 @@ class AuthSpec extends Specification with Mockito {
         .expirationTime(Date.from(Instant.now().plusSeconds(300)))
         .build()
 
-      val fakeUserProfile = UserProfile("testuser@org.int",isAdmin = false,Seq(),allCollectionsVisible = true,None,None,None,None,None,None)
+      val fakeUserProfile = UserProfile("userEmail@company.org",false,Some("test"),Some("test"),Seq(),true,None,None,Some(12345678L),None,None,None)
 
       mockBearerToken.validateToken(any) returns Right(LoginResultOK(mockClaims))
       mockUserProfileDAO.userProfileForEmail(any) returns Future(Some(Right(fakeUserProfile)))

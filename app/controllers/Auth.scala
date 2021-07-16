@@ -23,12 +23,13 @@ import play.api.libs.circe.Circe
 import play.api.mvc.Cookie.SameSite
 import responses.GenericErrorResponse
 import auth.ClaimsSetExtensions._
-import helpers.HttpClientFactory
+import helpers.{HttpClientFactory, UserAvatarHelper}
 
+import java.nio.ByteBuffer
 import java.time.format.DateTimeFormatter
 import scala.collection.JavaConverters._
 import java.time.{Duration, Instant, ZoneId, ZonedDateTime}
-import java.util.Date
+import java.util.{Base64, Date}
 import scala.collection.mutable
 import scala.util.Try
 
@@ -37,7 +38,8 @@ class Auth @Inject() (config:Configuration,
                       bearerTokenAuth: BearerTokenAuth,
                       userProfileDAO:UserProfileDAO,
                       cc:ControllerComponents,
-                      httpFactory:HttpClientFactory)
+                      httpFactory:HttpClientFactory,
+                      userAvatarHelper: UserAvatarHelper)
                      (implicit actorSystem: ActorSystem)
   extends AbstractController(cc) with Circe {
   private implicit val ec:ExecutionContext = cc.executionContext
@@ -102,6 +104,35 @@ class Auth @Inject() (config:Configuration,
     )
 
   /**
+    * tries to extract and save a profile picture from either `thumbnailPhoto` or `jpegPhoto` claim fields
+    * @param response
+    * @return
+    */
+  private def profilePicFromJWT(response: Either[String, JWTClaimsSet]) = {
+    import cats.implicits._
+    response match {
+      case Left(err)=>Future(Left(err))
+      case Right(claims)=>
+        Future.fromTry(Try {
+          Seq("thumbnailPhoto", "jpegPhoto")
+            .map(key => Option(claims.getStringClaim(key)))
+            .collectFirst { case Some(content) => content }
+            .map(Base64.getDecoder.decode)
+            .map(ByteBuffer.wrap)
+            .map(buffer=>userAvatarHelper.writeAvatarData(claims.getUserID, buffer))
+            .sequence
+        })
+          .flatten
+        .map(Right.apply)
+        .recover({
+          case err:Throwable=>
+            logger.error(s"Could not get user avatar from claims: ${err.getMessage}", err)
+            Left(err.getMessage)
+        })
+    }
+  }
+
+  /**
     * internal method, part of the step two exchange.
     * Given a decoded JWT, try to look up the user's profile in the database.
     * If there is no profile existing at the moment then create a base one.
@@ -118,10 +149,12 @@ class Auth @Inject() (config:Configuration,
             val newUserProfile = UserProfile(
               oAuthResponse.getUserID,
               oAuthResponse.getIsMMAdmin,
+              Option(oAuthResponse.getStringClaim("first_name")),
+              Option(oAuthResponse.getStringClaim("family_name")),
               Seq(),
               allCollectionsVisible=true,
               None,
-              None,
+              Option(oAuthResponse.getStringClaim("location")),
               None,
               None,
               None,
@@ -244,6 +277,7 @@ class Auth @Inject() (config:Configuration,
         for {
           maybeOauthResponse    <- stageTwo(actualCode, redirectUri(request))
           maybeValidatedContent <- validateContent(maybeOauthResponse)
+          _                     <- profilePicFromJWT(maybeValidatedContent)
           maybeUserProfile      <- userProfileFromJWT(maybeValidatedContent)
           result                <- finalCallbackResponse(maybeOauthResponse,
                                       maybeValidatedContent,
