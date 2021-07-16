@@ -72,16 +72,6 @@ object ClaimsSetExtensions {
       * @return
       */
     def getUserID:String = getEmail.getOrElse(getUsername)
-
-    /**
-      * extract and decode the base64 avatar data (if present)
-      * TODO: not implemented pending getting test data
-      * @return either a ByteBuffer with the decoded data or None
-      */
-    def extractAvatar:Option[ByteBuffer] = {
-      logger.error("extractAvatar is not implemented yet")
-      None
-    }
   }
 }
 

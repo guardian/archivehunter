@@ -256,10 +256,10 @@ trait Security extends BaseController {
   }
 
   def targetUserProfile[T](request:Request[T], targetUser:String)(implicit userProfileDAO:UserProfileDAO) = {
-    if(targetUser=="my"){
+    if(targetUser=="my"){                               //everyone is allowed to access their own lightbox
       Future(userProfileFromSession(request.session))
     } else {
-      userProfileFromSession(request.session) match {
+      userProfileFromSession(request.session) match {   //if targetUser!="my" then we are accessing somebody else's lightbox, only admins can do that
         case Some(Left(err))=>
           Future(Some(Left(err)))
         case Some(Right(someUserProfile))=>
