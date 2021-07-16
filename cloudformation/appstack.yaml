@@ -54,6 +54,9 @@ Parameters:
     Type: String
     Description: JSON style list of audience names, one of which must be the current "aud" field in a token in order for it to be considered valid
     Default: "[\"archivehunter\"]"
+  AvatarBucket:
+    Type: String
+    Description: Name of a bucket which will hold user avatars. Public access is not required; the primary proxy bucket usually makes a good choice.
   OfficeIpRange:
     Type: String
     Description: CIDR block of ip addresses to be allowed SSH access
@@ -997,6 +1000,7 @@ Resources:
             indexName = "archivehunter"
             problemItemsIndex="proxy-issues"
             problemSummaryIndex="proxy-issues-summary"
+            avatarBucket="${AvatarBucket}"
           }
 
           scanner {
@@ -1054,8 +1058,8 @@ Resources:
             oAuthUri: "${OAuthLoginUri}"
             tokenUrl: "${OAuthTokenUri}"
             adminClaimName: "${OAuthAdminClaimName}"
-            authCookieName: "archivehunter-auth"
-            refreshCookieName: "archivehunter-refresh"
+            authCookieName: "archivehunterAuth"
+            refreshCookieName: "archivehunterRefresh"
             enforceSecure: true    //You can turn this off to make development simpler but always turn it on for production!
             tokenSigningCertPath: "/usr/share/archivehunter/conf/oauth-signing.pem"
             validAudiences: ${OAuthValidAudiences}
