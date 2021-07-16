@@ -11,7 +11,7 @@ import com.theguardian.multimedia.archivehunter.common.clientManagers.S3ClientMa
 import org.slf4j.LoggerFactory
 import play.api.Configuration
 
-import java.net.URL
+import java.net.{URI, URL}
 import java.nio.ByteBuffer
 import java.time.Instant
 import java.util.Date
@@ -48,6 +48,7 @@ class UserAvatarHelper @Inject() (config:Configuration, s3ClientManager: S3Clien
     *         catch this with .recover() or .onComplete()
     */
   def writeAvatarData(username: String, content:ByteBuffer) = {
+    logger.debug(s"buffer current position ${content.position()} length ${content.remaining()} filename ${sanitisedKey(username)}")
     if(content.position()!=0) content.flip()
 
     val dataSource = Source
@@ -98,7 +99,7 @@ class UserAvatarHelper @Inject() (config:Configuration, s3ClientManager: S3Clien
     */
   def getAvatarLocation(username:String) = {
     config.getOptional[String]("externalData.avatarBucket").map(avatarBucket=>{
-      new URL("s3", avatarBucket, sanitisedKey(username))
+      new URI(s"s3://${avatarBucket}/${sanitisedKey(username)}")
     })
   }
 
@@ -109,17 +110,17 @@ class UserAvatarHelper @Inject() (config:Configuration, s3ClientManager: S3Clien
     * @param s3Url the S3 URL to translate
     * @return either a client-facing https presigned URL or a Failure indicating the problem
     */
-  def getPresignedUrl(s3Url:URL):Try[URL] = {
+  def getPresignedUrl(s3Url:URI, overrideExpiry:Option[Date]=None):Try[URL] = {
     config.getOptional[String]("externalData.avatarBucket") match {
       case Some(avatarBucket)=>
-        if(s3Url.getProtocol!="s3") {
+        if(s3Url.getScheme!="s3") {
           Failure(new RuntimeException("getPresignedUrl requires an S3 URL"))
         } else if(s3Url.getHost!=avatarBucket){
           Failure(new RuntimeException("incorrect bucket name"))
         } else {
-          val expiry = Date.from(Instant.now().plusSeconds(900))  //link is valid for 15mins
+          val expiry = overrideExpiry.getOrElse(Date.from(Instant.now().plusSeconds(900)))  //link is valid for 15mins
           Try {
-            s3Client.generatePresignedUrl(avatarBucket, s3Url.getFile, expiry)
+            s3Client.generatePresignedUrl(avatarBucket, s3Url.getPath.stripPrefix("/"), expiry)
           }
         }
     }

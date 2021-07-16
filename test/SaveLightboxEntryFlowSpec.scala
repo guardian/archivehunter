@@ -20,7 +20,7 @@ class SaveLightboxEntryFlowSpec extends Specification with Mockito {
     "call out to LightboxEntryDAO to save elements" in new AkkaTestkitSpecs2Support {
       val testArchiveEntry = ArchiveEntry("test-id","fakebucket","fakepath",None,None,1234L,
         ZonedDateTime.now(),"fakeetag",MimeType("application","octet-stream"),false, StorageClass.STANDARD,Seq(), false,None)
-      val testUserProfile = UserProfile("userEmail@company.org",false,Seq(),true,None,None,Some(12345678L),None,None,None)
+      val testUserProfile = UserProfile("userEmail@company.org",false,Some("test"),Some("test"),Seq(),true,None,None,Some(12345678L),None,None,None)
 
       implicit val mat = ActorMaterializer.create(system)
       implicit val ec:ExecutionContext = system.dispatcher
@@ -42,7 +42,7 @@ class SaveLightboxEntryFlowSpec extends Specification with Mockito {
     "report an underlying error as a stream failure" in new AkkaTestkitSpecs2Support {
       val testArchiveEntry = ArchiveEntry("test-id","fakebucket","fakepath",None,None,1234L,
         ZonedDateTime.now(),"fakeetag",MimeType("application","octet-stream"),false, StorageClass.STANDARD,Seq(), false,None)
-      val testUserProfile = UserProfile("userEmail@company.org",false,Seq(),true,None,None,Some(12345678L),None,None,None)
+      val testUserProfile = UserProfile("userEmail@company.org",false,Some("test"),Some("test"),Seq(),true,None,None,Some(12345678L),None,None,None)
 
       implicit val mat = ActorMaterializer.create(system)
       implicit val ec:ExecutionContext = system.dispatcher

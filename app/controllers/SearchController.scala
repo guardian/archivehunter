@@ -14,8 +14,9 @@ import io.circe.syntax._
 import com.sksamuel.elastic4s.circe._
 import com.sksamuel.elastic4s.http.search.Aggregations
 import com.sksamuel.elastic4s.searches.sort.SortOrder
-import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ArchiveEntryHitReader, StorageClassEncoder, ZonedDateTimeEncoder}
-import helpers.LightboxHelper
+import com.theguardian.multimedia.archivehunter.common.cmn_models.LightboxEntry
+import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ArchiveEntryHitReader, LightboxIndex, StorageClassEncoder, ZonedDateTimeEncoder}
+import helpers.{LightboxHelper, UserAvatarHelper}
 import models.{ChartFacet, ChartFacetData, UserProfileDAO}
 import org.slf4j.LoggerFactory
 import play.api.cache.SyncCacheApi
@@ -24,14 +25,17 @@ import requests.SearchRequest
 import play.api.libs.ws.WSClient
 import responses._
 
+import java.net.URI
 import scala.concurrent.Future
+import scala.util.{Failure, Success, Try}
 
 @Singleton
 class SearchController @Inject()(override val config:Configuration,
                                  override val controllerComponents:ControllerComponents,
                                  esClientManager:ESClientManager,
                                  override val bearerTokenAuth: BearerTokenAuth,
-                                 override val cache:SyncCacheApi)
+                                 override val cache:SyncCacheApi,
+                                 userAvatarHelper:UserAvatarHelper)
                                 (implicit val userProfileDAO:UserProfileDAO)
   extends AbstractController(controllerComponents) with Security with ArchiveEntryHitReader with ZonedDateTimeEncoder with StorageClassEncoder with Circe {
 
@@ -112,6 +116,25 @@ class SearchController @Inject()(override val config:Configuration,
     })
   }
 
+  private def fixupUserAvatars(records:Seq[ArchiveEntry]):Seq[ArchiveEntry] = {
+    def swapOutForPresigned(urlString:String):Option[String] = {
+      (for {
+        parsedUri <- Try { new URI(urlString) }
+        presigned <- userAvatarHelper.getPresignedUrl(parsedUri)
+      } yield presigned) match {
+        case Success(url)=>Some(url.toString)
+        case Failure(err)=>
+          logger.warn(s"Could not get presigned URL for user avater $urlString: ${err.getMessage}", err)
+          None
+      }
+    }
+
+    records
+      .map(e=>e.copy(lightboxEntries = e.lightboxEntries.map(lb=>{
+        lb.copy(avatarUrl = lb.avatarUrl.flatMap(swapOutForPresigned))
+      })))
+  }
+
   def browserSearch(startAt:Int,pageSize:Int) = IsAuthenticatedAsync(circe.json(2048)) { _=> request=>
     request.body.as[SearchRequest].fold(
       error=>{
@@ -127,7 +150,7 @@ class SearchController @Inject()(override val config:Configuration,
             logger.error(s"Could not perform advanced search: ${response.status} ${response.error.reason}")
             InternalServerError(GenericErrorResponse("search_error", response.error.reason).asJson)
           } else {
-            Ok(ObjectListResponse("ok", "entry", response.result.to[ArchiveEntry], response.result.totalHits.toInt).asJson)
+            Ok(ObjectListResponse("ok", "entry", fixupUserAvatars(response.result.to[ArchiveEntry]), response.result.totalHits.toInt).asJson)
           }
         })
       }
@@ -152,7 +175,7 @@ class SearchController @Inject()(override val config:Configuration,
             logger.error(s"Could not perform lightbox query: ${response.status} ${response.error.reason}")
             InternalServerError(GenericErrorResponse("search_error", response.error.reason).asJson)
           } else {
-            Ok(ObjectListResponse("ok", "entry", response.result.to[ArchiveEntry], response.result.totalHits.toInt).asJson)
+            Ok(ObjectListResponse("ok", "entry", fixupUserAvatars(response.result.to[ArchiveEntry]), response.result.totalHits.toInt).asJson)
           }
         }).recover({
           case err: Throwable =>
