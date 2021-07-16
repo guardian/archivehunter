@@ -77,6 +77,7 @@ const App:React.FC = ()=> {
             }
         } catch(err) {
             console.error("could not refresh login: ")
+            setLoading(false);
         }
     }
 
