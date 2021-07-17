@@ -29,3 +29,4 @@ node_modules
 *.csv
 *.lst
 /ProxyStatsGathering/scripts/ecs_rundev-CODE.yaml
+/utils/datamigration/venv/
