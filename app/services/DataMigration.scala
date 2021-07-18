@@ -3,7 +3,7 @@ package services
 import akka.actor.ActorSystem
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Keep, Sink, Source}
-import com.amazonaws.services.dynamodbv2.model.ScanRequest
+import com.amazonaws.services.dynamodbv2.model.{AttributeValue, ScanRequest}
 import com.gu.scanamo.{ScanamoAlpakka, Table}
 import com.gu.scanamo.request.ScanamoScanRequest
 import com.theguardian.multimedia.archivehunter.common.ZonedDateTimeEncoder
@@ -31,17 +31,25 @@ class DataMigration @Inject()(config:Configuration, lightboxEntryDAO: LightboxEn
 
   val replacement = "@guardian.co.uk$".r
 
-  def emailUpdater(prevEmail:String):String = {
-    replacement.replaceAllIn(prevEmail, "@theguardian.com")
+  def emailUpdater(prevValue:AttributeValue):Option[AttributeValue] = {
+    val prevEmail = prevValue.getS
+    val newEmail = replacement.replaceAllIn(prevEmail, "@theguardian.com")
+    if(newEmail==prevEmail) {
+      None
+    } else {
+      Some(new AttributeValue().withS(newEmail))
+    }
   }
 
-  def one = {
-    val tableName = config.get[String]("lightbox.tableName")
+  def runMigration() = {
+    for {
+      updateLightbox <- updateEmailAddresses(config.get[String]("lightbox.tableName"), "userEmail")
+    } yield updateLightbox
+  }
+  def updateEmailAddresses(tableName:String, primaryKeyField:String) = {
     val request = new ScanRequest()
       .withTableName(tableName)
-////    val request = ScanamoScanRequest(config.get[String]("lightbox.tableName"))
-//    val table = Table[LightboxEntry](config.get[String]("lightbox.tableName"))
-//    ScanamoAlpakka.exec(dynamoClient)(table.scan())
+
     dynamoClient.source(request)
       //.toMap here converts the mutable map that `asScala` gives us into an immutable map
       .flatMapConcat(response=>
@@ -56,9 +64,12 @@ class DataMigration @Inject()(config:Configuration, lightboxEntryDAO: LightboxEn
         logger.info(s"Got source record $record")
         record
       })
-      .via(LightboxUpdateBuilder[String,String]("userEmail",emailUpdater, classOf[String]))
+      .via(LightboxUpdateBuilder("userEmail",emailUpdater))
+      .map(updatedRecord=>{
+        logger.info(s"Got updated record $updatedRecord")
+        updatedRecord
+      })
       .toMat(LightboxUpdateSink(tableName, config, dyanmoClientMgr))(Keep.right)
       .run()
-
   }
 }
