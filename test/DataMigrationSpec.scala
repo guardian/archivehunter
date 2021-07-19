@@ -1,0 +1,25 @@
+import akka.actor.ActorSystem
+import akka.stream.Materializer
+import com.amazonaws.services.dynamodbv2.model.AttributeValue
+import com.theguardian.multimedia.archivehunter.common.clientManagers.DynamoClientManager
+import com.theguardian.multimedia.archivehunter.common.cmn_models.LightboxEntryDAO
+import org.specs2.mock.Mockito
+import org.specs2.mutable.Specification
+import play.api.Configuration
+import services.DataMigration
+
+class DataMigrationSpec extends Specification with Mockito {
+  "emailUpdater" should {
+    "replace the email domain if required and return Some data" in {
+      val toTest = new DataMigration(Configuration.empty, mock[LightboxEntryDAO], mock[DynamoClientManager])(mock[ActorSystem], mock[Materializer])
+
+      toTest.emailUpdater(new AttributeValue().withS("fred@guardian.co.uk")) must beSome(new AttributeValue().withS("fred@theguardian.com"))
+    }
+
+    "return None if no replacement is required" in {
+      val toTest = new DataMigration(Configuration.empty, mock[LightboxEntryDAO], mock[DynamoClientManager])(mock[ActorSystem], mock[Materializer])
+
+      toTest.emailUpdater(new AttributeValue().withS("fred@theguardian.com")) must beNone
+    }
+  }
+}

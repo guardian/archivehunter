@@ -4,7 +4,7 @@ import {RouteComponentProps} from "react-router";
 import AdminContainer from "./AdminContainer"
 import ErrorViewComponent from "../common/ErrorViewComponent";
 import TimestampFormatter from "../common/TimestampFormatter";
-import {Typography} from "@material-ui/core";
+import {Button, Typography} from "@material-ui/core";
 import {Helmet} from "react-helmet";
 
 interface VersionInfo {
@@ -16,6 +16,7 @@ interface VersionInfo {
 const AboutComponent:React.FC<RouteComponentProps> = (props) => {
     const [versionInfo, setVersionInfo] = useState<VersionInfo>({buildNumber: -1, buildBranch: "not loaded", buildDate: ""})
     const [lastError, setLastError] = useState<Error|undefined>(undefined);
+    const [didStartDataMigration, setDidStartDataMigration] = useState(false);
 
     useEffect(()=>{
         axios.get("/api/version").then(response=>{
@@ -25,6 +26,15 @@ const AboutComponent:React.FC<RouteComponentProps> = (props) => {
             setLastError(err)
         })
     }, []);
+
+    const requestDataMigration = async ()=>{
+        try {
+            await axios.post("/api/rundatamigration");
+            setDidStartDataMigration(true);
+        } catch(err) {
+            setLastError(err);
+        }
+    }
 
     return <AdminContainer {...props}>
         <Helmet>
@@ -38,6 +48,14 @@ const AboutComponent:React.FC<RouteComponentProps> = (props) => {
                     <Typography>This was built from the <b>{versionInfo.buildBranch}</b> branch at <TimestampFormatter relative={false} value={versionInfo.buildDate}/></Typography>
                 </div>
         }
+        <div>
+            <Button variant="outlined" onClick={requestDataMigration} disabled={didStartDataMigration}>Run data migration</Button>
+            {
+                didStartDataMigration ? <div>
+                    <Typography>Data migration operations started, please monitor the server logs</Typography>
+                </div> : undefined
+            }
+        </div>
         </AdminContainer>
 }
 

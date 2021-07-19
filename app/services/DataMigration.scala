@@ -11,7 +11,6 @@ import com.theguardian.multimedia.archivehunter.common.cmn_helpers.ZonedTimeForm
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{LightboxEntry, RestoreStatusEncoder}
 import org.slf4j.LoggerFactory
 import services.datamigration.streamcomponents.{LightboxUpdateBuilder, LightboxUpdateSink}
-//import com.amazonaws.services.dynamodbv2.model.{QueryRequest, ScanRequest}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.DynamoClientManager
 import com.theguardian.multimedia.archivehunter.common.cmn_models.LightboxEntryDAO
 import play.api.Configuration
@@ -44,8 +43,11 @@ class DataMigration @Inject()(config:Configuration, lightboxEntryDAO: LightboxEn
   def runMigration() = {
     for {
       updateLightbox <- updateEmailAddresses(config.get[String]("lightbox.tableName"), "userEmail")
-    } yield updateLightbox
+      updateBulkEntries <- updateEmailAddresses(config.get[String]("lightbox.bulkTableName"), "userEmail")
+      updateUserProfiles <- updateEmailAddresses(config.get[String]("auth.userProfileTable"),"userEmail")
+    } yield (updateLightbox, updateBulkEntries, updateUserProfiles)
   }
+
   def updateEmailAddresses(tableName:String, primaryKeyField:String) = {
     val request = new ScanRequest()
       .withTableName(tableName)
@@ -64,7 +66,7 @@ class DataMigration @Inject()(config:Configuration, lightboxEntryDAO: LightboxEn
         logger.info(s"Got source record $record")
         record
       })
-      .via(LightboxUpdateBuilder("userEmail",emailUpdater))
+      .via(LightboxUpdateBuilder(primaryKeyField,emailUpdater))
       .map(updatedRecord=>{
         logger.info(s"Got updated record $updatedRecord")
         updatedRecord

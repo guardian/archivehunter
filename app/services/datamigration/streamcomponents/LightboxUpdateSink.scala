@@ -9,6 +9,7 @@ import com.theguardian.multimedia.archivehunter.common.clientManagers.DynamoClie
 import org.slf4j.LoggerFactory
 import play.api.Configuration
 
+import java.util
 import scala.collection.JavaConverters._
 import scala.concurrent.{Future, Promise}
 import scala.util.{Failure, Success, Try}
@@ -24,14 +25,14 @@ class LightboxUpdateSink (tableName:String, config:Configuration, dynamoClientMa
 
     val logic = new GraphStageLogic(shape) {
       val client = dynamoClientManager.getClient(config.getOptional[String]("externalData.awsProfile"))
-      private var ops:java.util.List[WriteRequest] = _
+      private var ops:Seq[WriteRequest] = Seq()
 
-      def shouldCommit = ops.size() >=24
+      def shouldCommit = ops.length >=24
 
       def commit = Try {
-        logger.info(s"Committing ${ops.size()} operations to $tableName")
+        logger.info(s"Committing ${ops.length} operations to $tableName")
         val rq = new BatchWriteItemRequest()
-          .withRequestItems(Map(tableName->ops).asJava)
+          .withRequestItems(Map(tableName->ops.asJava).asJava)
         client.batchWriteItem(rq)
       }
 
@@ -44,7 +45,7 @@ class LightboxUpdateSink (tableName:String, config:Configuration, dynamoClientMa
             if(unprocessedCount>0) {
               logger.warn(s"There were $unprocessedCount items left unprocessed after the batch, retrying after $delaySeconds seconds")
               Thread.sleep(delaySeconds*1000)
-              ops = result.getUnprocessedItems.get(tableName)
+              ops = result.getUnprocessedItems.get(tableName).asScala
               if(attempt>=maxAttempts) {
                 Failure(new RuntimeException(s"Could not commit $unprocessedCount records after $attempt attempts"))
               } else {
@@ -52,7 +53,7 @@ class LightboxUpdateSink (tableName:String, config:Configuration, dynamoClientMa
               }
             } else {
               logger.info(s"All operations committed")
-              ops.clear()
+              ops = List()
               Success(result)
             }
           case Failure(err)=>
@@ -65,7 +66,7 @@ class LightboxUpdateSink (tableName:String, config:Configuration, dynamoClientMa
         override def onPush(): Unit = {
           val elem = grab(in)
 
-          ops.addAll(elem.marshal.asJava)
+          ops = ops ++ elem.marshal
 
           if(shouldCommit) {
             commitWithBackoff() match {
@@ -74,18 +75,32 @@ class LightboxUpdateSink (tableName:String, config:Configuration, dynamoClientMa
                 pull(in)
               case Failure(err)=>
                 logger.error(s"DynamoDB error, could not write data: ${err.getMessage}", err)
+                completionPromise.failure(err)
                 failStage(err)
             }
           } else {
-            logger.debug(s"Queued items for writing, queue length is now ${ops.size()}")
+            logger.debug(s"Queued items for writing, queue length is now ${ops.length}")
             pull(in)
           }
         }
 
         override def onUpstreamFinish(): Unit = {
-          logger.info(s"Upstream completed, ${ops.size()} items outstanding")
+          logger.info(s"Upstream completed, ${ops.length} items outstanding")
 
-          if(ops.size()>0) commitWithBackoff()
+          if(ops.nonEmpty) commitWithBackoff() match {
+            case Success(_)=>
+              logger.info(s"Committed successfully")
+              completionPromise.success(Done)
+              completeStage()
+            case Failure(err)=>
+              logger.error(s"Outstanding commit failed: ${err.getMessage}", err)
+              completionPromise.failure(err)
+              failStage(err)
+          } else {
+            //nothing to commit
+            completionPromise.success(Done)
+            completeStage()
+          }
         }
       })
 
