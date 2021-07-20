@@ -18,7 +18,7 @@ import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
 import io.circe.generic.auto._
 import io.circe.syntax._
-import models.{UserProfile, UserProfileDAO}
+import models.{OAuthTokenEntryDAO, UserProfile, UserProfileDAO}
 import play.api.libs.circe.Circe
 import play.api.mvc.Cookie.SameSite
 import responses.GenericErrorResponse
@@ -39,7 +39,8 @@ class Auth @Inject() (config:Configuration,
                       userProfileDAO:UserProfileDAO,
                       cc:ControllerComponents,
                       httpFactory:HttpClientFactory,
-                      userAvatarHelper: UserAvatarHelper)
+                      userAvatarHelper: UserAvatarHelper,
+                      oAuthTokenEntryDAO: OAuthTokenEntryDAO)
                      (implicit actorSystem: ActorSystem)
   extends AbstractController(cc) with Circe {
   private implicit val ec:ExecutionContext = cc.executionContext
@@ -261,20 +262,25 @@ class Auth @Inject() (config:Configuration,
             claimsSessionValues ++ Map("userProfile"->profile.asJson.noSpaces)
         }
 
-        val cookies = Map(
-          //config.get[String]("oAuth.authCookieName") -> oAuthResponse.access_token,
-          config.get[String]("oAuth.refreshCookieName") -> oAuthResponse.refresh_token
-        )
-          .map(kv=>kv._2.map(makeAuthCookie(kv._1, _)))
-          .collect({case Some(value)=>value})
-
         Result(
           header,
-          entity,
-          newCookies = cookies.toList
+          entity
         ).withSession(Session(sessionValues))
     }
   )
+
+  private def storeRefreshToken(response:Either[String, OAuthResponse], maybeValidatedContent:Either[String, JWTClaimsSet]) = (response, maybeValidatedContent) match {
+    case (Left(err), _)=>Future(Left(err))
+    case (_, Left(err))=>Future(Left(err))
+    case (Right(response), Right(validatedContent))=>
+      response.refresh_token match {
+        case None=>Future( Right( () ))
+        case Some(refreshToken)=>
+          oAuthTokenEntryDAO
+            .saveToken(validatedContent.getUserID, ZonedDateTime.now(), refreshToken)
+            .map(_=>Right( () ))
+      }
+  }
 
   def oauthCallback(state:Option[String], code:Option[String], error:Option[String]) = Action.async { request=>
     (code, error) match {
@@ -284,6 +290,7 @@ class Auth @Inject() (config:Configuration,
           maybeValidatedContent <- validateContent(maybeOauthResponse)
           _                     <- profilePicFromJWT(maybeValidatedContent)
           maybeUserProfile      <- userProfileFromJWT(maybeValidatedContent)
+          _                     <- storeRefreshToken(maybeOauthResponse, maybeValidatedContent)
           result                <- finalCallbackResponse(maybeOauthResponse,
                                       maybeValidatedContent,
                                       maybeUserProfile,
@@ -415,40 +422,47 @@ class Auth @Inject() (config:Configuration,
       .flatMap(expiryString=>Try { ZonedDateTime.parse(expiryString, DateTimeFormatter.ISO_DATE_TIME) }.toOption)
 
   def refreshIfRequired = Action.async { request =>
-    safeGetCookie(request, "oAuth.refreshCookieName") match {
-      case Some(refreshCookie) =>
-        if(!refreshCookie.httpOnly) {
-          logger.error(s"Client presented cookies for refresh that are not httpOnly: $refreshCookie")
-          Future(BadRequest(GenericErrorResponse("security_problem", "only httpOnly cookies are trusted for auth").asJson))
+    import cats.implicits._
+
+    expiryFromSession(request) match {
+      case Some(expiry) =>
+        if (Auth.claimIsExpired(expiry)) {
+          request.session
+            .get("username")
+            .map(oAuthTokenEntryDAO.lookupToken)
+            .sequence.map(_.flatten)
+            .flatMap({
+              case Some(refreshToken) =>
+                for {
+                  maybeOauthResponse <- requestRefresh(refreshToken.value)
+                  maybeValidatedContent <- validateContent(maybeOauthResponse)
+                  maybeUserProfile <- userProfileFromJWT(maybeValidatedContent)
+                  _ <- oAuthTokenEntryDAO.removeUsedToken(refreshToken)
+                  result <- finalCallbackResponse(maybeOauthResponse,
+                    maybeValidatedContent,
+                    maybeUserProfile,
+                    ResponseHeader(200),
+                    play.api.http.HttpEntity.Strict(
+                      ByteString(GenericErrorResponse("ok", "token refreshed").asJson.noSpaces),
+                      Some("application/json")
+                    )
+                  )
+                } yield result
+              case None =>
+                logger.error("Could not find a refresh token")
+                Future(BadRequest(GenericErrorResponse("error", "either no refresh token or server misconfigured").asJson))
+            }).recover({
+              case err: Throwable =>
+                logger.error(s"Could not refresh token for ${request.session.get("username")}: ${err.getMessage}", err)
+                InternalServerError(GenericErrorResponse("error", err.getMessage).asJson)
+          })
         } else {
-          expiryFromSession(request) match {
-           case Some(expiry) =>
-             if (Auth.claimIsExpired(expiry)) {
-               for {
-                 maybeOauthResponse <- requestRefresh(refreshCookie.value)
-                 maybeValidatedContent <- validateContent(maybeOauthResponse)
-                 maybeUserProfile <- userProfileFromJWT(maybeValidatedContent)
-                 result <- finalCallbackResponse(maybeOauthResponse,
-                   maybeValidatedContent,
-                   maybeUserProfile,
-                   ResponseHeader(200),
-                   play.api.http.HttpEntity.Strict(
-                     ByteString(GenericErrorResponse("ok", "token refreshed").asJson.noSpaces),
-                     Some("application/json")
-                   )
-                 )
-               } yield result
-             } else {
-               logger.info(s"No token refresh required")
-               Future(Ok(GenericErrorResponse("not_needed", "no refresh required").asJson))
-             }
-           case None =>
-             Future(InternalServerError(GenericErrorResponse("session_problem", "claim expiry not present or malformed").asJson))
-         }
+          logger.info(s"${request.session.get("username")}: No token refresh required")
+          Future(Ok(GenericErrorResponse("not_needed", "no refresh required").asJson))
         }
       case None =>
-        logger.error("Could not refresh login, either there was no refresh cookie or `oAuth.refreshCookieName` is not set in the config")
-        Future(BadRequest(GenericErrorResponse("error", "either no refresh cookie or server misconfigured").asJson))
+        logger.error(s"either no login or no expiry was set in the session")
+        Future(BadRequest(GenericErrorResponse("error", "no login token").asJson))
     }
   }
 }

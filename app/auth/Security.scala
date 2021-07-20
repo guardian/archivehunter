@@ -88,12 +88,6 @@ trait Security extends BaseController {
       logger.error("Unable to process server->server request, shared_secret is not set in application.conf")
       Left(LoginResultMisconfigured(auth))
     } else {
-//      val claimBuilder = new JWTClaimsSet.Builder
-//      val hmacClaim = claimBuilder
-//        .issuer("hmac")
-//        .audience("archivehunter")
-//        .subject(auth)
-//        .build()
       HMAC
         .calculateHmac(header, Conf.sharedSecret)
         .map(calculatedSig => {
@@ -122,16 +116,6 @@ trait Security extends BaseController {
         }
       case (None, Some(username))=>
         Right(LoginResultOK(username))
-//        io.circe.parser.parse(claims).flatMap(_.as[Map[String,String]]) match {
-//          case Right(json)=>
-//            val claims = json
-//              .foldLeft(new JWTClaimsSet.Builder())((builder, kv)=>builder.claim(kv._1, kv._2))
-//              .build()
-//            logger.debug(s"reconstituted claims: ${claims}")
-//            Right(LoginResultOK(claims))
-//          case Left(err)=>
-//            Left(LoginResultInvalid(err.toString))
-//        }
       case (None, None)=>
         bearerTokenAuth(request).map(result => {
           LoginResultOK(result.content.getUserID)
@@ -172,24 +156,6 @@ trait Security extends BaseController {
     uid => Action(b)(request => f(uid)(request))
   }
 
-//  def checkAdmin[A](claims:JWTClaimsSet, request:Request[A]) = {
-//      val adminClaimContent = for {
-//        maybeAdminClaim <- Option(claims.getStringClaim(bearerTokenAuth.isAdminClaimName())) match {
-//          case Some(str)=>Right(LoginResultOK(str))
-//          case None=>Left(LoginResultNotPresent)
-//        }
-//      } yield maybeAdminClaim
-//
-//      adminClaimContent match {
-//        case Right(LoginResultOK(stringValue))=>
-//          logger.debug(s"got value for isAdminClaim ${bearerTokenAuth.isAdminClaimName()}: $stringValue, downcasing and testing for 'true' or 'yes'")
-//          val downcased = stringValue.toLowerCase()
-//          downcased == "true" || downcased == "yes"
-//        case Left(_)=>
-//          logger.debug(s"got nothing for isAdminClaim ${bearerTokenAuth.isAdminClaimName()}")
-//          false
-//      }
-//  }
   def checkAdmin[A](request:Request[A]) = {
     userProfileFromSession(request.session) match {
       case Some(Right(profile))=>
