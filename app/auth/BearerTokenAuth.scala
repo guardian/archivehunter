@@ -176,36 +176,6 @@ class BearerTokenAuth @Inject() (config:Configuration) {
   }
 
   /**
-    * generates a new JWT token containing a subset of the claims of another
-    *
-    * @param key          signing key for the new token
-    * @param baseClaims   JWTClaimsSet with a superset of claims
-    * @param keysToRemove claim keys to remove from JWTClaimsSet before re-building
-    * @return
-    */
-  def generateResignedToken(key:ECKey, baseClaims:JWTClaimsSet, keysToRemove:Seq[String]=Seq("thumbnailPhoto","jpegPhoto")) = {
-    import com.nimbusds.jose._
-    import com.nimbusds.jwt._
-    import com.nimbusds.jose.crypto.ECDSASigner
-    import scala.collection.JavaConverters._
-
-    val header = new JWSHeader.Builder(JWSAlgorithm.ES256K)
-      .`type`(JOSEObjectType.JWT)
-      .keyID(key.getKeyID)
-      .build()
-
-    val payloadBuilder = baseClaims
-      .getClaims
-      .asScala
-      .filter(kv => !keysToRemove.contains(kv._1))
-      .foldLeft(new JWTClaimsSet.Builder())((builder, kv)=>builder.claim(kv._1, kv._2))
-
-    val signedJWT = new SignedJWT(header, payloadBuilder.build())
-    signedJWT.sign(new ECDSASigner(key.toECPrivateKey()))
-    signedJWT.serialize()
-  }
-
-  /**
    * try to validate the given token with the key provided.
    * Returns a JWTClaimsSet if successful
    * @param token JWT token to verify

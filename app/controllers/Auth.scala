@@ -27,10 +27,8 @@ import helpers.{HttpClientFactory, UserAvatarHelper}
 
 import java.nio.ByteBuffer
 import java.time.format.DateTimeFormatter
-import scala.collection.JavaConverters._
 import java.time.{Duration, Instant, ZoneId, ZonedDateTime}
-import java.util.{Base64, Date}
-import scala.collection.mutable
+import java.util.{Base64}
 import scala.util.Try
 
 @Singleton
@@ -87,22 +85,6 @@ class Auth @Inject() (config:Configuration,
     .map(kv=>s"${kv._1}=${URLEncoder.encode(kv._2, "UTF-8")}")
     .mkString("&")
 
-  /**
-    * internal method to return a cookie configured for authentication
-    * as per the server config
-    * @param name cookie name
-    * @param value cookie value
-    * @return the Cookie
-    */
-  private def makeAuthCookie(name:String, value:String):Cookie =
-    Cookie(
-      name,
-      value,
-      maxAge = Some(3600*8),    //expires in 8 hours, FIXME should be configurable
-      secure = config.getOptional[Boolean]("oAuth.enforceSecure").getOrElse(true),
-      httpOnly=true,
-      sameSite = Some(SameSite.Strict)
-    )
 
   /**
     * tries to extract and save a profile picture from either `thumbnailPhoto` or `jpegPhoto` claim fields
@@ -460,7 +442,13 @@ class Auth @Inject() (config:Configuration,
             }).recover({
               case err: Throwable =>
                 logger.error(s"Could not refresh token for ${request.session.get("username")}: ${err.getMessage}", err)
-                InternalServerError(GenericErrorResponse("error", err.getMessage).asJson)
+                val baseResponse = InternalServerError(GenericErrorResponse("error", err.getMessage).asJson)
+                if(Auth.claimIsExpired(expiry, trueIfNear=false)) {
+                  //if we are fully expired then blank out the session
+                  baseResponse.withSession(Session.emptyCookie)
+                } else {
+                  baseResponse
+                }
           })
         } else {
           logger.info(s"${request.session.get("username")}: No token refresh required")
@@ -483,10 +471,10 @@ object Auth {
     * @param expiryTime ZonedDateTime indicating the token expiry
     * @return true if the claims set is expired or shortly will be
     */
-  def claimIsExpired(expiryTime:ZonedDateTime) = {
+  def claimIsExpired(expiryTime:ZonedDateTime, trueIfNear:Boolean=true) = {
     val expiryWindow = Duration.ofMinutes(2)  //attempt a refresh if the token is valid for less than this
     val expiresIn = Duration.between(Instant.now(), expiryTime)
     logger.debug(s"refresh check - access token expiry at ${expiryTime} which expires in $expiresIn")
-    expiresIn.isNegative||expiresIn.isZero||expiryWindow.compareTo(expiresIn)>=0  //compareTo - if window>expiresIn result =1, if == result=0 if < result=-1
+    expiresIn.isNegative||expiresIn.isZero||(trueIfNear && expiryWindow.compareTo(expiresIn)>=0)  //compareTo - if window>expiresIn result =1, if == result=0 if < result=-1
   }
 }

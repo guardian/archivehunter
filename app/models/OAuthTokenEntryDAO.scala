@@ -35,7 +35,7 @@ class OAuthTokenEntryDAO @Inject() (config:Configuration, dynamoClientManager: D
   }).map(_.headOption)
 
   def removeUsedToken(token:OAuthTokenEntry) =
-    ScanamoAlpakka.exec(ddbClient)(table.delete('userEmail->token.value and 'issued->token.issued))
+    ScanamoAlpakka.exec(ddbClient)(table.delete('userEmail->token.userEmail and 'issued->token.issued))
 
   def saveToken(forUser:String, issuedAt:ZonedDateTime, value:String) = {
     val newEntry = OAuthTokenEntry(forUser, issuedAt.toInstant.getEpochSecond, value)

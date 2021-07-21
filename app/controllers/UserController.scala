@@ -33,9 +33,6 @@ class UserController @Inject()(override val controllerComponents:ControllerCompo
   def loginStatus = IsAuthenticated { username=> request =>
     userProfileFromSession(request.session) match {
       case None=>
-//        val userData = UserResponse.fromClaims(claims, claims.getIsMMAdmin)
-//        val maybeWithPicture = userData.copy(avatarUrl=userAvatarHelper.getAvatarUrl(claims.getUserID).map(_.toString))
-//        Ok(maybeWithPicture.asJson)
         BadRequest(GenericErrorResponse("profile_error","no profile in session").asJson)
       case Some(Left(err))=>
         logger.error(err.toString)
