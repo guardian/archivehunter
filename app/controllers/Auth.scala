@@ -18,7 +18,7 @@ import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
 import io.circe.generic.auto._
 import io.circe.syntax._
-import models.{OAuthTokenEntryDAO, UserProfile, UserProfileDAO}
+import models.{OAuthTokenEntry, OAuthTokenEntryDAO, UserProfile, UserProfileDAO}
 import play.api.libs.circe.Circe
 import play.api.mvc.Cookie.SameSite
 import responses.GenericErrorResponse
@@ -200,21 +200,6 @@ class Auth @Inject() (config:Configuration,
           }
       })
   )
-
-  private def filteredClaims(from:mutable.Map[String, AnyRef], keysToOmit:Seq[String]=Seq("thumbnailPhoto","jpegPhoto")) = {
-    from
-      .filter(kv => !keysToOmit.contains(kv._1))
-      .map({
-        case (k, v:String)=>if(v.length<36) Some(k->v) else None
-//        case (k, v:Int)=>Some(k->v.toString)
-//        case (k, v:Float)=>Some(k->v.toString)
-//        case (k, v:Long)=>Some(k->v.toString)
-        case (k, v:Date)=>Some(k->ZonedDateTime.ofInstant(v.toInstant, ZoneId.systemDefault()).format(DateTimeFormatter.ISO_ZONED_DATE_TIME))
-        case _=>None
-      })
-      .collect({case Some(value)=>value})
-      .toMap
-  }
 
   /**
     * internal method, part of the step two exchange.
@@ -421,6 +406,26 @@ class Auth @Inject() (config:Configuration,
       .get("claimExpiry")
       .flatMap(expiryString=>Try { ZonedDateTime.parse(expiryString, DateTimeFormatter.ISO_DATE_TIME) }.toOption)
 
+  private def saveUpdatedRefreshToken(request:Request[Any], maybeOAuthResponse:Either[String, OAuthResponse]):Future[Either[String, OAuthTokenEntry]] =
+    (request.session.get("username"), maybeOAuthResponse) match {
+      case (Some(username), Right(oAuthResponse))=>
+        oAuthResponse.refresh_token match {
+          case Some(refreshToken) =>
+            oAuthTokenEntryDAO
+              .saveToken(username, ZonedDateTime.now(), refreshToken)
+              .map(Right.apply)
+              .recover({
+                case err:Throwable=>
+                  logger.error(s"Could not save refresh token to dynamo: ${err.getMessage}", err)
+                  Left(err.getMessage)
+              })
+          case None =>
+            Future(Left("no refresh token was present"))
+        }
+      case _=>
+        Future(Left("either there was no username or no valid refresh token from the server"))
+    }
+
   def refreshIfRequired = Action.async { request =>
     import cats.implicits._
 
@@ -438,6 +443,7 @@ class Auth @Inject() (config:Configuration,
                   maybeValidatedContent <- validateContent(maybeOauthResponse)
                   maybeUserProfile <- userProfileFromJWT(maybeValidatedContent)
                   _ <- oAuthTokenEntryDAO.removeUsedToken(refreshToken)
+                  _ <- saveUpdatedRefreshToken(request, maybeOauthResponse)
                   result <- finalCallbackResponse(maybeOauthResponse,
                     maybeValidatedContent,
                     maybeUserProfile,
@@ -462,7 +468,7 @@ class Auth @Inject() (config:Configuration,
         }
       case None =>
         logger.error(s"either no login or no expiry was set in the session")
-        Future(BadRequest(GenericErrorResponse("error", "no login token").asJson))
+        Future(BadRequest(GenericErrorResponse("session_problem", "either no expiry time or no login token in session").asJson))
     }
   }
 }
