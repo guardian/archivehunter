@@ -384,6 +384,30 @@ Resources:
         - Key: Stage
           Value: !Ref Stage
 
+  OAuthTokensTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: userEmail
+          AttributeType: S
+        - AttributeName: issued
+          AttributeType: N
+      KeySchema:
+        - AttributeName: userEmail
+          KeyType: HASH
+        - AttributeName: issued
+          KeyType: RANGE
+      ProvisionedThroughput:
+        WriteCapacityUnits: 1
+        ReadCapacityUnits: 4
+      Tags:
+        - Key: App
+          Value: !Sub ${App}-webapp
+        - Key: Stack
+          Value: !Ref Stack
+        - Key: Stage
+          Value: !Ref Stage
+
   ProxyLocationTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -765,6 +789,7 @@ Resources:
             - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${LightboxBulkEntryTable}/index/*
             - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ServerTokensTable}
             - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ServerTokensTable}/index/*
+            - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${OAuthTokensTable}
       - PolicyName: TranscoderAccess
         PolicyDocument:
           Version: 2012-10-17
@@ -1063,6 +1088,7 @@ Resources:
             enforceSecure: true    //You can turn this off to make development simpler but always turn it on for production!
             tokenSigningCertPath: "/usr/share/archivehunter/conf/oauth-signing.pem"
             validAudiences: ${OAuthValidAudiences}
+            oAuthTokensTable: "${OAuthTokensTable}"
           }
 
           serverToken {
@@ -1169,6 +1195,8 @@ Resources:
 
           systemctl restart archivehunter
           systemctl enable archivehunter
+        - DeploySubnetsString: !Join [",",!Ref DeploySubnets]
+
   AutoScaleGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:
