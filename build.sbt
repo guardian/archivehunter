@@ -68,7 +68,7 @@ lazy val `archivehunter` = (project in file("."))
       "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
       "com.typesafe.akka" %% "akka-persistence" % akkaVersion,
       "com.typesafe.akka" %% "akka-cluster-sharding" % akkaVersion,
-      "com.nimbusds" % "nimbus-jose-jwt" % "8.17",
+      "com.nimbusds" % "nimbus-jose-jwt" % "9.11.1",
       "com.gu" % "kinesis-logback-appender" % "2.0.1",
       "com.fasterxml.jackson.dataformat" % "jackson-dataformat-cbor" % "2.11.4",  //fix vulnerable dependency for kinesis-logback-appender
       "org.apache.logging.log4j" % "log4j-api" % "2.13.2",
