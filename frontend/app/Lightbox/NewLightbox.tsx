@@ -205,11 +205,7 @@ const NewLightbox:React.FC<RouteComponentProps> = (props) => {
     //reload the search if the currently selected bulk changes
     useEffect(()=>{
         refreshData();
-    }, [selectedBulk]);
-
-    useEffect(()=>{
-        refreshData();
-    }, []);
+    }, [selectedBulk, selectedUser]);
 
     const handleComponentError = (desc:string) => {
         setLastError(desc);
