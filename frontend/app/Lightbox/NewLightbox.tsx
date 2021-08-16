@@ -46,7 +46,9 @@ const useStyles = makeStyles({
         gridColumnStart: 1,
         gridColumnEnd: -5,
         gridRowStart: "title-area",
-        gridRowEnd: "info-area"
+        gridRowEnd: "info-area",
+        overflowY: "hidden",
+        overflowX: "auto"
     },
     itemsArea: {
         gridColumnStart: 1,
@@ -70,7 +72,6 @@ const NewLightbox:React.FC<RouteComponentProps> = (props) => {
     const [userDetails, setUserDetails] = useState<UserDetails|undefined>(undefined);
     //bulk selector related state
     const [selectedUser, setSelectedUser] = useState<string>("my");
-    const [bulkSelections, setBulkSelections] = useState<LightboxBulk[]>([]);
     const [selectedBulk, setSelectedBulk] = useState<string|undefined>(undefined);
     const [expiryDays, setExpiryDays] = useState<number>(10);
     //general state
@@ -95,29 +96,12 @@ const NewLightbox:React.FC<RouteComponentProps> = (props) => {
         return undefined;
     }
 
-    const bulkSearchDeleteRequested = async (entryId:string) => {
-        try {
-            await axios.delete("/api/lightbox/"+selectedUser+"/bulk/" + entryId);
-            console.log("lightbox entry " + entryId + " deleted.");
-            //if we are deleting the current selection, the update the selection to undefined otherwise do a no-op update
-            //to trugger reload
-            const updatedSelected = selectedBulk===entryId ? undefined : selectedBulk;
-
-            setBulkSelections((prevState) => prevState.filter(entry=>entry.id!==entryId));
-            setSelectedBulk(updatedSelected);
-        } catch(err) {
-            console.error(err);
-            setLastError(formatError(err, false));
-            setShowingAlert(true);
-        }
-    }
-
     const performLoad = () => {
         const detailsRequest = axios.get<LightboxDetailsResponse>("/api/lightbox/" + selectedUser+"/details");
         const loginDetailsRequest = axios.get<UserDetailsResponse>("/api/loginStatus");
-        const bulkSelectionsRequest = axios.get<LightboxBulkResponse>("/api/lightbox/" + selectedUser+"/bulks");
+
         const configRequest = axios.get<ObjectListResponse<string>>("/api/config");
-        return Promise.all([detailsRequest, loginDetailsRequest, bulkSelectionsRequest, configRequest]);
+        return Promise.all([detailsRequest, loginDetailsRequest, configRequest]);
     }
 
     const refreshData = async () => {
@@ -127,12 +111,9 @@ const NewLightbox:React.FC<RouteComponentProps> = (props) => {
 
             const detailsResult = results[0].data as LightboxDetailsResponse;
             const loginDetailsResult = results[1].data as UserDetailsResponse;
-            const bulkSelectionsResult = results[2].data as LightboxBulkResponse;
-            const configResult = results[3].data as ObjectListResponse<string>;
+            const configResult = results[2].data as ObjectListResponse<string>;
             setLightboxDetails(detailsResult.entries)
             setUserDetails(loginDetailsResult);
-            setBulkSelections(bulkSelectionsResult.entries);
-            setBulkSelectionsCount(bulkSelectionsResult.entryCount);
             setExpiryDays(configResult.entries.length>0 ? parseInt(configResult.entries[0]) : 10);
 
         } catch(err) {
@@ -229,9 +210,7 @@ const NewLightbox:React.FC<RouteComponentProps> = (props) => {
         </div> : null }
 
         <div className={classes.bulkSelectorBox}>
-            <BulkSelectionsScroll entries={bulkSelections}
-                                  onSelected={(newId:string)=>setSelectedBulk(newId)}
-                                  onDeleteClicked={bulkSearchDeleteRequested}
+            <BulkSelectionsScroll onSelected={(newId:string|undefined)=>setSelectedBulk(newId)}
                                   currentSelection={selectedBulk}
                                   forUser={selectedUser}
                                   isAdmin={userDetails?.isAdmin ?? false}

@@ -1,19 +1,17 @@
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import TimestampFormatter from "../common/TimestampFormatter";
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome";
 import axios from 'axios';
 import LoadingThrobber from "../common/LoadingThrobber.jsx";
-import {LightboxBulk} from "../types";
+import {LightboxBulk, LightboxBulkResponse} from "../types";
 import {formatError} from "../common/ErrorViewComponent";
-import {Grid, IconButton, makeStyles, Tooltip, Typography} from "@material-ui/core";
+import {Grid, IconButton, LinearProgress, makeStyles, Tooltip, Typography} from "@material-ui/core";
 import clsx from "clsx";
 import {AirportShuttle, DeleteOutline, GetApp, Timelapse, WarningRounded} from "@material-ui/icons";
 
 interface BulkSelectionsScrollProps {
-    entries: LightboxBulk[];
     currentSelection?: string;
-    onSelected: (newId:string)=>void;
-    onDeleteClicked: (idToDelete:string)=>void;
+    onSelected: (newId:string|undefined)=>void;
     forUser: string;
     isAdmin: boolean;
     expiryDays: number;
@@ -62,6 +60,7 @@ const useStyles = makeStyles((theme)=>({
     bulkSelectionScroll: {
         overflowY: "hidden",
         overflowX: "auto",
+        width: "max-content"
     },
     clickable: {
         cursor: "pointer",
@@ -105,6 +104,8 @@ const useStyles = makeStyles((theme)=>({
 }));
 
 const BulkSelectionsScroll:React.FC<BulkSelectionsScrollProps> = (props) => {
+    const [bulkSelections, setBulkSelections] = useState<LightboxBulk[]>([]);
+    const [loading, setLoading] = useState(true);
     const classes = useStyles();
 
     const nameExtractor = /^([^:]+):(.*)$/;
@@ -117,6 +118,40 @@ const BulkSelectionsScroll:React.FC<BulkSelectionsScrollProps> = (props) => {
             return ({name: str, pathArray: []})
         }
     }
+
+    const bulkSearchDeleteRequested = async (entryId:string) => {
+        try {
+            await axios.delete("/api/lightbox/"+props.forUser+"/bulk/" + entryId);
+            console.log("lightbox entry " + entryId + " deleted.");
+            //if we are deleting the current selection, the update the selection to undefined otherwise do a no-op update
+            //to trugger reload
+            const updatedSelected = props.currentSelection===entryId ? undefined : props.currentSelection;
+
+            setBulkSelections((prevState) => prevState.filter(entry=>entry.id!==entryId));
+            props.onSelected(updatedSelected);
+        } catch(err) {
+            console.error(err);
+            if(props.onError) props.onError(formatError(err, false));
+        }
+    }
+
+
+    const loadData = async () => {
+        setLoading(true);
+        try {
+            const bulkSelections = await axios.get<LightboxBulkResponse>("/api/lightbox/" + props.forUser + "/bulks");
+            setBulkSelections(bulkSelections.data.entries);
+            setLoading(false);
+        } catch(err) {
+            setLoading(false);
+            console.error("Could not load in bulks: ", err);
+            if(props.onError) props.onError(formatError(err, false));
+        }
+    }
+
+    useEffect(()=>{
+        loadData();
+    }, [props.forUser]);
 
     const initiateDownloadInApp = (entryId:string) => {
         axios.get("/api/lightbox/bulk/appDownload/" + entryId, )
@@ -152,7 +187,7 @@ const BulkSelectionsScroll:React.FC<BulkSelectionsScrollProps> = (props) => {
 
     return <div className={classes.bulkSelectionScroll}>
         {
-            props.entries.map((entry,idx)=>{
+            loading ? <LinearProgress/> : bulkSelections.map((entry,idx)=>{
                 const bulkInfo = extractNameAndPathArray(entry.description);
                 const baseClasses = [
                     classes.entryView,
@@ -212,7 +247,7 @@ const BulkSelectionsScroll:React.FC<BulkSelectionsScrollProps> = (props) => {
                                     <Tooltip title="Remove this bulk from your lightbox">
                                         <IconButton style={{float: "right"}} onClick={(evt)=>{
                                             evt.stopPropagation();
-                                            props.onDeleteClicked(entry.id);
+                                            bulkSearchDeleteRequested(entry.id);
                                         }}>
                                             <DeleteOutline style={{color: "red"}}/>
                                         </IconButton>
