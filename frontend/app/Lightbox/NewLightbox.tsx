@@ -99,9 +99,9 @@ const NewLightbox:React.FC<RouteComponentProps> = (props) => {
     const performLoad = () => {
         const detailsRequest = axios.get<LightboxDetailsResponse>("/api/lightbox/" + selectedUser+"/details");
         const loginDetailsRequest = axios.get<UserDetailsResponse>("/api/loginStatus");
-        const bulkSelectionsRequest = axios.get<LightboxBulkResponse>("/api/lightbox/" + selectedUser+"/bulks");
+
         const configRequest = axios.get<ObjectListResponse<string>>("/api/config");
-        return Promise.all([detailsRequest, loginDetailsRequest, bulkSelectionsRequest, configRequest]);
+        return Promise.all([detailsRequest, loginDetailsRequest, configRequest]);
     }
 
     const refreshData = async () => {
@@ -111,11 +111,9 @@ const NewLightbox:React.FC<RouteComponentProps> = (props) => {
 
             const detailsResult = results[0].data as LightboxDetailsResponse;
             const loginDetailsResult = results[1].data as UserDetailsResponse;
-            const bulkSelectionsResult = results[2].data as LightboxBulkResponse;
-            const configResult = results[3].data as ObjectListResponse<string>;
+            const configResult = results[2].data as ObjectListResponse<string>;
             setLightboxDetails(detailsResult.entries)
             setUserDetails(loginDetailsResult);
-            setBulkSelectionsCount(bulkSelectionsResult.entryCount);
             setExpiryDays(configResult.entries.length>0 ? parseInt(configResult.entries[0]) : 10);
 
         } catch(err) {

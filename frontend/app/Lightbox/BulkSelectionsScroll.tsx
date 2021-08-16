@@ -1,9 +1,9 @@
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import TimestampFormatter from "../common/TimestampFormatter";
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome";
 import axios from 'axios';
 import LoadingThrobber from "../common/LoadingThrobber.jsx";
-import {LightboxBulk} from "../types";
+import {LightboxBulk, LightboxBulkResponse} from "../types";
 import {formatError} from "../common/ErrorViewComponent";
 import {Grid, IconButton, makeStyles, Tooltip, Typography} from "@material-ui/core";
 import clsx from "clsx";
@@ -105,6 +105,7 @@ const useStyles = makeStyles((theme)=>({
 
 const BulkSelectionsScroll:React.FC<BulkSelectionsScrollProps> = (props) => {
     const [bulkSelections, setBulkSelections] = useState<LightboxBulk[]>([]);
+    const [loading, setLoading] = useState(true);
     const classes = useStyles();
 
     const nameExtractor = /^([^:]+):(.*)$/;
@@ -133,6 +134,24 @@ const BulkSelectionsScroll:React.FC<BulkSelectionsScrollProps> = (props) => {
             if(props.onError) props.onError(formatError(err, false));
         }
     }
+
+
+    const loadData = async () => {
+        setLoading(true);
+        try {
+            const bulkSelections = await axios.get<LightboxBulkResponse>("/api/lightbox/" + props.forUser + "/bulks");
+            setBulkSelections(bulkSelections.data.entries);
+            setLoading(false);
+        } catch(err) {
+            setLoading(false);
+            console.error("Could not load in bulks: ", err);
+            if(props.onError) props.onError(formatError(err, false));
+        }
+    }
+
+    useEffect(()=>{
+        loadData();
+    }, []);
 
     const initiateDownloadInApp = (entryId:string) => {
         axios.get("/api/lightbox/bulk/appDownload/" + entryId, )
