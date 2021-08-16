@@ -5,7 +5,7 @@ import axios from 'axios';
 import LoadingThrobber from "../common/LoadingThrobber.jsx";
 import {LightboxBulk, LightboxBulkResponse} from "../types";
 import {formatError} from "../common/ErrorViewComponent";
-import {Grid, IconButton, makeStyles, Tooltip, Typography} from "@material-ui/core";
+import {Grid, IconButton, LinearProgress, makeStyles, Tooltip, Typography} from "@material-ui/core";
 import clsx from "clsx";
 import {AirportShuttle, DeleteOutline, GetApp, Timelapse, WarningRounded} from "@material-ui/icons";
 
@@ -151,7 +151,7 @@ const BulkSelectionsScroll:React.FC<BulkSelectionsScrollProps> = (props) => {
 
     useEffect(()=>{
         loadData();
-    }, []);
+    }, [props.forUser]);
 
     const initiateDownloadInApp = (entryId:string) => {
         axios.get("/api/lightbox/bulk/appDownload/" + entryId, )
@@ -187,7 +187,7 @@ const BulkSelectionsScroll:React.FC<BulkSelectionsScrollProps> = (props) => {
 
     return <div className={classes.bulkSelectionScroll}>
         {
-            bulkSelections.map((entry,idx)=>{
+            loading ? <LinearProgress/> : bulkSelections.map((entry,idx)=>{
                 const bulkInfo = extractNameAndPathArray(entry.description);
                 const baseClasses = [
                     classes.entryView,
