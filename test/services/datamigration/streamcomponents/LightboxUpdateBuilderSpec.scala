@@ -31,7 +31,7 @@ class LightboxUpdateBuilderSpec extends Specification {
 
       val result = Await.result(resultFuture, 3.seconds)
       result.length mustEqual 1
-      result.head.itemToDelete mustEqual Map("pk"->new AttributeValue().withS("somevalue"))
+      result.head.itemToDelete must beSome(Map("pk"->new AttributeValue().withS("somevalue")))
       result.head.itemToWrite mustEqual Map(
         "pk"->new AttributeValue().withS("anothervalue"),
         "anotherkey"->new AttributeValue().withN("1234"),

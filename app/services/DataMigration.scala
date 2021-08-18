@@ -11,7 +11,7 @@ import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ArchiveEnt
 import com.theguardian.multimedia.archivehunter.common.cmn_helpers.ZonedTimeFormat
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{LightboxEntry, RestoreStatusEncoder}
 import org.slf4j.LoggerFactory
-import services.datamigration.streamcomponents.{LightboxUpdateBuilder, LightboxUpdateSink, UpdateIndexLightboxEntry}
+import services.datamigration.streamcomponents.{LightboxUpdateBuilder, LightboxUpdateBuilderNonkey, LightboxUpdateSink, UpdateIndexLightboxEntry}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager}
 import play.api.Configuration
 import akka.stream.alpakka.dynamodb.scaladsl.DynamoImplicits._
@@ -27,6 +27,8 @@ import javax.inject.{Inject, Singleton}
 import scala.concurrent.{Future, Promise}
 import com.sksamuel.elastic4s.circe._
 import com.sksamuel.elastic4s.streams.RequestBuilder
+
+import scala.concurrent.duration.DurationInt
 
 @Singleton
 class DataMigration @Inject()(config:Configuration, dyanmoClientMgr:DynamoClientManager, esClientManager:ESClientManager, userAvatarHelper:UserAvatarHelper)
@@ -53,15 +55,14 @@ class DataMigration @Inject()(config:Configuration, dyanmoClientMgr:DynamoClient
 
   def runMigration() = {
     for {
-      updateLightbox <- updateEmailAddresses(config.get[String]("lightbox.tableName"), "userEmail", Some("fileId"))
-      //FIXME: bulk entries table does NOT key on userID
-      //updateBulkEntries <- updateEmailAddresses(config.get[String]("lightbox.bulkTableName"), "userEmail")
-      updateUserProfiles <- updateEmailAddresses(config.get[String]("auth.userProfileTable"),"userEmail", None)
+      updateLightbox <- updateEmailAddresses(config.get[String]("lightbox.tableName"), "userEmail", Some("fileId"), true)
+      updateBulkEntries <- updateEmailAddresses(config.get[String]("lightbox.bulkTableName"), "userEmail", None, false)
+      updateUserProfiles <- updateEmailAddresses(config.get[String]("auth.userProfileTable"),"userEmail", None, true)
       updateIndex <- migrateIndexLightboxData
-    } yield (updateLightbox, updateUserProfiles, updateIndex)
+    } yield (updateLightbox, updateBulkEntries, updateUserProfiles, updateIndex)
   }
 
-  def updateEmailAddresses(tableName:String, primaryKeyField:String, secondaryKeyField:Option[String]) = {
+  def updateEmailAddresses(tableName:String, primaryKeyField:String, secondaryKeyField:Option[String], isPrimaryKey:Boolean) = {
     val request = new ScanRequest()
       .withTableName(tableName)
 
@@ -79,7 +80,11 @@ class DataMigration @Inject()(config:Configuration, dyanmoClientMgr:DynamoClient
         logger.info(s"Got source record $record")
         record
       })
-      .via(LightboxUpdateBuilder(primaryKeyField,emailUpdater, secondaryKeyField))
+      .via(if(isPrimaryKey){
+        LightboxUpdateBuilder(primaryKeyField,emailUpdater, secondaryKeyField)
+      } else {
+        LightboxUpdateBuilderNonkey(primaryKeyField, emailUpdater)
+      })
       .map(updatedRecord=>{
         logger.info(s"Got updated record $updatedRecord")
         updatedRecord
@@ -89,7 +94,7 @@ class DataMigration @Inject()(config:Configuration, dyanmoClientMgr:DynamoClient
   }
 
   def getIndexPublisher =
-    esClient.publisher(search(indexName) query existsQuery("lightboxEntries"))
+    esClient.publisher(search(indexName) query existsQuery("lightboxEntries") scroll 5.minutes)
 
   def getIndexSubs(completionPromise:Promise[Done]) = {
     implicit val builder = new RequestBuilder[ArchiveEntry] {
