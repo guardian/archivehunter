@@ -13,8 +13,9 @@ import org.slf4j.LoggerFactory
   * and the new item which needs writing
   * @param primaryKeyName the name of the primary key to transform
   * @param pkTransformFunction a function that takes in the old primary key value and outputs the new primary key value
+  * @param secondaryKeyName an optional Range key name that is associated with the primary index
   */
-class LightboxUpdateBuilder(primaryKeyName:String, pkTransformFunction:AttributeValue=>Option[AttributeValue]) extends GraphStage[FlowShape[GenericDynamoEntry,UpdateRequest]] {
+class LightboxUpdateBuilder(primaryKeyName:String, pkTransformFunction:AttributeValue=>Option[AttributeValue], secondaryKeyName:Option[String]) extends GraphStage[FlowShape[GenericDynamoEntry,UpdateRequest]] {
   private final val in:Inlet[GenericDynamoEntry] = Inlet.create("LightboxUpdateBuilder.in")
   private final val out:Outlet[UpdateRequest] = Outlet.create("LightboxUpdateBuilder.out")
 
@@ -40,7 +41,11 @@ class LightboxUpdateBuilder(primaryKeyName:String, pkTransformFunction:Attribute
                   pull(in)
                 } else {
                   val updatedRecord = elem ++ Map(primaryKeyName -> updatedPkAttribute)
-                  val recordToDelete = Map(primaryKeyName -> pkAttrib)
+                  val recordToDelete = Seq(
+                    Some(primaryKeyName -> pkAttrib),
+                    secondaryKeyName.map(k=>k -> elem(k))
+                  ).collect({case Some(tupl)=>tupl})
+                    .toMap
                   logger.info(s"Updating $primaryKeyName ${pkAttrib.toString} to ${updatedPkAttribute.toString}")
                   push(out, UpdateRequest(updatedRecord, recordToDelete))
                 }
@@ -58,8 +63,8 @@ class LightboxUpdateBuilder(primaryKeyName:String, pkTransformFunction:Attribute
 }
 
 object LightboxUpdateBuilder {
-  def apply(primaryKeyName:String, pkTransformFunction:AttributeValue=>Option[AttributeValue]) = GraphDSL.create() { builder=>
-    val b = builder.add(new LightboxUpdateBuilder(primaryKeyName, pkTransformFunction))
+  def apply(primaryKeyName:String, pkTransformFunction:AttributeValue=>Option[AttributeValue], secondaryKeyName:Option[String]) = GraphDSL.create() { builder=>
+    val b = builder.add(new LightboxUpdateBuilder(primaryKeyName, pkTransformFunction, secondaryKeyName))
     FlowShape.of(b.in, b.out)
   }
 }

@@ -25,7 +25,7 @@ class LightboxUpdateBuilderSpec extends Specification {
 
       val resultFuture = Source
         .single(fakeItem)
-        .via(LightboxUpdateBuilder("pk",(_)=>Some(new AttributeValue().withS("anothervalue"))))
+        .via(LightboxUpdateBuilder("pk",(_)=>Some(new AttributeValue().withS("anothervalue")), None))
         .toMat(Sink.seq)(Keep.right)
         .run()
 
@@ -48,7 +48,7 @@ class LightboxUpdateBuilderSpec extends Specification {
 
       val resultFuture = Source
         .single(fakeItem)
-        .via(LightboxUpdateBuilder("otherfield",(_)=>Some(new AttributeValue().withS("anothervalue"))))
+        .via(LightboxUpdateBuilder("otherfield",(_)=>Some(new AttributeValue().withS("anothervalue")), None))
         .toMat(Sink.seq)(Keep.right)
         .run()
 
@@ -67,7 +67,7 @@ class LightboxUpdateBuilderSpec extends Specification {
 
     val resultFuture = Source
       .single(fakeItem)
-      .via(LightboxUpdateBuilder("pk",(_)=>Some(new AttributeValue().withS("somevalue"))))
+      .via(LightboxUpdateBuilder("pk",(_)=>Some(new AttributeValue().withS("somevalue")), None))
       .toMat(Sink.seq)(Keep.right)
       .run()
 

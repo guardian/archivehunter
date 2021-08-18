@@ -53,14 +53,15 @@ class DataMigration @Inject()(config:Configuration, dyanmoClientMgr:DynamoClient
 
   def runMigration() = {
     for {
-      updateLightbox <- updateEmailAddresses(config.get[String]("lightbox.tableName"), "userEmail")
-      updateBulkEntries <- updateEmailAddresses(config.get[String]("lightbox.bulkTableName"), "userEmail")
-      updateUserProfiles <- updateEmailAddresses(config.get[String]("auth.userProfileTable"),"userEmail")
+      updateLightbox <- updateEmailAddresses(config.get[String]("lightbox.tableName"), "userEmail", Some("fileId"))
+      //FIXME: bulk entries table does NOT key on userID
+      //updateBulkEntries <- updateEmailAddresses(config.get[String]("lightbox.bulkTableName"), "userEmail")
+      updateUserProfiles <- updateEmailAddresses(config.get[String]("auth.userProfileTable"),"userEmail", None)
       updateIndex <- migrateIndexLightboxData
-    } yield (updateLightbox, updateBulkEntries, updateUserProfiles, updateIndex)
+    } yield (updateLightbox, updateUserProfiles, updateIndex)
   }
 
-  def updateEmailAddresses(tableName:String, primaryKeyField:String) = {
+  def updateEmailAddresses(tableName:String, primaryKeyField:String, secondaryKeyField:Option[String]) = {
     val request = new ScanRequest()
       .withTableName(tableName)
 
@@ -78,7 +79,7 @@ class DataMigration @Inject()(config:Configuration, dyanmoClientMgr:DynamoClient
         logger.info(s"Got source record $record")
         record
       })
-      .via(LightboxUpdateBuilder(primaryKeyField,emailUpdater))
+      .via(LightboxUpdateBuilder(primaryKeyField,emailUpdater, secondaryKeyField))
       .map(updatedRecord=>{
         logger.info(s"Got updated record $updatedRecord")
         updatedRecord
