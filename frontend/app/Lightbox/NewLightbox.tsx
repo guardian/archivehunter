@@ -93,8 +93,8 @@ const NewLightbox:React.FC<RouteComponentProps> = (props) => {
     const userContext = useContext(UserContext);
 
     const userDisplayName = ()=>{
-        if(selectedUser!=="my") return selectedUser;
-        if(userContext.profile) return userContext.profile.firstName + " " + userContext.profile.lastName;
+        if(selectedUser!=="my") return selectedUser + "'s ";
+        if(userContext.profile) return "My ";
         return undefined;
     }
 
@@ -200,7 +200,7 @@ const NewLightbox:React.FC<RouteComponentProps> = (props) => {
             <MuiAlert severity="error" onClose={closeAlert}>{lastError}</MuiAlert>
         </Snackbar>
         <div className={classes.userNameBox}>
-            <Typography className={classes.userNameText}>{userDisplayName() ? `${userDisplayName()}'s Lightbox` : "Lightbox"}</Typography>
+            <Typography className={classes.userNameText}>{userDisplayName() ? `${userDisplayName()} Lightbox` : "Lightbox"}</Typography>
         </div>
 
         { userContext.profile?.isAdmin ? <div className={classes.userSelectorBox}>
