@@ -120,7 +120,7 @@ class LightboxController @Inject() (override val config:Configuration,
       saveFuture.flatMap({
         case Right(savedEntry)=>
           LightboxHelper
-            .addToBulkFromSearch(indexName,userProfile, userAvatarHelper.getAvatarLocationString(user),searchReq,savedEntry)
+            .addToBulkFromSearch(indexName,userProfile, userAvatarHelper.getAvatarLocationString(userProfile.userEmail),searchReq,savedEntry)
             .flatMap(updatedBulkEntry=>{
               lightboxBulkEntryDAO.put(updatedBulkEntry).map({
                 case None=>
@@ -161,7 +161,7 @@ class LightboxController @Inject() (override val config:Configuration,
             case Left(resp:QuotaExceededResponse)=>
               Future(new Status(413)(resp.asJson))
             case Right(restoreSize)=>
-              logger.info("Proceeding with bulk restore")
+              logger.info(s"Proceeding with bulk restore of size $restoreSize")
               for {
                 maybeLightboxBulkEntry <- getOrCreateBulkEntry(searchReq, userProfile, user)
                 response <- saveAndStartRestore(maybeLightboxBulkEntry, searchReq, userProfile, user)
