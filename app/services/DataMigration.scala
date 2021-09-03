@@ -29,6 +29,7 @@ import com.sksamuel.elastic4s.circe._
 import com.sksamuel.elastic4s.streams.RequestBuilder
 
 import scala.concurrent.duration.DurationInt
+import scala.util.{Failure, Success}
 
 @Singleton
 class DataMigration @Inject()(config:Configuration, dyanmoClientMgr:DynamoClientManager, esClientManager:ESClientManager, userAvatarHelper:UserAvatarHelper)
@@ -63,10 +64,11 @@ class DataMigration @Inject()(config:Configuration, dyanmoClientMgr:DynamoClient
   }
 
   def updateEmailAddresses(tableName:String, primaryKeyField:String, secondaryKeyField:Option[String], isPrimaryKey:Boolean) = {
+    logger.info(s"Starting update of email addresses on table $tableName for PK field $primaryKeyField and secondary key $secondaryKeyField. Is PK update? $isPrimaryKey")
     val request = new ScanRequest()
       .withTableName(tableName)
 
-    dynamoClient.source(request)
+    val processFuture = dynamoClient.source(request)
       //.toMap here converts the mutable map that `asScala` gives us into an immutable map
       .flatMapConcat(response=>
         Source.fromIterator(
@@ -76,6 +78,7 @@ class DataMigration @Inject()(config:Configuration, dyanmoClientMgr:DynamoClient
             .toIterator
         )
       )
+      .log("services.datamigration.stream")
       .map(record=>{
         logger.info(s"Got source record $record")
         record
@@ -91,6 +94,14 @@ class DataMigration @Inject()(config:Configuration, dyanmoClientMgr:DynamoClient
       })
       .toMat(LightboxUpdateSink(tableName, config, dyanmoClientMgr))(Keep.right)
       .run()
+
+    processFuture.onComplete({
+      case Success(_)=>
+        logger.info(s"Data migration for $tableName succeeded")
+      case Failure(err)=>
+        logger.error(s"Data migration for $tableName failed: ${err.getMessage}", err)
+    })
+    processFuture
   }
 
   def getIndexPublisher =
@@ -118,13 +129,19 @@ class DataMigration @Inject()(config:Configuration, dyanmoClientMgr:DynamoClient
   }
 
   def migrateIndexLightboxData = {
+    logger.info("Index data migration starting")
     val completionPromise = Promise[Done]()
 
     Source
       .fromPublisher(getIndexPublisher)
+      .log("services.datamigration.stream")
+      .map(raw=>{
+        logger.info(s"migrateIndexLightboxData: got raw record $raw")
+        raw
+      })
       .map(_.to[ArchiveEntry])
       .map(entry=>{
-        logger.debug(s"migrateIndexLightboxData: got entry ${entry}")
+        logger.info(s"migrateIndexLightboxData: got entry ${entry}")
         entry
       })
       .via(UpdateIndexLightboxEntry(emailUpdaterString, userAvatarHelper))

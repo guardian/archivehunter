@@ -1103,6 +1103,7 @@ Resources:
             restoresExpireAfter = 10
           }
 
+          akka.http.host-connection-pool.response-entity-subscription-timeout = 60.seconds
           akka.actor {
             provider = "cluster"
 
@@ -1195,7 +1196,6 @@ Resources:
 
           systemctl restart archivehunter
           systemctl enable archivehunter
-        - DeploySubnetsString: !Join [",",!Ref DeploySubnets]
 
   AutoScaleGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
