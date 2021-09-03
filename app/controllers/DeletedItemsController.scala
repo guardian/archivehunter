@@ -179,7 +179,7 @@ class DeletedItemsController @Inject() (override val config:Configuration,
         Future(InternalServerError(GenericErrorResponse("error", other.errorDesc).asJson))
       case Right(entry)=>
         if(entry.bucket!=collectionName) {
-          logger.warn(s"Invalid tombstone removal request: $itemId exist but is not within bucket $collectionName, returning 404")
+          logger.warn(s"Invalid tombstone removal request: $itemId exists but not within bucket $collectionName, returning 404")
           Future(NotFound(GenericErrorResponse("not_found", itemId).asJson))
         } else if(!entry.beenDeleted) {
           logger.warn(s"Invalid tombstone removal request: $itemId is not a tombstone")

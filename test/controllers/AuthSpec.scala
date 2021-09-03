@@ -38,14 +38,12 @@ class AuthSpec extends Specification with Mockito {
     "return true if presented with an expiry time in the past" in {
       val now = Instant.now()
       val testTime = ZonedDateTime.ofInstant(now.minusSeconds(500), ZoneId.systemDefault())
-      //val claims = fakeClaimBuilder.expirationTime(Date.from(now.minusSeconds(500))).build();
       Auth.claimIsExpired(testTime) must beTrue
     }
 
     "return false if presented with an expiry time in the future" in {
       val now = Instant.now()
       val testTime = ZonedDateTime.ofInstant(now.plusSeconds(500), ZoneId.systemDefault())
-      //val claims = fakeClaimBuilder.expirationTime(Date.from(now.plusSeconds(500))).build();
       Auth.claimIsExpired(testTime) must beFalse
     }
   }
