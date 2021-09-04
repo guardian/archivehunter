@@ -105,7 +105,7 @@ class DataMigration @Inject()(config:Configuration, dyanmoClientMgr:DynamoClient
   }
 
   def getIndexPublisher =
-    esClient.publisher(search(indexName) query existsQuery("lightboxEntries") scroll 5.minutes)
+    esClient.publisher(search(indexName) query nestedQuery("lightboxEntries", existsQuery("lightboxEntries.owner")) scroll 5.minutes)
 
   def getIndexSubs(completionPromise:Promise[Done]) = {
     implicit val builder = new RequestBuilder[ArchiveEntry] {
