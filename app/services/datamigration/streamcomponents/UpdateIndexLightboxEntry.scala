@@ -5,8 +5,11 @@ import akka.stream.{Attributes, FlowShape, Inlet, Outlet}
 import akka.stream.stage.{AbstractInHandler, AbstractOutHandler, GraphStage, GraphStageLogic}
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, LightboxIndex}
 import helpers.UserAvatarHelper
+import org.slf4j.LoggerFactory
 
 class UpdateIndexLightboxEntry(transformFunction:(String)=>Option[String], userAvatarHelper: UserAvatarHelper) extends GraphStage[FlowShape[ArchiveEntry, ArchiveEntry]] {
+  private val logger = LoggerFactory.getLogger(getClass)
+
   private final val in:Inlet[ArchiveEntry] = Inlet.create("UpdateIndexLightboxEntry.in")
   private final val out:Outlet[ArchiveEntry] = Outlet.create("UpdateIndexLightboxEntry.in")
 
@@ -34,7 +37,13 @@ class UpdateIndexLightboxEntry(transformFunction:(String)=>Option[String], userA
         val elem = grab(in)
 
         val updatedElem = elem.copy(lightboxEntries = elem.lightboxEntries.map(updateLightboxEntry))
-        push(out, updatedElem)
+        if(elem==updatedElem) {
+          logger.info(s"No updated required on ${elem.bucket}:${elem.path}")
+          pull(in)
+        } else {
+          logger.info(s"Updating lightbox entries on ${elem.bucket}:${elem.path}")
+          push(out, updatedElem)
+        }
       }
     })
   }

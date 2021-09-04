@@ -104,9 +104,56 @@ class DataMigration @Inject()(config:Configuration, dyanmoClientMgr:DynamoClient
     processFuture
   }
 
-  def getIndexPublisher =
-    esClient.publisher(search(indexName) query nestedQuery("lightboxEntries", existsQuery("lightboxEntries.owner")) scroll 5.minutes)
+  /**
+    * get the number of documents that need investigating and potentially updating
+    * @return a Future that is
+    */
+  def getIndexMigrationEstimate =
+    esClient
+      .execute(getIndexQuery(false).limit(0))
+      .flatMap(response=>{
+        if(response.isError) {
+          Future.failed(new RuntimeException(response.error.toString))
+        } else {
+          Future(response.result.hits.total)
+        }
+      })
 
+  /**
+    * Builds the query used to find items which are lightboxed in order to update them.
+    *
+    * See https://www.monterail.com/blog/how-to-index-objects-elasticsearch for more details on the "nested" query.
+    *
+    * @param scrolling if true, then set the "scroll" attribute to keep the query in-memory for streaming. If false, then
+    *                  don't memorise the query for streaming
+    * @return elastic4s SearchRequest
+    */
+  def getIndexQuery(scrolling:Boolean=true) = {
+    val baseQuery = search(indexName) query nestedQuery(
+      "lightboxEntries",
+      existsQuery("lightboxEntries.owner")
+    )
+
+    if(scrolling) {
+      baseQuery scroll 5.minutes
+    } else {
+      baseQuery
+    }
+  }
+
+  /**
+    * return a Publisher that is used as a stream source of items that need updating
+    * @return the Publisher
+    */
+  def getIndexPublisher = esClient.publisher(getIndexQuery())
+
+  /**
+    * return a Subscriber that is used as a stream sink that converts updated items into update requests and commits them
+    * @param completionPromise a Promise that holds no data. This is Completed when the subscriber completes without
+    *                          error and Failed if the subscriber errors. Check the resulting future's error to see what
+    *                          went wrong in this case
+    * @return the Subscriber.
+    */
   def getIndexSubs(completionPromise:Promise[Done]) = {
     implicit val builder = new RequestBuilder[ArchiveEntry] {
       import com.sksamuel.elastic4s.http.ElasticDsl._
@@ -128,8 +175,26 @@ class DataMigration @Inject()(config:Configuration, dyanmoClientMgr:DynamoClient
     )
   }
 
+  /**
+    * Perform data migration on the lightboxed items, i.e. update all the usernames to their newer equivalent
+    * @return a Future that completes when the update is done
+    */
   def migrateIndexLightboxData = {
     logger.info("Index data migration starting")
+    getIndexMigrationEstimate
+      .flatMap(hits=>{
+        logger.info(s"Initial estimate is that $hits records need checking")
+        if(hits>0) {
+          innerPerformMigration
+        } else {
+          logger.info(s"No migration needed on the index, skipping this stage")
+          //if there is nothing to migrate then complete immediately
+          Future(Done)
+        }
+      })
+  }
+
+  def innerPerformMigration = {
     val completionPromise = Promise[Done]()
 
     Source
