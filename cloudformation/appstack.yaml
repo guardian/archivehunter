@@ -31,9 +31,32 @@ Parameters:
   DeploymentDomain:
     Type: String
     Description: DNS domain that this is going to be deployed into.  This is needed for pan-domain authentication to work (see readme).  Assumption is that the access URL is at https://${App}.${DeploymentDomain}
-  PandaBucket:
+  OAuthConfigBucket:
     Type: String
-    Description: S3 bucket that contains the Pan-domain auth settings
+    Description: S3 bucket that contains the signing cert, which must be called `oauth-signing.pem`
+  OAuthClientId:
+    Type: String
+    Description: Client ID provided by the OAuth IdP
+  OAuthClientName:
+    Type: String
+    Description: Client Name provided by the OAuth IdP
+  OAuthLoginUri:
+    Type: String
+    Description: Login endpoint provided by the OAuth IdP
+  OAuthTokenUri:
+    Type: String
+    Description: Token endpoint provided by the OAuth IdP
+  OAuthAdminClaimName:
+    Type: String
+    Description: Name of a claim which, if present and a string 'true' will indicate that the user is an administrator
+    Default: multimedia_admin
+  OAuthValidAudiences:
+    Type: String
+    Description: JSON style list of audience names, one of which must be the current "aud" field in a token in order for it to be considered valid
+    Default: "[\"archivehunter\"]"
+  AvatarBucket:
+    Type: String
+    Description: Name of a bucket which will hold user avatars. Public access is not required; the primary proxy bucket usually makes a good choice.
   OfficeIpRange:
     Type: String
     Description: CIDR block of ip addresses to be allowed SSH access
@@ -353,6 +376,30 @@ Resources:
       ProvisionedThroughput:
         WriteCapacityUnits: 1
         ReadCapacityUnits: 3
+      Tags:
+        - Key: App
+          Value: !Sub ${App}-webapp
+        - Key: Stack
+          Value: !Ref Stack
+        - Key: Stage
+          Value: !Ref Stage
+
+  OAuthTokensTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: userEmail
+          AttributeType: S
+        - AttributeName: issued
+          AttributeType: N
+      KeySchema:
+        - AttributeName: userEmail
+          KeyType: HASH
+        - AttributeName: issued
+          KeyType: RANGE
+      ProvisionedThroughput:
+        WriteCapacityUnits: 1
+        ReadCapacityUnits: 4
       Tags:
         - Key: App
           Value: !Sub ${App}-webapp
@@ -742,6 +789,7 @@ Resources:
             - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${LightboxBulkEntryTable}/index/*
             - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ServerTokensTable}
             - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ServerTokensTable}/index/*
+            - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${OAuthTokensTable}
       - PolicyName: TranscoderAccess
         PolicyDocument:
           Version: 2012-10-17
@@ -789,7 +837,7 @@ Resources:
               - s3:GetObject
               - s3:ListObjects
             Resource:
-              - !Sub arn:aws:s3:::${PandaBucket}/*
+              - !Sub arn:aws:s3:::${OAuthConfigBucket}/*
       - PolicyName: MessageQueueRead
         PolicyDocument:
           Version: 2012-10-17
@@ -952,6 +1000,8 @@ Resources:
 
           echo "$LOCAL_IP  $HOSTNAME" >> /etc/hosts
 
+          aws s3 cp s3://${OAuthConfigBucket}/oauth-signing.pem /usr/share/archivehunter/conf/oauth-signing.pem
+
           cat > /usr/share/archivehunter/conf/application.conf << EOF
           play.http.secret.key = "${AppSecretString}"
           play.filters {
@@ -975,6 +1025,7 @@ Resources:
             indexName = "archivehunter"
             problemItemsIndex="proxy-issues"
             problemSummaryIndex="proxy-issues-summary"
+            avatarBucket="${AvatarBucket}"
           }
 
           scanner {
@@ -1021,10 +1072,23 @@ Resources:
           }
 
           auth {
-             panDomainBucket = "${PandaBucket}"
              deployedUrl = "https://${App}.${DeploymentDomain}"
              domain = "${DeploymentDomain}"
              userProfileTable = "${UserProfileTable}"
+          }
+
+          oAuth {
+            clientId: "${OAuthClientId}"
+            resource: "${OAuthClientName}"
+            oAuthUri: "${OAuthLoginUri}"
+            tokenUrl: "${OAuthTokenUri}"
+            adminClaimName: "${OAuthAdminClaimName}"
+            authCookieName: "archivehunterAuth"
+            refreshCookieName: "archivehunterRefresh"
+            enforceSecure: true    //You can turn this off to make development simpler but always turn it on for production!
+            tokenSigningCertPath: "/usr/share/archivehunter/conf/oauth-signing.pem"
+            validAudiences: ${OAuthValidAudiences}
+            oAuthTokensTable: "${OAuthTokensTable}"
           }
 
           serverToken {
@@ -1039,6 +1103,7 @@ Resources:
             restoresExpireAfter = 10
           }
 
+          akka.http.host-connection-pool.response-entity-subscription-timeout = 60.seconds
           akka.actor {
             provider = "cluster"
 
@@ -1131,6 +1196,7 @@ Resources:
 
           systemctl restart archivehunter
           systemctl enable archivehunter
+
   AutoScaleGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:

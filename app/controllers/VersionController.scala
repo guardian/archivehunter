@@ -1,26 +1,27 @@
 package controllers
 
+import auth.{BearerTokenAuth, Security}
+
 import java.io.{BufferedInputStream, File, FileInputStream, InputStream}
 import java.time.ZonedDateTime
 import java.util.Properties
-
 import com.theguardian.multimedia.archivehunter.common.ZonedDateTimeEncoder
-import helpers.InjectableRefresher
+
 import javax.inject.{Inject, Singleton}
 import play.api.Configuration
 import play.api.libs.circe.Circe
-import play.api.libs.ws.WSClient
 import play.api.mvc.{AbstractController, ControllerComponents}
 import io.circe.syntax._
 import io.circe.generic.auto._
+import play.api.cache.SyncCacheApi
 import responses.{GenericErrorResponse, VersionInfoResponse}
 
 @Singleton
 class VersionController @Inject() (override val controllerComponents:ControllerComponents,
                                    override val config:Configuration,
-                                   override val wsClient:WSClient,
-                                   override val refresher:InjectableRefresher)
-  extends AbstractController(controllerComponents) with Circe with ZonedDateTimeEncoder with PanDomainAuthActions {
+                                   override val bearerTokenAuth:BearerTokenAuth,
+                                   override val cache:SyncCacheApi)
+  extends AbstractController(controllerComponents) with Security with Circe with ZonedDateTimeEncoder {
 
   protected def findData():Option[InputStream] = {
     val classVersion = getClass.getResourceAsStream("version.properties")
@@ -58,7 +59,7 @@ class VersionController @Inject() (override val controllerComponents:ControllerC
     }
   }
 
-  def getInfo = APIAuthAction {
+  def getInfo = IsAuthenticated { _=> _=>
     getData() match {
       case Some(props)=>
         marshalData(props) match {

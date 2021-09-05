@@ -5,11 +5,13 @@
 GET     /is-online                  controllers.Application.healthcheck
 GET     /                           @controllers.Application.rootIndex()
 
+GET     /login                      @controllers.Auth.login(state:Option[String])
+
 GET     /test/api419                @controllers.Application.test419
-GET     /oauthCallback              @controllers.Auth.oauthCallback
-POST    /api/logout                 @controllers.Auth.logout
+GET     /oauthCallback              @controllers.Auth.oauthCallback(state:Option[String],code:Option[String],error:Option[String])
+GET     /logout                     @controllers.Auth.logout
 GET     /api/loginStatus            @controllers.UserController.loginStatus
-GET     /loginAuthStub              @controllers.Application.authstub
+POST    /api/loginRefresh           @controllers.Auth.refreshIfRequired
 
 POST    /api/scanTarget                 @controllers.ScanTargetController.newTarget
 DELETE  /api/scanTarget/:id             @controllers.ScanTargetController.removeTarget(id)
@@ -109,6 +111,8 @@ GET     /api/bulk/:tokenValue/get/:fileId   @controllers.BulkDownloadsController
 
 GET     /api/pathcache/size                 @controllers.PathCacheController.pathCacheSize
 PUT     /api/pathcache/rebuild              @controllers.PathCacheController.startCacheBuild(blankFirst:Boolean ?= false)
+
+POST    /api/rundatamigration                  @controllers.Application.runDataMigration
 
 # Map static resources from the /public folder to the /assets URL path
 GET     /assets/*file               controllers.Assets.at(path="/public", file)

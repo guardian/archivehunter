@@ -62,7 +62,7 @@ const useStyles = makeStyles({
         gridColumnEnd: -1,
         gridRowStart: "top",
         gridRowEnd: "bottom",
-        overflow: "auto",
+        overflow: "hidden", //scrollbars are displayed by the child component
     }
 });
 
@@ -286,6 +286,7 @@ const NewBrowseComponent:React.FC<RouteComponentProps> = (props) => {
                        onRightClicked={()=>setRightDividerPos((prev)=>prev+1)}
                        onLeftClicked={()=>setRightDividerPos((prev)=>prev-1)}
             />
+            {selectedEntry ?
             <EntryDetails entry={selectedEntry}
                           autoPlay={true}
                           showJobs={true}
@@ -298,7 +299,7 @@ const NewBrowseComponent:React.FC<RouteComponentProps> = (props) => {
                 //when the user adds to lightbox we record it here. This state var is bound to the NewSearchComponent
                 //which will then re-load data for the given entry (after a short delay)
                           lightboxedCb={(entryId:string)=>setNewlyLightboxed((prevState) => prevState.concat(entryId))}
-            />
+            /> : undefined }
         </div>
     </div>
 }

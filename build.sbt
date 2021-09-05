@@ -5,6 +5,7 @@ import com.typesafe.sbt.packager.docker._
 
 enablePlugins(RiffRaffArtifact, DockerPlugin, SystemdPlugin)
 
+scalacOptions := Seq("-unchecked", "-deprecation")
 scalaVersion := "2.12.13"
 
 val akkaVersion = "2.5.31"
@@ -67,11 +68,11 @@ lazy val `archivehunter` = (project in file("."))
       "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
       "com.typesafe.akka" %% "akka-persistence" % akkaVersion,
       "com.typesafe.akka" %% "akka-cluster-sharding" % akkaVersion,
+      "com.nimbusds" % "nimbus-jose-jwt" % "9.11.1",
       "com.gu" % "kinesis-logback-appender" % "2.0.1",
       "com.fasterxml.jackson.dataformat" % "jackson-dataformat-cbor" % "2.11.4",  //fix vulnerable dependency for kinesis-logback-appender
       "org.apache.logging.log4j" % "log4j-api" % "2.13.2",
       "com.typesafe.akka" %% "akka-testkit" % akkaVersion,
-      "com.gu" %% "panda-hmac-play_2-6" % "1.3.1",
       "io.sentry" % "sentry-logback" % "1.7.2",
         jdbc, ehcache, ws)
   )

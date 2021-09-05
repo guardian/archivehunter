@@ -12,7 +12,7 @@ interface LightboxInsertProps {
     lightboxedCb?: (entryId:string)=>Promise<void>;
     entryId: string;
     lightboxEntries: LightboxIndex[];
-    onError: (description:string)=>void;
+    onError?: (description:string)=>void;
 }
 
 const useStyles = makeStyles({
@@ -31,7 +31,7 @@ const LightboxInsert:React.FC<LightboxInsertProps> = (props) => {
         } catch(err) {
             console.error("could not put to lightbox: ", err);
             const errDescription = formatError(err, false);
-            props.onError(errDescription);
+            if(props.onError) props.onError(errDescription);
         }
     }
 
@@ -43,7 +43,7 @@ const LightboxInsert:React.FC<LightboxInsertProps> = (props) => {
             setLightboxSaving(false);
         } catch(err) {
             console.error("could not remove from lightbox: ", err);
-            props.onError(formatError(err, false));
+            if(props.onError) props.onError(formatError(err, false));
         }
     }
 

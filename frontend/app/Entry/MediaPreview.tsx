@@ -15,7 +15,7 @@ interface MediaPreviewProps {
     triggeredProxyGeneration?: ()=>void;
     itemId: string;
     itemName: string;
-    fileExtension: string;
+    fileExtension?: string;
     mimeType: MimeType;
     className?: string;
     relinkedCb?: ()=>void;

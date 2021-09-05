@@ -36,7 +36,8 @@ $settings_mapping = {
     "ingest.notificationsQueue" => "IngestTranscodeMsg",
     "lightbox.tableName" => "LightboxTable",
     "lightbox.bulkTableName" => "LightboxBulkEntryTable",
-    "serverToken.serverTokenTable" => "ServerTokensTable"
+    "serverToken.serverTokenTable" => "ServerTokensTable",
+    "oAuth.oAuthTokensTable" => "OAuthTokensTable"
 }
 
 

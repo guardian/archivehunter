@@ -1,11 +1,11 @@
 package controllers
 
-import com.gu.pandahmac.HMACAuthActions
-import com.gu.pandomainauth.action.UserRequest
+import auth.{BearerTokenAuth, Security}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.ESClientManager
+
 import javax.inject.{Inject, Singleton}
 import play.api.{Configuration, Logger}
-import play.api.mvc.{AbstractController, ControllerComponents}
+import play.api.mvc.{AbstractController, ControllerComponents, Request}
 import play.api.libs.json.Json
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -14,35 +14,38 @@ import io.circe.syntax._
 import com.sksamuel.elastic4s.circe._
 import com.sksamuel.elastic4s.http.search.Aggregations
 import com.sksamuel.elastic4s.searches.sort.SortOrder
-import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ArchiveEntryHitReader, StorageClassEncoder, ZonedDateTimeEncoder}
-import helpers.{InjectableRefresher, LightboxHelper}
+import com.theguardian.multimedia.archivehunter.common.cmn_models.LightboxEntry
+import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ArchiveEntryHitReader, LightboxIndex, StorageClassEncoder, ZonedDateTimeEncoder}
+import helpers.{LightboxHelper, UserAvatarHelper}
 import models.{ChartFacet, ChartFacetData, UserProfileDAO}
+import org.slf4j.LoggerFactory
+import play.api.cache.SyncCacheApi
 import play.api.libs.circe.Circe
 import requests.SearchRequest
 import play.api.libs.ws.WSClient
 import responses._
 
+import java.net.URI
 import scala.concurrent.Future
+import scala.util.{Failure, Success, Try}
 
 @Singleton
 class SearchController @Inject()(override val config:Configuration,
                                  override val controllerComponents:ControllerComponents,
                                  esClientManager:ESClientManager,
-                                 override val wsClient:WSClient,
-                                 override val refresher:InjectableRefresher,
-                                 userProfileDAO:UserProfileDAO)
-  extends AbstractController(controllerComponents) with ArchiveEntryHitReader with ZonedDateTimeEncoder with StorageClassEncoder with Circe with HMACAuthActions
-with PanDomainAuthActions {
+                                 override val bearerTokenAuth: BearerTokenAuth,
+                                 override val cache:SyncCacheApi,
+                                 userAvatarHelper:UserAvatarHelper)
+                                (implicit val userProfileDAO:UserProfileDAO)
+  extends AbstractController(controllerComponents) with Security with ArchiveEntryHitReader with ZonedDateTimeEncoder with StorageClassEncoder with Circe {
 
-  private val logger=Logger(getClass)
+  override protected val logger=LoggerFactory.getLogger(getClass)
   val indexName = config.getOptional[String]("externalData.indexName").getOrElse("archivehunter")
-
-  override def secret:String = config.get[String]("serverAuth.sharedSecret")
 
   private val esClient = esClientManager.getClient()
   import com.sksamuel.elastic4s.http.ElasticDsl._
 
-  def getEntry(fileId:String) = HMACAuthAction.async {
+  def getEntry(fileId:String) = IsAuthenticatedAsync { _=> _=>
     esClient.execute {
       search(indexName) query termQuery("id",fileId)
     }.map(response=>{
@@ -65,7 +68,7 @@ with PanDomainAuthActions {
     })
   }
 
-  def simpleStringSearch(q:Option[String],start:Option[Int],length:Option[Int]) = APIAuthAction.async {
+  def simpleStringSearch(q:Option[String],start:Option[Int],length:Option[Int]) = IsAuthenticatedAsync { _=> _=>
     val cli = esClientManager.getClient()
 
     val actualStart=start.getOrElse(0)
@@ -93,7 +96,7 @@ with PanDomainAuthActions {
     }
   }
 
-  def suggestions = APIAuthAction.async(parse.text) { request=>
+  def suggestions = IsAuthenticatedAsync(parse.text) { _=> request=>
     val sg = termSuggestion("sg").on("path").text(request.body)
 
     esClient.execute({
@@ -113,7 +116,26 @@ with PanDomainAuthActions {
     })
   }
 
-  def browserSearch(startAt:Int,pageSize:Int) = APIAuthAction.async(circe.json(2048)) { request=>
+  private def fixupUserAvatars(records:Seq[ArchiveEntry]):Seq[ArchiveEntry] = {
+    def swapOutForPresigned(urlString:String):Option[String] = {
+      (for {
+        parsedUri <- Try { new URI(urlString) }
+        presigned <- userAvatarHelper.getPresignedUrl(parsedUri)
+      } yield presigned) match {
+        case Success(url)=>Some(url.toString)
+        case Failure(err)=>
+          logger.warn(s"Could not get presigned URL for user avater $urlString: ${err.getMessage}", err)
+          None
+      }
+    }
+
+    records
+      .map(e=>e.copy(lightboxEntries = e.lightboxEntries.map(lb=>{
+        lb.copy(avatarUrl = lb.avatarUrl.flatMap(swapOutForPresigned))
+      })))
+  }
+
+  def browserSearch(startAt:Int,pageSize:Int) = IsAuthenticatedAsync(circe.json(2048)) { _=> request=>
     request.body.as[SearchRequest].fold(
       error=>{
         Future(BadRequest(GenericErrorResponse("bad_request", error.toString).asJson))
@@ -128,7 +150,7 @@ with PanDomainAuthActions {
             logger.error(s"Could not perform advanced search: ${response.status} ${response.error.reason}")
             InternalServerError(GenericErrorResponse("search_error", response.error.reason).asJson)
           } else {
-            Ok(ObjectListResponse("ok", "entry", response.result.to[ArchiveEntry], response.result.totalHits.toInt).asJson)
+            Ok(ObjectListResponse("ok", "entry", fixupUserAvatars(response.result.to[ArchiveEntry]), response.result.totalHits.toInt).asJson)
           }
         })
       }
@@ -139,28 +161,7 @@ with PanDomainAuthActions {
     })
   }
 
-  def targetUserProfile[T](request:UserRequest[T], targetUser:String) = {
-    val actualUserProfile = userProfileFromSession(request.session)
-    if(targetUser=="my"){
-      Future(actualUserProfile)
-    } else {
-      actualUserProfile match {
-        case Some(Left(err))=>
-          Future(Some(Left(err)))
-        case Some(Right(someUserProfile))=>
-          if(!someUserProfile.isAdmin){
-            logger.error(s"Non-admin user is trying to access lightbox of $targetUser")
-            Future(None)
-          } else {
-            userProfileDAO.userProfileForEmail(targetUser)
-          }
-        case None=>
-          Future(None)
-      }
-    }
-  }
-
-  def lightboxSearch(startAt:Int, pageSize:Int, bulkId:Option[String], user:String) = APIAuthAction.async {request=>
+  def lightboxSearch(startAt:Int, pageSize:Int, bulkId:Option[String], user:String) = IsAuthenticatedAsync { _=> request=>
     targetUserProfile(request,user).flatMap({
       case None => Future(BadRequest(GenericErrorResponse("session_error", "no session present").asJson))
       case Some(Left(err)) =>
@@ -174,7 +175,7 @@ with PanDomainAuthActions {
             logger.error(s"Could not perform lightbox query: ${response.status} ${response.error.reason}")
             InternalServerError(GenericErrorResponse("search_error", response.error.reason).asJson)
           } else {
-            Ok(ObjectListResponse("ok", "entry", response.result.to[ArchiveEntry], response.result.totalHits.toInt).asJson)
+            Ok(ObjectListResponse("ok", "entry", fixupUserAvatars(response.result.to[ArchiveEntry]), response.result.totalHits.toInt).asJson)
           }
         }).recover({
           case err: Throwable =>
@@ -207,7 +208,7 @@ with PanDomainAuthActions {
     } else Left("Facet did not have buckets parameter")
   }
 
-  def getProxyFacets() = APIAuthAction.async {
+  def getProxyFacets() = IsAuthenticatedAsync { _=> _=>
     esClient.execute {
       search(indexName) aggregations
         termsAggregation("Collection")
@@ -244,7 +245,7 @@ with PanDomainAuthActions {
     * @param filePath
     * @return
     */
-  def getByFilename(collectionName:String,filePath:String) = HMACAuthAction.async { request=>
+  def getByFilename(collectionName:String,filePath:String) = IsAuthenticatedAsync { _=> _=>
     esClient.execute {
       search(indexName) query boolQuery().withMust(Seq(
         matchQuery("bucket.keyword",collectionName),
@@ -264,7 +265,7 @@ with PanDomainAuthActions {
     * @param filePath
     * @return
     */
-  def searchByFilename(filePath:String) = HMACAuthAction.async { request=>
+  def searchByFilename(filePath:String) = IsAuthenticatedAsync { _=> _=>
     esClient.execute {
       search(indexName) query matchQuery("path.keyword", filePath)
     }.map(response=>{

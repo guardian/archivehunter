@@ -2,18 +2,18 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import axios from 'axios';
 import Expander from '../common/Expander.jsx';
-import ErrorViewComponent from '../common/ErrorViewComponent.jsx';
+import ErrorViewComponent, {formatError} from '../common/ErrorViewComponent.jsx';
 import JobStatusIcon from '../JobsList/JobStatusIcon.jsx';
 import {Link} from "react-router-dom";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {handle419} from "../common/Handle419.jsx";
 
 class EntryJobs extends React.Component {
     static propTypes = {
         entryId: PropTypes.string.isRequired,
         loadImmediate: PropTypes.bool.isRequired,
         autoRefresh: PropTypes.bool.isRequired,
-        autoRefreshUpdated: PropTypes.func.isRequired
+        autoRefreshUpdated: PropTypes.func.isRequired,
+        onError: PropTypes.func
     };
 
     constructor(props){
@@ -47,19 +47,7 @@ class EntryJobs extends React.Component {
             this.setState({loading: false, lastError: null, jobsList: response.data.entries})
         }).catch(err=>{
             console.error(err);
-            handle419(err).then(didRefresh=>{
-                if(didRefresh){
-                    console.log("refresh succeeded");
-                    //now retry the call
-                    this.loadData();
-                } else {
-                    this.setState({loading: false, lastError: err, jobsList: []});
-                }
-            }).catch(err=>{
-                console.error("Retry failed");
-                alert(err.toString());
-                window.location.reload(true);
-            })
+            if(props.onError) props.onError(formatError(err));
         }))
     }
 

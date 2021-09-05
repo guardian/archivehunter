@@ -2,12 +2,11 @@ package controllers
 
 import akka.actor.ActorSystem
 import akka.stream.Materializer
-import com.amazonaws.services.s3.AmazonS3
-import com.amazonaws.services.s3.model.{ListObjectsRequest, S3ObjectSummary}
+import auth.{BearerTokenAuth, Security}
 import com.sksamuel.elastic4s.http.search.TermsAggResult
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{ESClientManager, S3ClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{PathCacheIndexer, ScanTarget, ScanTargetDAO}
-import helpers.{InjectableRefresher, ItemFolderHelper, WithScanTarget}
+import helpers.{ItemFolderHelper, WithScanTarget}
 
 import javax.inject.{Inject, Singleton}
 import play.api.libs.circe.Circe
@@ -16,15 +15,13 @@ import play.api.mvc.{AbstractController, ControllerComponents}
 import responses.{ErrorListResponse, GenericErrorResponse, ObjectListResponse, PathInfoResponse}
 import io.circe.syntax._
 import io.circe.generic.auto._
-import play.api.libs.ws.WSClient
-import play.api.mvc.Result
+import org.slf4j.LoggerFactory
+import play.api.cache.SyncCacheApi
 import requests.SearchRequest
 
 import scala.annotation.switch
-import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
-import scala.util.Try
 
 @Singleton
 class BrowseCollectionController @Inject() (override val config:Configuration,
@@ -32,14 +29,14 @@ class BrowseCollectionController @Inject() (override val config:Configuration,
                                             scanTargetDAO:ScanTargetDAO,
                                             override val controllerComponents: ControllerComponents,
                                             esClientMgr:ESClientManager,
-                                            override val wsClient:WSClient,
-                                            override val refresher:InjectableRefresher,
-                                            folderHelper:ItemFolderHelper)
+                                            override val bearerTokenAuth:BearerTokenAuth,
+                                            folderHelper:ItemFolderHelper,
+                                            override val cache:SyncCacheApi)
                                            (implicit actorSystem:ActorSystem, mat:Materializer)
-extends AbstractController(controllerComponents) with PanDomainAuthActions with WithScanTarget with Circe{
+extends AbstractController(controllerComponents) with Security with WithScanTarget with Circe{
   import com.sksamuel.elastic4s.http.ElasticDsl._
 
-  private val logger=Logger(getClass)
+  override protected val logger=LoggerFactory.getLogger(getClass)
 
   private val awsProfile = config.getOptional[String]("externalData.awsProfile")
   private val s3Client = s3ClientMgr.getClient(awsProfile)
@@ -56,7 +53,7 @@ extends AbstractController(controllerComponents) with PanDomainAuthActions with 
     * @param prefix parent folder to list. If none, then lists the root
     * @return
     */
-  def getFolders(collectionName:String, prefix:Option[String]) = APIAuthAction.async {
+  def getFolders(collectionName:String, prefix:Option[String]) = IsAuthenticatedAsync { uid=> request=>
     val maybePrefix = prefix.flatMap(pfx=>{
       if(pfx=="") None else Some(pfx)
     })
@@ -83,7 +80,7 @@ extends AbstractController(controllerComponents) with PanDomainAuthActions with 
     result.buckets.map(b=>Tuple2(b.key,b.docCount)).toMap
   }
 
-  def pathSummary(collectionName:String, prefix:Option[String]) = APIAuthAction.async(circe.json(2048)) { request=>
+  def pathSummary(collectionName:String, prefix:Option[String]) = IsAuthenticatedAsync(circe.json(2048)) { uid=> request=>
     request.body.as[SearchRequest].fold(
       err=>
         Future(BadRequest(GenericErrorResponse("bad_request", err.toString).asJson)),
@@ -120,7 +117,7 @@ extends AbstractController(controllerComponents) with PanDomainAuthActions with 
       })
   }
 
-  def getCollections() = APIAuthAction.async { request=>
+  def getCollections() = IsAuthenticatedAsync { uid=> request=>
     userProfileFromSession(request.session) match {
       case Some(Right(profile)) =>
         scanTargetDAO.allScanTargets().map(resultList => {

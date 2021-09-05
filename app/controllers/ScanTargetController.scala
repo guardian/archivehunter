@@ -3,12 +3,13 @@ package controllers
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.util.UUID
-
 import akka.actor.{ActorRef, ActorSystem}
 import akka.stream.{ActorMaterializer, Materializer}
+import auth.{BearerTokenAuth, Security}
 import com.gu.scanamo._
 import com.gu.scanamo.syntax._
 import com.theguardian.multimedia.archivehunter.common.ZonedDateTimeEncoder
+
 import javax.inject.{Inject, Named, Singleton}
 import play.api.{Configuration, Logger}
 import play.api.mvc._
@@ -20,8 +21,8 @@ import com.theguardian.multimedia.archivehunter.common.clientManagers.DynamoClie
 import com.theguardian.multimedia.archivehunter.common.ProxyTranscodeFramework.ProxyGenerators
 import com.theguardian.multimedia.archivehunter.common.cmn_helpers.ZonedTimeFormat
 import com.theguardian.multimedia.archivehunter.common.cmn_models._
-import helpers.InjectableRefresher
-import play.api.libs.ws.WSClient
+import org.slf4j.LoggerFactory
+import play.api.cache.SyncCacheApi
 import services.{BucketScanner, BulkThumbnailer, LegacyProxiesScanner}
 
 import scala.concurrent.Future
@@ -34,15 +35,15 @@ class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner
                                       @Named("bulkThumbnailerActor") bulkThumbnailer: ActorRef,
                                       override val config:Configuration,
                                       override val controllerComponents:ControllerComponents,
-                                      override val wsClient:WSClient,
-                                      override val refresher:InjectableRefresher,
+                                      override val bearerTokenAuth:BearerTokenAuth,
+                                      override val cache:SyncCacheApi,
                                       ddbClientMgr:DynamoClientManager,
                                       proxyGenerators:ProxyGenerators,
                                       scanTargetDAO:ScanTargetDAO,
                                       jobModelDAO:JobModelDAO)
                                      (implicit system:ActorSystem)
-  extends AbstractController(controllerComponents) with PanDomainAuthActions with Circe with ZonedDateTimeEncoder with ZonedTimeFormat with JobModelEncoder with AdminsOnly {
-  private val logger=Logger(getClass)
+  extends AbstractController(controllerComponents) with Security with Circe with ZonedDateTimeEncoder with ZonedTimeFormat with JobModelEncoder {
+  override protected val logger=LoggerFactory.getLogger(getClass)
   implicit val mat:Materializer = ActorMaterializer.create(system)
 
   val table = Table[ScanTarget](config.get[String]("externalData.scanTargets"))
@@ -52,9 +53,8 @@ class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner
   private val conventionalClient = ddbClientMgr.getNewDynamoClient(profileName)
   private val alpakkaClient = ddbClientMgr.getNewAlpakkaDynamoClient(config.getOptional[String]("externalData.awsProfile"))
 
-  def newTarget = APIAuthAction(circe.json[ScanTarget]) { scanTarget=>
-    logger.debug(scanTarget.body.toString)
-    Scanamo.exec(conventionalClient)(table.put(scanTarget.body)).map({
+  def newTarget = IsAdmin(circe.json[ScanTarget]) { _=> request=>
+    Scanamo.exec(conventionalClient)(table.put(request.body)).map({
       case Left(writeError)=>
         InternalServerError(GenericErrorResponse("error",writeError.toString).asJson)
       case Right(createdScanTarget)=>
@@ -62,57 +62,57 @@ class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner
     }).getOrElse(Ok(ObjectCreatedResponse[Option[String]]("created","scan_target",None).asJson))
   }
 
-  def removeTarget(targetName:String) = APIAuthAction { request=>
-    adminsOnlySync(request) {
-      val r = Scanamo.exec(ddbClientMgr.getNewDynamoClient(profileName))(table.delete('bucketName -> targetName))
-      Ok(ObjectCreatedResponse[String]("deleted", "scan_target", targetName).asJson)
-    }
+  def removeTarget(targetName:String) = IsAdmin { _=> request=>
+    Scanamo.exec(ddbClientMgr.getNewDynamoClient(profileName))(table.delete('bucketName -> targetName))
+    Ok(ObjectCreatedResponse[String]("deleted", "scan_target", targetName).asJson)
   }
 
-  def get(targetName:String) = APIAuthAction { request=>
-    adminsOnlySync(request) {
-      Scanamo.exec(ddbClientMgr.getNewDynamoClient(profileName))(table.get('bucketName -> targetName)).map({
-        case Left(err) =>
-          InternalServerError(GenericErrorResponse("database_error", err.toString).asJson)
-        case Right(result) =>
-          Ok(ObjectGetResponse[ScanTarget]("ok", "scan_target", result).asJson)
-      }).getOrElse(NotFound(ObjectCreatedResponse[String]("not_found", "scan_target", targetName).asJson))
-    }
+  def get(targetName:String) = IsAdmin { _=> request=>
+    Scanamo.exec(ddbClientMgr.getNewDynamoClient(profileName))(table.get('bucketName -> targetName)).map({
+      case Left(err) =>
+        InternalServerError(GenericErrorResponse("database_error", err.toString).asJson)
+      case Right(result) =>
+        Ok(ObjectGetResponse[ScanTarget]("ok", "scan_target", result).asJson)
+    }).getOrElse(NotFound(ObjectCreatedResponse[String]("not_found", "scan_target", targetName).asJson))
   }
 
-  def listScanTargets = APIAuthAction.async { request=>
-    adminsOnlyAsync(request) {
-      ScanamoAlpakka.exec(alpakkaClient)(table.scan()).map({ result =>
-        val errors = result.collect({
-          case Left(readError) => readError
-        })
-
-        if (errors.isEmpty) {
-          val success = result.collect({
-            case Right(scanTarget) => scanTarget
-          })
-          Ok(ObjectListResponse[List[ScanTarget]]("ok", "scan_target", success, success.length).asJson)
-        } else {
-          errors.foreach(err => logger.error(err.toString))
-          InternalServerError(GenericErrorResponse("error", errors.map(_.toString).mkString(",")).asJson)
-        }
+  def listScanTargets = IsAdminAsync { _=> request=>
+    ScanamoAlpakka.exec(alpakkaClient)(table.scan()).map({ result =>
+      val errors = result.collect({
+        case Left(readError) => readError
       })
-    }
+
+      if (errors.isEmpty) {
+        val success = result.collect({
+          case Right(scanTarget) => scanTarget
+        })
+        Ok(ObjectListResponse[List[ScanTarget]]("ok", "scan_target", success, success.length).asJson)
+      } else {
+        errors.foreach(err => logger.error(err.toString))
+        InternalServerError(GenericErrorResponse("error", errors.map(_.toString).mkString(",")).asJson)
+      }
+    })
   }
 
-  private def withLookup(targetName:String)(block: ScanTarget=>Result) = Scanamo.exec(conventionalClient)(table.get('bucketName -> targetName )).map({
-    case Left(error)=>
-      InternalServerError(GenericErrorResponse("error", error.toString).asJson)
-    case Right(tgt)=>
-      block(tgt)
-  }).getOrElse(NotFound(ObjectCreatedResponse[String]("not_found","scan_target",targetName).asJson))
+  private def withLookup(targetName:String)(block: ScanTarget=>Result) = Scanamo
+    .exec(conventionalClient)(table.get('bucketName -> targetName ))
+    .map({
+      case Left(error)=>
+        InternalServerError(GenericErrorResponse("error", error.toString).asJson)
+      case Right(tgt)=>
+        block(tgt)
+    })
+    .getOrElse(NotFound(ObjectCreatedResponse[String]("not_found","scan_target",targetName).asJson))
 
-  private def withLookupAsync(targetName:String)(block: ScanTarget=>Future[Result]) = Scanamo.exec(conventionalClient)(table.get('bucketName -> targetName )).map({
-    case Left(error)=>
-      Future(InternalServerError(GenericErrorResponse("error", error.toString).asJson))
-    case Right(tgt)=>
-      block(tgt)
-  }).getOrElse(Future(NotFound(ObjectCreatedResponse[String]("not_found","scan_target",targetName).asJson)))
+  private def withLookupAsync(targetName:String)(block: ScanTarget=>Future[Result]) = Scanamo
+    .exec(conventionalClient)(table.get('bucketName -> targetName ))
+    .map({
+      case Left(error)=>
+        Future(InternalServerError(GenericErrorResponse("error", error.toString).asJson))
+      case Right(tgt)=>
+        block(tgt)
+    })
+    .getOrElse(Future(NotFound(ObjectCreatedResponse[String]("not_found","scan_target",targetName).asJson)))
 
   /**
     * tries to create and save a scan job and then calls the block with the saved result.
@@ -140,54 +140,44 @@ class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner
     })
   }
 
-  def manualTrigger(targetName:String) = APIAuthAction.async { request=>
-    adminsOnlyAsync(request) {
-      withLookupAsync(targetName) { tgt =>
-        withNewScanJob(tgt, "ManualScan") { job =>
-          bucketScanner ! BucketScanner.PerformDeletionScan(tgt, thenScanForNew = true, Some(job))
-          Ok(GenericErrorResponse("ok", "scan started").asJson)
-        }
-      }
-    }
-  }
-
-  def manualTriggerAdditionScan(targetName:String) = APIAuthAction.async { request=>
-    adminsOnlyAsync(request) {
-      withLookupAsync(targetName) { tgt =>
-        withNewScanJob(tgt,"AdditionScan") { job =>
-          bucketScanner ! BucketScanner.PerformTargetScan(tgt, Some(job))
-          Ok(GenericErrorResponse("ok", "scan started").asJson)
-        }
-      }
-    }
-  }
-
-  def manualTriggerDeletionScan(targetName:String) = APIAuthAction.async { request=>
-    adminsOnlyAsync(request) {
-      withLookupAsync(targetName) { tgt =>
-        withNewScanJob(tgt, "DeletionScan") { job =>
-          bucketScanner ! BucketScanner.PerformDeletionScan(tgt, maybeJob=Some(job))
-          Ok(GenericErrorResponse("ok", "scan started").asJson)
-        }
-      }
-    }
-  }
-
-  def scanForLegacyProxies(targetName:String) = APIAuthAction { request=>
-    adminsOnlySync(request) {
-      withLookup(targetName) { tgt =>
-        proxyScanner ! LegacyProxiesScanner.ScanBucket(tgt)
+  def manualTrigger(targetName:String) = IsAdminAsync { _=> request=>
+    withLookupAsync(targetName) { tgt =>
+      withNewScanJob(tgt, "ManualScan") { job =>
+        bucketScanner ! BucketScanner.PerformDeletionScan(tgt, thenScanForNew = true, Some(job))
         Ok(GenericErrorResponse("ok", "scan started").asJson)
       }
     }
   }
 
-  def genProxies(targetName:String) = APIAuthAction { request=>
-    adminsOnlySync(request) {
-      withLookup(targetName) { tgt =>
-        bulkThumbnailer ! new BulkThumbnailer.DoThumbnails(tgt)
-        Ok(GenericErrorResponse("ok", "proxy run started").asJson)
+  def manualTriggerAdditionScan(targetName:String) = IsAdminAsync { _=> request=>
+    withLookupAsync(targetName) { tgt =>
+      withNewScanJob(tgt,"AdditionScan") { job =>
+        bucketScanner ! BucketScanner.PerformTargetScan(tgt, Some(job))
+        Ok(GenericErrorResponse("ok", "scan started").asJson)
       }
+    }
+  }
+
+  def manualTriggerDeletionScan(targetName:String) = IsAdminAsync { _=> request=>
+    withLookupAsync(targetName) { tgt =>
+      withNewScanJob(tgt, "DeletionScan") { job =>
+        bucketScanner ! BucketScanner.PerformDeletionScan(tgt, maybeJob=Some(job))
+        Ok(GenericErrorResponse("ok", "scan started").asJson)
+      }
+    }
+  }
+
+  def scanForLegacyProxies(targetName:String) = IsAdmin { _=> request=>
+    withLookup(targetName) { tgt =>
+      proxyScanner ! LegacyProxiesScanner.ScanBucket(tgt)
+      Ok(GenericErrorResponse("ok", "scan started").asJson)
+    }
+  }
+
+  def genProxies(targetName:String) = IsAdmin { _=> request=>
+    withLookup(targetName) { tgt =>
+      bulkThumbnailer ! new BulkThumbnailer.DoThumbnails(tgt)
+      Ok(GenericErrorResponse("ok", "proxy run started").asJson)
     }
   }
 
@@ -196,43 +186,39 @@ class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner
     * @param targetName
     * @return
     */
-  def initiateCheckJob(targetName:String) = APIAuthAction.async { request=>
-    adminsOnlyAsync(request) {
-      withLookupAsync(targetName){ tgt =>
-        proxyGenerators.requestCheckJob(tgt.bucketName, tgt.proxyBucket, tgt.region).map({
-          case Left(err) =>
-            InternalServerError(GenericErrorResponse("error", err.toString).asJson)
-          case Right(jobId) =>
-            val updatedJobIds = tgt.pendingJobIds match {
-              case Some(existingSeq) => existingSeq ++ Seq(jobId.toString)
-              case None => Seq(jobId.toString)
-            }
-            val updatedTarget = tgt.copy(pendingJobIds = Some(updatedJobIds))
-            scanTargetDAO.put(updatedTarget) match {
-              case Success(record) =>
-                Ok(ObjectCreatedResponse("ok", "jobId", jobId).asJson)
-              case Failure(err) =>
-                InternalServerError(GenericErrorResponse("error", err.toString).asJson)
-            }
-        })
-      }
+  def initiateCheckJob(targetName:String) = IsAdminAsync { _=> request=>
+    withLookupAsync(targetName){ tgt =>
+      proxyGenerators.requestCheckJob(tgt.bucketName, tgt.proxyBucket, tgt.region).map({
+        case Left(err) =>
+          InternalServerError(GenericErrorResponse("error", err).asJson)
+        case Right(jobId) =>
+          val updatedJobIds = tgt.pendingJobIds match {
+            case Some(existingSeq) => existingSeq ++ Seq(jobId)
+            case None => Seq(jobId.toString)
+          }
+          val updatedTarget = tgt.copy(pendingJobIds = Some(updatedJobIds))
+          scanTargetDAO.put(updatedTarget) match {
+            case Success(record) =>
+              Ok(ObjectCreatedResponse("ok", "jobId", jobId).asJson)
+            case Failure(err) =>
+              InternalServerError(GenericErrorResponse("error", err.toString).asJson)
+          }
+      })
     }
   }
 
-  def createPipelines(targetName:String, force:Boolean) = APIAuthAction.async { request=>
-    adminsOnlyAsync(request){
-      withLookupAsync(targetName){ tgt =>
-        proxyGenerators.requestPipelineCreate(tgt.bucketName, tgt.proxyBucket, tgt.region, force).map({
-          case Left(err)=>
-            InternalServerError(GenericErrorResponse("error",err).asJson)
-          case Right(jobId)=>
-            val updatedScanTarget = tgt.withAnotherPendingJob(jobId)
-            scanTargetDAO.put(updatedScanTarget) match {
-              case Success(scanTarget)=>Ok(ObjectCreatedResponse("ok","job",jobId).asJson)
-              case Failure(err)=>InternalServerError(GenericErrorResponse("error", err.toString).asJson)
-            }
-        })
-      }
+  def createPipelines(targetName:String, force:Boolean) = IsAdminAsync { _=> _=>
+    withLookupAsync(targetName){ tgt =>
+      proxyGenerators.requestPipelineCreate(tgt.bucketName, tgt.proxyBucket, tgt.region, force).map({
+        case Left(err)=>
+          InternalServerError(GenericErrorResponse("error",err).asJson)
+        case Right(jobId)=>
+          val updatedScanTarget = tgt.withAnotherPendingJob(jobId)
+          scanTargetDAO.put(updatedScanTarget) match {
+            case Success(scanTarget)=>Ok(ObjectCreatedResponse("ok","job",jobId).asJson)
+            case Failure(err)=>InternalServerError(GenericErrorResponse("error", err.toString).asJson)
+          }
+      })
     }
   }
 }

@@ -4,16 +4,14 @@ import akka.actor.ActorSystem
 import akka.stream.Materializer
 import akka.stream.scaladsl._
 import akka.util.ByteString
-import com.gu.pandomainauth.action.UserRequest
+import auth.{BearerTokenAuth, Security}
 import com.sksamuel.elastic4s.searches.queries.Query
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ArchiveEntryHitReader, Indexer, StorageClassEncoder, ZonedDateTimeEncoder}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{ESClientManager, S3ClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{ItemNotFound, ScanTarget, ScanTargetDAO}
-import helpers.{InjectableRefresher, ItemFolderHelper, WithScanTarget}
-import io.circe.Json
+import helpers.{ItemFolderHelper, WithScanTarget}
 import play.api.{Configuration, Logger}
 import play.api.libs.circe.Circe
-import play.api.libs.ws.WSClient
 import play.api.mvc.{AbstractController, ControllerComponents, Request, ResponseHeader, Result}
 import responses.{BulkDeleteConfirmationResponse, DeletionSummaryResponse, GenericErrorResponse, ObjectListResponse, PathInfoResponse}
 
@@ -21,6 +19,8 @@ import javax.inject.{Inject, Singleton}
 import scala.concurrent.Future
 import io.circe.syntax._
 import io.circe.generic.auto._
+import org.slf4j.LoggerFactory
+import play.api.cache.SyncCacheApi
 import play.api.http.HttpEntity
 import requests.SearchRequest
 
@@ -29,20 +29,20 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 @Singleton
 class DeletedItemsController @Inject() (override val config:Configuration,
-                                            scanTargetDAO:ScanTargetDAO,
-                                            override val controllerComponents: ControllerComponents,
-                                            esClientMgr:ESClientManager,
-                                            override val wsClient:WSClient,
-                                            override val refresher:InjectableRefresher)
-                                           (implicit actorSystem:ActorSystem, mat:Materializer)
-  extends AbstractController(controllerComponents) with PanDomainAuthActions with WithScanTarget with ArchiveEntryHitReader
-    with ZonedDateTimeEncoder with StorageClassEncoder with Circe with AdminsOnly
+                                        scanTargetDAO:ScanTargetDAO,
+                                        override val controllerComponents: ControllerComponents,
+                                        esClientMgr:ESClientManager,
+                                        override val bearerTokenAuth: BearerTokenAuth,
+                                        override val cache:SyncCacheApi)
+                                       (implicit actorSystem:ActorSystem, mat:Materializer)
+  extends AbstractController(controllerComponents) with Security with WithScanTarget with ArchiveEntryHitReader
+    with ZonedDateTimeEncoder with StorageClassEncoder with Circe
 {
   import com.sksamuel.elastic4s.http.ElasticDsl._
   import com.sksamuel.elastic4s.streams.ReactiveElastic._
 
   private implicit val esClient = esClientMgr.getClient()
-  private val logger=Logger(getClass)
+  override protected val logger=LoggerFactory.getLogger(getClass)
 
   private val indexName = config.get[String]("externalData.indexName")
 
@@ -71,7 +71,7 @@ class DeletedItemsController @Inject() (override val config:Configuration,
     * @param prefix
     * @return
     */
-  def deletedItemsSummary(collectionName:String, prefix:Option[String]) = APIAuthAction.async(circe.json(2048)) { request=>
+  def deletedItemsSummary(collectionName:String, prefix:Option[String]) = IsAuthenticatedAsync(circe.json(2048)) { uid=> request=>
     request.body.as[SearchRequest].fold(
       err=>
         Future(BadRequest(GenericErrorResponse("bad_request", err.toString).asJson)),
@@ -116,7 +116,7 @@ class DeletedItemsController @Inject() (override val config:Configuration,
     * @param prefix optional path prefix
     * @return
     */
-  def deletedItemsListStreaming(collectionName:String, prefix:Option[String], limit:Option[Long]) = APIAuthAction.async(circe.json(2048)) { request=>
+  def deletedItemsListStreaming(collectionName:String, prefix:Option[String], limit:Option[Long]) = IsAuthenticatedAsync(circe.json(2048)) { uid=> request=>
     withQueryFromSearchdoc(collectionName, prefix, request) { query=>
       val source = Source.fromPublisher(esClient.publisher(makeSearchRequest(query).scroll("5m")))
       val appliedLimit = limit.getOrElse(1000L)
@@ -134,25 +134,23 @@ class DeletedItemsController @Inject() (override val config:Configuration,
     }
   }
 
-  def bulkDeleteBySearch(collectionName:String, prefix:Option[String]) = APIAuthAction.async(circe.json(2048)) { request=>
-    adminsOnlyAsync(request, true) {
-      withQueryFromSearchdoc(collectionName, prefix, request) { query=>
-        esClient
-          .execute(deleteByQuery(indexName, "entry", query))
-          .map(response=>{
-            if(response.status>=200 && response.status<=299) {
-              Ok(BulkDeleteConfirmationResponse("ok",response.result.deleted, response.result.took).asJson)
-            } else {
-              logger.error(s"Could not perform bulk deletion of tombstones for $collectionName at $prefix: ${response.status} ${response.error}")
-              InternalServerError(GenericErrorResponse("db_error", response.error.toString).asJson)
-            }
-          })
-          .recover({
-            case err:Throwable=>
-              logger.error(s"Bulk delete thread for $collectionName at $prefix crashed: ${err.getMessage}",err)
-              InternalServerError(GenericErrorResponse("db_error", err.toString).asJson)
-          })
-      }
+  def bulkDeleteBySearch(collectionName:String, prefix:Option[String]) = IsAdminAsync(circe.json(2048)) { uid=> request=>
+    withQueryFromSearchdoc(collectionName, prefix, request) { query=>
+      esClient
+        .execute(deleteByQuery(indexName, "entry", query))
+        .map(response=>{
+          if(response.status>=200 && response.status<=299) {
+            Ok(BulkDeleteConfirmationResponse("ok",response.result.deleted, response.result.took).asJson)
+          } else {
+            logger.error(s"Could not perform bulk deletion of tombstones for $collectionName at $prefix: ${response.status} ${response.error}")
+            InternalServerError(GenericErrorResponse("db_error", response.error.toString).asJson)
+          }
+        })
+        .recover({
+          case err:Throwable=>
+            logger.error(s"Bulk delete thread for $collectionName at $prefix crashed: ${err.getMessage}",err)
+            InternalServerError(GenericErrorResponse("db_error", err.toString).asJson)
+        })
     }
   }
 
@@ -172,26 +170,23 @@ class DeletedItemsController @Inject() (override val config:Configuration,
         InternalServerError(GenericErrorResponse("internal_error", err.getMessage).asJson)
     })
 
-  def removeTombstoneById(collectionName:String, itemId:String) = APIAuthAction.async { request=>
-    adminsOnlyAsync(request, true) {
-      indexer.getByIdFull(itemId).flatMap({
-        case Left(ItemNotFound(itemId))=>
+  def removeTombstoneById(collectionName:String, itemId:String) = IsAdminAsync { uid=> request=>
+    indexer.getByIdFull(itemId).flatMap({
+      case Left(ItemNotFound(itemId))=>
+        Future(NotFound(GenericErrorResponse("not_found", itemId).asJson))
+      case Left(other)=>
+        logger.error(s"Could not look up item $itemId from $collectionName: ${other.errorDesc}")
+        Future(InternalServerError(GenericErrorResponse("error", other.errorDesc).asJson))
+      case Right(entry)=>
+        if(entry.bucket!=collectionName) {
+          logger.warn(s"Invalid tombstone removal request: $itemId exists but not within bucket $collectionName, returning 404")
           Future(NotFound(GenericErrorResponse("not_found", itemId).asJson))
-        case Left(other)=>
-          logger.error(s"Could not look up item $itemId from $collectionName: ${other.errorDesc}")
-          Future(InternalServerError(GenericErrorResponse("error", other.errorDesc).asJson))
-        case Right(entry)=>
-          if(entry.bucket!=collectionName) {
-            logger.warn(s"Invalid tombstone removal request: $itemId exist but is not within bucket $collectionName, returning 404")
-            Future(NotFound(GenericErrorResponse("not_found", itemId).asJson))
-          } else if(!entry.beenDeleted) {
-            logger.warn(s"Invalid tombstone removal request: $itemId is not a tombstone")
-            Future(Conflict(GenericErrorResponse("conflict","this item is not a tombstone").asJson))
-          } else {
-            performItemDelete(collectionName, itemId)
-          }
-      })
-
-    }
+        } else if(!entry.beenDeleted) {
+          logger.warn(s"Invalid tombstone removal request: $itemId is not a tombstone")
+          Future(Conflict(GenericErrorResponse("conflict","this item is not a tombstone").asJson))
+        } else {
+          performItemDelete(collectionName, itemId)
+        }
+    })
   }
 }
