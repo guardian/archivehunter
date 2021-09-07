@@ -55,7 +55,6 @@ object ClaimsSetExtensions {
       * try to get the username field.  It tries the `preferred_username`, `username` and `sub` fields in that order.
       * any valid JWT should have a `sub` field, if it does not then a RuntimeException is raised (this should not happen).
       *
-      * The user name is also normalised to lower case.
       * @return a String with the field contents
       */
     def getUsername:String = {
@@ -67,13 +66,15 @@ object ClaimsSetExtensions {
         case Some(value)=>value
         case None=>throw new RuntimeException("User JWT is not valid, it does not contain a 'sub' claim")
       }
-    }.toLowerCase
+    }
 
     /**
-      * we prefer to use the email to identify the user but if there is a problem with that fall back to the username
+      * we prefer to use the email to identify the user but if there is a problem with that fall back to the username.
+      *
+      * The returned string is normalised to lower case
       * @return
       */
-    def getUserID:String = getEmail.getOrElse(getUsername)
+    def getUserID:String = getEmail.getOrElse(getUsername).toLowerCase()
   }
 }
 
