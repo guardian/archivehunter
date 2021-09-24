@@ -22,5 +22,5 @@ import com.typesafe.config.ConfigFactory
 object Conf {
   val conf = ConfigFactory.load()
 
-  val sharedSecret = conf.getString("shared_secret")
+  val sharedSecret = Option(conf.getString("shared_secret"))
 }
