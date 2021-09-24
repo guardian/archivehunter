@@ -19,8 +19,11 @@ package auth
 
 import com.typesafe.config.ConfigFactory
 
+import scala.util.Try
+
 object Conf {
   val conf = ConfigFactory.load()
 
-  val sharedSecret = Option(conf.getString("shared_secret"))
+  //TODO: when play is updated, check if we can get an Option in a better way than this
+  val sharedSecret = Try { conf.getString("serverAuth.sharedSecret") }.toOption
 }
