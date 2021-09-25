@@ -184,7 +184,7 @@ class AuthSpec extends Specification with Mockito {
         there was one(mockHttp).singleRequest(any, any, any, any)
         there was one(mockUserProfileDAO).userProfileForEmail("testuser")
         there was no(mockUserProfileDAO).put(any)
-        there was one(mockOAuthTokenDAO).saveToken(org.mockito.Matchers.eq("testuser"),any[ZonedDateTime], org.mockito.Matchers.eq("refresh-token"))
+        there was one(mockOAuthTokenDAO).saveToken(org.mockito.ArgumentMatchers.eq("testuser"),any[ZonedDateTime], org.mockito.ArgumentMatchers.eq("refresh-token"))
       }
     }
 
@@ -220,7 +220,7 @@ class AuthSpec extends Specification with Mockito {
         there was one(mockHttp).singleRequest(any, any, any, any)
         there was one(mockUserProfileDAO).userProfileForEmail("testuser")
         there was one(mockUserProfileDAO).put(any)
-        there was one(mockOAuthTokenDAO).saveToken(org.mockito.Matchers.eq("testuser"),any[ZonedDateTime], org.mockito.Matchers.eq("refresh-token"))
+        there was one(mockOAuthTokenDAO).saveToken(org.mockito.ArgumentMatchers.eq("testuser"),any[ZonedDateTime], org.mockito.ArgumentMatchers.eq("refresh-token"))
       }
     }
 
@@ -315,7 +315,7 @@ class AuthSpec extends Specification with Mockito {
         there was one(mockUserProfileDAO).userProfileForEmail("testuser")
         there was no(mockUserProfileDAO).put(any)
         there was one(mockOAuthTokenDAO).lookupToken("testuser")
-        there was one(mockOAuthTokenDAO).saveToken(org.mockito.Matchers.eq("testuser"),any,org.mockito.Matchers.eq("new-refresh-token"))
+        there was one(mockOAuthTokenDAO).saveToken(org.mockito.ArgumentMatchers.eq("testuser"),any,org.mockito.ArgumentMatchers.eq("new-refresh-token"))
         there was one(mockOAuthTokenDAO).removeUsedToken(fakeExistingRefreshToken)
       }
     }

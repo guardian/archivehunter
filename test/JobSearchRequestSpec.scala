@@ -3,6 +3,7 @@ import com.theguardian.multimedia.archivehunter.common.cmn_models.{JobModel, Job
 import org.specs2.mock.Mockito
 import org.specs2.mutable._
 import requests.JobSearchRequest
+import scala.language.reflectiveCalls
 
 class JobSearchRequestSpec extends Specification with Mockito{
   "JobSearchRequest.makeIntersection" should {

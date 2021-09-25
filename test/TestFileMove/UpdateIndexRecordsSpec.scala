@@ -11,14 +11,12 @@ import com.theguardian.multimedia.archivehunter.common._
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{ESError, UnexpectedReturnCode}
 import org.specs2.mock.Mockito
 import org.specs2.mutable.Specification
-import scalaz.NonEmptyList
 import services.FileMove.GenericMoveActor.{FileMoveTransientData, MoveActorMessage, PerformStep, RollbackStep, StepFailed, StepSucceeded}
 import services.FileMove.UpdateIndexRecords
 
 import scala.concurrent.{Await, Future}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.util.Success
 
 class UpdateIndexRecordsSpec extends Specification with Mockito {
   sequential
