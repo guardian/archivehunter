@@ -6,6 +6,7 @@ import akka.actor.{ActorRef, ActorSystem}
 import auth.{BearerTokenAuth, Security}
 import com.amazonaws.auth.profile.ProfileCredentialsProvider
 import com.amazonaws.auth.{AWSCredentialsProviderChain, ContainerCredentialsProvider, InstanceProfileCredentialsProvider}
+import com.amazonaws.internal.CredentialsEndpointProvider
 import com.amazonaws.regions.{Region, Regions}
 import com.amazonaws.services.cloudformation.AmazonCloudFormationClientBuilder
 import com.amazonaws.services.cloudformation.model._
@@ -55,8 +56,7 @@ class ProxyFrameworkAdminController @Inject() (override val config:Configuration
 
   def credentialsProvider(profileName:Option[String]=None) = new AWSCredentialsProviderChain(
     new ProfileCredentialsProvider(profileName.getOrElse("default")),
-    new ContainerCredentialsProvider(),
-    new InstanceProfileCredentialsProvider()
+    InstanceProfileCredentialsProvider.getInstance()
   )
 
   protected def getCfClient(region:String) =
