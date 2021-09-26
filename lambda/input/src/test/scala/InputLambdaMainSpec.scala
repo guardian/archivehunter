@@ -153,10 +153,14 @@ class InputLambdaMainSpec extends Specification with Mockito with ZonedDateTimeE
 
   "InputLambdaMain.handleRestore" should {
     "update any open/pending jobs that refer to the file in question but leave ones that are not RESTORE" in {
+      val mockBucketEntity = mock[S3EventNotification.S3BucketEntity]
+      mockBucketEntity.getName returns "test-bucket"
+      val mockObjectEntity = mock[S3EventNotification.S3ObjectEntity]
+      mockObjectEntity.getKey returns "path/to/file"
       val mockDao = mock[JobModelDAO]
       val mockEntity = mock[S3EventNotification.S3Entity]
-      mockEntity.getBucket returns (mock[S3EventNotification.S3BucketEntity].getName returns "test-bucket")
-      mockEntity.getObject returns (mock[S3EventNotification.S3ObjectEntity].getKey returns "path/to/file")
+      mockEntity.getBucket returns mockBucketEntity
+      mockEntity.getObject returns mockObjectEntity
 
       val mockRecord = mock[S3EventNotification.S3EventNotificationRecord]
       mockRecord.getS3 returns mockEntity
