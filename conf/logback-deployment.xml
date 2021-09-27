@@ -114,6 +114,10 @@
     <logger name="services.datamigration.stream" level="DEBUG"/>
     <logger name="services.DataMigration" level="DEBUG"/>
 
+    <logger name="auth.HMAC" level="DEBUG"/>
+    <logger name="auth.Security" level="DEBUG"/>
+    <logger name="auth.Conf" level="DEBUG"/>
+
     <root level="WARN">
         <appender-ref ref="STDOUT" />
         <appender-ref ref="KINESIS"/>
