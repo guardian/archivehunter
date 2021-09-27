@@ -327,7 +327,7 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
 
       val mockProxyLocation = mock[ProxyLocation]
       mockProxyLocationDAO.getProxy(anyString,any)(any) returns Future(None)
-      mockProxyLocationDAO.getProxy(anyString,org.mockito.Matchers.eq(ProxyType.VIDEO))(any) returns Future(Some(mockProxyLocation))
+      mockProxyLocationDAO.getProxy(anyString,org.mockito.ArgumentMatchers.eq(ProxyType.VIDEO))(any) returns Future(Some(mockProxyLocation))
 
       val mockEntry = mock[ArchiveEntry]
       mockEntry.id returns "fake-id"
@@ -366,7 +366,7 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
 
       val mockProxyLocation = mock[ProxyLocation]
       mockProxyLocationDAO.getProxy(anyString,any)(any) returns Future(None)
-      mockProxyLocationDAO.getProxy(anyString,org.mockito.Matchers.eq(ProxyType.VIDEO))(any) returns Future.failed(new RuntimeException("kaboom"))
+      mockProxyLocationDAO.getProxy(anyString,org.mockito.ArgumentMatchers.eq(ProxyType.VIDEO))(any) returns Future.failed(new RuntimeException("kaboom"))
 
       val mockEntry = mock[ArchiveEntry]
       mockEntry.id returns "fake-id"

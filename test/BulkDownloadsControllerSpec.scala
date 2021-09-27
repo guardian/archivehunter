@@ -21,6 +21,7 @@ import play.api.cache.SyncCacheApi
 import scala.concurrent.duration._
 import java.time.ZonedDateTime
 import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.language.reflectiveCalls
 
 class BulkDownloadsControllerSpec extends Specification with Mockito with ZonedDateTimeEncoder with ArchiveEntryHitReader with StorageClassEncoder {
   sequential

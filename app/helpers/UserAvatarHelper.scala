@@ -112,6 +112,8 @@ class UserAvatarHelper @Inject() (config:Configuration, s3ClientManager: S3Clien
     */
   def getPresignedUrl(s3Url:URI, overrideExpiry:Option[Date]=None):Try[URL] = {
     config.getOptional[String]("externalData.avatarBucket") match {
+      case None=>
+        Failure(new RuntimeException("externalData.avatarBucket is not set, you need this in order to store user avatars"))
       case Some(avatarBucket)=>
         if(s3Url.getScheme!="s3") {
           Failure(new RuntimeException("getPresignedUrl requires an S3 URL"))

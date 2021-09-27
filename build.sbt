@@ -5,7 +5,7 @@ import com.typesafe.sbt.packager.docker._
 
 enablePlugins(RiffRaffArtifact, DockerPlugin, SystemdPlugin)
 
-scalacOptions := Seq("-unchecked", "-deprecation")
+scalacOptions := Seq("-unchecked", "-deprecation", "-feature", "-language:postfixOps")
 scalaVersion := "2.12.13"
 
 val akkaVersion = "2.5.31"
@@ -25,7 +25,7 @@ lazy val commonSettings = Seq(
     "com.amazonaws" % "aws-java-sdk-s3" % awsSdkVersion,
     "com.amazonaws" % "aws-java-sdk-elastictranscoder"% awsSdkVersion,
     "com.amazonaws" % "aws-java-sdk-sqs"% awsSdkVersion,
-    "com.dripower" %% "play-circe" % "2610.0",
+    "com.dripower" %% "play-circe" % "2712.0",
     "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.11.4",
     "com.sksamuel.elastic4s" %% "elastic4s-http" % elastic4sVersion  exclude("com.fasterxml.jackson.module","jackson-module-scala"),
     "com.sksamuel.elastic4s" %% "elastic4s-circe" % elastic4sVersion,
@@ -46,9 +46,8 @@ lazy val `archivehunter` = (project in file("."))
   .dependsOn(common)
   .settings(commonSettings,
     libraryDependencies ++= Seq(
-      "com.typesafe.play" %% "play-guice" % "2.6.25",
       "org.scala-lang.modules" %% "scala-java8-compat" % "0.8.0",
-      "com.dripower" %% "play-circe" % "2610.0",
+      "com.dripower" %% "play-circe" % "2712.0",
       "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.11.4",
       "com.sksamuel.elastic4s" %% "elastic4s-http" % elastic4sVersion exclude("com.fasterxml.jackson.module","jackson-module-scala"),
       "com.sksamuel.elastic4s" %% "elastic4s-circe" % elastic4sVersion,
@@ -74,7 +73,7 @@ lazy val `archivehunter` = (project in file("."))
       "org.apache.logging.log4j" % "log4j-api" % "2.13.2",
       "com.typesafe.akka" %% "akka-testkit" % akkaVersion,
       "io.sentry" % "sentry-logback" % "1.7.2",
-        jdbc, ehcache, ws)
+      guice, ehcache, ws)
   )
 
 val lambdaDeps = Seq(
@@ -91,7 +90,7 @@ lazy val common = (project in file("common"))
       "io.circe" %% "circe-parser" % circeVersion,
       "io.circe" %% "circe-java8" % circeVersion,
       "com.gu" %% "scanamo" % "1.0.0-M8",
-      "com.google.inject" % "guice" % "4.1.0",  //keep this in sync with play version
+      "com.google.inject" % "guice" % "4.2.3",  //keep this in sync with play version
       "com.amazonaws" % "aws-java-sdk-sns" % awsSdkVersion,
       "com.amazonaws" % "aws-java-sdk-sts" % awsSdkVersion,
       "com.amazonaws" % "aws-java-sdk-cloudformation" % awsSdkVersion,
@@ -142,7 +141,7 @@ lazy val proxyStatsGathering = (project in file("ProxyStatsGathering"))
       "com.amazonaws" % "aws-lambda-java-events" % "2.1.0",
       "com.amazonaws" % "aws-lambda-java-core" % "1.0.0",
       "org.scala-lang.modules" %% "scala-java8-compat" % "0.8.0",
-      "com.sandinh" %% "akka-guice" % "3.2.0"
+      "com.sandinh" %% "akka-guice" % "3.3.0"
     ),
     version := sys.props.getOrElse("build.number","DEV"),
     dockerUsername  := sys.props.get("docker.username"),
