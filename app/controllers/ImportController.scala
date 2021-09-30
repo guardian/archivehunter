@@ -231,13 +231,24 @@ class ImportController @Inject()(override val config:Configuration,
       case Left(err)=>
         Future(BadRequest(GenericErrorResponse("bad_request", err.toString()).asJson))
       case Right(importRequest)=>
-        for {
+        val result = for {
           item <- indexer.getById(importRequest.itemId) //this version fails on a RuntimeException if there is no item present
           itemsScanTarget <- scanTargetDAO.targetForBucket(item.bucket)
           proxyBucket <- proxyBucketForMaybeScanTarget(itemsScanTarget)
           proxyRecords <- simplifyDynamoReturn(proxyLocationDAO.getAllProxiesFor(item.id))
           result <- checkAndPerformProxyImport(importRequest, item, proxyBucket, proxyRecords)
         } yield result
+
+        result.recover({
+          case err:Throwable=>
+            if(err.getMessage=="Item could not be found") {
+              logger.error(s"Proxy import request $importRequest from $uid references non-existing item")
+              NotFound(GenericErrorResponse("bad_request","invalid item").asJson)
+            } else {
+              logger.error(s"Could not perform import request $importRequest: ${err.getMessage}", err)
+              InternalServerError(GenericErrorResponse("server_error","see logs").asJson)
+            }
+        })
     }
   }
 }
