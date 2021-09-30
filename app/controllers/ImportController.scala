@@ -1,40 +1,41 @@
 package controllers
 
 import akka.actor.{ActorRef, ActorSystem}
+import auth.{BearerTokenAuth, Security}
 import com.amazonaws.services.s3.AmazonS3
 import com.sksamuel.elastic4s.http.ElasticClient
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{ESClientManager, S3ClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_helpers.PathCacheExtractor
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{PathCacheEntry, PathCacheIndexer, ScanTarget, ScanTargetDAO}
-import helpers.InjectableRefresher
 import play.api.Configuration
 import play.api.libs.circe.Circe
-import play.api.libs.ws.WSClient
 import play.api.mvc.{AbstractController, ControllerComponents}
 import requests.SpecificImportRequest
 import io.circe.generic.auto._
 import io.circe.syntax._
 import org.slf4j.LoggerFactory
+import play.api.cache.SyncCacheApi
 import responses.{GenericErrorResponse, ObjectCreatedResponse}
 import services.IngestProxyQueue
 
-import javax.inject.{Inject, Named}
+import javax.inject.{Inject, Named, Singleton}
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 
+@Singleton
 class ImportController @Inject()(override val config:Configuration,
                                    override val controllerComponents:ControllerComponents,
-                                   override val refresher:InjectableRefresher,
-                                   override val wsClient:WSClient,
                                    scanTargetDAO:ScanTargetDAO,
                                    s3ClientMgr: S3ClientManager,
                                    esClientMgr: ESClientManager,
+                                   override val bearerTokenAuth: BearerTokenAuth,
+                                   override val cache:SyncCacheApi,
                                    @Named("ingestProxyQueue") ingestProxyQueue:ActorRef)
                                   (implicit actorSystem:ActorSystem)
-  extends AbstractController(controllerComponents) with PanDomainAuthActions with Circe {
+  extends AbstractController(controllerComponents) with Security with Circe {
 
-  private val logger = LoggerFactory.getLogger(getClass)
+  override protected val logger = LoggerFactory.getLogger(getClass)
 
   private val awsProfile = config.getOptional[String]("externalData.awsProfile")
   private implicit val esClient = esClientMgr.getClient()
@@ -77,7 +78,7 @@ class ImportController @Inject()(override val config:Configuration,
     writePathCacheEntries(newCacheEntries)
   }
 
-  def importFromPath = APIAuthAction.async(circe.json(2048)) { request=>
+  def importFromPath = IsAuthenticatedAsync(circe.json(2048)) { uid=> request=>
     request.body.as[SpecificImportRequest] match {
       case Left(err)=>
         Future(BadRequest(GenericErrorResponse("bad_request",err.toString()).asJson))
