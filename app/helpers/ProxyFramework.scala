@@ -133,7 +133,7 @@ class ProxyFramework @Inject()(config:Configuration,
     })
 
     newPolicyFuture.map(newPolicy=>{
-      val str = Printer.noSpaces.pretty(newPolicy.asJson)
+      val str = newPolicy.asJson.noSpaces
       logger.debug(s"Updating policy of $mainAppQueueUrl to $str")
       val rq = new SetQueueAttributesRequest().withQueueUrl(mainAppQueueUrl).withAttributes(Map("Policy"->str).asJava)
       val result = sqsClient.setQueueAttributes(rq)
@@ -159,7 +159,7 @@ class ProxyFramework @Inject()(config:Configuration,
     })
 
     newPolicyFuture.map(newPolicy=>{
-      val str = Printer.noSpaces.pretty(newPolicy.asJson)
+      val str = newPolicy.asJson.noSpaces
       logger.debug(s"Updating policy of $mainAppQueueUrl to $str")
       val rq = new SetQueueAttributesRequest().withQueueUrl(mainAppQueueUrl).withAttributes(Map("Policy" -> str).asJava)
       val result = sqsClient.setQueueAttributes(rq)

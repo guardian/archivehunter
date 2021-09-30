@@ -39,7 +39,6 @@ extends AbstractController(controllerComponents) with Security with WithScanTarg
   override protected val logger=LoggerFactory.getLogger(getClass)
 
   private val awsProfile = config.getOptional[String]("externalData.awsProfile")
-  private val s3Client = s3ClientMgr.getClient(awsProfile)
   private val esClient = esClientMgr.getClient()
 
   private val indexName = config.get[String]("externalData.indexName")
