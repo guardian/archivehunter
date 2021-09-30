@@ -11,7 +11,7 @@ import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer, P
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_helpers.PathCacheExtractor
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{PathCacheEntry, PathCacheIndexer, ScanTarget, ScanTargetDAO}
-import helpers.ProxyLocator
+import helpers.{IndexerFactory, ProxyLocator}
 import play.api.Configuration
 import play.api.libs.circe.Circe
 import play.api.mvc.{AbstractController, ControllerComponents, Result}
@@ -38,6 +38,7 @@ class ImportController @Inject()(override val config:Configuration,
                                    override val bearerTokenAuth: BearerTokenAuth,
                                    override val cache:SyncCacheApi,
                                     ddbClientMgr:DynamoClientManager,
+                                    indexerFactory: IndexerFactory,
                                    @Named("ingestProxyQueue") ingestProxyQueue:ActorRef)
                                   (implicit actorSystem:ActorSystem, mat:Materializer)
   extends AbstractController(controllerComponents) with Security with Circe with ProxyTypeEncoder {
@@ -47,11 +48,10 @@ class ImportController @Inject()(override val config:Configuration,
   private val awsProfile = config.getOptional[String]("externalData.awsProfile")
   private implicit val esClient = esClientMgr.getClient()
 
-  private val indexName = config.get[String]("externalData.indexName")
   private implicit val pathCacheIndexer = new PathCacheIndexer(config.getOptional[String]("externalData.pathCacheIndex").getOrElse("pathcache"), esClient)
 
   private implicit val ddbAkkaClient = ddbClientMgr.getNewAlpakkaDynamoClient(awsProfile)
-  private implicit val indexer = new Indexer(indexName)
+  private implicit val indexer = indexerFactory.get()
 
   def writePathCacheEntries(newCacheEntries:Seq[PathCacheEntry])
                            (implicit pathCacheIndexer:PathCacheIndexer,  elasticClient:ElasticClient) = {

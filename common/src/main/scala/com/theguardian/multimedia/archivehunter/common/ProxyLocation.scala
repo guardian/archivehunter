@@ -108,7 +108,7 @@ object ProxyLocation extends DocId {
         case Some(value) => value
       }
       logger.debug(s"doc ID is ${makeDocId(mainMediaBucket, mediaItemKey)} from $mainMediaBucket and $key")
-      Right(new ProxyLocation(makeDocId(mainMediaBucket, mediaItemKey), makeDocId(proxyBucket, key), pt, proxyBucket, key, Some(client.getRegionName), StorageClass.safeWithName(meta.getStorageClass)))
+      Right(new ProxyLocation(makeDocId(mainMediaBucket, mediaItemKey), makeDocId(proxyBucket, key), pt, proxyBucket, key, Option(client.getRegionName), StorageClass.safeWithName(meta.getStorageClass)))
     } catch {
       case ex:Throwable=>
         logger.error("could not find proxyLocation in s3: ", ex)
