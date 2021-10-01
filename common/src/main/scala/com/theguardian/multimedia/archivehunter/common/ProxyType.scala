@@ -4,7 +4,7 @@ import io.circe.{Decoder, Encoder}
 
 object ProxyType extends Enumeration {
   type ProxyType = Value
-  val VIDEO, AUDIO, THUMBNAIL,UNKNOWN = Value
+  val VIDEO, AUDIO, THUMBNAIL, METADATA, UNKNOWN = Value
 }
 
 trait ProxyTypeEncoder {
