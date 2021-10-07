@@ -84,16 +84,17 @@ trait Security extends BaseController {
    */
   private def hmacUsername(header: RequestHeader, auth: String):Either[LoginResult, LoginResultOK[String]] = {
     logger.debug(s"headers: ${header.headers.toSimpleMap.toString}")
-    if(Conf.sharedSecret.isEmpty){
-      logger.error("Unable to process server->server request, shared_secret is not set in application.conf")
-      Left(LoginResultMisconfigured(auth))
-    } else {
-      HMAC
-        .calculateHmac(header, Conf.sharedSecret)
-        .map(calculatedSig => {
-          if ("HMAC "+calculatedSig == auth) Right(LoginResultOK("hmac-auth")) else Left(LoginResultInvalid("hmac"))
-        })
-        .getOrElse(Left(LoginResultInvalid("")))
+    config.getOptional[String]("serverAuth.sharedSecret") match {
+      case None=>
+        logger.error("Unable to process server->server request, shared_secret is not set in application.conf")
+        Left(LoginResultMisconfigured(auth))
+      case Some(sharedSecret)=>
+        HMAC
+          .calculateHmac(header, sharedSecret)
+          .map(calculatedSig => {
+            if ("HMAC "+calculatedSig == auth) Right(LoginResultOK("hmac-auth")) else Left(LoginResultInvalid("hmac"))
+          })
+          .getOrElse(Left(LoginResultInvalid("")))
     }
   }
 
