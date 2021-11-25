@@ -252,8 +252,8 @@ class Auth @Inject() (config:Configuration,
   private def isErrorPresent(response: Either[String, JWTClaimsSet]) = {
     response match {
       case Left(err)=>
-        val numberPattern: Regex = "(?<=\\().*(?=\\))".r
-        Future("?error=%s".format((numberPattern findFirstIn err).get))
+        val stringPattern: Regex = "(?<=\\().*(?=\\))".r
+        Future("?error=%s".format((stringPattern findFirstIn err).get))
       case Right(claims)=>
         Future(s"")
     }
