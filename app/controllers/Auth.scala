@@ -11,7 +11,7 @@ import com.nimbusds.jwt.JWTClaimsSet
 import org.slf4j.LoggerFactory
 import play.api.Configuration
 import play.api.mvc.{AbstractController, ControllerComponents, Cookie, DiscardingCookie, Request, ResponseHeader, Result, Session}
-
+import scala.util.matching.Regex
 import java.net.{URL, URLEncoder}
 import java.nio.charset.StandardCharsets
 import javax.inject.{Inject, Singleton}
@@ -249,6 +249,16 @@ class Auth @Inject() (config:Configuration,
       }
   }
 
+  private def isErrorPresent(response: Either[String, JWTClaimsSet]) = {
+    response match {
+      case Left(err)=>
+        val numberPattern: Regex = "(?<=\\().*(?=\\))".r
+        Future("?error=%s".format((numberPattern findFirstIn err).get))
+      case Right(claims)=>
+        Future(s"")
+    }
+  }
+
   def oauthCallback(state:Option[String], code:Option[String], error:Option[String]) = Action.async { request=>
     (code, error) match {
       case (Some(actualCode), _)=>
@@ -258,10 +268,11 @@ class Auth @Inject() (config:Configuration,
           _                     <- profilePicFromJWT(maybeValidatedContent)
           maybeUserProfile      <- userProfileFromJWT(maybeValidatedContent)
           _                     <- storeRefreshToken(maybeOauthResponse, maybeValidatedContent)
+          maybeError            <- isErrorPresent(maybeValidatedContent)
           result                <- finalCallbackResponse(maybeOauthResponse,
                                       maybeValidatedContent,
                                       maybeUserProfile,
-                                      ResponseHeader(StatusCodes.TemporaryRedirect.intValue, headers=Map("Location"->state.getOrElse("/"))),
+                                      ResponseHeader(StatusCodes.TemporaryRedirect.intValue, headers=Map("Location"->"%s%s".format(state.getOrElse("/"), maybeError))),
                                       play.api.http.HttpEntity.NoEntity
                                   )
         } yield result

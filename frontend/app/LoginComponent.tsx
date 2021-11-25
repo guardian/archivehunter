@@ -1,4 +1,4 @@
-import React from "react";
+import React, {useState, useEffect} from "react";
 import {Button, Grid, makeStyles, Paper, Typography} from "@material-ui/core";
 import clsx from "clsx";
 import {ChevronRight} from "@material-ui/icons";
@@ -22,12 +22,24 @@ const useStyles = makeStyles((theme)=>({
         marginRight: "auto",
         marginTop: "10em",
     },
+    errorText: {
+        marginLeft: "1em",
+        marginRight: "1em",
+    },
 }));
 
 const LoginComponent = ()=>{
     const classes = useStyles();
+    const [lastError, setLastError] = useState<string|undefined>(undefined);
 
     const doLogin = ()=>window.location.href = "/login";
+
+    useEffect(() => {
+        const dataToTest = new URLSearchParams(window.location.search).get("error");
+        if (dataToTest) {
+            setLastError(dataToTest)
+        }
+    }, []);
 
     return (
         <Paper className={clsx(classes.actionPanel, classes.loginBox)}>
@@ -48,6 +60,19 @@ const LoginComponent = ()=>{
                         Log me in
                     </Button>
                 </Grid>
+                {lastError ?
+                    <>
+                        <Grid item>
+                            <Typography>
+                                An error occurred when attempting to log you in.
+                            </Typography>
+                        </Grid>
+                        <Grid item className={classes.errorText}>
+                            <Typography>
+                                {lastError}
+                            </Typography>
+                        </Grid>
+                    </> : null}
             </Grid>
         </Paper>
     );
