@@ -5,8 +5,8 @@
   "main": "index.js",
   "scripts": {
     "test": "jest  --unhandled-rejections=strict",
-    "dev": "webpack --mode development --watch",
-    "build": "webpack --mode production"
+    "dev": "webpack --mode development --watch --openssl-legacy-provider",
+    "build": "webpack --mode production --openssl-legacy-provider"
   },
   "jest": {
     "moduleFileExtensions": [

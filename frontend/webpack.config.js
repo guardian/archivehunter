@@ -9,8 +9,7 @@ var config = {
     entry: APP_DIR + '/index.tsx',
     output: {
         path: BUILD_DIR,
-        filename: 'bundle.js',
-        hashFunction: "xxhash64"
+        filename: 'bundle.js'
     },
     resolve: {
         extensions: [".ts", ".tsx", ".js", ".jsx"],
