@@ -18,6 +18,7 @@ interface NewSearchComponentProps {
     onLoadingStarted?: ()=>void;
     onLoadingFinished?: (loadedData:ArchiveEntry[])=>void;
     extraRequiredItemId?: string;         //if the container wants to be sure certain items are loaded, given that they exist, put the id here
+    filterString?: string;
 }
 
 const useStyles = makeStyles({
@@ -45,6 +46,13 @@ const NewSearchComponent:React.FC<NewSearchComponentProps> = (props) => {
 
     const [cancelToken, setCancelToken] = useState<CancelToken|undefined>(undefined);
     const classes = useStyles();
+    const [localFilter, setLocalFilter] = useState<string>("");
+
+    useEffect(()=>{
+        if((props.filterString) || (props.filterString == "")) {
+            setLocalFilter(props.filterString);
+        }
+    }, [props.filterString]);
 
     const makeSearchRequest = (token:CancelToken, startAt: number):Promise<AxiosResponse<SearchResponse>> => {
         if(props.advancedSearch) {
@@ -215,7 +223,7 @@ const NewSearchComponent:React.FC<NewSearchComponentProps> = (props) => {
 
     return <Grid container className={classes.searchResultsContainer}>
         {
-            entries.map((entry,idx)=><EntryView
+            entries.filter(entry => entry.path.toLowerCase().includes(localFilter.toLowerCase())).map((entry,idx)=><EntryView
                                                 key={idx}
                                                 isSelected={ props.selectedEntry ? props.selectedEntry.id===entry.id : false}
                                                 entry={entry}

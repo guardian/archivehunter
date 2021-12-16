@@ -18,12 +18,13 @@ import MuiAlert from "@material-ui/lab/Alert";
 import EntryDetails from "../Entry/EntryDetails";
 import LightboxDetailsInsert from "./LightboxDetailsInsert";
 import {UserContext} from "../Context/UserContext";
+import BrowseFilter from "../browse/BrowseFilter";
 
 const useStyles = makeStyles({
     browserWindow: {
         display: "grid",
         gridTemplateColumns: "repeat(20, 5%)",
-        gridTemplateRows: "[top] 40px [title-area] 200px [info-area] auto [bottom]",
+        gridTemplateRows: "[top] 40px [title-area] 130px [filter-area] 80px [info-area] auto [bottom]",
         height: "95vh"
     },
     userNameBox: {
@@ -47,7 +48,7 @@ const useStyles = makeStyles({
         gridColumnStart: 1,
         gridColumnEnd: -5,
         gridRowStart: "title-area",
-        gridRowEnd: "info-area",
+        gridRowEnd: "filter-area",
         overflowY: "hidden",
         overflowX: "auto"
     },
@@ -65,6 +66,13 @@ const useStyles = makeStyles({
         gridRowEnd: "bottom",
         padding: "1em",
         borderLeft: "1px"
+    },
+    filterArea: {
+        gridColumnStart: 1,
+        gridColumnEnd: -5,
+        gridRowStart: "filter-area",
+        gridRowEnd: "info-area",
+        padding: "1em"
     }
 });
 
@@ -89,6 +97,7 @@ const NewLightbox:React.FC<RouteComponentProps> = (props) => {
     const [itemLimit, setItemLimit] = useState(300);
     const [basicSearchUrl, setBasicSearchUrl] = useState<string|undefined>(undefined);
     const [showingArchiveSpinner, setShowingArchiveSpinner] = useState(false);
+    const [filterString, setFilterString] = useState<string>("");
 
     const userContext = useContext(UserContext);
 
@@ -216,7 +225,10 @@ const NewLightbox:React.FC<RouteComponentProps> = (props) => {
                                   onError={handleComponentError}
             />
         </div>
-
+        <div className={classes.filterArea}>
+        <BrowseFilter filterString={filterString}
+                      filterStringChanged={(newString)=>setFilterString(newString)}/>
+        </div>
         <div className={classes.itemsArea}>
             <NewSearchComponent pageSize={pageSize}
                                 itemLimit={itemLimit}
@@ -225,6 +237,7 @@ const NewLightbox:React.FC<RouteComponentProps> = (props) => {
                                 selectedEntry={selectedEntry}
                                 onEntryClicked={(newEntry)=>setSelectedEntry(newEntry)}
                                 onErrorOccurred={handleComponentError}
+                                filterString={filterString}
             />
         </div>
 
