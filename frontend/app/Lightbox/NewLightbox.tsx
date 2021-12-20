@@ -24,7 +24,7 @@ const useStyles = makeStyles({
     browserWindow: {
         display: "grid",
         gridTemplateColumns: "repeat(20, 5%)",
-        gridTemplateRows: "[top] 40px [title-area] 130px [filter-area] 80px [info-area] auto [bottom]",
+        gridTemplateRows: "[top] 40px [title-area] 200px [filter-area] 80px [info-area] auto [bottom]",
         height: "95vh"
     },
     userNameBox: {
