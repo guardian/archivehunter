@@ -13,6 +13,7 @@ import EntryDetails from "../Entry/EntryDetails";
 import BoxSizing from "../common/BoxSizing";
 import {urlParamsFromSearch} from "../common/UrlPathHelpers";
 import Helmet from "react-helmet";
+import BrowseFilter from "./BrowseFilter";
 
 const useStyles = makeStyles({
     browserWindow: {
@@ -63,7 +64,15 @@ const useStyles = makeStyles({
         gridRowStart: "top",
         gridRowEnd: "bottom",
         overflow: "hidden", //scrollbars are displayed by the child component
-    }
+    },
+    filterArea: {
+        gridColumnStart: 6,
+        gridColumnEnd: 8,
+        gridRowStart: "top",
+        gridRowEnd: "info-area",
+        padding: "1em",
+        overflow: "hidden"
+    },
 });
 
 const NewBrowseComponent:React.FC<RouteComponentProps> = (props) => {
@@ -89,6 +98,7 @@ const NewBrowseComponent:React.FC<RouteComponentProps> = (props) => {
     const [rightDividerPos, setRightDividerPos] = useState(-4);
 
     const classes = useStyles();
+    const [filterString, setFilterString] = useState<string>("");
 
     const refreshCollectionNames = async () => {
         try {
@@ -245,6 +255,10 @@ const NewBrowseComponent:React.FC<RouteComponentProps> = (props) => {
                              orderChanged={(newOrder)=>setSortOrder(newOrder)}
                              fieldChanged={(newField)=>setSortField(newField)}/>
         </div>
+        <div className={classes.filterArea}>
+            <BrowseFilter filterString={filterString}
+                             filterStringChanged={(newString)=>setFilterString(newString)}/>
+        </div>
         <div className={classes.pathSelector} style={{gridColumnEnd: leftDividerPos}}>
             <BoxSizing justify="right"
                        onRightClicked={()=>setLeftDividerPos((prev)=>prev+1)}
@@ -279,6 +293,7 @@ const NewBrowseComponent:React.FC<RouteComponentProps> = (props) => {
                                 onLoadingStarted={()=>setLoading(true)}
                                 onLoadingFinished={loadingDidComplete}
                                 extraRequiredItemId={urlRequestedItem}
+                                filterString={filterString}
             />
         </div>
         <div className={classes.detailsArea} style={{gridColumnStart: rightDividerPos}}>
