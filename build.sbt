@@ -14,13 +14,14 @@ val elastic4sVersion = "6.7.8"
 val awsSdkVersion = "1.11.959"
 val jacksonVersion = "2.9.10"
 val jacksonCoreVersion = "2.9.10.8"
+val log4jVersion = "2.17.1"
 
 lazy val commonSettings = Seq(
   version := "1.0",
   scalaVersion := "2.12.2",
-  libraryDependencies ++= Seq("org.apache.logging.log4j" % "log4j-core" % "2.15.0",
+  libraryDependencies ++= Seq("org.apache.logging.log4j" % "log4j-core" % log4jVersion,
     "com.beust" % "jcommander" % "1.75", //snyk identified as vulnerable
-    "org.apache.logging.log4j" % "log4j-api" % "2.15.0",
+    "org.apache.logging.log4j" % "log4j-api" % log4jVersion,
     "org.scala-lang.modules" %% "scala-java8-compat" % "0.8.0",
     "com.amazonaws" % "aws-java-sdk-s3" % awsSdkVersion,
     "com.amazonaws" % "aws-java-sdk-elastictranscoder"% awsSdkVersion,
@@ -70,7 +71,7 @@ lazy val `archivehunter` = (project in file("."))
       "com.nimbusds" % "nimbus-jose-jwt" % "9.11.1",
       "com.gu" % "kinesis-logback-appender" % "2.0.1",
       "com.fasterxml.jackson.dataformat" % "jackson-dataformat-cbor" % "2.11.4",  //fix vulnerable dependency for kinesis-logback-appender
-      "org.apache.logging.log4j" % "log4j-api" % "2.15.0",
+      "org.apache.logging.log4j" % "log4j-api" % log4jVersion,
       "com.typesafe.akka" %% "akka-testkit" % akkaVersion,
       "io.sentry" % "sentry-logback" % "1.7.2",
       guice, ehcache, ws)
@@ -104,9 +105,9 @@ lazy val inputLambda = (project in file("lambda/input"))
   .settings(commonSettings,
   // https://mvnrepository.com/artifact/com.amazonaws/aws-java-sdk-lambda
   libraryDependencies ++= Seq(
-    "org.apache.logging.log4j" % "log4j-core" % "2.15.0",
-    "org.apache.logging.log4j" % "log4j-api" % "2.15.0",
-    "org.apache.logging.log4j" % "log4j-1.2-api" % "2.15.0",
+    "org.apache.logging.log4j" % "log4j-core" % log4jVersion,
+    "org.apache.logging.log4j" % "log4j-api" % log4jVersion,
+    "org.apache.logging.log4j" % "log4j-1.2-api" % log4jVersion,
     "com.sksamuel.elastic4s" %% "elastic4s-http" % elastic4sVersion,
     "com.sksamuel.elastic4s" %% "elastic4s-circe" % elastic4sVersion,
     "com.sksamuel.elastic4s" %% "elastic4s-testkit" % elastic4sVersion % "test",
