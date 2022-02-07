@@ -69,7 +69,8 @@
     <logger name="helpers.UserAvatarHelper" level="INFO"/>
     <logger name="controllers.BulkDownloadsController" level="INFO"/>
 
-    <logger name="com.gu.pandomainauth.action.AuthActions" level="INFO"/>
+    <logger name="auth.HMAC" level="DEBUG"/>
+    <logger name="auth" level="INFO"/>
 
     <logger name="helpers.DDBSink" level="INFO"/>
     <logger name="helpers.S3ToProxyLocationFlow" level="INFO"/>
