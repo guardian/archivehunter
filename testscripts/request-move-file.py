@@ -57,7 +57,7 @@ def get_token(uri:str, secret:str, method:str, content:bytes, checksum:str) -> (
 
     content_length = len(content)
 
-    string_to_sign = "{}\n{}\n{}\n{}\n{}".format(httpdate, content_length, checksum, method, url_parts.path)
+    string_to_sign = "{}\n{}\n{}\n{}\n{}".format(httpdate, content_length, checksum, method, url_parts.path + "?" + url_parts.query)
     print("string_to_sign: " + string_to_sign)
     hm = hmac.digest(secret.encode("UTF-8"), msg=string_to_sign.encode("UTF-8"), digest=hashlib.sha384)
     return "HMAC {0}".format(base64.b64encode(hm).decode("UTF-8")), httpdate
@@ -77,7 +77,7 @@ if options.secret is None:
 
 method = "PUT"
 uri = "https://{host}/api/move/{fileid}?to={collection}".format(host=options.host,
-                                                                fileid=options.entry_id,
+                                                                fileid=urllib.parse.quote(options.entry_id),
                                                                 collection=urllib.parse.quote(options.dest))
 
 print("uri is " + uri)
