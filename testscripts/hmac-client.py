@@ -29,14 +29,36 @@ import json
 # requests_log.setLevel(logging.DEBUG)
 # requests_log.propagate = True
 
-def get_token(uri, secret):
+
+def checksum(content:bytes) -> str:
+    """
+    Calculates the SHA-384 checksum of the given content and returns the base64 encoded representation as a string
+    :param content: the content to hash
+    :return: a string representing the checksum
+    """
+    digest = hashlib.sha384(content).digest()
+    return base64.b64encode(digest).decode("UTF-8")
+
+
+def get_token(uri:str, secret:str, method:str, content:bytes, checksum:str) -> (str, str):
+    """
+    Generates an HMAC token
+    :param uri:  URI that is going to be accessed
+    :param secret: Shared secret with the server
+    :param method: HTTP method for the request
+    :param content: byte string of the request body. Can be empty.
+    :param checksum: SHA-384 checksum of the body content. If content is empty then this should be the SHA checksum of an empty string
+    :return: tuple consisting of the body of an "Authorization" header and the HTTP style date/time of the request.
+    """
     t = datetime.now()
     httpdate = formatdate(timeval=mktime(t.timetuple()),localtime=False,usegmt=True)
     url_parts = urlparse(uri)
 
-    string_to_sign = "{0}\n{1}".format(httpdate, url_parts.path)
+    content_length = len(content)
+
+    string_to_sign = "{}\n{}\n{}\n{}\n{}".format(httpdate, content_length, checksum, method, url_parts.path)
     print("string_to_sign: " + string_to_sign)
-    hm = hmac.digest(secret.encode("UTF-8"), msg=string_to_sign.encode("UTF-8"), digest=hashlib.sha256)
+    hm = hmac.digest(secret.encode("UTF-8"), msg=string_to_sign.encode("UTF-8"), digest=hashlib.sha384)
     return "HMAC {0}".format(base64.b64encode(hm).decode("UTF-8")), httpdate
 
 #START MAIN
@@ -58,8 +80,10 @@ if options.secret is None:
     print("You must supply the password in --secret")
     exit(1)
 
+method = "GET"
 if options.remove:
     uri = "https://{host}/api/proxy/{fileid}/{proxytype}".format(host=options.host,fileid=options.entry_id, proxytype=options.proxy_type)
+    method = "DELETE"
 elif options.query:
     uri = "https://{host}/api/proxy/{fileid}/all".format(host=options.host, fileid=options.entry_id)
 elif options.raw:
@@ -68,12 +92,16 @@ else:
     uri = "https://{host}/api/proxy".format(host=options.host)
 
 print("uri is " + uri)
-authtoken, httpdate = get_token(uri, options.secret)
+content_body = "".encode("UTF-8")
+content_hash = checksum(content_body)
+
+authtoken, httpdate = get_token(uri, options.secret, method, content_body, content_hash)
 print(authtoken)
 
 headers = {
-        'X-Gu-Tools-HMAC-Date': httpdate,
-        'X-Gu-Tools-HMAC-Token': authtoken,
+        'Date': httpdate,
+        'Authorization': authtoken,
+        'X-Sha384-Checksum': content_hash,
 }
 
 print(headers)
