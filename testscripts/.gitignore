@@ -1,0 +1,4 @@
+*.txt
+*.yaml
+-requirements.txt
+*.iml
