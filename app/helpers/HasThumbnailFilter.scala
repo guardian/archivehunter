@@ -30,7 +30,7 @@ class HasThumbnailFilter @Inject() (ddbClientManager:DynamoClientManager, config
   override def createLogic(inheritedAttributes: Attributes): GraphStageLogic = new GraphStageLogic(shape) {
     val awsProfile = config.getOptional("externalData.awsProfile").map(_.mkString)
     val tableName = config.get[String]("proxies.tableName")
-    implicit val ddbClient = ddbClientManager.getNewAlpakkaDynamoClient(awsProfile)
+    implicit val ddbClient = ddbClientManager.getNewAsyncDynamoClient(awsProfile)
 
     setHandler(in, new AbstractInHandler {
       override def onPush(): Unit = {

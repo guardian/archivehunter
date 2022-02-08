@@ -167,14 +167,10 @@ class ProxiesRelinker @Inject() (config:Configuration,
         case Some(Right(jobModel))=>
           val updatedJob = jobModel.copy(startedAt = Some(ZonedDateTime.now()),jobStatus=JobStatus.ST_RUNNING)
           jobModelDAO.putJob(updatedJob).onComplete({
-            case Success(None)=>
+            case Success(_)=>
               relinkScan(jobId,None)
-            case Success(Some(Right(updatedJobModel)))=>
-              relinkScan(jobId,None)
-            case Success(Some(Left(err)))=>
-              logger.error(s"Could not update database: $err")
             case Failure(err)=>
-              logger.error(s"Could not update job: $err")
+              logger.error(s"Could not update job: ${err.getMessage}", err)
           })
       })
 

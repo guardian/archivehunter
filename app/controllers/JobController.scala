@@ -1,12 +1,11 @@
 package controllers
 
-import java.time.ZonedDateTime
 import java.util.UUID
 import akka.actor.{ActorRef, ActorSystem}
 import akka.stream.{ActorMaterializer, Materializer}
 import auth.{BearerTokenAuth, Security}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager}
-import com.gu.scanamo.error.DynamoReadError
+import org.scanamo.DynamoReadError
 import com.theguardian.multimedia.archivehunter.common._
 
 import javax.inject.{Inject, Named, Singleton}
@@ -38,15 +37,11 @@ class JobController @Inject() (override val config:Configuration,
                                override val cache:SyncCacheApi,
                                proxyLocationDAO:ProxyLocationDAO,
                                proxyGenerators:ProxyGenerators)
-                              (implicit actorSystem:ActorSystem)
+                              (implicit actorSystem:ActorSystem, mat:Materializer)
   extends AbstractController(controllerComponents) with Circe with JobModelEncoder with ZonedDateTimeEncoder with Security with QueryRemaps {
 
   override protected val logger=LoggerFactory.getLogger(getClass)
-
-  private implicit val mat:Materializer = ActorMaterializer.create(actorSystem)
-  private val awsProfile = config.getOptional[String]("externalData.awsProfile")
   private val indexName = config.getOptional[String]("externalData.indexName").getOrElse("archivehunter")
-  private  val tableName:String = config.get[String]("proxies.tableName")
 
   protected implicit val indexer = new Indexer(indexName)
 

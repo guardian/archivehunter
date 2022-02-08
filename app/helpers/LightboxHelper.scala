@@ -40,16 +40,10 @@ object LightboxHelper {
     }
 
     val lbEntry = LightboxEntry(userProfile.userEmail, indexEntry.id, ZonedDateTime.now(), expectedRestoreStatus, None, None, None, None, bulkId)
-    lightboxEntryDAO.put(lbEntry).map({
-      case None=>
-        logger.debug(s"lightbox entry saved, no return")
-        Success(lbEntry)
-      case Some(Right(value))=>
-        logger.debug(s"lightbox entry saved, returned $value")
-        Success(lbEntry)
-      case Some(Left(err))=>
-        logger.error(s"Could not save lightbox entry: ${err.toString}")
-        Failure(new RuntimeException(err.toString))
+    lightboxEntryDAO.put(lbEntry).map(Success.apply).recover({
+      case err:Throwable=>
+        logger.error(s"Could not save lightbox entry for ${userProfile.userEmail}: ${err.getMessage}", err)
+        Failure(err)
     })
   }
 

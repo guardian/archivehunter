@@ -12,10 +12,13 @@ import com.theguardian.multimedia.archivehunter.common.clientManagers._
 import com.theguardian.multimedia.archivehunter.common._
 import com.theguardian.multimedia.archivehunter.common.cmn_models._
 import com.theguardian.multimedia.archivehunter.common.errors.{ExternalSystemError, NothingFoundError}
+
 import javax.inject.{Inject, Singleton}
 import org.apache.logging.log4j.{LogManager, Logger}
 import io.circe.syntax._
 import io.circe.generic.auto._
+import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
+
 import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -39,7 +42,7 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration,
 
   protected val awsProfile = config.getOptional[String]("externalData.awsProfile")
   protected implicit val s3Client = s3ClientMgr.getClient(awsProfile)
-  protected implicit val dynamoClient = ddbClientManager.getNewAlpakkaDynamoClient(awsProfile)
+  protected implicit val dynamoClient:DynamoDbAsyncClient = ddbClientManager.getNewAsyncDynamoClient(awsProfile)
   protected implicit val esClient = esClientMgr.getClient()
   protected val indexer = new Indexer(config.get[String]("externalData.indexName"))
 
@@ -208,6 +211,8 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration,
         case Some(uriString) =>
           val rq = RequestModel(requestType, uriString, targetProxyBucket, jobDesc.jobId, None, None, proxyType)
           sendRequest(rq, target.region)
+            .map(result=>Success(result))
+            .recover({case err:Throwable=>Failure(err)})
       }
     }).recoverWith({
       case err: Throwable =>
@@ -269,7 +274,7 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration,
     * @return a Future with the message ID or a Failure if it errors
     */
   protected def sendRequest(rq:RequestModel,region:String) = {
-    proxyFrameworkInstanceDAO.recordsForRegion(region).map(recordList=>{
+    proxyFrameworkInstanceDAO.recordsForRegion(region).flatMap(recordList=>{
       val failures = recordList.collect({case Left(err)=>err})
       if(failures.nonEmpty) throw new RuntimeException(s"Database error: $failures")
 
@@ -282,7 +287,9 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration,
 
       val pfInst = records.head
       implicit val stsClient = stsClientMgr.getClientForRegion(awsProfile, region)
-      snsClientMgr.getTemporaryClient(region, pfInst.roleArn).map(snsClient=>{
+      Future
+        .fromTry(snsClientMgr.getTemporaryClient(region, pfInst.roleArn))
+        .map(snsClient=>{
           val pubRq = new PublishRequest().withTopicArn(pfInst.inputTopicArn).withMessage(rq.asJson.toString)
           val result = snsClient.publish(pubRq)
           result.getMessageId
@@ -297,28 +304,20 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration,
   }
 
   protected def saveNSend(jobDesc:JobModel, rq:RequestModel, region:String, jobUuid:String) =
-    jobModelDAO.putJob(jobDesc).flatMap({
-      case None=>
-        sendRequest(rq, region).map({
-          case Success(msgId)=>
-            Right(jobUuid)
-          case Failure(err)=>
+    jobModelDAO.putJob(jobDesc).flatMap(_=> {
+      sendRequest(rq, region)
+        .map(_=>Right(jobUuid))
+        .recover({
+          case err:Throwable =>
             logger.error(s"Could not send request to $region: ", err)
             updateJobFailed(jobDesc, Some(err.toString))
             Left(err.toString)
         })
-      case Some(Right(updatedRecord))=>
-        sendRequest(rq, region).map({
-          case Success(msgId)=>Right(jobUuid)
-          case Failure(err)=>
-            logger.error(s"Could not send request to $region: ", err)
-            updateJobFailed(jobDesc, Some(err.toString))
-            Left(err.toString)
-        })
-      case Some(Left(err))=>
+    }).recover({
+      case err:Throwable=>
         logger.error("Could not save job: ", err)
         //no point in updating the job if it didn't save in the first place
-        Future(Left(err.toString))
+        Left(err.toString)
     })
 
   def requestCheckJob(sourceBucket:String, destBucket:String, region:String) = {

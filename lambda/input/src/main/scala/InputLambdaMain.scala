@@ -196,16 +196,13 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
           jobModelDAO.putJob(updatedJob)
         })
 
-        Future.sequence(updateFutures).map(updateResults=>{
-          val updateFailures = updateResults.collect({case Some(Left(err))=>err})
-          if(updateFailures.nonEmpty){
-            logger.error(s"Could not update jobs for source ID $docId: ")
-            updateFailures.foreach(err=>logger.error(err))
-            ()
-          } else {
+        Future.sequence(updateFutures)
+          .map(_=>{
             logger.info(s"Updated jobs for source ID $docId")
             ()
-          }
+          }).recover({
+          case err:Throwable=>
+            logger.error(s"Could not update jobs for source ID $docId:${err.getMessage}", err)
         })
       }
     })
@@ -286,6 +283,6 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
 
     //need to block here, AWS terminates the lambda as soon as the function returns.
     //as a bonus, if any of the operations fail this raises an exception and therefore is reported as a run failure
-    Await.result(Future.sequence(resultList), 45 seconds)
+    Await.result(Future.sequence(resultList), 45.seconds)
   }
 }

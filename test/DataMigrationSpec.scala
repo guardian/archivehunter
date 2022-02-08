@@ -7,7 +7,6 @@ import helpers.UserAvatarHelper
 import org.specs2.mock.Mockito
 import org.specs2.mutable.Specification
 import play.api.Configuration
-import services.DataMigration
 
 class DataMigrationSpec extends Specification with Mockito {
   "emailUpdater" should {

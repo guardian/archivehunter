@@ -132,19 +132,17 @@ class BulkDownloadsController @Inject()(override val config:Configuration,
     .put(updatedToken)
     .flatMap(_=>{
       val retrievalToken = ServerTokenEntry.create(duration = tokenLongDuration, forUser = updatedToken.createdForUser, associatedId = updatedToken.associatedId) //create a 2 hour token to cover the download.
-      serverTokenDAO.put(retrievalToken).map({
-        case None =>
-          Ok(BulkDownloadInitiateResponse("ok", bulkEntry, retrievalToken.value, None).asJson)
-        case Some(Right(_)) =>
-          Ok(BulkDownloadInitiateResponse("ok", bulkEntry, retrievalToken.value, None).asJson)
-        case Some(Left(err)) =>
-          logger.error(s"Could not save retrieval token: $err")
-          InternalServerError(GenericErrorResponse("db_error", s"Could not save retrieval token: $err").asJson)
+      serverTokenDAO.put(retrievalToken).map(_=> {
+        Ok(BulkDownloadInitiateResponse("ok", bulkEntry, retrievalToken.value, None).asJson)
+      }).recover({
+        case err:Throwable=>
+          logger.error(s"Could not save retrieval token: ${err.getMessage}", err)
+          InternalServerError(GenericErrorResponse("db_error", s"Could not save retrieval token, see logs").asJson)
       })
-    }).recoverWith({
+    }).recover({
       case err:Throwable=>
-        logger.error(s"Could not search index for bulk entries: $err")
-        Future(Forbidden(GenericErrorResponse("forbidden", "invalid or expired token").asJson))
+        logger.error(s"Could not search index for bulk entries: ${err.getMessage}", err)
+        Forbidden(GenericErrorResponse("forbidden", "invalid or expired token").asJson)
     })
 
   protected def saveTokenAndGetDownload(updatedToken:ServerTokenEntry, bulkEntry: LightboxBulkEntry) = serverTokenDAO
@@ -152,14 +150,12 @@ class BulkDownloadsController @Inject()(override val config:Configuration,
     .flatMap(_=>{
       entriesForBulk(bulkEntry).flatMap(results=> {
         val retrievalToken = ServerTokenEntry.create(duration = tokenLongDuration, forUser = updatedToken.createdForUser) //create a 2 hour token to cover the download.
-        serverTokenDAO.put(retrievalToken).map({
-          case None =>
-            Ok(BulkDownloadInitiateResponse("ok", bulkEntry, retrievalToken.value, Some(results)).asJson)
-          case Some(Right(_)) =>
-            Ok(BulkDownloadInitiateResponse("ok", bulkEntry, retrievalToken.value, Some(results)).asJson)
-          case Some(Left(err)) =>
-            logger.error(s"Could not save retrieval token: $err")
-            InternalServerError(GenericErrorResponse("db_error", s"Could not save retrieval token: $err").asJson)
+        serverTokenDAO.put(retrievalToken).map(_=> {
+          Ok(BulkDownloadInitiateResponse("ok", bulkEntry, retrievalToken.value, Some(results)).asJson)
+        }).recover({
+          case err:Throwable=>
+            logger.error(s"Could not save retrieval token: ${err.getMessage}", err)
+            InternalServerError(GenericErrorResponse("db_error", s"Could not save retrieval token, see logs").asJson)
         })
       }).recoverWith({
         case err:Throwable=>

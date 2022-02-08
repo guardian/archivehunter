@@ -1,16 +1,13 @@
 package helpers.LightboxStreamComponents
 
 import java.time.ZonedDateTime
-
 import akka.stream.{Attributes, Outlet, SourceShape}
 import akka.stream.stage.{AbstractOutHandler, GraphStage, GraphStageLogic}
-import com.amazonaws.services.dynamodbv2.model.{AttributeValue, QueryRequest, ScanRequest}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.DynamoClientManager
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{LightboxEntry, RestoreStatus}
-import javax.inject.Inject
 import play.api.{Configuration, Logger}
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
 
@@ -30,6 +27,8 @@ class LightboxDynamoSource(memberOfBulk:String, config:Configuration, dynamoClie
   override def shape: SourceShape[LightboxEntry] = SourceShape.of(out)
 
   override def createLogic(inheritedAttributes: Attributes): GraphStageLogic = new GraphStageLogic(shape) {
+    import software.amazon.awssdk.services.dynamodb.model.{AttributeValue, QueryRequest}
+
     protected val client = dynamoClientManager.getClient(config.getOptional[String]("externalData.awsProfile"))
     val logger = Logger(getClass)
     private var lastEvaluatedKey:Option[mutable.Map[String, AttributeValue]] = None
@@ -46,19 +45,18 @@ class LightboxDynamoSource(memberOfBulk:String, config:Configuration, dynamoClie
       */
     def getNextPage(limit:Int,exclusiveStartKey:Option[mutable.Map[String, AttributeValue]]) = {
       logger.info(s"getNextPage: memberOfBulk is $memberOfBulk")
-      val baseRq = new QueryRequest()
-        .withTableName(config.get[String]("lightbox.tableName"))
-        .withIndexName("memberOfBulkIndex")
-        .withLimit(limit)
-        .withKeyConditionExpression(s"memberOfBulk = :bulkId")
-        .withExpressionAttributeValues(Map(":bulkId"->new AttributeValue().withS(memberOfBulk)).asJava)
+      val baseRq = new QueryRequest(config.get[String]("lightbox.tableName")).toBuilder
+        .indexName("memberOfBulkIndex")
+        .limit(limit)
+        .keyConditionExpression(s"memberOfBulk = :bulkId")
+        .expressionAttributeValues(Map(":bulkId"->new AttributeValue().toBuilder.s(memberOfBulk).build()).asJava)
 
       val rqWithStart = exclusiveStartKey match {
-        case Some(key)=>baseRq.withExclusiveStartKey(key.asJava)
+        case Some(key)=>baseRq.exclusiveStartKey(key.asJava)
         case None=>baseRq
       }
 
-      Try { client.query(rqWithStart) }
+      Try { client.query(rqWithStart.build()) }
     }
 
     /**
@@ -68,7 +66,7 @@ class LightboxDynamoSource(memberOfBulk:String, config:Configuration, dynamoClie
       * @return an Option that contains the value of the key, if one is present
       */
     def optionalString(sourceData:mutable.Map[String, AttributeValue], key:String):Option[String] = {
-      sourceData.get(key).flatMap(attributeValue=>Option(attributeValue.getS))
+      sourceData.get(key).flatMap(attributeValue=>Option(attributeValue.s()))
     }
 
     /**
@@ -78,10 +76,10 @@ class LightboxDynamoSource(memberOfBulk:String, config:Configuration, dynamoClie
       */
     def buildLightboxEntry(sourceData: mutable.Map[String,AttributeValue]):Try[LightboxEntry] = Try {
       LightboxEntry(
-        sourceData("userEmail").getS,
-        sourceData("fileId").getS,
-        ZonedDateTime.parse(sourceData("addedAt").getS),
-        RestoreStatus.withName(sourceData("restoreStatus").getS),
+        sourceData("userEmail").s(),
+        sourceData("fileId").s(),
+        ZonedDateTime.parse(sourceData("addedAt").s()),
+        RestoreStatus.withName(sourceData("restoreStatus").s()),
         optionalString(sourceData,"restoreStarted").map(timeStr=>ZonedDateTime.parse(timeStr)),
         optionalString(sourceData,"restoreCompleted").map(timeStr=>ZonedDateTime.parse(timeStr)),
         optionalString(sourceData,"availableUntil").map(timeStr=>ZonedDateTime.parse(timeStr)),
@@ -96,13 +94,14 @@ class LightboxDynamoSource(memberOfBulk:String, config:Configuration, dynamoClie
           logger.info("cache is empty, getting next page of 100 results")
           getNextPage(pageSize, lastEvaluatedKey) match {
             case Success(scanResult)=>
-              logger.info(s"Got scan result with ${scanResult.getCount} items")
-              lastEvaluatedKey = Option(scanResult.getLastEvaluatedKey.asScala)
-              resultCache = scanResult.getItems.asScala.map(_.asScala)
-              ctr+=scanResult.getCount
-              logger.info(s"Scan returned ${scanResult.getCount} items, running total is now $ctr items total")
-              if(scanResult.getCount<pageSize) {
-                logger.info(s"${scanResult.getCount} items is less than page size of 100, assuming that all items have been returned")
+              logger.info(s"Got scan result with ${scanResult.count()} items")
+              lastEvaluatedKey = Option(scanResult.lastEvaluatedKey().asScala)
+              resultCache = scanResult.items().asScala.map(_.asScala).toSeq
+
+              ctr+=scanResult.count()
+              logger.info(s"Scan returned ${scanResult.count()} items, running total is now $ctr items total")
+              if(scanResult.count()<pageSize) {
+                logger.info(s"${scanResult.count()} items is less than page size of 100, assuming that all items have been returned")
                 lastPage = true
               }
 

@@ -1,8 +1,8 @@
 package services.FileMove
 
-import akka.stream.alpakka.dynamodb.scaladsl.DynamoClient
 import com.sksamuel.elastic4s.http.ElasticClient
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer, ProxyLocation, ProxyLocationDAO}
+import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -13,7 +13,7 @@ import scala.util.{Failure, Success}
   * old ones.
   * rollback makes it copy them back again the other way
   */
-class UpdateIndexRecords(indexer:Indexer, proxyLocationDAO: ProxyLocationDAO)(implicit esClient:ElasticClient, dynamoClient:DynamoClient) extends GenericMoveActor {
+class UpdateIndexRecords(indexer:Indexer, proxyLocationDAO: ProxyLocationDAO)(implicit esClient:ElasticClient, dynamoClient:DynamoDbAsyncClient) extends GenericMoveActor {
   import GenericMoveActor._
 
   def deleteCopiedProxies(proxyList:Seq[ProxyLocation]) = {
@@ -26,15 +26,22 @@ class UpdateIndexRecords(indexer:Indexer, proxyLocationDAO: ProxyLocationDAO)(im
 
   private def writeProxies(destFileProxy:Seq[ProxyLocation]) =
     Future.sequence(
-      destFileProxy.map(loc => proxyLocationDAO.saveProxy(loc))
+      destFileProxy.map(loc => proxyLocationDAO
+        .saveProxy(loc)
+        .map(Right.apply)
+        .recover({
+          case err:Throwable=>
+            Left(err.getMessage)
+        })
+      )
     ).map(proxyUpdateResults=>{
-      val failures = proxyUpdateResults.collect({ case Some(Left(err))=>err})
+      val failures = proxyUpdateResults.collect({ case Left(err)=>err})
       if(failures.nonEmpty) {
         logger.error(s"Could not copy all proxies, ${failures.length} out of ${proxyUpdateResults.length} failed: ")
-        failures.foreach(err=>logger.error(s"\t${err.toString}"))
+        failures.foreach(err=>logger.error(s"\t$err"))
         throw new RuntimeException(s"${failures.length} proxy copies failed")
       } else {
-        proxyUpdateResults.collect({ case Some(Right(proxyLocation))=>proxyLocation})
+        proxyUpdateResults.collect({ case Right(proxyLocation)=>proxyLocation})
       }
     })
 
@@ -128,8 +135,14 @@ class UpdateIndexRecords(indexer:Indexer, proxyLocationDAO: ProxyLocationDAO)(im
 
         val resaveProxiesFuture = state.sourceFileProxies
           .map(proxySeq =>
-            Future.sequence(proxySeq.map(proxyLocationDAO.saveProxy))
-              .map(_.collect({ case Some(result) => result }))
+            Future.sequence(proxySeq.map(proxy=>proxyLocationDAO
+              .saveProxy(proxy)
+              .map(Right.apply)
+              .recover({
+                case err:Throwable=>
+                  Left(err.getMessage)
+              })
+            ))
           )
           .getOrElse(Future(Seq()))
           .map(resultSeq => {

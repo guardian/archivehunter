@@ -4,13 +4,14 @@ import akka.actor.{Actor, ActorSystem, Cancellable}
 import akka.stream.scaladsl.{Keep, Source}
 import akka.stream.{ActorMaterializer, KillSwitches}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager}
-import com.amazonaws.services.dynamodbv2.model._
 import com.google.inject.Injector
 import com.theguardian.multimedia.archivehunter.common.ProxyLocation
 import helpers._
+
 import javax.inject.{Inject, Singleton}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{ScanTarget, ScanTargetDAO}
 import play.api.{Configuration, Logger}
+import software.amazon.awssdk.services.dynamodb.model.{DescribeTableRequest, GlobalSecondaryIndexUpdate, ProvisionedThroughput, UpdateGlobalSecondaryIndexAction, UpdateTableRequest}
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.concurrent.duration._
@@ -56,22 +57,23 @@ class LegacyProxiesScanner @Inject()(config:Configuration, ddbClientMgr:DynamoCl
     *         Once it is then ScanBucket will be dispatched again with the [[ScanTarget]] provided in the `tgt` argument
     */
   def updateProvisionedWriteCapacity(boostTo: Int, tgt:ScanTarget, completionPromise:Option[Promise[Boolean]]):Either[LPSError, Boolean] = {
-    val result = ddbClient.describeTable(config.get[String]("proxies.tableName"))
+    val rq = new DescribeTableRequest().toBuilder.tableName(config.get[String]("proxies.tableName")).build()
+    val result = ddbClient.describeTable(rq)
 
-    if(result.getTable.getTableStatus!="ACTIVE"){
-      logger.warn(s"Can't update table status while it is in ${result.getTable.getTableStatus} state.")
+    if(result.table().tableStatusAsString()!="ACTIVE"){
+      logger.warn(s"Can't update table status while it is in ${result.table().tableStatusAsString()} state.")
       Left(WrongTableState)
     } else {
-      val tableThroughput = result.getTable.getProvisionedThroughput
-      if(tableThroughput.getReadCapacityUnits==0){  //we are not in provisioned mode
+      val tableThroughput = result.table().provisionedThroughput()
+      if(tableThroughput.readCapacityUnits()==0){  //we are not in provisioned mode
         return Right(true)
       }
-      val indexName = result.getTable.getGlobalSecondaryIndexes.get(0).getIndexName
+      val indexName = result.table().globalSecondaryIndexes().get(0).indexName()
 
-      val indexThroughput = result.getTable.getGlobalSecondaryIndexes.get(0).getProvisionedThroughput
+      val indexThroughput = result.table().globalSecondaryIndexes().get(0).provisionedThroughput()
       logger.info(s"index name is $indexName, throughput is $indexThroughput")
 
-      if (tableThroughput.getWriteCapacityUnits == boostTo && indexThroughput.getWriteCapacityUnits==boostTo) {
+      if (tableThroughput.writeCapacityUnits() == boostTo && indexThroughput.writeCapacityUnits()==boostTo) {
         Right(true)
       } else {
         val msgToSend = completionPromise match {
@@ -79,33 +81,38 @@ class LegacyProxiesScanner @Inject()(config:Configuration, ddbClientMgr:DynamoCl
           case None => CheckTableReady(ScanBucket(tgt))
         }
         try {
-          val newTableThroughput = new ProvisionedThroughput()
-            .withWriteCapacityUnits(boostTo.toLong)
-            .withReadCapacityUnits(tableThroughput.getReadCapacityUnits)
-          val newIndexThroughput = new ProvisionedThroughput()
-            .withWriteCapacityUnits(boostTo.toLong)
-            .withReadCapacityUnits(10L)
+          val newTableThroughput = new ProvisionedThroughput().toBuilder
+            .writeCapacityUnits(boostTo.toLong)
+            .readCapacityUnits(tableThroughput.readCapacityUnits())
+            .build()
+          val newIndexThroughput = new ProvisionedThroughput().toBuilder
+            .writeCapacityUnits(boostTo.toLong)
+            .readCapacityUnits(10L)
+            .build()
 
-          val initialRq = new UpdateTableRequest()
-            .withTableName(tableName)
+          val initialRq = new UpdateTableRequest().toBuilder
+            .tableName(tableName)
 
-          val tableRq = if(tableThroughput.getWriteCapacityUnits == boostTo){
+          val tableRq = if(tableThroughput.writeCapacityUnits() == boostTo){
             initialRq
           } else {
-            initialRq.withProvisionedThroughput(newTableThroughput)
+            initialRq.provisionedThroughput(newTableThroughput)
           }
 
-          val indexRq = if(indexThroughput.getWriteCapacityUnits==boostTo){
+          val indexRq = if(indexThroughput.writeCapacityUnits()==boostTo){
             tableRq
           } else {
-            tableRq.withGlobalSecondaryIndexUpdates(new GlobalSecondaryIndexUpdate()
-              .withUpdate(new UpdateGlobalSecondaryIndexAction()
-                .withIndexName(indexName)
-                .withProvisionedThroughput(newIndexThroughput)))
+            tableRq.globalSecondaryIndexUpdates(new GlobalSecondaryIndexUpdate().toBuilder
+              .update(new UpdateGlobalSecondaryIndexAction().toBuilder
+                .indexName(indexName)
+                .provisionedThroughput(newIndexThroughput)
+                .build()
+              ).build()
+            )
           }
 
-          ddbClient.updateTable(indexRq) //this raises if it fails, caught just below.
-          tableReadyTimer = Some(system.scheduler.schedule(10 seconds, 1 second, self, msgToSend))
+          ddbClient.updateTable(indexRq.build()) //this raises if it fails, caught just below.
+          tableReadyTimer = Some(system.scheduler.scheduleAtFixedRate(10 seconds, 1 second, self, msgToSend))
           Right(false)
         } catch {
           case ex:Throwable=>Left(ProviderError(ex))
@@ -120,9 +127,12 @@ class LegacyProxiesScanner @Inject()(config:Configuration, ddbClientMgr:DynamoCl
     */
   def isTableReady = {
     logger.info(s"Checking if table is ready...")
-    val result = ddbClient.describeTable(config.get[String]("proxies.tableName"))
+    val rq = new DescribeTableRequest().toBuilder
+      .tableName(config.get[String]("proxies.tableName"))
+      .build()
+    val result = ddbClient.describeTable(rq)
 
-    result.getTable.getTableStatus match {
+    result.table().tableStatusAsString() match {
       case "ACTIVE"=> //update has completed
         logger.info("Table has re-entered ACTIVE state")
         tableReadyTimer match {
@@ -182,7 +192,7 @@ class LegacyProxiesScanner @Inject()(config:Configuration, ddbClientMgr:DynamoCl
         streamCompletionPromise.future.onComplete({
           case Success(_)=>
             logger.info("Scan bucket completed, reverting provisioned write capacity...")
-            val updateCapacityPromise = Promise[Boolean]
+            val updateCapacityPromise = Promise[Boolean]()
             updateProvisionedWriteCapacity(4,tgt,Some(updateCapacityPromise))
             updateCapacityPromise.future.onComplete({
               case Success(_)=>

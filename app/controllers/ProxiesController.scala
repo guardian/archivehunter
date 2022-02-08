@@ -4,13 +4,14 @@ import java.time.ZonedDateTime
 import java.util.UUID
 import akka.actor.{ActorRef, ActorSystem}
 import akka.pattern.AskTimeoutException
+import akka.stream.scaladsl.Sink
 import akka.stream.{ActorMaterializer, Materializer}
 import akka.util.Timeout
 import auth.{BearerTokenAuth, Security}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager}
 import com.amazonaws.HttpMethod
 import com.amazonaws.services.s3.model.{AmazonS3Exception, GeneratePresignedUrlRequest, GetObjectMetadataRequest, ObjectMetadata}
-import com.gu.scanamo.{ScanamoAlpakka, Table}
+import org.scanamo.{DynamoReadError, ScanamoAlpakka, Table}
 import com.theguardian.multimedia.archivehunter.common._
 
 import javax.inject.{Inject, Named, Singleton}
@@ -22,7 +23,8 @@ import responses._
 import scala.concurrent.ExecutionContext.Implicits.global
 import io.circe.generic.auto._
 import io.circe.syntax._
-import com.gu.scanamo.syntax._
+import org.scanamo.syntax._
+import org.scanamo.generic.auto._
 import com.theguardian.multimedia.archivehunter.common.errors.{ExternalSystemError, NothingFoundError}
 import com.theguardian.multimedia.archivehunter.common.cmn_models._
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{JobModelDAO, ScanTargetDAO}
@@ -31,7 +33,6 @@ import services.ProxiesRelinker
 import com.theguardian.multimedia.archivehunter.common.ProxyTranscodeFramework.{ProxyGenerators, RequestType}
 import org.slf4j.LoggerFactory
 import play.api.cache.SyncCacheApi
-import play.api.libs.ws.WSClient
 import requests.ManualProxySet
 
 import scala.concurrent.duration._
@@ -65,27 +66,35 @@ class ProxiesController @Inject()(override val config:Configuration,
 
   private val s3conn = s3ClientMgr.getClient(awsProfile)
 
-  private implicit val ddbClient = ddbClientMgr.getClient(awsProfile)
-  private implicit val ddbAkkaClient = ddbClientMgr.getNewAlpakkaDynamoClient(awsProfile)
+  //private implicit val ddbClient = ddbClientMgr.getClient(awsProfile)
+  private implicit val ddbAsync = ddbClientMgr.getNewAsyncDynamoClient(awsProfile)
+  private val scanamoAlpakka = ScanamoAlpakka(ddbAsync)
 
+  type ProxyDataType = List[Either[DynamoReadError, ProxyLocation]]
+  private val MakeProxyDataSink = Sink.fold[ProxyDataType, ProxyDataType](List())(_ ++ _)
 
   def proxyForId(fileId:String, proxyType:Option[String]) = IsAuthenticatedAsync { _=> _=>
-    try {
       proxyType match {
         case None=>
-          ScanamoAlpakka.exec(ddbAkkaClient)(table.query('fileId->fileId)).map(result=>{
-            val failures = result.collect({case Left(err)=>err})
-            if(failures.nonEmpty){
-              logger.error(s"Could not look up proxy for $fileId: $failures")
-              InternalServerError(GenericErrorResponse("error",failures.map(_.toString).mkString(", ")).asJson)
-            } else {
-              val output = result.collect({case Right(entry)=>entry})
+          scanamoAlpakka
+            .exec(table.query("fileId"===fileId))
+            .runWith(Sink.head)
+            .map(result=>{
+              val failures = result.collect({case Left(err)=>err})
+              if(failures.nonEmpty){
+                logger.error(s"Could not look up proxy for $fileId: $failures")
+                InternalServerError(GenericErrorResponse("error",failures.map(_.toString).mkString(", ")).asJson)
+              } else {
+                val output = result.collect({case Right(entry)=>entry})
 
-              Ok(ObjectListResponse("ok","proxy_location",output, output.length).asJson)
-            }
-          })
+                Ok(ObjectListResponse("ok","proxy_location",output, output.length).asJson)
+              }
+            })
         case Some(t)=>
-          ScanamoAlpakka.exec(ddbAkkaClient)(table.get('fileId->fileId and ('proxyType->t.toUpperCase))).map({
+          scanamoAlpakka
+            .exec(table.get("fileId"===fileId and ("proxyType"===t.toUpperCase)))
+            .runWith(Sink.head)
+            .map({
             case None=>
               NotFound(GenericErrorResponse("not_found","No proxy was registered").asJson)
             case Some(Left(err))=>
@@ -95,71 +104,61 @@ class ProxiesController @Inject()(override val config:Configuration,
               Ok(responses.ObjectGetResponse("ok","proxy_location",items).asJson)
           })
       }
-
-    } catch {
-      case ex:Throwable=>
-        logger.error("Could not get dynamodb client: ", ex)
-        Future(InternalServerError(GenericErrorResponse("dynamo error", ex.toString).asJson))
-    }
   }
 
   def getAllProxyRefs(fileId:String) = IsAuthenticatedAsync { _=> _=>
-    ScanamoAlpakka.exec(ddbAkkaClient)(
-      table.query('fileId->fileId)
-    ).map(results=>{
-      val failures = results.collect({ case Left(err) => err})
-      if(failures.nonEmpty){
-        failures.foreach(err=>logger.error(s"Could not retrieve proxy reference: $err"))
-        InternalServerError(GenericErrorResponse("db_error", failures.mkString(", ")).asJson)
-      } else {
-        val success = results.collect({ case Right(location)=>location})
-        Ok(ObjectListResponse("ok","ProxyLocation",success, success.length).asJson)
-      }
-    })
+    scanamoAlpakka
+      .exec(table.query("fileId"===fileId))
+      .runWith(MakeProxyDataSink)
+      .map(results=>{
+        val failures = results.collect({ case Left(err) => err})
+        if(failures.nonEmpty){
+          failures.foreach(err=>logger.error(s"Could not retrieve proxy reference: $err"))
+          InternalServerError(GenericErrorResponse("db_error", failures.mkString(", ")).asJson)
+        } else {
+          val success = results.collect({ case Right(location)=>location})
+          Ok(ObjectListResponse("ok","ProxyLocation",success, success.length).asJson)
+        }
+      })
   }
 
   def getPlayable(fileId:String, proxyType:Option[String]) = IsAuthenticatedAsync { _=> _=>
-    try {
       val actualType = proxyType match {
         case None=>"VIDEO"
         case Some(t)=>t.toUpperCase
       }
 
-      ScanamoAlpakka.exec(ddbAkkaClient)(
-        table.get('fileId->fileId and ('proxyType->actualType))
-      ).map({
-        case None=>
-          NotFound(GenericErrorResponse("not_found",s"no $proxyType proxy found for $fileId").asJson)
-        case Some(Right(proxyLocation))=>
-          implicit val s3client = s3ClientMgr.getS3Client(awsProfile, proxyLocation.region)
-          val expiration = new java.util.Date()
-          expiration.setTime(expiration.getTime + (1000 * 60 * 60)) //expires in 1 hour
+      scanamoAlpakka
+        .exec(table.get("fileId"===fileId and ("proxyType"===actualType)))
+        .runWith(Sink.head)
+        .map({
+          case None=>
+            NotFound(GenericErrorResponse("not_found",s"no $proxyType proxy found for $fileId").asJson)
+          case Some(Right(proxyLocation))=>
+            implicit val s3client = s3ClientMgr.getS3Client(awsProfile, proxyLocation.region)
+            val expiration = new java.util.Date()
+            expiration.setTime(expiration.getTime + (1000 * 60 * 60)) //expires in 1 hour
 
-          if(s3client.doesObjectExist(proxyLocation.bucketName, proxyLocation.bucketPath)) {
-            val meta = s3client.getObjectMetadata(proxyLocation.bucketName, proxyLocation.bucketPath)
-            val mimeType = MimeType.fromString(meta.getContentType) match {
-              case Left(str) =>
-                logger.warn(s"Could not get MIME type for s3://${proxyLocation.bucketName}/${proxyLocation.bucketPath}: $str")
-                MimeType("application", "octet-stream")
-              case Right(t) => t
+            if(s3client.doesObjectExist(proxyLocation.bucketName, proxyLocation.bucketPath)) {
+              val meta = s3client.getObjectMetadata(proxyLocation.bucketName, proxyLocation.bucketPath)
+              val mimeType = MimeType.fromString(meta.getContentType) match {
+                case Left(str) =>
+                  logger.warn(s"Could not get MIME type for s3://${proxyLocation.bucketName}/${proxyLocation.bucketPath}: $str")
+                  MimeType("application", "octet-stream")
+                case Right(t) => t
+              }
+              val rq = new GeneratePresignedUrlRequest(proxyLocation.bucketName, proxyLocation.bucketPath)
+                .withMethod(HttpMethod.GET)
+                .withExpiration(expiration)
+              val result = s3client.generatePresignedUrl(rq)
+              Ok(PlayableProxyResponse("ok", result.toString, mimeType).asJson)
+            } else {
+              logger.warn(s"Invalid proxy location: $proxyLocation does not point to an existing file")
+              NotFound(GenericErrorResponse("invalid_location",s"No proxy found for $proxyType on $fileId").asJson)
             }
-            val rq = new GeneratePresignedUrlRequest(proxyLocation.bucketName, proxyLocation.bucketPath)
-              .withMethod(HttpMethod.GET)
-              .withExpiration(expiration)
-            val result = s3client.generatePresignedUrl(rq)
-            Ok(PlayableProxyResponse("ok", result.toString, mimeType).asJson)
-          } else {
-            logger.warn(s"Invalid proxy location: $proxyLocation does not point to an existing file")
-            NotFound(GenericErrorResponse("invalid_location",s"No proxy found for $proxyType on $fileId").asJson)
-          }
-        case Some(Left(err))=>
-          InternalServerError(GenericErrorResponse("db_error", err.toString).asJson)
-      })
-    } catch {
-      case ex:Throwable=>
-        logger.error(s"Could not get playable $proxyType for $fileId", ex)
-        Future(InternalServerError(GenericErrorResponse("error",ex.toString).asJson))
-    }
+          case Some(Left(err))=>
+            InternalServerError(GenericErrorResponse("db_error", err.toString).asJson)
+        })
   }
 
   lazy val defaultRegion = config.getOptional[String]("externalData.awsRegion").getOrElse("eu-west-1")
@@ -325,16 +324,13 @@ class ProxiesController @Inject()(override val config:Configuration,
     val jobId = UUID.randomUUID().toString
     val jobDesc = JobModel(jobId,"RelinkProxies",None,None,JobStatus.ST_PENDING,None,"global",None,SourceType.SRC_GLOBAL,None)
 
-    jobModelDAO.putJob(jobDesc).map({
-      case None=>
-        proxiesRelinker ! ProxiesRelinker.RelinkAllRequest(jobId)
-        Ok(responses.ObjectCreatedResponse("ok","job",jobId).asJson)
-      case Some(Left(dberr))=>
-        logger.error(s"Could not create job entry: $dberr")
+    jobModelDAO.putJob(jobDesc).map(_=> {
+      proxiesRelinker ! ProxiesRelinker.RelinkAllRequest(jobId)
+      Ok(responses.ObjectCreatedResponse("ok", "job", jobId).asJson)
+    }).recover({
+      case dberr:Throwable=>
+        logger.error(s"Could not create job entry: ${dberr.getMessage}", dberr)
         InternalServerError(GenericErrorResponse("db_error",dberr.toString).asJson)
-      case Some(Right(entry))=>
-        proxiesRelinker ! ProxiesRelinker.RelinkAllRequest(jobId)
-        Ok(responses.ObjectCreatedResponse("ok","job",jobId).asJson)
     })
   }
 
@@ -342,8 +338,7 @@ class ProxiesController @Inject()(override val config:Configuration,
     val jobId = UUID.randomUUID().toString
     val jobDesc = JobModel(jobId, "RelinkProxies", Some(ZonedDateTime.now()), None, JobStatus.ST_RUNNING, None, scanTargetName, None, SourceType.SRC_SCANTARGET, None)
 
-    jobModelDAO.putJob(jobDesc).flatMap({
-      case None =>
+    jobModelDAO.putJob(jobDesc).flatMap(_=>{
         proxiesRelinker ! ProxiesRelinker.RelinkScanTargetRequest(jobId, scanTargetName)
 
         scanTargetDAO.withScanTarget(scanTargetName) { target =>
@@ -358,14 +353,11 @@ class ProxiesController @Inject()(override val config:Configuration,
           case Some(Right(rec)) =>
             Ok(responses.ObjectCreatedResponse("ok", "job", jobId).asJson)
         }
-
-      case Some(Left(dberr)) =>
-        Future(InternalServerError(GenericErrorResponse("db_error", dberr.toString).asJson))
-      case Some(Right(entry)) =>
-        proxiesRelinker ! ProxiesRelinker.RelinkScanTargetRequest(jobId, scanTargetName)
-        Future(Ok(responses.ObjectCreatedResponse("ok", "job", jobId).asJson))
+    }).recover({
+      case dberr:Throwable=>
+        logger.error(s"Could not initiate relink for target $scanTargetName: ${dberr.getMessage}", dberr)
+        InternalServerError(GenericErrorResponse("db_error", dberr.getMessage).asJson)
     })
-
   }
 
   def checkProxyExists(bucket:String, path:String):Try[Option[ObjectMetadata]] = {
@@ -410,13 +402,11 @@ class ProxiesController @Inject()(override val config:Configuration,
                   Future(InternalServerError(GenericErrorResponse("error", err.toString).asJson))
                 case Success(Some(proxyMeta)) => //proxy exists
                   val newLoc = ProxyLocation.fromS3(proxySetRequest.proxyBucket, proxySetRequest.proxyPath, proxySetRequest.entryId, proxyMeta, Some(proxySetRequest.region), proxySetRequest.proxyType)
-                  proxyLocationDAO.saveProxy(newLoc).map({
-                    case Some(Left(err)) =>
+                  proxyLocationDAO.saveProxy(newLoc).map(_=> {
+                    Ok(ObjectCreatedResponse("ok", "proxy", newLoc.proxyId).asJson)
+                  }).recover({
+                    case err:Throwable =>
                       InternalServerError(GenericErrorResponse("db_error", err.toString).asJson)
-                    case Some(Right(record)) =>
-                      Ok(ObjectGetResponse("ok", "proxy", record).asJson)
-                    case None =>
-                      Ok(ObjectCreatedResponse("ok", "proxy", newLoc.proxyId).asJson)
                   })
               }
           })

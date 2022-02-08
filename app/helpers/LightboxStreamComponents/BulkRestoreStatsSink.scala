@@ -30,7 +30,7 @@ class BulkRestoreStatsSink @Inject() (@Named("glacierRestoreActor") glacierResto
   override def createLogicAndMaterializedValue(inheritedAttributes: Attributes): (GraphStageLogic, Future[BulkRestoreStats]) = {
     val logger = Logger(getClass)
 
-    val completionPromise = Promise[BulkRestoreStats]
+    val completionPromise = Promise[BulkRestoreStats]()
 
     var currentStats:BulkRestoreStats = BulkRestoreStats.empty
     val logic = new GraphStageLogic(shape) {

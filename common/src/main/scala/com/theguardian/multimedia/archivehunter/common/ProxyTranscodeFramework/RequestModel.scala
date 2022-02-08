@@ -17,9 +17,9 @@ case class RequestModel (requestType: RequestType.Value, inputMediaUri: String,
                          createPipelineRequest: Option[CreatePipeline], proxyType:Option[ProxyType.Value])
 
 trait RequestModelEncoder {
-  implicit val requestTypeEncoder = Encoder.enumEncoder(RequestType)
-  implicit val requestTypeDecoder = Decoder.enumDecoder(RequestType)
+  implicit val requestTypeEncoder = Encoder.encodeEnumeration(RequestType)
+  implicit val requestTypeDecoder = Decoder.decodeEnumeration(RequestType)
 
-  implicit val proxyTypeEncoder = Encoder.enumEncoder(ProxyType)
-  implicit val proxyTypeDecoder = Decoder.enumDecoder(ProxyType)
+  implicit val proxyTypeEncoder = Encoder.encodeEnumeration(ProxyType)
+  implicit val proxyTypeDecoder = Decoder.decodeEnumeration(ProxyType)
 }

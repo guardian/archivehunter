@@ -1,7 +1,8 @@
 package helpers
 
-import java.time.{ZoneId, ZonedDateTime}
+import akka.stream.alpakka.s3.ListBucketResultContents
 
+import java.time.{ZoneId, ZonedDateTime}
 import akka.stream.{Attributes, FlowShape, Inlet, Outlet}
 import akka.stream.alpakka.s3.scaladsl._
 import akka.stream.scaladsl._
@@ -10,6 +11,7 @@ import com.theguardian.multimedia.archivehunter.common.clientManagers.{ESClientM
 import com.amazonaws.services.s3.{AmazonS3, AmazonS3Client}
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.ItemNotFound
+
 import javax.inject.Inject
 import play.api.{Configuration, Logger}
 

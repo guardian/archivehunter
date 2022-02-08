@@ -51,11 +51,7 @@ class ProblemItemRetry @Inject()(config:Configuration, proxyGenerators:ProxyGene
 
       val job = JobModel.newJob("ProblemItemRerun",collectionName, SourceType.SRC_SCANTARGET).copy(jobStatus = JobStatus.ST_RUNNING)
 
-      jobModelDAO.putJob(job).map({
-        case Some(Left(err))=>
-          logger.error(s"Could not save job record: $err")
-          originalSender ! akka.actor.Status.Failure(new RuntimeException(s"Could not save job record: $err"))
-        case _=>
+      jobModelDAO.putJob(job).map(_=>{
           logger.info(s"Starting problem item scan for $collectionName")
           val completionPromise = Promise[Unit]()
           val detector = new EOSDetect[Unit, ArchiveEntry](completionPromise, ())
@@ -77,6 +73,10 @@ class ProblemItemRetry @Inject()(config:Configuration, proxyGenerators:ProxyGene
               jobModelDAO.putJob(updatedJob)
               logger.error(s"Problem item scan failed for $collectionName: ", err)
           })
+      }).recover({
+        case err:Throwable=>
+          logger.error(s"Could not save job record: $err")
+          originalSender ! akka.actor.Status.Failure(new RuntimeException(s"Could not save job record: $err"))
       })
   }
 }

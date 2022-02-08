@@ -3,7 +3,7 @@ package com.theguardian.multimedia.archivehunter.common.cmn_models
 import java.time.ZonedDateTime
 import java.util.UUID
 
-import com.gu.scanamo.DynamoFormat
+import org.scanamo.DynamoFormat
 import com.theguardian.multimedia.archivehunter.common.ProxyTranscodeFramework.RequestType
 import com.theguardian.multimedia.archivehunter.common.{ProxyType, StorageClassEncoder}
 import io.circe.{Decoder, Encoder}
@@ -47,33 +47,30 @@ object JobModel extends ((String, String, Option[ZonedDateTime], Option[ZonedDat
 
 
 trait JobModelEncoder {
-  implicit val jobStatusEncoder = Encoder.enumEncoder(JobStatus)
-  implicit val jobStatusDecoder = Decoder.enumDecoder(JobStatus)
+  implicit val jobStatusEncoder = Encoder.encodeEnumeration(JobStatus)
+  implicit val jobStatusDecoder = Decoder.decodeEnumeration(JobStatus)
 
   implicit val jobStatusFormat = DynamoFormat.coercedXmap[JobStatus.Value,String,IllegalArgumentException](
-    input=>JobStatus.withName(input)
-  )(
+    input=>JobStatus.withName(input),
     pt=>pt.toString
   )
 
-  implicit val proxyTypeEncoder = Encoder.enumEncoder(ProxyType)
-  implicit val proxyTypeDecoder = Decoder.enumDecoder(ProxyType)
+  implicit val proxyTypeEncoder = Encoder.encodeEnumeration(ProxyType)
+  implicit val proxyTypeDecoder = Decoder.decodeEnumeration(ProxyType)
 
   implicit val proxyTypeFormat = DynamoFormat.coercedXmap[ProxyType.Value, String, IllegalArgumentException](
-    input=>ProxyType.withName(input)
-  )(pt=>pt.toString)
+    input=>ProxyType.withName(input),pt=>pt.toString)
 
-  implicit val sourceTypeEncoder = Encoder.enumEncoder(SourceType)
-  implicit val sourceTypeDecoder = Decoder.enumDecoder(SourceType)
+  implicit val sourceTypeEncoder = Encoder.encodeEnumeration(SourceType)
+  implicit val sourceTypeDecoder = Decoder.decodeEnumeration(SourceType)
 
   implicit val sourceTypeFormat = DynamoFormat.coercedXmap[SourceType.Value,String,IllegalArgumentException](
-    input=>SourceType.withName(input)
-  )(
+    input=>SourceType.withName(input),
     pt=>pt.toString
   )
 
-  implicit val requestTypeEncoder = Encoder.enumEncoder(RequestType)
-  implicit val requestTypeDecoder = Decoder.enumDecoder(RequestType)
+  implicit val requestTypeEncoder = Encoder.encodeEnumeration(RequestType)
+  implicit val requestTypeDecoder = Decoder.decodeEnumeration(RequestType)
   implicit val requestTypeFormat =
-    DynamoFormat.coercedXmap[RequestType.Value,String,IllegalArgumentException](input=>RequestType.withName(input))(_.toString)
+    DynamoFormat.coercedXmap[RequestType.Value,String,IllegalArgumentException](input=>RequestType.withName(input),_.toString)
 }

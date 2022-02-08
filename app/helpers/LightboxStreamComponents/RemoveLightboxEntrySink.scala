@@ -19,7 +19,7 @@ class RemoveLightboxEntrySink (userEmail:String)(implicit lightboxEntryDAO:Light
   override def shape: SinkShape[ArchiveEntry] = SinkShape.of(in)
 
   override def createLogicAndMaterializedValue(inheritedAttributes: Attributes): (GraphStageLogic,Future[Int]) = {
-    val promise = Promise[Int]
+    val promise = Promise[Int]()
     var ctr:Int = 0
 
     (new GraphStageLogic(shape) {

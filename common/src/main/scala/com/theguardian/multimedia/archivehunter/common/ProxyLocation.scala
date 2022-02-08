@@ -4,7 +4,7 @@ import java.net.URI
 
 import com.amazonaws.services.s3.AmazonS3
 import com.amazonaws.services.s3.model.ObjectMetadata
-import com.gu.scanamo.DynamoFormat
+import org.scanamo.DynamoFormat
 import com.theguardian.multimedia.archivehunter.common.clientManagers.S3ClientManager
 import io.circe.{Decoder, Encoder}
 import org.apache.logging.log4j.LogManager
@@ -124,8 +124,7 @@ trait ProxyLocationEncoder extends StorageClassEncoder {
   implicit val proxyTypeDecoder = Decoder.decodeEnumeration(ProxyType)
 
   implicit val proxyTypeFormat = DynamoFormat.coercedXmap[ProxyType.Value,String,IllegalArgumentException](
-    input=>ProxyType.withName(input)
-  )(
+    input=>ProxyType.withName(input),
     pt=>pt.toString
   )
 }

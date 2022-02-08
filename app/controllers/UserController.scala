@@ -165,19 +165,19 @@ class UserController @Inject()(override val controllerComponents:ControllerCompo
             performUpdate(originalProfile, updateRq) match {
               case Right(updatedProfile) =>
                 logger.info(s"updatedProfile is $updatedProfile")
-                userProfileDAO.put(updatedProfile).map({
-                  case None =>
-                    Ok(ObjectGetResponse("updated","profile",updatedProfile).asJson)
-                  case Some(Left(err)) =>
-                    InternalServerError(GenericErrorResponse("db_error", err.toString).asJson)
-                  case Some(Right(previousValue))=>
-                    Ok(ObjectGetResponse("updated","userProfile", updatedProfile).asJson)
-                })
-              case Left(err)=>
+                userProfileDAO
+                  .put(updatedProfile)
+                  .map(_ => Ok(ObjectGetResponse("updated", "profile", updatedProfile).asJson))
+                  .recover({
+                    case err: Throwable =>
+                      logger.error(s"Could not update user profile for ${updateRq.user}: ${err.getMessage}", err)
+                      InternalServerError(GenericErrorResponse("db_error", err.getMessage).asJson)
+                  })
+              case Left(err) =>
                 Future(BadRequest(GenericErrorResponse("bad_request", err).asJson))
             }
-        })
-    }
+            })
+        }
   }
 
   def myProfile = IsAuthenticated { _=> request=>

@@ -110,9 +110,6 @@
     <logger name="services.FileMoveActor" level="DEBUG"/>
     <logger name="services.FileMove" level="DEBUG"/>
     <logger name-="FileMoveActorSpec" level="DEBUG"/>
-    <logger name="services.datamigration.streamcomponents" level="DEBUG"/>
-    <logger name="services.datamigration.stream" level="DEBUG"/>
-    <logger name="services.DataMigration" level="DEBUG"/>
 
     <root level="WARN">
         <appender-ref ref="STDOUT" />

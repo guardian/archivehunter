@@ -7,6 +7,6 @@ object ProxyHealth extends Enumeration {
 }
 
 trait ProxyHealthEncoder {
-  implicit val proxyResultEncoder = Encoder.enumEncoder(ProxyHealth)
-  implicit val proxyResultDecoder = Decoder.enumDecoder(ProxyHealth)
+  implicit val proxyResultEncoder = Encoder.encodeEnumeration(ProxyHealth)
+  implicit val proxyResultDecoder = Decoder.decodeEnumeration(ProxyHealth)
 }

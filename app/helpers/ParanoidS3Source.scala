@@ -8,7 +8,6 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.{Http, model}
 import akka.http.scaladsl.model._
 import akka.stream._
-import akka.stream.alpakka.s3.scaladsl.ListBucketResultContents
 import akka.stream.stage.{AbstractOutHandler, GraphStage, GraphStageLogic}
 import akka.http.scaladsl.model.HttpHeader.ParsingResult._
 import akka.stream.scaladsl.Sink

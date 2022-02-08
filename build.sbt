@@ -13,8 +13,8 @@ val akkaVersion = "2.6.18"
 val akkaClusterVersion = "1.0.9"
 val elastic4sVersion = "6.7.8"
 val awsSdkVersion = "1.12.153"
-val jacksonVersion = "2.9.10"
-val jacksonCoreVersion = "2.9.10.8"
+val jacksonVersion = "2.11.4"
+val jacksonCoreVersion = "2.11.4"
 
 lazy val commonSettings = Seq(
   version := "1.0",
@@ -48,7 +48,7 @@ lazy val `archivehunter` = (project in file("."))
   .settings(commonSettings,
     libraryDependencies ++= Seq(
       "com.dripower" %% "play-circe" % "2814.2",
-      "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.11.4",
+      "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.13.1",
       "com.sksamuel.elastic4s" %% "elastic4s-http" % elastic4sVersion exclude("com.fasterxml.jackson.module","jackson-module-scala"),
       "com.sksamuel.elastic4s" %% "elastic4s-circe" % elastic4sVersion,
       "com.sksamuel.elastic4s" %% "elastic4s-testkit" % elastic4sVersion % "test",
@@ -66,6 +66,12 @@ lazy val `archivehunter` = (project in file("."))
       "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
       "com.typesafe.akka" %% "akka-persistence" % akkaVersion,
       "com.typesafe.akka" %% "akka-cluster-sharding" % akkaVersion,
+      "com.typesafe.akka" %% "akka-discovery" % akkaVersion,
+      "com.typesafe.akka" %% "akka-actor-typed" % akkaVersion,
+      "com.typesafe.akka" %% "akka-serialization-jackson" % akkaVersion,
+      "com.typesafe.akka" %% "akka-http-spray-json" % "10.1.15",
+      "com.typesafe.akka" %% "akka-http-xml" % "10.1.15",
+      "com.typesafe.akka" %% "akka-http" % "10.1.15",
       "com.nimbusds" % "nimbus-jose-jwt" % "9.11.1",
       "com.gu" % "kinesis-logback-appender" % "2.0.1",
       "com.fasterxml.jackson.dataformat" % "jackson-dataformat-cbor" % "2.11.4",  //fix vulnerable dependency for kinesis-logback-appender

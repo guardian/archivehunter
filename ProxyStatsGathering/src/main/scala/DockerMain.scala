@@ -1,5 +1,7 @@
 import akka.stream.scaladsl.RunnableGraph
+import com.sksamuel.elastic4s.http.{ElasticClient, ElasticProperties}
 import com.theguardian.multimedia.archivehunter.common.ProblemItemIndexer
+import com.theguardian.multimedia.archivehunter.common.clientManagers.ESClientManagerImpl
 
 import scala.concurrent.{Await, Future}
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -7,6 +9,7 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
 object DockerMain extends MainContent {
+
   def main(args:Array[String]) : Unit = {
     try {
       println(s"mode is ${sys.env.get("MODE")}")
@@ -14,7 +17,8 @@ object DockerMain extends MainContent {
       sys.env.get("MODE") match {
         case None=> runit(args)
         case Some("stats")=>runit(args)
-        case Some("indexfix")=>runFixIndex(args)
+        //case Some("indexfix")=>runFixIndex(args)
+        case Some("indexfix")=>throw new RuntimeException("indexfix mode is currently disabled")
         case Some(_)=>throw new RuntimeException("Invalid MODE parameter, you should specify stats or indexfix")
       }
       System.exit(0)
@@ -53,7 +57,7 @@ object DockerMain extends MainContent {
 
     val resultFuture = RunnableGraph.fromGraph(graphModel).run()
 
-    val finalResult = Await.result(resultFuture, 8 hours)
+    val finalResult = Await.result(resultFuture, 8.hours)
     println(s"Final result is: $finalResult")
 
     problemsSummaryIndexer.indexSummaryCount(finalResult).map(response=>{
@@ -65,7 +69,7 @@ object DockerMain extends MainContent {
     })
   }
 
-  def runFixIndex(args:Array[String]) : Unit = {
-    Await.ready(runProblemItemFix, 1 hour)
-  }
+//  def runFixIndex(args:Array[String]) : Unit = {
+//    Await.ready(runProblemItemFix, 1.hour)
+//  }
 }

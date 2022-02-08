@@ -190,7 +190,7 @@ class GlacierRestoreActor @Inject() (config:Configuration, esClientMgr:ESClientM
 
       //completion is detected by the inputLambda, and the job status will be updated there.
       jobModelDAO.putJob(newJob).onComplete({
-        case Success(None)=>
+        case Success(_)=>
           logger.debug(s"${entry.location}: initiating restore")
           Try { s3client.restoreObjectV2(rq) } match {
             case Success(_)=>originalSender ! RestoreInProgress
@@ -198,19 +198,8 @@ class GlacierRestoreActor @Inject() (config:Configuration, esClientMgr:ESClientM
               logger.error("S3 restore request failed: ", err)
               originalSender ! RestoreFailure(err)
           }
-        case Success(Some(Right(record)))=>
-          logger.debug(s"${entry.location}: initiating restore")
-          Try { s3client.restoreObjectV2(rq) } match {
-            case Success(_)=>originalSender ! RestoreInProgress
-            case Failure(err)=>
-              logger.error("S3 restore request failed: ", err)
-              originalSender ! RestoreFailure(err)
-          }
-        case Success(Some(Left(error)))=>
-          logger.error(s"Could not update job info for ${newJob.jobId} on ${entry.location}: $error")
-          originalSender ! RestoreFailure(new RuntimeException("Could not update job"))
         case Failure(err)=>
-          logger.error(s"putJob crashed", err)
+          logger.error(s"Could not update job info for ${newJob.jobId} on ${entry.location}: ${err.getMessage}", err)
           originalSender ! RestoreFailure(err)
       })
 
@@ -224,36 +213,30 @@ class GlacierRestoreActor @Inject() (config:Configuration, esClientMgr:ESClientM
       val originalSender = sender()
 
       //completion is detected by the inputLambda, and the job status will be updated there.
-      jobModelDAO.putJob(newJob).map({
-        case None=>
+      jobModelDAO.putJob(newJob)
+        .map(_=>{
           logger.debug(s"${entry.location}: initiating restore")
           Try { s3client.restoreObjectV2(rq) }
-        case Some(Right(record))=>
-          logger.debug(s"${entry.location}: initiating restore")
-          Try { s3client.restoreObjectV2(rq) }
-        case Some(Left(error))=>
-          logger.error(s"Could not update job info for ${newJob.jobId} on ${entry.location}: $error")
-          val err = new RuntimeException(error.toString)
-          Failure(err)
-      }).map({
-        case Success(restoreObjectResult)=>
-          logger.info(s"Restore started for ${entry.location}, requestor charged? ${restoreObjectResult.isRequesterCharged}, output path ${restoreObjectResult.getRestoreOutputPath}")
-          updateLightbox(lbEntry, availableUntil=Some(willExpire)).andThen({ case _ =>
-            originalSender ! RestoreSuccess
-          })
+        })
+        .map({
+          case Success(restoreObjectResult)=>
+            logger.info(s"Restore started for ${entry.location}, requestor charged? ${restoreObjectResult.isRequesterCharged}, output path ${restoreObjectResult.getRestoreOutputPath}")
+            updateLightbox(lbEntry, availableUntil=Some(willExpire)).andThen({ case _ =>
+              originalSender ! RestoreSuccess
+            })
 
-        case Failure(ex)=>
-          logger.error(s"Could not restore ${entry.location}", ex)
-          updateLightbox(lbEntry, error=Some(ex)).andThen({
-            case _=>originalSender ! RestoreFailure(ex)
-          })
+          case Failure(ex)=>
+            logger.error(s"Could not restore ${entry.location}", ex)
+            updateLightbox(lbEntry, error=Some(ex)).andThen({
+              case _=>originalSender ! RestoreFailure(ex)
+            })
       }).recover({
         case ex:akka.stream.BufferOverflowException=>
           logger.debug(ex.toString)
           logger.warn(s"Caught buffer overflow exception, retrying operation in 5s")
           system.scheduler.scheduleOnce(5.seconds,self,InitiateRestore(entry,lbEntry,maybeExpiry))
         case ex:Throwable=>
-          logger.error(s"Unexpected exception while initiating restore of ${entry.location}: ", ex)
+          logger.error(s"Unexpected exception while initiating restore of ${entry.location}: ${ex.getMessage}", ex)
       })
 
   }
