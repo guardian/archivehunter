@@ -5,36 +5,37 @@ import com.typesafe.sbt.packager.docker._
 
 enablePlugins(RiffRaffArtifact, DockerPlugin, SystemdPlugin)
 
+ThisBuild / libraryDependencySchemes += "org.scala-lang.modules" % "scala-java8-compat" % "pvp"
 scalacOptions := Seq("-unchecked", "-deprecation", "-feature", "-language:postfixOps")
-scalaVersion := "2.12.13"
+scalaVersion := "2.13.8"
 
-val akkaVersion = "2.5.31"
+val akkaVersion = "2.6.18"
 val akkaClusterVersion = "1.0.9"
 val elastic4sVersion = "6.7.8"
-val awsSdkVersion = "1.11.959"
+val awsSdkVersion = "1.12.153"
 val jacksonVersion = "2.9.10"
 val jacksonCoreVersion = "2.9.10.8"
 
 lazy val commonSettings = Seq(
   version := "1.0",
-  scalaVersion := "2.12.2",
+  scalaVersion := "2.13.8",
   libraryDependencies ++= Seq("org.apache.logging.log4j" % "log4j-core" % "2.17.1",
     "com.beust" % "jcommander" % "1.75", //snyk identified as vulnerable
     "org.apache.logging.log4j" % "log4j-api" % "2.17.1",
-    "org.scala-lang.modules" %% "scala-java8-compat" % "0.8.0",
     "com.amazonaws" % "aws-java-sdk-s3" % awsSdkVersion,
     "com.amazonaws" % "aws-java-sdk-elastictranscoder"% awsSdkVersion,
     "com.amazonaws" % "aws-java-sdk-sqs"% awsSdkVersion,
-    "com.dripower" %% "play-circe" % "2712.0",
+    "com.dripower" %% "play-circe" % "2814.2",
     "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.11.4",
     "com.sksamuel.elastic4s" %% "elastic4s-http" % elastic4sVersion  exclude("com.fasterxml.jackson.module","jackson-module-scala"),
     "com.sksamuel.elastic4s" %% "elastic4s-circe" % elastic4sVersion,
     "com.sksamuel.elastic4s" %% "elastic4s-http-streams" % elastic4sVersion,
     "com.sksamuel.elastic4s" %% "elastic4s-testkit" % elastic4sVersion % "test",
     "com.sksamuel.elastic4s" %% "elastic4s-embedded" % elastic4sVersion % "test",
-    "com.lightbend.akka" %% "akka-stream-alpakka-dynamodb" % "0.20",
-    "com.lightbend.akka" %% "akka-stream-alpakka-s3" % "0.20",
-    "com.gu" %% "scanamo-alpakka" % "1.0.0-M8",
+    "com.typesafe.akka" %% "akka-actor" % akkaVersion,
+    "com.lightbend.akka" %% "akka-stream-alpakka-dynamodb" % "3.0.4",
+    "com.lightbend.akka" %% "akka-stream-alpakka-s3" % "3.0.4",
+    "org.scanamo" %% "scanamo-alpakka" % "1.0.0-M17",
     "com.fasterxml.jackson.dataformat" % "jackson-dataformat-yaml" % jacksonVersion,
     "com.fasterxml.jackson.core" % "jackson-databind" % jacksonCoreVersion,
     "com.google.guava" % "guava" % "30.0-jre",
@@ -46,8 +47,7 @@ lazy val `archivehunter` = (project in file("."))
   .dependsOn(common)
   .settings(commonSettings,
     libraryDependencies ++= Seq(
-      "org.scala-lang.modules" %% "scala-java8-compat" % "0.8.0",
-      "com.dripower" %% "play-circe" % "2712.0",
+      "com.dripower" %% "play-circe" % "2814.2",
       "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.11.4",
       "com.sksamuel.elastic4s" %% "elastic4s-http" % elastic4sVersion exclude("com.fasterxml.jackson.module","jackson-module-scala"),
       "com.sksamuel.elastic4s" %% "elastic4s-circe" % elastic4sVersion,
@@ -62,7 +62,6 @@ lazy val `archivehunter` = (project in file("."))
       "com.typesafe.akka" %% "akka-cluster" % akkaVersion,
       "com.typesafe.akka" %% "akka-cluster-metrics" % akkaVersion,
       "com.typesafe.akka" %% "akka-actor" % akkaVersion,
-      "com.typesafe.akka" %% "akka-agent" % akkaVersion,
       "com.typesafe.akka" %% "akka-stream" % akkaVersion,
       "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
       "com.typesafe.akka" %% "akka-persistence" % akkaVersion,
@@ -78,18 +77,17 @@ lazy val `archivehunter` = (project in file("."))
 
 val lambdaDeps = Seq(
 )
-val circeVersion = "0.9.3"
+val circeVersion = "0.14.1"
 
 lazy val common = (project in file("common"))
   .settings(commonSettings,
     libraryDependencies ++= Seq(
       "com.amazonaws" % "aws-java-sdk-s3" % awsSdkVersion,
-      "com.gu" %% "scanamo-alpakka" % "1.0.0-M8",
+      "org.scanamo" %% "scanamo-alpakka" % "1.0.0-M17",
       "io.circe" %% "circe-core" % circeVersion,
       "io.circe" %% "circe-generic" % circeVersion,
       "io.circe" %% "circe-parser" % circeVersion,
-      "io.circe" %% "circe-java8" % circeVersion,
-      "com.gu" %% "scanamo" % "1.0.0-M8",
+      "org.scanamo" %% "scanamo" % "1.0.0-M17",
       "com.google.inject" % "guice" % "4.2.3",  //keep this in sync with play version
       "com.amazonaws" % "aws-java-sdk-sns" % awsSdkVersion,
       "com.amazonaws" % "aws-java-sdk-sts" % awsSdkVersion,
@@ -114,10 +112,9 @@ lazy val inputLambda = (project in file("lambda/input"))
     "com.amazonaws" % "aws-java-sdk-lambda" % awsSdkVersion,
     "com.amazonaws" % "aws-lambda-java-events" % "2.1.0",
     "com.amazonaws" % "aws-lambda-java-core" % "1.0.0",
-    "org.scala-lang.modules" %% "scala-java8-compat" % "0.8.0",
   ),
-  assemblyJarName in assembly := "inputLambda.jar",
-  assemblyMergeStrategy in assembly := {
+  assembly / assemblyJarName:= "inputLambda.jar",
+  assembly / assemblyMergeStrategy:= {
     case PathList("javax", "servlet", xs @ _*)         => MergeStrategy.first
     case PathList(ps @ _*) if ps.last endsWith ".html" => MergeStrategy.first
     case "application.conf" => MergeStrategy.concat
@@ -126,7 +123,7 @@ lazy val inputLambda = (project in file("lambda/input"))
     case PathList(ps @ _*) if ps.last == "module-info.class" => MergeStrategy.discard
     case meta(_)=>MergeStrategy.discard
     case x=>
-      val oldStrategy = (assemblyMergeStrategy in assembly).value
+      val oldStrategy = (assembly / assemblyMergeStrategy).value
       oldStrategy(x)
 
   }
@@ -140,14 +137,13 @@ lazy val proxyStatsGathering = (project in file("ProxyStatsGathering"))
       "com.amazonaws" % "aws-java-sdk-lambda" % awsSdkVersion,
       "com.amazonaws" % "aws-lambda-java-events" % "2.1.0",
       "com.amazonaws" % "aws-lambda-java-core" % "1.0.0",
-      "org.scala-lang.modules" %% "scala-java8-compat" % "0.8.0",
       "com.sandinh" %% "akka-guice" % "3.3.0"
     ),
     version := sys.props.getOrElse("build.number","DEV"),
     dockerUsername  := sys.props.get("docker.username"),
     dockerRepository := Some("andyg42"),
     dockerPermissionStrategy := DockerPermissionStrategy.None,
-    packageName in Docker := "andyg42/archivehunter-proxystats",
+    Docker / packageName := "andyg42/archivehunter-proxystats",
     packageName := "archivehunter-proxystats",
 //    dockerBaseImage := "openjdk:8-jdk-alpine",
     dockerAlias := docker.DockerAlias(sys.props.get("docker.host"),sys.props.get("docker.username"),"proxy-stats-gathering",Some(sys.props.getOrElse("build.number","DEV"))),
@@ -167,16 +163,15 @@ lazy val autoDowningLambda = (project in file("lambda/autodowning")).settings(co
       "com.amazonaws" % "aws-java-sdk-events" % awsSdkVersion,
       "com.amazonaws" % "aws-java-sdk-ec2" % awsSdkVersion,
       "com.amazonaws" % "aws-lambda-java-core" % "1.0.0",
-      "org.scala-lang.modules" %% "scala-java8-compat" % "0.8.0",
       "ch.qos.logback"          %  "logback-classic" % "1.2.3",
       "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.11.4",
       specs2 % Test
     ),
-    assemblyJarName in assembly := "autoDowningLambda.jar",
-    assemblyMergeStrategy in assembly := {
+    assembly / assemblyJarName := "autoDowningLambda.jar",
+    assembly / assemblyMergeStrategy := {
       case PathList(ps @ _*) if ps.last=="module-info.class" => MergeStrategy.discard
       case x=>
-        val oldStrategy = (assemblyMergeStrategy in assembly).value
+        val oldStrategy = (assembly / assemblyMergeStrategy).value
         oldStrategy(x)
     }
   )
@@ -187,14 +182,14 @@ riffRaffUploadArtifactBucket := Option("riffraff-artifact")
 riffRaffUploadManifestBucket := Option("riffraff-builds")
 riffRaffManifestProjectName := "multimedia:ArchiveHunter"
 riffRaffArtifactResources := Seq(
-  (packageBin in Debian in archivehunter).value -> s"archivehunter-webapp/${(name in archivehunter).value}.deb",
-  (assembly in Universal in inputLambda).value -> s"archivehunter-input-lambda/${(assembly in Universal in inputLambda).value.getName}",
-  (assembly in Universal in autoDowningLambda).value -> s"archivehunter-autodowning-lambda/${(assembly in Universal in autoDowningLambda).value.getName}",
-  (baseDirectory in Global in archivehunter).value / "riff-raff.yaml" -> "riff-raff.yaml",
+  (archivehunter / Debian / packageBin).value -> s"archivehunter-webapp/${(archivehunter / name).value}.deb",
+  (inputLambda / Universal / assembly).value -> s"archivehunter-input-lambda/${(inputLambda / Universal / assembly).value.getName}",
+  (autoDowningLambda / Universal / assembly).value -> s"archivehunter-autodowning-lambda/${(autoDowningLambda / Universal / assembly).value.getName}",
+  (archivehunter / baseDirectory).value / "riff-raff.yaml" -> "riff-raff.yaml",
 )
 
 
 resolvers += "scalaz-bintray" at "https://dl.bintray.com/scalaz/releases"
 
-unmanagedResourceDirectories in Test +=  { baseDirectory ( _ /"target/web/public/test" ).value }
+Test / unmanagedResourceDirectories +=  { baseDirectory ( _ /"target/web/public/test" ).value }
 
