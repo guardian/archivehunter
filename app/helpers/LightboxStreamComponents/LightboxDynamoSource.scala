@@ -10,6 +10,7 @@ import play.api.{Configuration, Logger}
 import scala.jdk.CollectionConverters._
 import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
+import software.amazon.awssdk.services.dynamodb.model.{AttributeValue, QueryRequest}
 
 /**
   * this is an Akka source that yields LightboxEntries belonging to a specific bulk from a DynamoDB query.
@@ -25,10 +26,9 @@ class LightboxDynamoSource(memberOfBulk:String, config:Configuration, dynamoClie
   val pageSize = 100
 
   override def shape: SourceShape[LightboxEntry] = SourceShape.of(out)
+  private def getQueryRequestBuilder = QueryRequest.builder.tableName(config.get[String]("lightbox.tableName"))
 
   override def createLogic(inheritedAttributes: Attributes): GraphStageLogic = new GraphStageLogic(shape) {
-    import software.amazon.awssdk.services.dynamodb.model.{AttributeValue, QueryRequest}
-
     protected val client = dynamoClientManager.getClient(config.getOptional[String]("externalData.awsProfile"))
     val logger = Logger(getClass)
     private var lastEvaluatedKey:Option[mutable.Map[String, AttributeValue]] = None
@@ -45,11 +45,11 @@ class LightboxDynamoSource(memberOfBulk:String, config:Configuration, dynamoClie
       */
     def getNextPage(limit:Int,exclusiveStartKey:Option[mutable.Map[String, AttributeValue]]) = {
       logger.info(s"getNextPage: memberOfBulk is $memberOfBulk")
-      val baseRq = new QueryRequest(config.get[String]("lightbox.tableName")).toBuilder
+      val baseRq = getQueryRequestBuilder
         .indexName("memberOfBulkIndex")
         .limit(limit)
         .keyConditionExpression(s"memberOfBulk = :bulkId")
-        .expressionAttributeValues(Map(":bulkId"->new AttributeValue().toBuilder.s(memberOfBulk).build()).asJava)
+        .expressionAttributeValues(Map(":bulkId"-> AttributeValue.builder().s(memberOfBulk).build()).asJava)
 
       val rqWithStart = exclusiveStartKey match {
         case Some(key)=>baseRq.exclusiveStartKey(key.asJava)

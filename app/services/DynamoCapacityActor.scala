@@ -107,10 +107,10 @@ class DynamoCapacityActor @Inject() (ddbClientMgr:DynamoClientManager, config:Ar
     if(currentThroughput.readCapacityUnits()==actualReadTarget && currentThroughput.writeCapacityUnits()==actualWriteTarget){
       Success(None)
     } else {
-      Success(Some(new GlobalSecondaryIndexUpdate().toBuilder.update(
-        new UpdateGlobalSecondaryIndexAction().toBuilder
+      Success(Some(GlobalSecondaryIndexUpdate.builder().update(
+        UpdateGlobalSecondaryIndexAction.builder()
           .indexName(rq.indexName)
-          .provisionedThroughput(new ProvisionedThroughput().toBuilder
+          .provisionedThroughput(ProvisionedThroughput.builder()
             .readCapacityUnits(actualReadTarget)
             .writeCapacityUnits(actualWriteTarget)
             .build()
@@ -122,7 +122,7 @@ class DynamoCapacityActor @Inject() (ddbClientMgr:DynamoClientManager, config:Ar
   }
 
   private def makeDescribeTableRequest(tableName:String) =
-    new DescribeTableRequest().toBuilder.tableName(tableName).build()
+     DescribeTableRequest.builder().tableName(tableName).build()
 
   def getTableStatus(tableName: String):String =
     ddbClient.describeTable(makeDescribeTableRequest(tableName)).table().tableStatusAsString()
@@ -190,7 +190,7 @@ class DynamoCapacityActor @Inject() (ddbClientMgr:DynamoClientManager, config:Ar
             case Some(target)=>target.toLong
           }
 
-          val rq = new UpdateTableRequest().toBuilder.tableName(tableRq.tableName)
+          val rq = UpdateTableRequest.builder().tableName(tableRq.tableName)
 
           if(tableThroughput.readCapacityUnits()==0 && tableThroughput.writeCapacityUnits()==0){
             logger.info(s"Table ${tableRq.tableName} is in auto-provisioning mode, don't need to update.")
@@ -202,7 +202,7 @@ class DynamoCapacityActor @Inject() (ddbClientMgr:DynamoClientManager, config:Ar
             sender() ! UpdateRequestSuccess(tableRq.tableName, mustWait = false)
           } else {
             val rqWithTableUpdate = if (tableThroughput.readCapacityUnits() != actualReadTarget || tableThroughput.writeCapacityUnits() != actualWriteTarget) {
-              rq.provisionedThroughput(new ProvisionedThroughput().toBuilder
+              rq.provisionedThroughput(ProvisionedThroughput.builder()
                 .readCapacityUnits(actualReadTarget)
                 .writeCapacityUnits(actualWriteTarget)
                 .build()

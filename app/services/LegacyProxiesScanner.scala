@@ -57,7 +57,7 @@ class LegacyProxiesScanner @Inject()(config:Configuration, ddbClientMgr:DynamoCl
     *         Once it is then ScanBucket will be dispatched again with the [[ScanTarget]] provided in the `tgt` argument
     */
   def updateProvisionedWriteCapacity(boostTo: Int, tgt:ScanTarget, completionPromise:Option[Promise[Boolean]]):Either[LPSError, Boolean] = {
-    val rq = new DescribeTableRequest().toBuilder.tableName(config.get[String]("proxies.tableName")).build()
+    val rq = DescribeTableRequest.builder().tableName(config.get[String]("proxies.tableName")).build()
     val result = ddbClient.describeTable(rq)
 
     if(result.table().tableStatusAsString()!="ACTIVE"){
@@ -81,16 +81,16 @@ class LegacyProxiesScanner @Inject()(config:Configuration, ddbClientMgr:DynamoCl
           case None => CheckTableReady(ScanBucket(tgt))
         }
         try {
-          val newTableThroughput = new ProvisionedThroughput().toBuilder
+          val newTableThroughput = ProvisionedThroughput.builder()
             .writeCapacityUnits(boostTo.toLong)
             .readCapacityUnits(tableThroughput.readCapacityUnits())
             .build()
-          val newIndexThroughput = new ProvisionedThroughput().toBuilder
+          val newIndexThroughput = ProvisionedThroughput.builder()
             .writeCapacityUnits(boostTo.toLong)
             .readCapacityUnits(10L)
             .build()
 
-          val initialRq = new UpdateTableRequest().toBuilder
+          val initialRq = UpdateTableRequest.builder()
             .tableName(tableName)
 
           val tableRq = if(tableThroughput.writeCapacityUnits() == boostTo){
@@ -102,8 +102,8 @@ class LegacyProxiesScanner @Inject()(config:Configuration, ddbClientMgr:DynamoCl
           val indexRq = if(indexThroughput.writeCapacityUnits()==boostTo){
             tableRq
           } else {
-            tableRq.globalSecondaryIndexUpdates(new GlobalSecondaryIndexUpdate().toBuilder
-              .update(new UpdateGlobalSecondaryIndexAction().toBuilder
+            tableRq.globalSecondaryIndexUpdates(GlobalSecondaryIndexUpdate.builder()
+              .update(UpdateGlobalSecondaryIndexAction.builder()
                 .indexName(indexName)
                 .provisionedThroughput(newIndexThroughput)
                 .build()
@@ -127,7 +127,7 @@ class LegacyProxiesScanner @Inject()(config:Configuration, ddbClientMgr:DynamoCl
     */
   def isTableReady = {
     logger.info(s"Checking if table is ready...")
-    val rq = new DescribeTableRequest().toBuilder
+    val rq = DescribeTableRequest.builder()
       .tableName(config.get[String]("proxies.tableName"))
       .build()
     val result = ddbClient.describeTable(rq)

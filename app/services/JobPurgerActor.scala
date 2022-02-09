@@ -1,23 +1,18 @@
 package services
 
 import java.time.ZonedDateTime
-import java.time.format.DateTimeFormatter
 import akka.actor.{Actor, ActorRef, ActorSystem, Status}
 import akka.stream.{ActorMaterializer, Materializer}
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.DynamoClientManager
-import com.theguardian.multimedia.archivehunter.common.cmn_models
-import com.theguardian.multimedia.archivehunter.common.cmn_models.{JobModel, JobModelDAO, JobStatus, SourceType}
-import org.scanamo
+import com.theguardian.multimedia.archivehunter.common.cmn_models.{JobModel, JobModelDAO, JobModelEncoder}
 import org.scanamo._
 import org.scanamo.syntax._
 import org.scanamo.generic.auto._
 
 import javax.inject.{Inject, Singleton}
 import play.api.{Configuration, Logger}
-import software.amazon.awssdk.services.dynamodb.model.AttributeValue
 
-import scala.jdk.CollectionConverters._
 import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success}
 
@@ -39,7 +34,8 @@ object JobPurgerActor {
 }
 
 @Singleton
-class JobPurgerActor @Inject() (config:Configuration, ddbClientMgr:DynamoClientManager, jobModelDAO: JobModelDAO)(implicit system:ActorSystem) extends Actor{
+class JobPurgerActor @Inject() (config:Configuration, ddbClientMgr:DynamoClientManager, jobModelDAO: JobModelDAO)(implicit system:ActorSystem)
+  extends Actor with JobModelEncoder {
   import JobPurgerActor._
   private val logger = Logger(getClass)
 
