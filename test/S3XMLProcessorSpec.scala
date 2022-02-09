@@ -1,6 +1,6 @@
-import java.time.Instant
+import akka.stream.alpakka.s3.ListBucketResultContents
 
-import akka.stream.alpakka.s3.scaladsl.ListBucketResultContents
+import java.time.Instant
 import helpers.{S3Error, S3XMLProcessor}
 import org.specs2.mock.Mockito
 import org.specs2.mutable._

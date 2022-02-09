@@ -37,7 +37,7 @@ class ImportControllerSpec extends Specification with AfterAll with Mockito {
       val cc = mock[ControllerComponents]
       val scanTargetDAO = mock[ScanTargetDAO]
       val proxyTargetDAO = mock[ProxyLocationDAO]
-      proxyTargetDAO.saveProxy(any)(any) returns Future(None)
+      proxyTargetDAO.saveProxy(any)(any) returns Future(mock[ProxyLocation])
       val mockS3Client = mock[AmazonS3]
       mockS3Client.doesObjectExist(any,any) returns true
       mockS3Client.getRegionName returns "region-name"
@@ -90,7 +90,7 @@ class ImportControllerSpec extends Specification with AfterAll with Mockito {
       val cc = mock[ControllerComponents]
       val scanTargetDAO = mock[ScanTargetDAO]
       val proxyTargetDAO = mock[ProxyLocationDAO]
-      proxyTargetDAO.saveProxy(any)(any) returns Future(None)
+      proxyTargetDAO.saveProxy(any)(any) returns Future(mock[ProxyLocation])
       val mockS3Client = mock[AmazonS3]
       mockS3Client.doesObjectExist(any,any) returns true
       mockS3Client.getRegionName returns "region-name"
@@ -144,7 +144,7 @@ class ImportControllerSpec extends Specification with AfterAll with Mockito {
       val cc = mock[ControllerComponents]
       val scanTargetDAO = mock[ScanTargetDAO]
       val proxyTargetDAO = mock[ProxyLocationDAO]
-      proxyTargetDAO.saveProxy(any)(any) returns Future(None)
+      proxyTargetDAO.saveProxy(any)(any) returns Future(mock[ProxyLocation])
       val mockS3Client = mock[AmazonS3]
       mockS3Client.doesObjectExist(any,any) returns true
       mockS3Client.getRegionName returns "region-name"
@@ -199,7 +199,7 @@ class ImportControllerSpec extends Specification with AfterAll with Mockito {
       val cc = mock[ControllerComponents]
       val scanTargetDAO = mock[ScanTargetDAO]
       val proxyTargetDAO = mock[ProxyLocationDAO]
-      proxyTargetDAO.saveProxy(any)(any) returns Future(None)
+      proxyTargetDAO.saveProxy(any)(any) returns Future(mock[ProxyLocation])
       val mockS3Client = mock[AmazonS3]
       mockS3Client.doesObjectExist(any,any) returns true
       mockS3Client.getRegionName returns "region-name"
@@ -251,7 +251,7 @@ class ImportControllerSpec extends Specification with AfterAll with Mockito {
       val cc = mock[ControllerComponents]
       val scanTargetDAO = mock[ScanTargetDAO]
       val proxyTargetDAO = mock[ProxyLocationDAO]
-      proxyTargetDAO.saveProxy(any)(any) returns Future(None)
+      proxyTargetDAO.saveProxy(any)(any) returns Future(mock[ProxyLocation])
       val mockS3Client = mock[AmazonS3]
       mockS3Client.doesObjectExist(any,any) returns false
       mockS3Client.getRegionName returns "region-name"

@@ -33,7 +33,7 @@ class GlacierRestoreActorSpec extends Specification with Mockito {
       val mockedJobModelDAO = mock[JobModelDAO]
       mockedJobModelDAO.putJob(any[JobModel]) returns Future(None)
       val mockedLightboxEntryDAO = mock[LightboxEntryDAO]
-      mockedLightboxEntryDAO.put(any[LightboxEntry])(any) returns Future(None)
+      mockedLightboxEntryDAO.put(any[LightboxEntry])(any) returns Future(mock[LightboxEntry])
 
       val mockedEntry = mock[ArchiveEntry]
       mockedEntry.id returns "mock-entry-id"

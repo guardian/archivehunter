@@ -1,4 +1,4 @@
-import com.gu.scanamo.error.{DynamoReadError, MissingProperty}
+import org.scanamo.{DynamoReadError, MissingProperty}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{JobModel, JobStatus, SourceType}
 import org.specs2.mock.Mockito
 import org.specs2.mutable._

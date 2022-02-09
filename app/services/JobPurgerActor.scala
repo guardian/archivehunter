@@ -34,14 +34,17 @@ object JobPurgerActor {
 }
 
 @Singleton
-class JobPurgerActor @Inject() (config:Configuration, ddbClientMgr:DynamoClientManager, jobModelDAO: JobModelDAO)(implicit system:ActorSystem)
+class JobPurgerActor @Inject() (config:Configuration, ddbClientMgr:DynamoClientManager, jobModelDAO: JobModelDAO)(implicit system:ActorSystem, mat:Materializer)
   extends Actor with JobModelEncoder {
   import JobPurgerActor._
   private val logger = Logger(getClass)
 
   implicit val ec:ExecutionContext = system.dispatcher
-  implicit val mat:Materializer = ActorMaterializer.create(system)
 
+  val scanamoAlpakka = ScanamoAlpakka(ddbClientMgr.getNewAsyncDynamoClient())
+  val tableName = config.get[String]("externalData.jobTable")
+
+  protected def makeScanSource() = Source.fromGraph(scanamoAlpakka.exec(Table[JobModel](tableName).scan()))
   /**
     * this provides the actor to send CheckMaybePurge message to. Included like this to make testing easier.
     */
@@ -94,11 +97,9 @@ class JobPurgerActor @Inject() (config:Configuration, ddbClientMgr:DynamoClientM
       }
 
     case StartJobPurge=>
-      val scanamoAlpakka = ScanamoAlpakka(ddbClientMgr.getNewAsyncDynamoClient())
       logger.info(s"Starting expired job scan...")
-      //val src = dynamoClient.source(new ScanRequest().withTableName()
-      val tableName = config.get[String]("externalData.jobTable")
-      val src = Source.fromGraph(scanamoAlpakka.exec(Table[JobModel](tableName).scan()))
+
+      val src = makeScanSource()
 
       val originalSender = sender()
       val completionFuture = src.map(results=>{

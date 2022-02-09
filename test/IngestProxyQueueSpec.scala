@@ -1,5 +1,4 @@
 import java.time.ZonedDateTime
-
 import akka.actor.Props
 import akka.testkit.TestProbe
 import com.theguardian.multimedia.archivehunter.common._
@@ -10,16 +9,15 @@ import org.specs2.mutable.Specification
 import play.api.Configuration
 import services.{GenericSqsActor, IngestProxyQueue}
 import akka.pattern.ask
-import akka.stream.alpakka.dynamodb.scaladsl.DynamoClient
-import com.amazonaws.services.dynamodbv2.{AmazonDynamoDB, AmazonDynamoDBAsync}
 import com.amazonaws.services.sqs.AmazonSQS
 import com.amazonaws.services.sqs.model._
 import com.theguardian.multimedia.archivehunter.common.ProxyTranscodeFramework.{ProxyGenerators, RequestType}
 import io.circe.syntax._
 import io.circe.generic.auto._
 import models.AwsSqsMsg
+import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
@@ -40,10 +38,10 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       implicit val mockProxyLocationDAO = mock[ProxyLocationDAO]
       val mockS3ClientMgr = mock[S3ClientManager]
       val mockDDBlientMgr = mock[DynamoClientManager]
-      val mockDDBClient = mock[DynamoClient]
+      val mockDDBClient = mock[DynamoDbAsyncClient]
       val mockESClientMgr = mock[ESClientManager]
 
-      mockDDBlientMgr.getNewAlpakkaDynamoClient(any)(any, any) returns mockDDBClient
+      mockDDBlientMgr.getNewAsyncDynamoClient(any) returns mockDDBClient
       val mockEtsProxyActor = TestProbe()
       implicit val mockScanTargetDAO = mock[ScanTargetDAO]
       val mockedSelf = TestProbe()
@@ -78,8 +76,8 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       implicit val mockProxyLocationDAO = mock[ProxyLocationDAO]
       val mockS3ClientMgr = mock[S3ClientManager]
       val mockDDBlientMgr = mock[DynamoClientManager]
-      val mockDDBClient = mock[DynamoClient]
-      mockDDBlientMgr.getNewAlpakkaDynamoClient(any)(any, any) returns mockDDBClient
+      val mockDDBClient = mock[DynamoDbAsyncClient]
+      mockDDBlientMgr.getNewAsyncDynamoClient(any) returns mockDDBClient
       val mockESClientMgr = mock[ESClientManager]
       val mockEtsProxyActor = TestProbe()
       implicit val mockScanTargetDAO = mock[ScanTargetDAO]
@@ -114,8 +112,8 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       implicit val mockProxyLocationDAO = mock[ProxyLocationDAO]
       val mockS3ClientMgr = mock[S3ClientManager]
       val mockDDBlientMgr = mock[DynamoClientManager]
-      val mockDDBClient = mock[DynamoClient]
-      mockDDBlientMgr.getNewAlpakkaDynamoClient(any)(any, any) returns mockDDBClient
+      val mockDDBClient = mock[DynamoDbAsyncClient]
+      mockDDBlientMgr.getNewAsyncDynamoClient(any) returns mockDDBClient
       val mockEtsProxyActor = TestProbe()
       val mockESClientMgr = mock[ESClientManager]
       implicit val mockScanTargetDAO = mock[ScanTargetDAO]
@@ -153,13 +151,16 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       val mockSqsClientMgr = mock[SQSClientManager]
       val mockProxyGenerators = mock[ProxyGenerators]
 
-      mockProxyGenerators.requestProxyJob(any,any[ArchiveEntry],any) returns Future(Success("fake-job-id"))
+      mockProxyGenerators.requestProxyJob(
+        org.mockito.ArgumentMatchers.any,
+        org.mockito.ArgumentMatchers.any[ArchiveEntry],
+        org.mockito.ArgumentMatchers.any[Option[ProxyType.Value]]) returns Future(Success("fake-job-id"))
 
       implicit val mockProxyLocationDAO = mock[ProxyLocationDAO]
       val mockS3ClientMgr = mock[S3ClientManager]
       val mockDDBlientMgr = mock[DynamoClientManager]
-      val mockDDBClient = mock[DynamoClient]
-      mockDDBlientMgr.getNewAlpakkaDynamoClient(any)(any, any) returns mockDDBClient
+      val mockDDBClient = mock[DynamoDbAsyncClient]
+      mockDDBlientMgr.getNewAsyncDynamoClient(any) returns mockDDBClient
       val mockEtsProxyActor = TestProbe()
       implicit val mockScanTargetDAO = mock[ScanTargetDAO]
       val mockedSelf = TestProbe()
@@ -192,12 +193,16 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       val mockSqsClientMgr = mock[SQSClientManager]
       val mockProxyGenerators = mock[ProxyGenerators]
 
-      mockProxyGenerators.requestProxyJob(any,any[ArchiveEntry],any) returns Future(Failure(new RuntimeException("boo!")))
+      mockProxyGenerators.requestProxyJob(
+        org.mockito.ArgumentMatchers.any,
+        org.mockito.ArgumentMatchers.any[ArchiveEntry],
+        org.mockito.ArgumentMatchers.any[Option[ProxyType.Value]]) returns Future(Failure(new RuntimeException("boo!")))
+
       implicit val mockProxyLocationDAO = mock[ProxyLocationDAO]
       val mockS3ClientMgr = mock[S3ClientManager]
       val mockDDBlientMgr = mock[DynamoClientManager]
-      val mockDDBClient = mock[DynamoClient]
-      mockDDBlientMgr.getNewAlpakkaDynamoClient(any)(any, any) returns mockDDBClient
+      val mockDDBClient = mock[DynamoDbAsyncClient]
+      mockDDBlientMgr.getNewAsyncDynamoClient(any) returns mockDDBClient
       val mockEtsProxyActor = TestProbe()
       implicit val mockScanTargetDAO = mock[ScanTargetDAO]
       val mockedSelf = TestProbe()
@@ -231,11 +236,15 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       implicit val mockProxyLocationDAO = mock[ProxyLocationDAO]
       val mockProxyGenerators = mock[ProxyGenerators]
 
-      mockProxyGenerators.requestProxyJob(any,any[ArchiveEntry],any) returns Future.failed(new RuntimeException("my hovercraft is full of eels"))
+      mockProxyGenerators.requestProxyJob(
+        org.mockito.ArgumentMatchers.any,
+        org.mockito.ArgumentMatchers.any[ArchiveEntry],
+        org.mockito.ArgumentMatchers.any[Option[ProxyType.Value]]) returns Future.failed(new RuntimeException("my hovercraft is full of eels"))
+
       val mockS3ClientMgr = mock[S3ClientManager]
       val mockDDBlientMgr = mock[DynamoClientManager]
-      val mockDDBClient = mock[DynamoClient]
-      mockDDBlientMgr.getNewAlpakkaDynamoClient(any)(any, any) returns mockDDBClient
+      val mockDDBClient = mock[DynamoDbAsyncClient]
+      mockDDBlientMgr.getNewAsyncDynamoClient(any) returns mockDDBClient
       val mockEtsProxyActor = TestProbe()
       implicit val mockScanTargetDAO = mock[ScanTargetDAO]
       val mockedSelf = TestProbe()
@@ -274,8 +283,8 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       implicit val mockProxyLocationDAO = mock[ProxyLocationDAO]
       val mockS3ClientMgr = mock[S3ClientManager]
       val mockDDBlientMgr = mock[DynamoClientManager]
-      val mockDDBClient = mock[DynamoClient]
-      mockDDBlientMgr.getNewAlpakkaDynamoClient(any)(any, any) returns mockDDBClient
+      val mockDDBClient = mock[DynamoDbAsyncClient]
+      mockDDBlientMgr.getNewAsyncDynamoClient(any) returns mockDDBClient
       val mockEtsProxyActor = TestProbe()
       implicit val mockScanTargetDAO = mock[ScanTargetDAO]
       val mockedSelf = TestProbe()
@@ -310,8 +319,8 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       implicit val mockProxyLocationDAO = mock[ProxyLocationDAO]
       val mockS3ClientMgr = mock[S3ClientManager]
       val mockDDBlientMgr = mock[DynamoClientManager]
-      val mockDDBClient = mock[DynamoClient]
-      mockDDBlientMgr.getNewAlpakkaDynamoClient(any)(any, any) returns mockDDBClient
+      val mockDDBClient = mock[DynamoDbAsyncClient]
+      mockDDBlientMgr.getNewAsyncDynamoClient(any) returns mockDDBClient
       val mockEtsProxyActor = TestProbe()
       implicit val mockScanTargetDAO = mock[ScanTargetDAO]
       val mockedSelf = TestProbe()
@@ -349,8 +358,8 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       implicit val mockProxyLocationDAO = mock[ProxyLocationDAO]
       val mockS3ClientMgr = mock[S3ClientManager]
       val mockDDBlientMgr = mock[DynamoClientManager]
-      val mockDDBClient = mock[DynamoClient]
-      mockDDBlientMgr.getNewAlpakkaDynamoClient(any)(any, any) returns mockDDBClient
+      val mockDDBClient = mock[DynamoDbAsyncClient]
+      mockDDBlientMgr.getNewAsyncDynamoClient(any) returns mockDDBClient
       val mockEtsProxyActor = TestProbe()
       implicit val mockScanTargetDAO = mock[ScanTargetDAO]
       val mockedSelf = TestProbe()

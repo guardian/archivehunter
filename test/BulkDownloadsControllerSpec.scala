@@ -67,7 +67,7 @@ class BulkDownloadsControllerSpec extends Specification with Mockito with ZonedD
       false,
       None
     )
-  ).toIterator)
+  ).iterator)
 
   "BulkDownloadsController.streamingEntriesForBulk" should {
     "yield a stream of NDJSON formatted ArchiveEntrySynopsis" in {
@@ -108,12 +108,12 @@ class BulkDownloadsControllerSpec extends Specification with Mockito with ZonedD
       failures.length mustEqual 0
 
       results.length mustEqual 2
-      results.head.right.get.path mustEqual "path/to/file"
-      results.head.right.get.fileSize mustEqual 1234
-      results.head.right.get.entryId mustEqual "abcde"
-      results(1).right.get.path mustEqual "path/to/file2"
-      results(1).right.get.fileSize mustEqual 1234
-      results(1).right.get.entryId mustEqual "xxyz"
+      results.head.toOption.get.path mustEqual "path/to/file"
+      results.head.toOption.get.fileSize mustEqual 1234
+      results.head.toOption.get.entryId mustEqual "abcde"
+      results(1).toOption.get.path mustEqual "path/to/file2"
+      results(1).toOption.get.fileSize mustEqual 1234
+      results(1).toOption.get.entryId mustEqual "xxyz"
     }
   }
 
@@ -126,7 +126,7 @@ class BulkDownloadsControllerSpec extends Specification with Mockito with ZonedD
 
       val mockServerTokenDAO = mock[ServerTokenDAO]
 
-      mockServerTokenDAO.put(any) returns Future(None)
+      mockServerTokenDAO.put(any) returns Future(mock[ServerTokenEntry])
 
       val toTest = new BulkDownloadsController(fakeConfig, mock[SyncCacheApi], mockServerTokenDAO, mock[LightboxBulkEntryDAO],
         mock[LightboxEntryDAO], mock[ESClientManager], mock[S3ClientManager], mock[ControllerComponents], mock[BearerTokenAuth], TestProbe().ref)  {

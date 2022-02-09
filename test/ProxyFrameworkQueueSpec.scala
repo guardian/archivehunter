@@ -1,21 +1,21 @@
 import java.time.ZonedDateTime
 import akka.actor.{ActorSystem, Props}
 import akka.testkit.TestProbe
-import com.amazonaws.services.dynamodbv2.model.AttributeValue
 import com.amazonaws.services.sqs.AmazonSQS
 import com.amazonaws.services.sqs.model.{DeleteMessageRequest, DeleteMessageResult, ReceiveMessageRequest}
-import com.gu.scanamo.error.{DynamoReadError, NoPropertyOfType}
 import com.sksamuel.elastic4s.http.update.UpdateResponse
 import com.sksamuel.elastic4s.http.{ElasticClient, ElasticError, HttpClient, RequestFailure, RequestSuccess, Shards}
 import com.theguardian.multimedia.archivehunter.common.{ProxyType, _}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager, SQSClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models._
 import models.{JobReportNew, JobReportStatus}
+import org.scanamo.{DynamoValue, NoPropertyOfType}
 import org.specs2.mock.Mockito
 import org.specs2.mutable.Specification
 import play.api.{Configuration, Logger}
 import services.ProxyFrameworkQueue.{HandleRunning, UpdateProblemsIndexSuccess}
 import services.{GenericSqsActor, ProxyFrameworkQueue, ProxyFrameworkQueueFunctions}
+import software.amazon.awssdk.services.dynamodb.model.AttributeValue
 
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration._
@@ -35,8 +35,8 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
       val mockedScanTargetDAO = mock[ScanTargetDAO]
 
       val mockedArchiveEntry = mock[ArchiveEntry]
-      val mockedUpdateProxyRef = mock[Function3[String, ArchiveEntry, ProxyType.Value, Future[Either[String, Option[ProxyLocation]]]]]
-      mockedUpdateProxyRef.apply(any, any, any) returns Future(Right(None))
+      val mockedUpdateProxyRef = mock[Function3[String, ArchiveEntry, ProxyType.Value, Future[Either[String, ProxyLocation]]]]
+      mockedUpdateProxyRef.apply(any, any, any) returns Future(Right(mock[ProxyLocation]))
 
       val testProbe = TestProbe()
       val fakeIncoming = JobReportNew(JobReportStatus.SUCCESS, None, "fake-job-id", Some("input-uri"), Some("output-uri"), None, None, None)
@@ -67,7 +67,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
 
         override def thumbnailJobOriginalMedia(jobDesc: JobModel): Future[Either[String, ArchiveEntry]] = Future(Right(mockedArchiveEntry))
 
-        override def updateProxyRef(proxyUri: String, archiveEntry: ArchiveEntry, proxyType: ProxyType.Value): Future[Either[String, Option[ProxyLocation]]] = mockedUpdateProxyRef(proxyUri, archiveEntry, proxyType)
+        override def updateProxyRef(proxyUri: String, archiveEntry: ArchiveEntry, proxyType: ProxyType.Value): Future[Either[String, ProxyLocation]] = mockedUpdateProxyRef(proxyUri, archiveEntry, proxyType)
 
         override protected implicit val indexer = mockedIndexer
       }))
@@ -183,7 +183,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
       val mockedJd = new JobModel("fake-job-id", "PROXY", None, None, JobStatus.ST_PENDING, None, "fake-source", None, SourceType.SRC_MEDIA, None)
 
       val mockedJobModelDAO = mock[JobModelDAO]
-      mockedJobModelDAO.putJob(any) returns Future(Some(Left(NoPropertyOfType("something", new AttributeValue()))))
+      mockedJobModelDAO.putJob(any) returns Future(Some(Left(NoPropertyOfType("something", DynamoValue.nil))))
       val mockedScanTargetDAO = mock[ScanTargetDAO]
 
       val mockedArchiveEntry = mock[ArchiveEntry]
@@ -357,16 +357,16 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
         val mockedScanTargetDAO = mock[ScanTargetDAO]
 
         val mockedArchiveEntry = mock[ArchiveEntry]
-        val mockedUpdateProxyRef = mock[Function2[String, ArchiveEntry, Future[Either[String, Option[ProxyLocation]]]]]
-        mockedUpdateProxyRef.apply(any, any) returns Future(Right(None))
+        val mockedUpdateProxyRef = mock[Function2[String, ArchiveEntry, Future[Either[String, ProxyLocation]]]]
+        mockedUpdateProxyRef.apply(any, any) returns Future(Right(mock[ProxyLocation]))
 
         val testProbe = TestProbe()
         val fakeIncoming = JobReportNew(JobReportStatus.WARNING, None, "fake-job-id", Some("input-uri"), Some("s3://proxybucket/path/to/file.mp4"), None, None, None)
 
         val fakeMessage = ProxyFrameworkQueue.HandleWarning(fakeIncoming, mockedJd, mock[ReceiveMessageRequest], "receipt-handle", testProbe.ref)
 
-        val mockUpdateProxyRef = mock[Function3[String, ArchiveEntry, ProxyType.Value, Future[Either[String, Option[ProxyLocation]]]]]
-        mockUpdateProxyRef.apply(any, any, any) returns Future(Right(Some(ProxyLocation("xxxfileid", "xxxproxyId", ProxyType.VIDEO, "proxybucket", "/path/to/proxy.mp4", Some("myregion"), StorageClass.STANDARD))))
+        val mockUpdateProxyRef = mock[Function3[String, ArchiveEntry, ProxyType.Value, Future[Either[String, ProxyLocation]]]]
+        mockUpdateProxyRef.apply(any, any, any) returns Future(Right(ProxyLocation("xxxfileid", "xxxproxyId", ProxyType.VIDEO, "proxybucket", "/path/to/proxy.mp4", Some("myregion"), StorageClass.STANDARD)))
         val mockedSqsClient = mock[AmazonSQS]
         mockedSqsClient.deleteMessage(any) returns new DeleteMessageResult()
 
@@ -385,10 +385,9 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
         )(mock[ProxyLocationDAO]) {
           override protected val sqsClient = mockedSqsClient
 
-
           override def thumbnailJobOriginalMedia(jobDesc: JobModel): Future[Either[String, ArchiveEntry]] = mockThumnailJobOriginalMedia(jobDesc)
 
-          override def updateProxyRef(proxyUri: String, archiveEntry: ArchiveEntry, proxyType: ProxyType.Value): Future[Either[String, Option[ProxyLocation]]] = mockUpdateProxyRef(proxyUri, archiveEntry, proxyType)
+          override def updateProxyRef(proxyUri: String, archiveEntry: ArchiveEntry, proxyType: ProxyType.Value): Future[Either[String, ProxyLocation]] = mockUpdateProxyRef(proxyUri, archiveEntry, proxyType)
         }
         ))
 
@@ -409,16 +408,16 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
         val mockedScanTargetDAO = mock[ScanTargetDAO]
 
         val mockedArchiveEntry = mock[ArchiveEntry]
-        val mockedUpdateProxyRef = mock[Function2[String, ArchiveEntry, Future[Either[String, Option[ProxyLocation]]]]]
-        mockedUpdateProxyRef.apply(any, any) returns Future(Right(None))
+//        val mockedUpdateProxyRef = mock[Function2[String, ArchiveEntry, Future[Either[String, Option[ProxyLocation]]]]]
+//        mockedUpdateProxyRef.apply(any, any) returns Future(Right(None))
 
         val testProbe = TestProbe()
         val fakeIncoming = JobReportNew(JobReportStatus.WARNING, None, "fake-job-id", Some("input-uri"), None, None, None, None)
 
         val fakeMessage = ProxyFrameworkQueue.HandleWarning(fakeIncoming, mockedJd, mock[ReceiveMessageRequest], "receipt-handle", testProbe.ref)
 
-        val mockUpdateProxyRef = mock[Function3[String, ArchiveEntry, ProxyType.Value, Future[Either[String, Option[ProxyLocation]]]]]
-        mockUpdateProxyRef.apply(any, any, any) returns Future(Right(Some(ProxyLocation("xxxfileid", "xxxproxyId", ProxyType.VIDEO, "proxybucket", "/path/to/proxy.mp4", Some("myregion"), StorageClass.STANDARD))))
+        val mockUpdateProxyRef = mock[(String, ArchiveEntry, ProxyType.Value) => Future[Either[String, ProxyLocation]]]
+        mockUpdateProxyRef.apply(any, any, any) returns Future(Right(ProxyLocation("xxxfileid", "xxxproxyId", ProxyType.VIDEO, "proxybucket", "/path/to/proxy.mp4", Some("myregion"), StorageClass.STANDARD)))
 
         val mockedSqsClient = mock[AmazonSQS]
         mockedSqsClient.deleteMessage(any) returns new DeleteMessageResult()
@@ -440,7 +439,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
 
           override def thumbnailJobOriginalMedia(jobDesc: JobModel): Future[Either[String, ArchiveEntry]] = mockThumnailJobOriginalMedia(jobDesc)
 
-          override def updateProxyRef(proxyUri: String, archiveEntry: ArchiveEntry, proxyType: ProxyType.Value): Future[Either[String, Option[ProxyLocation]]] = mockUpdateProxyRef(proxyUri, archiveEntry, proxyType)
+          override def updateProxyRef(proxyUri: String, archiveEntry: ArchiveEntry, proxyType: ProxyType.Value): Future[Either[String, ProxyLocation]] = mockUpdateProxyRef(proxyUri, archiveEntry, proxyType)
         }
         ))
 
@@ -466,8 +465,8 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
       val mockedScanTargetDAO = mock[ScanTargetDAO]
 
       val mockedArchiveEntry = mock[ArchiveEntry]
-      val mockedUpdateProxyRef = mock[Function3[String, ArchiveEntry, ProxyType.Value, Future[Either[String, Option[ProxyLocation]]]]]
-      mockedUpdateProxyRef.apply(any, any, any) returns Future(Right(None))
+      val mockedUpdateProxyRef = mock[Function3[String, ArchiveEntry, ProxyType.Value, Future[Either[String, ProxyLocation]]]]
+      mockedUpdateProxyRef.apply(any, any, any) returns Future(Right(mock[ProxyLocation]))
 
       val problemItemFake = ProblemItem("fake-fileid","fakecollection","/path/to/file", esRecordSays = false, verifyResults=Seq(
         ProxyVerifyResult("fake-fileid",ProxyType.VIDEO, true, false, Some(false)),
@@ -513,7 +512,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
 
         override def thumbnailJobOriginalMedia(jobDesc: JobModel): Future[Either[String, ArchiveEntry]] = Future(Right(mockedArchiveEntry))
 
-        override def updateProxyRef(proxyUri: String, archiveEntry: ArchiveEntry, proxyType: ProxyType.Value): Future[Either[String, Option[ProxyLocation]]] = mockedUpdateProxyRef(proxyUri, archiveEntry, proxyType)
+        override def updateProxyRef(proxyUri: String, archiveEntry: ArchiveEntry, proxyType: ProxyType.Value): Future[Either[String, ProxyLocation]] = mockedUpdateProxyRef(proxyUri, archiveEntry, proxyType)
 
         override protected implicit val indexer = mockedIndexer
       }))
@@ -536,8 +535,8 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
       val mockedScanTargetDAO = mock[ScanTargetDAO]
 
       val mockedArchiveEntry = mock[ArchiveEntry]
-      val mockedUpdateProxyRef = mock[Function3[String, ArchiveEntry, ProxyType.Value, Future[Either[String, Option[ProxyLocation]]]]]
-      mockedUpdateProxyRef.apply(any, any, any) returns Future(Right(None))
+      val mockedUpdateProxyRef = mock[Function3[String, ArchiveEntry, ProxyType.Value, Future[Either[String, ProxyLocation]]]]
+      mockedUpdateProxyRef.apply(any, any, any) returns Future(Right(mock[ProxyLocation]))
 
       val problemItemFake = ProblemItem("fake-fileid","fakecollection","/path/to/file", esRecordSays = false, verifyResults=Seq(
         ProxyVerifyResult("fake-fileid",ProxyType.VIDEO, true, false, Some(false)),
@@ -583,7 +582,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
 
         override def thumbnailJobOriginalMedia(jobDesc: JobModel): Future[Either[String, ArchiveEntry]] = Future(Right(mockedArchiveEntry))
 
-        override def updateProxyRef(proxyUri: String, archiveEntry: ArchiveEntry, proxyType: ProxyType.Value): Future[Either[String, Option[ProxyLocation]]] = mockedUpdateProxyRef(proxyUri, archiveEntry, proxyType)
+        override def updateProxyRef(proxyUri: String, archiveEntry: ArchiveEntry, proxyType: ProxyType.Value): Future[Either[String, ProxyLocation]] = mockedUpdateProxyRef(proxyUri, archiveEntry, proxyType)
 
         override protected implicit val indexer = mockedIndexer
       }))
