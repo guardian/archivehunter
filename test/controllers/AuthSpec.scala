@@ -201,7 +201,7 @@ class AuthSpec extends Specification with Mockito {
 
       mockBearerToken.validateToken(any) returns Right(LoginResultOK(mockClaims))
       mockUserProfileDAO.userProfileForEmail(any) returns Future(None)
-      mockUserProfileDAO.put(any) returns Future(mock[UserProfile])
+      mockUserProfileDAO.put(any) returns Future(UserProfile("someuser@mycompany.org",false,None,None,Seq(),true,None,None,None,None,None,None))
       mockOAuthTokenDAO.saveToken(any,any,any) returns Future(mock[OAuthTokenEntry])
 
       new WithApplication(buildMyApp(Some(mockClientFactory), mockUserProfileDAO, Some(mockBearerToken), Some(mockOAuthTokenDAO))) {

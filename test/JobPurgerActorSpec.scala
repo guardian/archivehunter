@@ -8,6 +8,7 @@ import org.specs2.mutable.Specification
 import play.api.Configuration
 import services.JobPurgerActor
 import akka.pattern.ask
+import akka.stream.Materializer
 import akka.stream.scaladsl.Source
 import akka.testkit.TestProbe
 import org.scanamo.DynamoReadError
@@ -20,20 +21,20 @@ import scala.concurrent.{Await, ExecutionContext, Future}
 class JobPurgerActorSpec extends Specification with Mockito {
   sequential
 
-  def makeStringAttribute(value:String) = AttributeValue.builder().s(value).build()
-  def makeStringAttributeNull = AttributeValue.builder().nul(true).build()
   
   "JobPurgerActor!CheckMaybePurge" should {
     "delete an item that is earlier than purgeTime" in new AkkaTestkitSpecs2Support {
       implicit val ec:ExecutionContext = system.dispatcher
+      implicit val mat:Materializer = Materializer.matFromSystem
+
       val testConfig = Configuration.empty
       val mockedDDBClientManager = mock[DynamoClientManager]
       val mockedJobModelDAO = mock[JobModelDAO]
-      mockedJobModelDAO.deleteJob(anyString) returns
-        Future( () )
+      mockedJobModelDAO.deleteJob(anyString) returns Future( () )
 
       val toTest = system.actorOf(Props(new JobPurgerActor(testConfig, mockedDDBClientManager, mockedJobModelDAO)))
 
+      println(s"toTest is $toTest")
       val fakeDateTime = ZonedDateTime.of(2018,12,10,0,0,0,0,ZoneId.systemDefault())
       val testEntry = JobModel("testId",
         "proxy",
@@ -48,7 +49,10 @@ class JobPurgerActorSpec extends Specification with Mockito {
       )
       implicit val timeout:akka.util.Timeout = 30 seconds
 
-      Await.ready(toTest ? JobPurgerActor.CheckMaybePurge(testEntry, Some(ZonedDateTime.of(2018,12,11,0,0,0,0,ZoneId.systemDefault()))), 30 seconds)
+      Await.ready(toTest ? JobPurgerActor.CheckMaybePurge(
+        testEntry,
+        Some(ZonedDateTime.of(2018,12,11,0,0,0,0,ZoneId.systemDefault()))
+      ), 30 seconds)
       there was one(mockedJobModelDAO).deleteJob("testId")
     }
 
@@ -176,18 +180,6 @@ class JobPurgerActorSpec extends Specification with Mockito {
         m.jobId returns name
         m
       }
-//      val scanResultList = List(
-//        ScanResponse.builder().items(
-//          Map("jobId"->makeStringAttribute("testId1")).asJava,
-//          Map("jobId"->makeStringAttribute("testId2")).asJava,
-//          Map("jobId"->makeStringAttribute("testId3")).asJava,
-//        ).build(),
-//        ScanResponse.builder().items(
-//          Map("jobId"->makeStringAttribute("testId4")).asJava,
-//          Map("jobId"->makeStringAttribute("testId5")).asJava,
-//          Map("jobId"->makeStringAttribute("testId6")).asJava,
-//        ).build(),
-//      )
 
       val scanResultList:List[List[Either[DynamoReadError, JobModel]]] = List(
         List(
@@ -203,9 +195,7 @@ class JobPurgerActorSpec extends Specification with Mockito {
       )
       val testConfig = Configuration.from(Map("externalData.jobTable"->"testJobTable"))
       val mockedDDBClientManager = mock[DynamoClientManager]
-//      val mockedDDBClient = mock[DynamoClient]
-//      mockedDDBClientManager.getNewAlpakkaDynamoClient(any)(any, any) returns mockedDDBClient
-//      mockedDDBClient.source(any) returns Source(scanResultList).asInstanceOf[Source[Nothing,NotUsed]]
+
       val mockedJobModelDAO = mock[JobModelDAO]
 
       val testProbe = TestProbe()

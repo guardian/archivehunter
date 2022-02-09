@@ -2,8 +2,6 @@ import java.time.ZonedDateTime
 import akka.stream.{ActorMaterializer, Materializer}
 import akka.stream.scaladsl.Source
 import akka.stream.scaladsl.{Keep, Sink}
-import cats.data.NonEmptyList
-import org.scanamo.{DynamoReadError, InvalidPropertiesError}
 import com.sksamuel.elastic4s.http.{ElasticClient, HttpClient}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{LightboxEntry, LightboxEntryDAO}
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer, MimeType, StorageClass}

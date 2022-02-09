@@ -41,10 +41,13 @@ class JobPurgerActor @Inject() (config:Configuration, ddbClientMgr:DynamoClientM
 
   implicit val ec:ExecutionContext = system.dispatcher
 
-  val scanamoAlpakka = ScanamoAlpakka(ddbClientMgr.getNewAsyncDynamoClient())
-  val tableName = config.get[String]("externalData.jobTable")
 
-  protected def makeScanSource() = Source.fromGraph(scanamoAlpakka.exec(Table[JobModel](tableName).scan()))
+  protected def makeScanSource() = {
+    val scanamoAlpakka = ScanamoAlpakka(ddbClientMgr.getNewAsyncDynamoClient())
+    val tableName = config.get[String]("externalData.jobTable")
+    Source.fromGraph(scanamoAlpakka.exec(Table[JobModel](tableName).scan()))
+  }
+
   /**
     * this provides the actor to send CheckMaybePurge message to. Included like this to make testing easier.
     */

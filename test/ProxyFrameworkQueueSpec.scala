@@ -183,11 +183,11 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
       val mockedJd = new JobModel("fake-job-id", "PROXY", None, None, JobStatus.ST_PENDING, None, "fake-source", None, SourceType.SRC_MEDIA, None)
 
       val mockedJobModelDAO = mock[JobModelDAO]
-      mockedJobModelDAO.putJob(any) returns Future(Some(Left(NoPropertyOfType("something", DynamoValue.nil))))
+      mockedJobModelDAO.putJob(any) returns Future.failed(new RuntimeException("something blew up"))
       val mockedScanTargetDAO = mock[ScanTargetDAO]
 
       val mockedArchiveEntry = mock[ArchiveEntry]
-      val mockedUpdateProxyRef = mock[Function2[String, ArchiveEntry, Future[Either[String, Option[ProxyLocation]]]]]
+      val mockedUpdateProxyRef = mock[(String, ArchiveEntry) => Future[Either[String, Option[ProxyLocation]]]]
       mockedUpdateProxyRef.apply(any, any) returns Future(Right(None))
 
       val testProbe = TestProbe()
@@ -199,7 +199,11 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
       mockedSqsClient.deleteMessage(any) returns new DeleteMessageResult()
 
       val toTest = system.actorOf(Props(new ProxyFrameworkQueue(
-        Configuration.from(Map("proxyFramework.notificationsQueue" -> "someQueue", "externalData.indexName" -> "someIndex", "externalData.problemItemsIndex" -> "problem-items")),
+        Configuration.from(Map(
+          "proxyFramework.notificationsQueue" -> "someQueue",
+          "externalData.indexName" -> "someIndex",
+          "externalData.problemItemsIndex" -> "problem-items"
+        )),
         system,
         mock[SQSClientManager],
         mock[S3ClientManager],
@@ -236,7 +240,8 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
       val testProbe = TestProbe()
       val testProbeRef = testProbe.ref
 
-      val fakeIncoming = JobReportNew(JobReportStatus.RUNNING, None, "fake-job-id", Some("input-uri"), None, None, None, Some(ZonedDateTime.parse("2019-01-02T01:02:04.000Z")))
+      val fakeIncoming = JobReportNew(JobReportStatus.RUNNING, None, "fake-job-id", Some("input-uri"),
+        None, None, None, Some(ZonedDateTime.parse("2019-01-02T01:02:04.000Z")))
 
       val fakeMessage = GenericSqsActor.HandleDomainMessage(fakeIncoming, mockedRq, "receipt-handle")
 
