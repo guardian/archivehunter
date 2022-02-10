@@ -10,9 +10,10 @@ scalacOptions := Seq("-unchecked", "-deprecation", "-feature", "-language:postfi
 scalaVersion := "2.13.8"
 
 val akkaVersion = "2.6.18"
-val akkaClusterVersion = "1.0.9"
+val akkaClusterVersion = "1.1.3"
 val elastic4sVersion = "6.7.8"
 val awsSdkVersion = "1.12.153"
+val awsSdk2Version = "2.17.124"
 val jacksonVersion = "2.11.4"
 val jacksonCoreVersion = "2.11.4"
 
@@ -25,7 +26,7 @@ lazy val commonSettings = Seq(
     "com.amazonaws" % "aws-java-sdk-s3" % awsSdkVersion,
     "com.amazonaws" % "aws-java-sdk-elastictranscoder"% awsSdkVersion,
     "com.amazonaws" % "aws-java-sdk-sqs"% awsSdkVersion,
-    "com.dripower" %% "play-circe" % "2814.2",
+    "com.dripower" %% "play-circe" % "2812.0",
     "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.13.1",
     "com.sksamuel.elastic4s" %% "elastic4s-http" % elastic4sVersion  exclude("com.fasterxml.jackson.module","jackson-module-scala"),
     "com.sksamuel.elastic4s" %% "elastic4s-circe" % elastic4sVersion,
@@ -33,9 +34,10 @@ lazy val commonSettings = Seq(
     "com.sksamuel.elastic4s" %% "elastic4s-testkit" % elastic4sVersion % "test",
     "com.sksamuel.elastic4s" %% "elastic4s-embedded" % elastic4sVersion % "test",
     "com.typesafe.akka" %% "akka-actor" % akkaVersion,
-    "com.lightbend.akka" %% "akka-stream-alpakka-dynamodb" % "3.0.4",
-    "com.lightbend.akka" %% "akka-stream-alpakka-s3" % "3.0.4",
-    "org.scanamo" %% "scanamo-alpakka" % "1.0.0-M17",
+    "software.amazon.awssdk" % "dynamodb" % awsSdk2Version,
+    "com.lightbend.akka" %% "akka-stream-alpakka-dynamodb" % "2.0.2",
+    "com.lightbend.akka" %% "akka-stream-alpakka-s3" % "2.0.2",
+    "org.scanamo" %% "scanamo-alpakka" % "1.0.0-M16",
     "com.fasterxml.jackson.dataformat" % "jackson-dataformat-yaml" % jacksonVersion,
     "com.fasterxml.jackson.core" % "jackson-databind" % jacksonCoreVersion,
     "com.google.guava" % "guava" % "30.0-jre",
@@ -47,7 +49,7 @@ lazy val `archivehunter` = (project in file("."))
   .dependsOn(common)
   .settings(commonSettings,
     libraryDependencies ++= Seq(
-      "com.dripower" %% "play-circe" % "2814.2",
+      "com.dripower" %% "play-circe" % "2812.0",
       "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.13.1",
       "com.sksamuel.elastic4s" %% "elastic4s-http" % elastic4sVersion exclude("com.fasterxml.jackson.module","jackson-module-scala"),
       "com.sksamuel.elastic4s" %% "elastic4s-circe" % elastic4sVersion,
@@ -70,11 +72,11 @@ lazy val `archivehunter` = (project in file("."))
       "com.typesafe.akka" %% "akka-discovery" % akkaVersion,
       "com.typesafe.akka" %% "akka-actor-typed" % akkaVersion,
       "com.typesafe.akka" %% "akka-serialization-jackson" % akkaVersion,
-      "com.typesafe.akka" %% "akka-http-spray-json" % "10.1.15",
-      "com.typesafe.akka" %% "akka-http-xml" % "10.1.15",
-      "com.typesafe.akka" %% "akka-http" % "10.1.15",
-      "com.nimbusds" % "nimbus-jose-jwt" % "9.11.1",
-      "com.gu" % "kinesis-logback-appender" % "2.0.1",
+      "com.typesafe.akka" %% "akka-http-spray-json" % "10.2.7",
+      "com.typesafe.akka" %% "akka-http-xml" % "10.2.7",
+      "com.typesafe.akka" %% "akka-http" % "10.2.7",
+      "com.nimbusds" % "nimbus-jose-jwt" % "9.18",
+      "com.gu" % "kinesis-logback-appender" % "2.0.3",
       "com.fasterxml.jackson.dataformat" % "jackson-dataformat-cbor" % "2.11.4",  //fix vulnerable dependency for kinesis-logback-appender
       "org.apache.logging.log4j" % "log4j-api" % "2.17.1",
       "com.typesafe.akka" %% "akka-testkit" % akkaVersion,
@@ -84,17 +86,18 @@ lazy val `archivehunter` = (project in file("."))
 
 val lambdaDeps = Seq(
 )
-val circeVersion = "0.14.1"
+
+val circeVersion = "0.12.0-M3" //required for compatibility with elastic4s-circe
 
 lazy val common = (project in file("common"))
   .settings(commonSettings,
     libraryDependencies ++= Seq(
       "com.amazonaws" % "aws-java-sdk-s3" % awsSdkVersion,
-      "org.scanamo" %% "scanamo-alpakka" % "1.0.0-M17",
+      "org.scanamo" %% "scanamo-alpakka" % "1.0.0-M16",
       "io.circe" %% "circe-core" % circeVersion,
       "io.circe" %% "circe-generic" % circeVersion,
       "io.circe" %% "circe-parser" % circeVersion,
-      "org.scanamo" %% "scanamo" % "1.0.0-M17",
+      "org.scanamo" %% "scanamo" % "1.0.0-M16",
       "com.google.inject" % "guice" % "4.2.3",  //keep this in sync with play version
       "com.amazonaws" % "aws-java-sdk-sns" % awsSdkVersion,
       "com.amazonaws" % "aws-java-sdk-sts" % awsSdkVersion,
