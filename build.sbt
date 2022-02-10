@@ -125,9 +125,9 @@ lazy val inputLambda = (project in file("lambda/input"))
     case PathList("javax", "servlet", xs @ _*)         => MergeStrategy.first
     case PathList(ps @ _*) if ps.last endsWith ".html" => MergeStrategy.first
     case "application.conf" => MergeStrategy.concat
-      //META-INF/org/apache/logging/log4j/core/config/plugins/Log4j2Plugins.dat
     case PathList("META-INF","org","apache","logging","log4j","core","config","plugins","Log4j2Plugins.dat") => MergeStrategy.last
     case PathList(ps @ _*) if ps.last == "module-info.class" => MergeStrategy.discard
+    case PathList(ps @ _*) if ps.last=="mime.types" => MergeStrategy.last
     case meta(_)=>MergeStrategy.discard
     case x=>
       val oldStrategy = (assembly / assemblyMergeStrategy).value
@@ -185,6 +185,8 @@ lazy val autoDowningLambda = (project in file("lambda/autodowning")).settings(co
     assembly / assemblyJarName := "autoDowningLambda.jar",
     assembly / assemblyMergeStrategy := {
       case PathList(ps @ _*) if ps.last=="module-info.class" => MergeStrategy.discard
+      case meta(_) => MergeStrategy.discard
+      case PathList(ps @ _*) if ps.last=="mime.types" => MergeStrategy.last
       case x=>
         val oldStrategy = (assembly / assemblyMergeStrategy).value
         oldStrategy(x)
