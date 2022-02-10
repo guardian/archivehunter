@@ -23,19 +23,39 @@ class CopyMainFile (s3ClientManager: S3ClientManager, config:Configuration)(impl
   import GenericMoveActor._
   private implicit lazy val mat:Materializer = Materializer.matFromSystem
 
+  /**
+    * Request a standard S3 bucket->bucket copy. This only works on files less than 5Gb in size; for larger ones you
+    * need to download and re-upload - this is done via streaming in `largeFileCopy`. In order to maintain compatibility
+    * between these two implementations, the return value is a `MultipartUploadResult` even though multi-part is not used here.
+    *
+    * @param destBucket bucket to copy into
+    * @param sourceBucket bucket to copy from
+    * @param path path of the file to copy
+    * @param s3Client implicitly provided S3 client object
+    * @return a Future, containing a MultipartUploadResult which fails on error.  This method is, however, synchronous under the hood until
+    *         updated to AWS SDK v2
+    */
   def standardS3Copy(destBucket:String, sourceBucket:String, path:String)(implicit s3Client:AmazonS3) =
     Future.fromTry(Try {
-      logger.info(s"Copying ${entry.bucket}:${entry.path} to  ${currentState.destBucket}:${entry.path}")
+      logger.info(s"Copying ${sourceBucket}:${path} to  ${destBucket}:${path}")
 
-      val result = s3Client.copyObject(entry.bucket, entry.path, currentState.destBucket, entry.path)
+      val result = s3Client.copyObject(sourceBucket, path, destBucket, path)
       logger.info("Copy succeeded")
-      MultipartUploadResult(Uri(),currentState.destBucket, entry.path, result.getETag, Option(result.getVersionId))
+      MultipartUploadResult(Uri(), destBucket, path, result.getETag, Option(result.getVersionId))
     })
 
+  /**
+    * Copy a file from one bucket to another by streaming the contents through the application.  This is the only option
+    * to copy files larger than 5Gb.
+    *
+    * @param destBucket bucket to copy into
+    * @param sourceBucket bucket to copy from
+    * @param path path of the file to copy
+    * @return a Future containing a MultipartUploadResult which fails on error.
+    */
   def largeFileCopy(destBucket:String, sourceBucket:String, path:String) = {
-    //val s3Client = s3ClientManager.getAlpakkaS3Client(region=Some(currentState.destRegion), profileName=config.getOptional[String]("externalData.awsProfile"))
       val s3file = S3.download(sourceBucket, path)
-      s3file.runWith(Sink.head).flatMap({
+      s3file.runWith(Sink.head).flatMap({ //the download method materializes once when the file is found, that passes us another source for streming the data.
         case None=>
           logger.error(s"Could not find large S3 file s3://$sourceBucket/$path")
           Future.failed(new RuntimeException(s"File does not exist: s3://$sourceBucket/$path"))
@@ -90,8 +110,6 @@ class CopyMainFile (s3ClientManager: S3ClientManager, config:Configuration)(impl
         case None=>
           sender() ! StepFailed(currentState, "No archive entry source")
         case Some(entry)=>
-          implicit val s3Client = s3ClientManager.getS3Client(region=Some(currentState.destRegion),profileName=config.getOptional[String]("externalData.awsProfile"))
-
           val originalSender = sender()
 
           logger.info(s"Rolling back failed file move, going to delete ${currentState.destBucket}:${entry.path} if ${entry.bucket}:${entry.path} exists")
@@ -99,16 +117,19 @@ class CopyMainFile (s3ClientManager: S3ClientManager, config:Configuration)(impl
           val copyBackFuture = if(!sourceClient.doesObjectExist(entry.bucket, entry.path)){
             //if the file no longer exists in the source bucket, then copy it back from the destination
             if(entry.size<5368709120L) {
-              standardS3Copy(entry.bucket, currentState.destBucket, entry.path).map(result=>Some(result))
+              logger.info(s"File no longer exists on s3://${entry.bucket}/${entry.path}, copying it back with standard copy...")
+              standardS3Copy(entry.bucket, currentState.destBucket, entry.path)(destClient).map(result=>Some(result))
             } else {
+              logger.info(s"File no longer exists on s3://${entry.bucket}/${entry.path}, copying it back with large-file copy...")
               largeFileCopy(entry.bucket, currentState.destBucket, entry.path).map(result=>Some(result))
             }
           } else {
+            logger.info(s"File already exists on s3://${entry.bucket}/${entry.path}, no copy-back required")
             Future(None)
           }
 
           val resultFut = for {
-            maybeTransferResult <- copyBackFuture
+            _ <- copyBackFuture
             deleteResult <- Future.fromTry(Try { destClient.deleteObject(currentState.destBucket, entry.path) })
           } yield deleteResult
 

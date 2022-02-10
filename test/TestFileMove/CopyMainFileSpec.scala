@@ -97,10 +97,11 @@ class CopyMainFileSpec extends Specification with Mockito with DocId {
       val mockedClientMgr = mock[S3ClientManager]
       val mockedS3Client = mock[AmazonS3]
       mockedClientMgr.getS3Client(any,any) returns mockedS3Client
-      val mockedGetResponse = mock[ObjectMetadata]
-      val mockedDeleteResponse = mock[DeleteObjectsResponse]
 
       mockedS3Client.doesObjectExist(any,any) returns false
+      val mockedCopyResult = new CopyObjectResult()
+      mockedCopyResult.setETag("some-etag")
+      mockedS3Client.copyObject(any, any,any,any) returns mockedCopyResult
 
       val testItem = ArchiveEntry("fake-id","sourcebucket","/path/to/file",None,None,1234L,ZonedDateTime.now(),"fake-etag",
         MimeType.fromString("video/quicktime").right.get,true,StorageClass.STANDARD_IA,Seq(), false,None)
