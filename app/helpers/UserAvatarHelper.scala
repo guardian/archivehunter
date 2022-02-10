@@ -3,9 +3,10 @@ package helpers
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model.ContentTypes
 import akka.stream.Materializer
-import akka.stream.alpakka.s3.acl.CannedAcl
-import akka.stream.alpakka.s3.impl.S3Headers
-import akka.stream.scaladsl.Source
+import akka.stream.alpakka.s3.S3Headers
+import akka.stream.alpakka.s3.headers.CannedAcl
+import akka.stream.alpakka.s3.scaladsl.S3
+import akka.stream.scaladsl.{Sink, Source}
 import akka.util.ByteString
 import com.theguardian.multimedia.archivehunter.common.clientManagers.S3ClientManager
 import org.slf4j.LoggerFactory
@@ -31,7 +32,6 @@ import scala.util.{Failure, Success, Try}
 class UserAvatarHelper @Inject() (config:Configuration, s3ClientManager: S3ClientManager)(implicit system:ActorSystem, mat:Materializer) {
   private val logger = LoggerFactory.getLogger(getClass)
 
-  private val alpakkaS3 = s3ClientManager.getAlpakkaS3Client(config.getOptional[String]("externalData.awsProfile"))
   private val s3Client = s3ClientManager.getClient(config.getOptional[String]("externalData.awsProfile"))
   private val sanitiser = "[^\\w\\d-_]".r
 
@@ -57,14 +57,14 @@ class UserAvatarHelper @Inject() (config:Configuration, s3ClientManager: S3Clien
 
     config.getOptional[String]("externalData.avatarBucket") match {
       case Some(avatarBucket)=>
-        alpakkaS3.putObject(
+        S3.putObject(
           avatarBucket,
           sanitisedKey(username),
           dataSource,
           content.remaining(),  //we should be at the start of the buffer
           ContentTypes.NoContentType, //FIXME: should determine content type of buffer somehow
-          S3Headers(CannedAcl.Private)
-        )
+          S3Headers.empty.withCannedAcl(CannedAcl.Private)
+        ).runWith(Sink.head)
       case None=>
         logger.error("There is nothing configured for `externalData.avatarBucket` so user avatars will not work. Please update the configuration.")
         Future.failed(new RuntimeException("Invalid configuration, please see server logs"))

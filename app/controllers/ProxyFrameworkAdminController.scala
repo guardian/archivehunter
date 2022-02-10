@@ -206,13 +206,14 @@ class ProxyFrameworkAdminController @Inject() (override val config:Configuration
         if(results.nonEmpty){
           Future(Conflict(GenericErrorResponse("already_exists", "A record already exists for this region").asJson))
         } else {
-          proxyFrameworkInstanceDAO.put(rec).map({
-            case None=>
+          proxyFrameworkInstanceDAO
+            .put(rec)
+            .map(_=>
               Ok(GenericErrorResponse("ok","Record saved").asJson)
-            case Some(Right(updatedRecord))=>
-              Ok(GenericErrorResponse("ok","Record saved").asJson)
-            case Some(Left(err))=>
-              InternalServerError(GenericErrorResponse("db_error",err.toString).asJson)
+            ).recover({
+              case err:Throwable=>
+                logger.error(s"Could not update proxy framework deployment: ${err.getMessage}", err)
+                InternalServerError(GenericErrorResponse("db_error",err.getMessage).asJson)
           })
         }
       })

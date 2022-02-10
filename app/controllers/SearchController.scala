@@ -77,7 +77,7 @@ class SearchController @Inject()(override val config:Configuration,
     q match {
       case Some(searchTerms) =>
         val responseFuture = esClient.execute {
-          search(indexName) query { boolQuery.must(searchTerms, not(regexQuery("path.keyword",".*/+\\.[^\\.]+"))) } from actualStart size actualLength sortBy fieldSort("path.keyword")
+          search(indexName) query { boolQuery().must(searchTerms, not(regexQuery("path.keyword",".*/+\\.[^\\.]+"))) } from actualStart size actualLength sortBy fieldSort("path.keyword")
         }
 
         responseFuture.map(response=>{
@@ -198,9 +198,11 @@ class SearchController @Inject()(override val config:Configuration,
       val buckets = aggs("buckets").asInstanceOf[List[Map[String,Any]]]
       val facetData = buckets.map(entry=>{
         if(entry.contains(forKey)){
-          Some(chartSubBucketsFor(entry(forKey).asInstanceOf[Map[String, Any]]).map(data=>
-            ChartFacetData[T](entry.getOrElse("key_as_string",entry("key")).asInstanceOf[String], data)
-          ))
+          Some(
+            chartSubBucketsFor(entry(forKey).asInstanceOf[Map[String, Any]])
+              .map(data=>
+                ChartFacetData[T](entry.getOrElse("key_as_string",entry("key")).asInstanceOf[String], data)
+            ))
         } else None
       })
       logger.debug(facetData.toString)

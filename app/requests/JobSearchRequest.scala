@@ -2,7 +2,7 @@ package requests
 
 import java.time.ZonedDateTime
 
-import com.gu.scanamo.error.DynamoReadError
+import org.scanamo.DynamoReadError
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{JobModel, JobModelDAO, JobStatus}
 import play.api.Logger
 

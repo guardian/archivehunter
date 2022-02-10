@@ -7,10 +7,8 @@ import akka.actor.{ActorRef, ActorSystem}
 import akka.stream.scaladsl.{Flow, GraphDSL, RunnableGraph}
 import akka.stream.{ActorMaterializer, ClosedShape, Materializer}
 import auth.{BearerTokenAuth, Security, UserRequest}
-import com.amazonaws.HttpMethod
-import com.amazonaws.services.s3.model.{GeneratePresignedUrlRequest, ResponseHeaderOverrides}
 import com.google.inject.Injector
-import com.gu.scanamo.error.DynamoReadError
+import org.scanamo.DynamoReadError
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer, StorageClass, ZonedDateTimeEncoder}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models._
@@ -111,35 +109,25 @@ class LightboxController @Inject() (override val config:Configuration,
       Future(InternalServerError(GenericErrorResponse("error", err.toString).asJson))
     case Right(entry)=>
       logger.info(s"Got bulk restore entry: $entry")
-      val saveFuture = lightboxBulkEntryDAO.put(entry).map({
-        case None=>Right(entry)
-        case Some(Right(x))=>Right(x)
-        case Some(Left(err))=>Left(err)
-      })
 
-      saveFuture.flatMap({
-        case Right(savedEntry)=>
+      lightboxBulkEntryDAO.put(entry)
+        .flatMap(savedEntry=>{
           LightboxHelper
-            .addToBulkFromSearch(indexName,userProfile, userAvatarHelper.getAvatarLocationString(userProfile.userEmail),searchReq,savedEntry)
-            .flatMap(updatedBulkEntry=>{
-              lightboxBulkEntryDAO.put(updatedBulkEntry).map({
-                case None=>
-                  Ok(ObjectCreatedResponse("ok","bulkLightboxEntry", updatedBulkEntry.id).asJson)
-                case Some(Right(_))=>
-                  Ok(ObjectCreatedResponse("ok","bulkLightboxEntry", updatedBulkEntry.id).asJson)
-                case Some(Left(err))=>
-                  InternalServerError(GenericErrorResponse("db_error",err.toString).asJson)
+            .addToBulkFromSearch(indexName, userProfile, userAvatarHelper.getAvatarLocationString(userProfile.userEmail), searchReq, savedEntry)
+            .flatMap(updatedBulkEntry => {
+              lightboxBulkEntryDAO.put(updatedBulkEntry).map(_=>{
+                  Ok(ObjectCreatedResponse("ok", "bulkLightboxEntry", updatedBulkEntry.id).asJson)
               })
             }).recover({
-              case err:Throwable=>
+              case err: Throwable =>
                 logger.error("Could not save lightbox entry: ", err)
                 InternalServerError(GenericErrorResponse("error", err.toString).asJson)
             })
-
-        case Left(err)=>
-          logger.error(s"Could not save bulk restore entry: $err")
-          Future(InternalServerError(GenericErrorResponse("db_error",err.toString).asJson))
-      })
+        }).recover({
+          case err:Throwable=>
+            logger.error(s"Could not save bulk restore entry: $err")
+            InternalServerError(GenericErrorResponse("db_error",err.toString).asJson)
+        })
   }
 
   private def getOrCreateBulkEntry(searchReq:SearchRequest, userProfile:UserProfile, user:String) = {
@@ -384,14 +372,12 @@ class LightboxController @Inject() (override val config:Configuration,
 
   private def makeDownloadToken(entryId:String, userEmail:String) = {
     val token = ServerTokenEntry.create(associatedId = Some(entryId),duration=tokenShortDuration, forUser = Some(userEmail))
-    serverTokenDAO.put(token).map({
-      case None =>
-        Ok(ObjectCreatedResponse("ok", "link", s"archivehunter:bulkdownload:${token.value}").asJson)
-      case Some(Right(_)) =>
-        Ok(ObjectCreatedResponse("ok", "link", s"archivehunter:bulkdownload:${token.value}").asJson)
-      case Some(Left(err)) =>
+    serverTokenDAO.put(token).map(_=> {
+      Ok(ObjectCreatedResponse("ok", "link", s"archivehunter:bulkdownload:${token.value}").asJson)
+    }).recover({
+      case err:Throwable =>
         logger.error(s"Could not save token to database: $err")
-        InternalServerError(GenericErrorResponse("db_error", err.toString).asJson)
+        InternalServerError(GenericErrorResponse("db_error", "Could not save token, see logs").asJson)
     })
   }
 

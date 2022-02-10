@@ -1,11 +1,11 @@
 import com.amazonaws.services.ec2.model.{Instance, InstanceNetworkInterface, Tag, TagDescription}
 import com.google.inject.AbstractModule
-import com.gu.scanamo.error.DynamoReadError
 import com.theguardian.multimedia.archivehunter.common.ArchiveHunterConfiguration
 import models.{InstanceIp, LifecycleDetails}
 import org.specs2.mock.Mockito
 import org.specs2.mutable._
 import org.mockito.Mockito.{times, verify}
+import org.scanamo.DynamoReadError
 
 import scala.util.{Failure, Success, Try}
 
@@ -15,109 +15,6 @@ class AutodowningLambdaSpec extends Specification with Mockito {
       bind(classOf[ArchiveHunterConfiguration]).to(classOf[ArchiveHunterConfigurationMock])
     }
   }
-
-  //tag matching has been temporarily removed
-//  "AutoDowningLambdaMain.shouldHandle" should {
-//    "return true if all required tags are matched" in {
-//      val fakeTags = Map(
-//        "APP_TAG"->"myapp",
-//        "STACK_TAG"->"mystack",
-//        "STAGE_TAG"->"mystage"
-//      )
-//
-//      val test = new AutoDowningLambdaMain {
-//        override def getTagConfigValue(configKey: String): Option[String] = fakeTags.get(configKey)
-//
-//        override def getInjectorModule = new TestInjectorModule
-//
-//        override def getLoadBalancerHost: String = "loadbalancer"
-//
-//        override val akkaComms = mock[AkkaComms]
-//
-//        override def getEc2Tags(instance: Instance): Seq[TagDescription] = Seq(
-//          new TagDescription().withKey("App").withValue("myapp"),
-//          new TagDescription().withKey("Stack").withValue("mystack"),
-//          new TagDescription().withKey("Stage").withValue("mystage"),
-//          new TagDescription().withKey("irrelevant").withValue("irrelevant"),
-//        )
-//      }
-//
-//      val fakeInstance = new Instance().withTags(
-//        new Tag().withKey("App").withValue("myapp"),
-//        new Tag().withKey("Stack").withValue("mystack"),
-//        new Tag().withKey("Stage").withValue("mystage"),
-//        new Tag().withKey("irrelevant").withValue("irrelevant")
-//      )
-//
-//      test.shouldHandle(fakeInstance) must beTrue
-//    }
-//
-//    "return false if any required tags are not matched" in {
-//      val fakeTags = Map(
-//        "APP_TAG"->"myapp",
-//        "STACK_TAG"->"mystack",
-//        "STAGE_TAG"->"mystage"
-//      )
-//
-//      val test = new AutoDowningLambdaMain {
-//        override def getTagConfigValue(configKey: String): Option[String] = fakeTags.get(configKey)
-//
-//        override def getInjectorModule = new TestInjectorModule
-//
-//        override def getLoadBalancerHost: String = "loadbalancer"
-//
-//        override val akkaComms = mock[AkkaComms]
-//
-//        override def getEc2Tags(instance: Instance): Seq[TagDescription] = Seq(
-//          new TagDescription().withKey("App").withValue("myapp"),
-//          new TagDescription().withKey("Stack").withValue("anotherstack"),
-//          new TagDescription().withKey("Stage").withValue("mystage"),
-//          new TagDescription().withKey("irrelevant").withValue("irrelevant"),
-//        )
-//      }
-//
-//      val fakeInstance = new Instance().withTags(
-//        new Tag().withKey("App").withValue("myapp"),
-//        new Tag().withKey("Stack").withValue("anotherstack"),
-//        new Tag().withKey("Stage").withValue("mystage"),
-//        new Tag().withKey("irrelevant").withValue("irrelevant")
-//      )
-//
-//      test.shouldHandle(fakeInstance) must beFalse
-//    }
-//
-//    "not crash if any required tags are missing" in {
-//      val fakeTags = Map(
-//        "APP_TAG"->"myapp",
-//        "STACK_TAG"->"mystack",
-//        "STAGE_TAG"->"mystage"
-//      )
-//
-//      val test = new AutoDowningLambdaMain {
-//        override def getTagConfigValue(configKey: String): Option[String] = fakeTags.get(configKey)
-//
-//        override def getInjectorModule = new TestInjectorModule
-//
-//        override def getLoadBalancerHost: String = "loadbalancer"
-//
-//        override val akkaComms = mock[AkkaComms]
-//
-//        override def getEc2Tags(instance: Instance): Seq[TagDescription] = Seq(
-//          new TagDescription().withKey("App").withValue("myapp"),
-//          new TagDescription().withKey("Stage").withValue("mystage"),
-//          new TagDescription().withKey("irrelevant").withValue("irrelevant"),
-//        )
-//      }
-//
-//      val fakeInstance = new Instance().withTags(
-//        new Tag().withKey("App").withValue("myapp"),
-//        new Tag().withKey("Stage").withValue("mystage"),
-//        new Tag().withKey("irrelevant").withValue("irrelevant")
-//      )
-//
-//      test.shouldHandle(fakeInstance) must beFalse
-//    }
-//  }
 
   "AutodowningLambdaMain.processInstance" should {
     "raise an exception if getEc2Info consistently fails" in {
@@ -281,16 +178,16 @@ class AutodowningLambdaSpec extends Specification with Mockito {
         .withNetworkInterfaces(new InstanceNetworkInterface().withPrivateIpAddress("10.11.12.13"))
         .withInstanceId("fake-instance-id")
 
-      val addRecordMock = mock[Function1[InstanceIp,Option[Either[DynamoReadError,InstanceIp]]]]
+      val addRecordMock = mock[(InstanceIp) => Try[Unit]]
 
-      addRecordMock.apply(any) returns None
+      addRecordMock.apply(any) returns Success( () )
 
       val test = new AutoDowningLambdaMain {
         override def getInjectorModule = new TestInjectorModule
 
         override def getLoadBalancerHost: String = "loadbalancer"
 
-        override def addRecord(rec: InstanceIp): Option[Either[DynamoReadError, InstanceIp]] = addRecordMock(rec)
+        override def addRecord(rec: InstanceIp): Try[Unit] = addRecordMock(rec)
 
         override val akkaComms = mock[AkkaComms]
       }
@@ -302,18 +199,16 @@ class AutodowningLambdaSpec extends Specification with Mockito {
 
     "retry if dynamo returns an error" in {
       val fakeDetails = mock[LifecycleDetails]
-      val fakeError = mock[DynamoReadError]
-      fakeError.toString returns "fake error"
 
       val fakeInstance = new Instance()
         .withNetworkInterfaces(new InstanceNetworkInterface().withPrivateIpAddress("10.11.12.13"))
         .withInstanceId("fake-instance-id")
 
-      val addRecordMock = mock[Function1[InstanceIp,Option[Either[DynamoReadError,InstanceIp]]]]
+      val addRecordMock = mock[(InstanceIp) => Try[Unit]]
 
-      addRecordMock.apply(any) returns Some(Left(fakeError))
+      addRecordMock.apply(any) returns Failure(new RuntimeException("fake error"))
 
-      val fakeRegisterStarted = mock[Function3[LifecycleDetails,Instance,Int,Unit]]
+      val fakeRegisterStarted = mock[(LifecycleDetails, Instance, Int) => Unit]
       fakeRegisterStarted.apply(any, any, any) returns (())
 
       val test = new AutoDowningLambdaMain {
@@ -321,12 +216,12 @@ class AutodowningLambdaSpec extends Specification with Mockito {
 
         override def getLoadBalancerHost: String = "loadbalancer"
 
-        override def addRecord(rec: InstanceIp): Option[Either[DynamoReadError, InstanceIp]] = addRecordMock(rec)
+        override def addRecord(rec: InstanceIp): Try[Unit] = addRecordMock(rec)
 
         override val akkaComms = mock[AkkaComms]
 
         /**
-          * the registerInstanceStarted implementation recurses in order to retry. We detect this and redirect to the mock
+          * the registerInstanceStarted implementation recourses in order to retry. We detect this and redirect to the mock
           * if it's a retry (attempt > 0)
           * @param details [[LifecycleDetails]] object from the Cloudwatch Event
           * @param instance `Instance` instance from EC2 SDK

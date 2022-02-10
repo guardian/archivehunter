@@ -1,15 +1,16 @@
-import com.amazonaws.services.dynamodbv2.{AmazonDynamoDBAsyncClientBuilder, AmazonDynamoDBClientBuilder}
 import com.amazonaws.services.lambda.runtime.{Context, RequestHandler}
 import org.apache.logging.log4j.LogManager
 import com.amazonaws.services.ec2.AmazonEC2ClientBuilder
 import com.amazonaws.services.ec2.model._
 import com.google.inject.{AbstractModule, Guice}
-import com.gu.scanamo.{Scanamo, Table}
-import com.gu.scanamo.syntax._
+import org.scanamo.{Scanamo, Table}
+import org.scanamo.syntax._
+import org.scanamo.generic.auto._
 import com.theguardian.multimedia.archivehunter.common.ArchiveHunterConfiguration
 import models._
+import software.amazon.awssdk.services.dynamodb.DynamoDbClient
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success, Try}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -24,7 +25,8 @@ class AutoDowningLambdaMain extends RequestHandler[java.util.LinkedHashMap[Strin
   val instanceTableName = config.get("instances.tableName")
   val instanceTable = Table[InstanceIp](instanceTableName)
   val ec2Client = AmazonEC2ClientBuilder.defaultClient()
-  val ddbClient = AmazonDynamoDBClientBuilder.defaultClient()
+  val ddbClient = DynamoDbClient.builder().build()
+  val scanamo = Scanamo(ddbClient)
 
   val akkaComms = new AkkaComms(getLoadBalancerHost, 8558)
 
@@ -41,21 +43,6 @@ class AutoDowningLambdaMain extends RequestHandler[java.util.LinkedHashMap[Strin
     * @return string of the loadbalancer config. Raises if the environment variable "LOADBALANCER" is not set.
     */
   protected def getLoadBalancerHost = sys.env("LOADBALANCER")
-
-//  def getEc2Ip(instanceId:String) = Try {
-//    val rq = new DescribeInstancesRequest().withInstanceIds(instanceId)
-//    val result = ec2Client.describeInstances(rq)
-//
-//    val instances = result.getReservations.asScala.headOption.flatMap(_.getInstances.asScala.headOption)
-//
-//    val interfaces = for {
-//      res <- result.getReservations.asScala.headOption
-//      instances <- res.getInstances.asScala.headOption
-//      nets <- instances.getNetworkInterfaces.asScala.headOption
-//    } yield nets
-//
-//    interfaces.map(_.getPrivateIpAddress)
-//  }
 
   /**
     * get EC2 metadata about the given instance ID. This requires Describe permissions on the EC2 resource in question.
@@ -92,14 +79,14 @@ class AutoDowningLambdaMain extends RequestHandler[java.util.LinkedHashMap[Strin
       new Filter().withName("resource-type").withValues("instance")
     )
     val result = ec2Client.describeTags(rq)
-    result.getTags.asScala
+    result.getTags.asScala.toSeq
   }
 
-  def addRecord(rec:InstanceIp) = Scanamo.exec(ddbClient)(instanceTable.put(rec))
+  def addRecord(rec:InstanceIp) = Try { scanamo.exec(instanceTable.put(rec)) }
 
-  def findRecord(instanceId:String) = Scanamo.exec(ddbClient)(instanceTable.get('instanceId->instanceId))
+  def findRecord(instanceId:String) = scanamo.exec(instanceTable.get("instanceId"===instanceId))
 
-  def deleteRecord(rec:InstanceIp) = Scanamo.exec(ddbClient)(instanceTable.delete('instanceId->rec.instanceId))
+  def deleteRecord(rec:InstanceIp) = Try { scanamo.exec(instanceTable.delete("instanceId"->rec.instanceId)) }
 
   def findAkkaNode(ipAddress:String, allNodes:Seq[AkkaMember]) =
     allNodes.find(_.node.getHost==ipAddress)
@@ -125,7 +112,7 @@ class AutoDowningLambdaMain extends RequestHandler[java.util.LinkedHashMap[Strin
             case Some(akkaNode)=>
               akkaComms.downAkkaNode(akkaNode)
           }
-        }), 60 seconds)
+        }), 60.seconds)
       case None=>
         throw new RuntimeException(s"No record returned for ${details.EC2InstanceId}")
       case Some(Left(err))=>
@@ -148,12 +135,10 @@ class AutoDowningLambdaMain extends RequestHandler[java.util.LinkedHashMap[Strin
       case Success(Some(ipAddr)) =>
         val record = InstanceIp(instance.getInstanceId, ipAddr)
         logger.info(s"Got IP address $ipAddr for ${instance.getInstanceId}")
+
         addRecord(record) match {
-          case Some(Right(newRecord))=>
-            logger.info("Record saved")
-          case None=>
-            logger.info("Record saved")
-          case Some(Left(err))=>
+          case Success(_)=>
+          case Failure(err)=>
             logger.warn(s"Could not contact dynamodb: $err")
             if(attempt>100) throw new RuntimeException(s"Could not contact dynamodb: $err")
             Thread.sleep(1000)

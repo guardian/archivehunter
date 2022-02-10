@@ -2,8 +2,6 @@ package com.theguardian.multimedia.archivehunter.common.cmn_models
 
 import java.time.ZonedDateTime
 
-import com.gu.scanamo.DynamoFormat
-
 /**
   * a ScanTarget represents a specific storage location for media and contains metadata about when it was scanned and where the proxies
   * should be located.

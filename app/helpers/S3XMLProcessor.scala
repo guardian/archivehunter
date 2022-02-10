@@ -1,11 +1,10 @@
 package helpers
 
+import akka.stream.alpakka.s3.ListBucketResultContents
+
 import java.net.URLDecoder
 import java.time.Instant
-
 import akka.stream.{Attributes, FlowShape, Inlet, Outlet}
-import akka.stream.alpakka.s3.impl.ListBucketResult
-import akka.stream.alpakka.s3.scaladsl.ListBucketResultContents
 import akka.stream.stage.{AbstractInHandler, AbstractOutHandler, GraphStage, GraphStageLogic}
 import akka.util.ByteString
 

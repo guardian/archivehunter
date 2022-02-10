@@ -57,7 +57,7 @@ class CreateProxySinkSpec extends Specification with Mockito {
       stubProxyGenerators.defaultProxyType(any) returns Some(ProxyType.VIDEO)
       stubProxyGenerators.requestProxyJob(any, any[ArchiveEntry], any) returns Future(Success("something"))
       implicit val stubProxyLocationDAO = mock[ProxyLocationDAO]
-      implicit val mat:Materializer = ActorMaterializer.create(system)
+      implicit val mat:Materializer = Materializer.matFromSystem(system)
       val completionPromise = Promise[Unit]()
 
       val eosDetect = new EOSDetect[Unit,ArchiveEntry](completionPromise, ())

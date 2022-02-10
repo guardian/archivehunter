@@ -3,7 +3,7 @@ package helpers.LightboxStreamComponents
 import akka.actor.ActorSystem
 import akka.stream.{Attributes, FlowShape, Inlet, Outlet}
 import akka.stream.stage.{AbstractInHandler, AbstractOutHandler, GraphStage, GraphStageLogic}
-import com.gu.scanamo.error.DynamoReadError
+import org.scanamo.DynamoReadError
 import com.sksamuel.elastic4s.http.HttpClient
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{LightboxEntry, LightboxEntryDAO}

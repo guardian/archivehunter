@@ -4,10 +4,12 @@ import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.util.UUID
 import akka.actor.{ActorRef, ActorSystem}
+import akka.stream.scaladsl.Sink
 import akka.stream.{ActorMaterializer, Materializer}
 import auth.{BearerTokenAuth, Security}
-import com.gu.scanamo._
-import com.gu.scanamo.syntax._
+import org.scanamo._
+import org.scanamo.syntax._
+import org.scanamo.generic.auto._
 import com.theguardian.multimedia.archivehunter.common.ZonedDateTimeEncoder
 
 import javax.inject.{Inject, Named, Singleton}
@@ -50,25 +52,33 @@ class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner
 
   private val profileName = config.getOptional[String]("externalData.awsProfile")
 
-  private val conventionalClient = ddbClientMgr.getNewDynamoClient(profileName)
-  private val alpakkaClient = ddbClientMgr.getNewAlpakkaDynamoClient(config.getOptional[String]("externalData.awsProfile"))
+  private val scanamo = Scanamo(ddbClientMgr.getNewDynamoClient(profileName))
+  private val scanamoAlpakka = ScanamoAlpakka(ddbClientMgr.getNewAsyncDynamoClient(profileName))
 
   def newTarget = IsAdmin(circe.json[ScanTarget]) { _=> request=>
-    Scanamo.exec(conventionalClient)(table.put(request.body)).map({
-      case Left(writeError)=>
-        InternalServerError(GenericErrorResponse("error",writeError.toString).asJson)
-      case Right(createdScanTarget)=>
-        Ok(ObjectCreatedResponse[String]("created","scan_target",createdScanTarget.bucketName).asJson)
-    }).getOrElse(Ok(ObjectCreatedResponse[Option[String]]("created","scan_target",None).asJson))
+    try {
+      scanamo.exec(table.put(request.body))
+      Ok(ObjectCreatedResponse[String]("created","scan_target",request.body.bucketName).asJson)
+    } catch {
+      case err:Throwable=>
+        logger.error(s"Can't create scan target ${request.body.bucketName}: ${err.getMessage}", err)
+        InternalServerError(GenericErrorResponse("error",err.getMessage).asJson)
+    }
   }
 
   def removeTarget(targetName:String) = IsAdmin { _=> request=>
-    Scanamo.exec(ddbClientMgr.getNewDynamoClient(profileName))(table.delete('bucketName -> targetName))
-    Ok(ObjectCreatedResponse[String]("deleted", "scan_target", targetName).asJson)
+    try {
+      scanamo.exec(table.delete("bucketName" === targetName))
+      Ok(ObjectCreatedResponse[String]("deleted", "scan_target", targetName).asJson)
+    } catch {
+      case err:Throwable=>
+        logger.error(s"Can't create scan target $targetName: ${err.getMessage}", err)
+        InternalServerError(GenericErrorResponse("error",err.getMessage).asJson)
+    }
   }
 
   def get(targetName:String) = IsAdmin { _=> request=>
-    Scanamo.exec(ddbClientMgr.getNewDynamoClient(profileName))(table.get('bucketName -> targetName)).map({
+    scanamo.exec(table.get("bucketName"===targetName)).map({
       case Left(err) =>
         InternalServerError(GenericErrorResponse("database_error", err.toString).asJson)
       case Right(result) =>
@@ -77,25 +87,26 @@ class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner
   }
 
   def listScanTargets = IsAdminAsync { _=> request=>
-    ScanamoAlpakka.exec(alpakkaClient)(table.scan()).map({ result =>
-      val errors = result.collect({
-        case Left(readError) => readError
-      })
-
-      if (errors.isEmpty) {
-        val success = result.collect({
-          case Right(scanTarget) => scanTarget
+    scanTargetDAO.allScanTargets()
+      .map({ result =>
+        val errors = result.collect({
+          case Left(readError) => readError
         })
-        Ok(ObjectListResponse[List[ScanTarget]]("ok", "scan_target", success, success.length).asJson)
-      } else {
-        errors.foreach(err => logger.error(err.toString))
-        InternalServerError(GenericErrorResponse("error", errors.map(_.toString).mkString(",")).asJson)
-      }
-    })
+
+        if (errors.isEmpty) {
+          val success = result.collect({
+            case Right(scanTarget) => scanTarget
+          })
+          Ok(ObjectListResponse[List[ScanTarget]]("ok", "scan_target", success, success.length).asJson)
+        } else {
+          errors.foreach(err => logger.error(err.toString))
+          InternalServerError(GenericErrorResponse("error", errors.map(_.toString).mkString(",")).asJson)
+        }
+      })
   }
 
-  private def withLookup(targetName:String)(block: ScanTarget=>Result) = Scanamo
-    .exec(conventionalClient)(table.get('bucketName -> targetName ))
+  private def withLookup(targetName:String)(block: ScanTarget=>Result) = scanamo
+    .exec(table.get("bucketName"===targetName ))
     .map({
       case Left(error)=>
         InternalServerError(GenericErrorResponse("error", error.toString).asJson)
@@ -104,8 +115,8 @@ class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner
     })
     .getOrElse(NotFound(ObjectCreatedResponse[String]("not_found","scan_target",targetName).asJson))
 
-  private def withLookupAsync(targetName:String)(block: ScanTarget=>Future[Result]) = Scanamo
-    .exec(conventionalClient)(table.get('bucketName -> targetName ))
+  private def withLookupAsync(targetName:String)(block: ScanTarget=>Future[Result]) = scanamo
+    .exec(table.get("bucketName"===targetName ))
     .map({
       case Left(error)=>
         Future(InternalServerError(GenericErrorResponse("error", error.toString).asJson))
@@ -126,18 +137,18 @@ class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner
     val jobUuid = UUID.randomUUID()
     val job = JobModel(jobUuid.toString,jobType,Some(ZonedDateTime.now()),None,JobStatus.ST_RUNNING,None,tgt.bucketName,None,SourceType.SRC_SCANTARGET,lastUpdatedTS=None)
 
-    jobModelDAO.putJob(job).map({
-      case None=>
+    jobModelDAO
+      .putJob(job)
+      .flatMap(_=>{
         val updatedTarget = tgt.withAnotherPendingJob(job.jobId)
-        scanTargetDAO.put(updatedTarget)
-        block(job)
-      case Some(Right(rec))=>
-        val updatedTarget = tgt.withAnotherPendingJob(job.jobId)
-        scanTargetDAO.put(updatedTarget)
-        block(job)
-      case Some(Left(err))=>
-        InternalServerError(GenericErrorResponse("db_error",err.toString).asJson)
-    })
+        Future.fromTry(scanTargetDAO.put(updatedTarget))
+      })
+      .map(_=>block(job))
+      .recover({
+        case err:Throwable=>
+          logger.error(s"Could not create and save new scan job: ${err.getMessage}", err)
+          InternalServerError(GenericErrorResponse("db_error","Could not create and save scan job, see logs").asJson)
+      })
   }
 
   def manualTrigger(targetName:String) = IsAdminAsync { _=> request=>

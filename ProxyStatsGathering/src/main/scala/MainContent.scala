@@ -155,7 +155,7 @@ trait MainContent extends ProblemItemRequestBuilder with ProblemItemHitReader{
     }
   }
 
-  def runProblemItemFix = {
+  def runProblemItemFix(implicit httpClient:com.sksamuel.elastic4s.http.HttpClient) = {
    val result = getProblemItemSource(getProblemsIndexName)
      .map(_.to[ProblemItem]).log("fix-stream")
      .toMat(new ProblemItemDeleteIfEmpty(getProblemsIndexName))(Keep.right).run()

@@ -63,7 +63,7 @@ class IngestProxyQueue @Inject()(config: Configuration,
 
   override protected val notificationsQueue = config.get[String]("ingest.notificationsQueue")
 
-  private implicit val ddbClient = dynamoClientMgr.getNewAlpakkaDynamoClient(config.getOptional[String]("externalData.awsProfile"))
+  private implicit val ddbClient = dynamoClientMgr.getNewAsyncDynamoClient(config.getOptional[String]("externalData.awsProfile"))
   lazy val defaultRegion = config.getOptional[String]("externalData.awsRegion").getOrElse("eu-west-1")
 
   override def convertMessageBody(body: String): Either[io.circe.Error, IngestMessage] =

@@ -1,7 +1,7 @@
 package com.theguardian.multimedia.archivehunter.common
 
 import java.time.{ZoneId, ZonedDateTime}
-import akka.stream.alpakka.dynamodb.scaladsl.DynamoClient
+import akka.stream.alpakka.dynamodb.scaladsl.DynamoDb
 import com.amazonaws.services.s3.{AmazonS3, AmazonS3Client}
 import com.sksamuel.elastic4s.http.{ElasticClient, HttpClient}
 import com.theguardian.multimedia.archivehunter.common.StorageClass.StorageClass
@@ -10,9 +10,8 @@ import com.theguardian.multimedia.archivehunter.common.cmn_models.{IndexerError,
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 import org.apache.logging.log4j.LogManager
-//needed to serialize/deserialize ZonedDateTime, even if Intellij says it's not
-import io.circe.java8.time._
 import io.circe.generic.semiauto._
+import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
 
 object ArchiveEntry extends ((String, String, String, Option[String], Option[String], Long, ZonedDateTime, String, MimeType, Boolean, StorageClass, Seq[LightboxIndex], Boolean, Option[MediaMetadata])=>ArchiveEntry) with DocId {
   private val logger = LogManager.getLogger(getClass)
@@ -70,7 +69,7 @@ object ArchiveEntry extends ((String, String, String, Option[String], Option[Str
 
 case class ArchiveEntry(id:String, bucket: String, path: String, region:Option[String], file_extension: Option[String], size: scala.Long, last_modified: ZonedDateTime, etag: String, mimeType: MimeType, proxied: Boolean, storageClass:StorageClass, lightboxEntries:Seq[LightboxIndex], beenDeleted:Boolean=false, mediaMetadata:Option[MediaMetadata]) {
   private val logger = LogManager.getLogger(getClass)
-  def getProxy(proxyType: ProxyType.Value)(implicit proxyLocationDAO:ProxyLocationDAO, client:DynamoClient) = proxyLocationDAO.getProxy(id,proxyType)
+  def getProxy(proxyType: ProxyType.Value)(implicit proxyLocationDAO:ProxyLocationDAO, client:DynamoDbAsyncClient) = proxyLocationDAO.getProxy(id,proxyType)
 
   /**
     * register a new proxy against this item.  This operation consists of saving the given proxy id to the proxies table,
@@ -82,20 +81,13 @@ case class ArchiveEntry(id:String, bucket: String, path: String, region:Option[S
     * @param httpClient implicitly provided elastic4s HttpClient object to allow index save access
     * @return a Future, containing an [[ArchiveEntry]] representing the updated record.  This future fails on error.
     */
-  def registerNewProxy(proxy: ProxyLocation)(implicit proxyLocationDAO: ProxyLocationDAO, indexer:Indexer, client:DynamoClient, httpClient: ElasticClient):Future[ArchiveEntry] = {
+  def registerNewProxy(proxy: ProxyLocation)(implicit proxyLocationDAO: ProxyLocationDAO, indexer:Indexer, client:DynamoDbAsyncClient, httpClient: ElasticClient):Future[ArchiveEntry] = {
     proxyLocationDAO.saveProxy(proxy)
-      .map({
-        case Some(Right(result))=>
-          logger.info(s"Saved proxy info $proxy")
-          val updated = this.copy(proxied = true)
-          indexer.indexSingleItem(updated)
-          updated
-        case None=>
+      .map(_=>{
           logger.info(s"Saved proxy info $proxy (no result data)")
           val updated = this.copy(proxied = true)
           indexer.indexSingleItem(updated)
           updated
-        case Some(Left(err))=>throw new RuntimeException(err.toString)
       })
   }
 

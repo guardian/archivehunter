@@ -1,11 +1,9 @@
 import java.time.ZonedDateTime
-import akka.stream.ActorMaterializer
+import akka.stream.{ActorMaterializer, Materializer}
 import akka.stream.scaladsl.Source
 import akka.stream.scaladsl.{Keep, Sink}
-import cats.data.NonEmptyList
-import com.gu.scanamo.error.{DynamoReadError, InvalidPropertiesError, PropertyReadError}
 import com.sksamuel.elastic4s.http.{ElasticClient, HttpClient}
-import com.theguardian.multimedia.archivehunter.common.cmn_models.LightboxEntryDAO
+import com.theguardian.multimedia.archivehunter.common.cmn_models.{LightboxEntry, LightboxEntryDAO}
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer, MimeType, StorageClass}
 import helpers.LightboxStreamComponents.SaveLightboxEntryFlow
 import models.UserProfile
@@ -22,13 +20,13 @@ class SaveLightboxEntryFlowSpec extends Specification with Mockito {
         ZonedDateTime.now(),"fakeetag",MimeType("application","octet-stream"),false, StorageClass.STANDARD,Seq(), false,None)
       val testUserProfile = UserProfile("userEmail@company.org",false,Some("test"),Some("test"),Seq(),true,None,None,Some(12345678L),None,None,None)
 
-      implicit val mat = ActorMaterializer.create(system)
+      implicit val mat = Materializer.matFromSystem(system)
       implicit val ec:ExecutionContext = system.dispatcher
       implicit val lightboxEntryDAO = mock[LightboxEntryDAO]
       implicit val esClient = mock[ElasticClient]
       implicit val indexer = mock[Indexer]
 
-      lightboxEntryDAO.put(any)(any) returns Future(None)
+      lightboxEntryDAO.put(any)(any) returns Future(mock[LightboxEntry])
       val testelem = new SaveLightboxEntryFlow("test-bulk-id",testUserProfile)
 
       val testStream = Source(scala.collection.immutable.Iterable(testArchiveEntry)).viaMat(testelem)(Keep.right).to(Sink.ignore)
@@ -50,7 +48,7 @@ class SaveLightboxEntryFlowSpec extends Specification with Mockito {
       implicit val esClient = mock[ElasticClient]
       implicit val indexer = mock[Indexer]
 
-      lightboxEntryDAO.put(any)(any) returns Future(Some(Left(new InvalidPropertiesError(NonEmptyList(PropertyReadError("test",null), List())))))
+      lightboxEntryDAO.put(any)(any) returns Future.failed(new RuntimeException("test error"))
       val testelem = new SaveLightboxEntryFlow("test-bulk-id",testUserProfile)
 
       val testStream = Source(scala.collection.immutable.Iterable(testArchiveEntry)).viaMat(testelem)(Keep.right).to(Sink.ignore)

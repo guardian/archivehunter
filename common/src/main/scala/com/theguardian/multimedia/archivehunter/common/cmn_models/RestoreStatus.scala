@@ -1,6 +1,6 @@
 package com.theguardian.multimedia.archivehunter.common.cmn_models
 
-import com.gu.scanamo.DynamoFormat
+import org.scanamo.DynamoFormat
 import io.circe.{Decoder, Encoder}
 
 /**
@@ -17,10 +17,9 @@ object RestoreStatus extends Enumeration {
 }
 
 trait RestoreStatusEncoder {
-  implicit val restoreStatusEncoder = Encoder.enumEncoder(RestoreStatus)
-  implicit val restoreStatusDecoder = Decoder.enumDecoder(RestoreStatus)
+  implicit val restoreStatusEncoder = Encoder.encodeEnumeration(RestoreStatus)
+  implicit val restoreStatusDecoder = Decoder.decodeEnumeration(RestoreStatus)
 
   implicit val restoreStatusFormat = DynamoFormat.coercedXmap[RestoreStatus.Value,String,IllegalArgumentException](
-    input=>RestoreStatus.withName(input)
-  )(rs=>rs.toString)
+    input=>RestoreStatus.withName(input), rs=>rs.toString)
 }

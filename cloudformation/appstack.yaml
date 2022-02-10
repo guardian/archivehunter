@@ -1123,9 +1123,10 @@ Resources:
 
           akka.remote {
             log-remote-lifecycle-events = on
-            netty.tcp {
-              hostname = "${!LOCAL_IP}"
-              port = 2552
+            artery {
+                transport = tcp
+                hostname = "${!LOCAL_IP}"
+                canonical.port = 2552
             }
           }
 

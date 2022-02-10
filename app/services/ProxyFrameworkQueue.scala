@@ -92,7 +92,7 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
 
   override protected val notificationsQueue = config.get[String]("proxyFramework.notificationsQueue")
 
-  private implicit val ddbClient = dynamoClientMgr.getNewAlpakkaDynamoClient(config.getOptional[String]("externalData.awsProfile"))
+  private implicit val ddbClient = dynamoClientMgr.getNewAsyncDynamoClient(config.getOptional[String]("externalData.awsProfile"))
 
   protected implicit val esClient = esClientMgr.getClient()
   protected implicit val indexer = new Indexer(config.get[String]("externalData.indexName"))
@@ -209,15 +209,14 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
           Future(Left(err))
         case Right(proxyLocation) =>
           logger.info("Saving proxy location...")
-          proxyLocationDAO.saveProxy(proxyLocation).map({
-            case None =>
-              Right(None)
-            case Some(Left(err)) =>
-              Left(err.toString)
-            case Some(Right(updatedLocation)) =>
-              logger.info(s"Updated location: $updatedLocation")
-              Right(Some(updatedLocation))
-          })
+          proxyLocationDAO
+            .saveProxy(proxyLocation)
+            .map(_=>Right(proxyLocation))
+            .recover({
+              case err:Throwable=>
+                logger.error(s"Could not save proxy location for file id ${proxyLocation.fileId}: ${err.getMessage}", err)
+                Left(err.getMessage)
+            })
       })
   }
 
@@ -350,16 +349,11 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
 
         val updatedJobDesc = jobDesc.copy(jobStatus = actualStatus, completedAt = Some(ZonedDateTime.now()))
         jobModelDAO.putJob(updatedJobDesc).onComplete({
-          case Success(Some(Left(err)))=>
-            logger.error(s"Could not update job ${jobDesc.jobId}: $err")
-          case Success(Some(Right(rec)))=>
-            logger.info(s"Updated job ${jobDesc.jobId}")
-            sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle(receiptHandle))
-          case Success(None)=>
+          case Success(_)=>
             logger.info(s"Updated job ${jobDesc.jobId}")
             sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle(receiptHandle))
           case Failure(err)=>
-            logger.error(s"update thread failed: ", err)
+            logger.error(s"Could not update job ${jobDesc.jobId}: ${err.getMessage}", err)
         })
 
         if(actualStatus==JobStatus.ST_ERROR){
@@ -406,16 +400,12 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
         case Left(err)=>s"$err for ${msg.log}"
         case Right(log)=>log
       }))
-      jobModelDAO.putJob(updatedJob).map({
-        case None=>
-          logger.info(s"Job ${jobDesc.jobId} updated")
-          sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle(receiptHandle))
-          originalSender ! akka.actor.Status.Success
-        case Some(Right(mdl))=>
-          logger.info(s"Job ${jobDesc.jobId} updated")
-          sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle(receiptHandle))
-          originalSender ! akka.actor.Status.Success
-        case Some(Left(err))=>
+      jobModelDAO.putJob(updatedJob).map(_=> {
+        logger.info(s"Job ${jobDesc.jobId} updated")
+        sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle(receiptHandle))
+        originalSender ! akka.actor.Status.Success
+      }).recover({
+        case err:Throwable=>
           logger.error(s"Could not update job description: $err")
           originalSender ! akka.actor.Status.Failure(new RuntimeException(err.toString))
       })
@@ -441,9 +431,6 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
     case HandleRunning(msg, jobDesc, rq, receiptHandle, originalSender)=>
       val updatedJd = jobDesc.copy(jobStatus = JobStatus.ST_RUNNING)
       jobModelDAO.putJob(updatedJd).onComplete({
-        case Success(Some(Left(err)))=>
-          logger.error(s"Could not update job model in database: ${err.toString}")
-          originalSender ! akka.actor.Status.Failure(new RuntimeException(s"Could not update job model in database: ${err.toString}"))
         case Success(_)=>
           sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle(receiptHandle))
           originalSender ! akka.actor.Status.Success
@@ -491,9 +478,6 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
           })
         case Right(_) =>
           jobModelDAO.putJob(updatedJd).onComplete({
-            case Success(Some(Left(err)))=>
-              logger.error(s"Could not update job model in database: ${err.toString}")
-              originalSender ! akka.actor.Status.Failure(new RuntimeException(s"Could not update job model in database: ${err.toString}"))
             case Success(_)=>
               sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle(receiptHandle))
               originalSender ! akka.actor.Status.Success
@@ -521,9 +505,6 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
       )
 
       jobModelDAO.putJob(updatedJd).onComplete({
-        case Success(Some(Left(err)))=>
-          logger.error(s"Could not update job model in database: ${err.toString}")
-          originalSender ! akka.actor.Status.Failure(new RuntimeException(s"Could not update job model in database: ${err.toString}"))
         case Success(_)=>
           sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle(receiptHandle))
           originalSender ! akka.actor.Status.Success

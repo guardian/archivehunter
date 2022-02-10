@@ -55,16 +55,15 @@ class FileMoveActor @Inject() (config:Configuration,
                                esClientManager:ESClientManager,
                                dynamoClientManager: DynamoClientManager,
                                jobModelDAO: JobModelDAO,
-                               s3ClientManager: S3ClientManager)(implicit system:ActorSystem)
+                               s3ClientManager: S3ClientManager)(implicit system:ActorSystem, mat:Materializer)
   extends Actor {
   import FileMoveActor._
   import GenericMoveActor._
   import services.FileMove.GenericMoveActor._
 
   private val logger = LoggerFactory.getLogger(getClass)
-  private implicit val mat:Materializer = ActorMaterializer.create(system)
   private implicit val esClient = esClientManager.getClient()
-  private implicit val dynamoClient = dynamoClientManager.getNewAlpakkaDynamoClient(config.getOptional[String]("externalData.awsProfile"))
+  private implicit val dynamoClient = dynamoClientManager.getNewAsyncDynamoClient(config.getOptional[String]("externalData.awsProfile"))
 
   val indexName = config.getOptional[String]("externalData.indexName").getOrElse("archivehunter")
   private val indexer = new Indexer(indexName)
@@ -107,8 +106,9 @@ class FileMoveActor @Inject() (config:Configuration,
     case MoveFile(sourceFileId, destination, isAsync)=>
       val originalSender = sender()
       val newJob = JobModel.newJob("FileMove",sourceFileId,SourceType.SRC_MEDIA).copy(jobStatus = JobStatus.ST_RUNNING)
-      jobModelDAO.putJob(newJob).map({
-        case Some(Right(_)) | None =>
+      jobModelDAO
+        .putJob(newJob)
+        .map(_=>{
           val setupData = FileMoveTransientData.initialise(sourceFileId, destination.bucketName, destination.proxyBucket, destination.region)
 
           logger.info(s"Setting up file move with initial data $setupData")
@@ -133,7 +133,9 @@ class FileMoveActor @Inject() (config:Configuration,
           if(isAsync){
             originalSender ! MoveAsync(newJob.jobId)
           }
-        case Some(Left(err))=>
+      }).recover({
+        case err:Throwable=>
+          logger.error(s"Could not move file with id $sourceFileId to destination $destination: ${err.getMessage}", err)
           originalSender ! MoveFailed(err.toString)
       })
   }

@@ -202,27 +202,30 @@ class ProxyFramework @Inject()(config:Configuration,
     */
   def setupDeployment(rec:ProxyFrameworkInstance) = {
         logger.debug(s"Got stack info: $rec")
-        proxyFrameworkInstanceDAO.put(rec).flatMap({
-          case None=>
+        proxyFrameworkInstanceDAO
+          .put(rec)
+          .flatMap(_=> {
             logger.debug(s"Write succeeded, commencing setup...")
             attachFramework(rec).flatMap({
-              case Success(results)=>
+              case Success(results) =>
                 logger.debug(s"Subscription succeeded, updating record with subscription ID")
                 val updatedRec = rec.copy(subscriptionId = Some(results._1))
-                proxyFrameworkInstanceDAO.put(updatedRec).map({
-                  case None=>Success(results)
-                  case Some(Right(finalRec))=>Success(results)
-                  case Some(Left(err))=>Failure(new RuntimeException(s"Could not write to database: $err"))
-                })
-              case Failure(err)=>
+                proxyFrameworkInstanceDAO
+                  .put(updatedRec)
+                  .map(_=>Success(results))
+                  .recover({
+                    case err:Throwable=>
+                      logger.error(s"Can't write proxy framework instance to database: ${err.getMessage}", err)
+                      Failure(err)
+                  })
+              case Failure(err) =>
                 logger.error("Failed to attach framework to app instance")
                 Future(Failure(err))
             })
-          case Some(Right(updatedRecord))=>
-            logger.debug(s"Write succeeded, commencing setup...")
-            attachFramework(rec)
-          case Some(Left(err))=>
-            Future(Failure(new RuntimeException(s"Could not write to database: $err")))
+          }).recover({
+          case err:Throwable=>
+            logger.error(s"Can't set up proxy framework instance $rec: ${err.getMessage}", err)
+            Failure(err)
         })
   }
 }

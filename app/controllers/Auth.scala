@@ -150,15 +150,11 @@ class Auth @Inject() (config:Configuration,
             )
             userProfileDAO
               .put(newUserProfile)
-              .map({
-                case None=>
-                  logger.debug("userProfileDAO.put returned None, assuming saved")
-                  Right(newUserProfile)
-                case Some(Right(savedProfile))=>
-                  logger.debug("userProfileDAO.put returned a profile, assuming that is the one that was saved")
-                  Right(savedProfile)
-                case Some(Left(err))=>
-                  Left(err.toString)
+              .map(Right.apply)
+              .recover({
+                case err:Throwable=>
+                  logger.error(s"Could not save user profile for ${newUserProfile.userEmail}: ${err.getMessage}", err)
+                  Left(err.getMessage)
               })
           case Some(Left(dynamoErr))=>Future(Left(dynamoErr.toString))
           case Some(Right(userProfile))=>Future(Right(userProfile))

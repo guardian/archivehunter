@@ -1,16 +1,15 @@
 package services
 
 import java.util.UUID
-
 import akka.actor.{Actor, ActorRef, Timers}
-import com.amazonaws.services.dynamodbv2.document.Table
-import com.amazonaws.services.dynamodbv2.model._
 import com.theguardian.multimedia.archivehunter.common.ArchiveHunterConfiguration
 import com.theguardian.multimedia.archivehunter.common.clientManagers.DynamoClientManager
+
 import javax.inject.{Inject, Singleton}
 import play.api.Logger
+import software.amazon.awssdk.services.dynamodb.model.{DescribeTableRequest, GlobalSecondaryIndexUpdate, ProvisionedThroughput, TableDescription, TableStatus, UpdateGlobalSecondaryIndexAction, UpdateTableRequest}
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success, Try}
 import scala.concurrent.duration._
 
@@ -88,39 +87,45 @@ class DynamoCapacityActor @Inject() (ddbClientMgr:DynamoClientManager, config:Ar
     *         returned; if an update is required then Success(Some(GlobalSecondaryIndexUpdate())) is returned
     */
   def updateForIndex(rq:UpdateCapacityIndex, desc:TableDescription):Try[Option[GlobalSecondaryIndexUpdate]] = {
-    val indexDesc = desc.getGlobalSecondaryIndexes.asScala.find(_.getIndexName==rq.indexName) match {
+    val indexDesc = desc.globalSecondaryIndexes().asScala.find(_.indexName()==rq.indexName) match {
       case None=>
-        return Failure(new RuntimeException(s"Could not find index ${rq.indexName} on table ${desc.getTableName}"))
+        return Failure(new RuntimeException(s"Could not find index ${rq.indexName} on table ${desc.tableName()}"))
       case Some(idx)=>idx
     }
-    val currentThroughput = indexDesc.getProvisionedThroughput
+    val currentThroughput = indexDesc.provisionedThroughput()
 
     val actualReadTarget = rq.readTarget match {
-      case None=>currentThroughput.getReadCapacityUnits.toLong
+      case None=>currentThroughput.readCapacityUnits().toLong
       case Some(tgt)=>tgt.toLong
     }
 
     val actualWriteTarget = rq.writeTarget match {
-      case None=>currentThroughput.getWriteCapacityUnits.toLong
+      case None=>currentThroughput.writeCapacityUnits().toLong
       case Some(tgt)=>tgt.toLong
     }
 
-    if(currentThroughput.getReadCapacityUnits==actualReadTarget && currentThroughput.getWriteCapacityUnits==actualWriteTarget){
+    if(currentThroughput.readCapacityUnits()==actualReadTarget && currentThroughput.writeCapacityUnits()==actualWriteTarget){
       Success(None)
     } else {
-      Success(Some(new GlobalSecondaryIndexUpdate().withUpdate(
-        new UpdateGlobalSecondaryIndexAction().withIndexName(rq.indexName)
-          .withProvisionedThroughput(new ProvisionedThroughput()
-            .withReadCapacityUnits(actualReadTarget)
-            .withWriteCapacityUnits(actualWriteTarget)
+      Success(Some(GlobalSecondaryIndexUpdate.builder().update(
+        UpdateGlobalSecondaryIndexAction.builder()
+          .indexName(rq.indexName)
+          .provisionedThroughput(ProvisionedThroughput.builder()
+            .readCapacityUnits(actualReadTarget)
+            .writeCapacityUnits(actualWriteTarget)
+            .build()
           )
-        )
+          .build()
+        ).build()
       ))
     }
   }
 
+  private def makeDescribeTableRequest(tableName:String) =
+     DescribeTableRequest.builder().tableName(tableName).build()
+
   def getTableStatus(tableName: String):String =
-    ddbClient.describeTable(tableName).getTable.getTableStatus
+    ddbClient.describeTable(makeDescribeTableRequest(tableName)).table().tableStatusAsString()
 
   /**
     * recursively check the state of tables that need to be updated and dispatch the requested message to the requested
@@ -160,60 +165,61 @@ class DynamoCapacityActor @Inject() (ddbClientMgr:DynamoClientManager, config:Ar
     case TestGetCheckList=>
       sender() ! TestCheckListResponse(checkList)
     case tableRq: UpdateCapacityTable=>
-      val result = ddbClient.describeTable(tableRq.tableName)
-      if(result.getTable.getTableStatus!="ACTIVE"){
-        logger.warn(s"Can't update table status while it is in ${result.getTable.getTableStatus} state.")
-        sender ! TableWrongStateError(tableRq.tableName, result.getTable.getTableStatus, "ACTIVE")
+      val result = ddbClient.describeTable(makeDescribeTableRequest(tableRq.tableName))
+      if(result.table().tableStatus()!=TableStatus.ACTIVE){
+        logger.warn(s"Can't update table status while it is in ${result.table().tableStatusAsString()} state.")
+        sender() ! TableWrongStateError(tableRq.tableName, result.table().tableStatusAsString(), "ACTIVE")
       } else {
-        val tableThroughput = result.getTable.getProvisionedThroughput
+        val tableThroughput = result.table().provisionedThroughput()
 
-        val potentialIndexUpdate = tableRq.indexUpdates.map(updateForIndex(_, result.getTable))
+        val potentialIndexUpdate = tableRq.indexUpdates.map(updateForIndex(_, result.table()))
         val potentialIndexUpdateFailures = potentialIndexUpdate.collect({case Failure(err)=>err})
         if(potentialIndexUpdateFailures.nonEmpty){
           logger.error("Could not build list of index updates:")
           potentialIndexUpdateFailures.foreach(err=>logger.error("Index update list error: ", err))
-          sender ! InvalidRequestError(tableRq.tableName, potentialIndexUpdateFailures)
+          sender() ! InvalidRequestError(tableRq.tableName, potentialIndexUpdateFailures)
         } else {
           val indexUpdates = potentialIndexUpdate.collect({case Success(Some(update))=>update})
           val actualReadTarget = tableRq.readTarget match {
-            case None=>tableThroughput.getReadCapacityUnits.toLong
+            case None=>tableThroughput.readCapacityUnits().toLong
             case Some(target)=>target.toLong
           }
 
           val actualWriteTarget = tableRq.writeTarget match {
-            case None=>tableThroughput.getWriteCapacityUnits.toLong
+            case None=>tableThroughput.writeCapacityUnits().toLong
             case Some(target)=>target.toLong
           }
 
-          val rq = new UpdateTableRequest().withTableName(tableRq.tableName)
+          val rq = UpdateTableRequest.builder().tableName(tableRq.tableName)
 
-          if(tableThroughput.getReadCapacityUnits==0 && tableThroughput.getWriteCapacityUnits==0){
+          if(tableThroughput.readCapacityUnits()==0 && tableThroughput.writeCapacityUnits()==0){
             logger.info(s"Table ${tableRq.tableName} is in auto-provisioning mode, don't need to update.")
             tableRq.signalActor ! tableRq.signalMsg
             sender() ! UpdateRequestSuccess(tableRq.tableName, mustWait = false)
-          } else if(tableThroughput.getReadCapacityUnits==actualReadTarget && tableThroughput.getWriteCapacityUnits==actualWriteTarget && indexUpdates.isEmpty){
+          } else if(tableThroughput.readCapacityUnits()==actualReadTarget && tableThroughput.writeCapacityUnits()==actualWriteTarget && indexUpdates.isEmpty){
             logger.info(s"Table ${tableRq.tableName} and indices already have requested throughput")
             tableRq.signalActor ! tableRq.signalMsg
             sender() ! UpdateRequestSuccess(tableRq.tableName, mustWait = false)
           } else {
-            val rqWithTableUpdate = if (tableThroughput.getReadCapacityUnits != actualReadTarget || tableThroughput.getWriteCapacityUnits != actualWriteTarget) {
-              rq.withProvisionedThroughput(new ProvisionedThroughput()
-                .withReadCapacityUnits(actualReadTarget)
-                .withWriteCapacityUnits(actualWriteTarget)
+            val rqWithTableUpdate = if (tableThroughput.readCapacityUnits() != actualReadTarget || tableThroughput.writeCapacityUnits() != actualWriteTarget) {
+              rq.provisionedThroughput(ProvisionedThroughput.builder()
+                .readCapacityUnits(actualReadTarget)
+                .writeCapacityUnits(actualWriteTarget)
+                .build()
               )
             } else {
               rq
             }
 
             val rqWithIndexUpdate = if(indexUpdates.nonEmpty){
-              rq.withGlobalSecondaryIndexUpdates(indexUpdates.asJavaCollection)
+              rq.globalSecondaryIndexUpdates(indexUpdates.asJavaCollection)
             } else {
               rq
             }
 
             logger.info(s"Updating table ${tableRq.tableName} with capacity $actualReadTarget read, $actualWriteTarget write and index $indexUpdates")
 
-            val updateResult = ddbClient.updateTable(rq)
+            val updateResult = ddbClient.updateTable(rq.build())
             checkList ++= Seq(tableRq)
             sender() ! UpdateRequestSuccess(tableRq.tableName, mustWait = true)
           }

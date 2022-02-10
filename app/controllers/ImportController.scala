@@ -5,7 +5,6 @@ import akka.stream.Materializer
 import auth.{BearerTokenAuth, Security}
 import com.amazonaws.services.s3.AmazonS3
 import io.circe.generic.auto._
-import com.gu.scanamo.error.DynamoReadError
 import com.sksamuel.elastic4s.http.ElasticClient
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer, ProxyLocation, ProxyLocationDAO, ProxyTypeEncoder}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager}
@@ -18,6 +17,7 @@ import play.api.mvc.{AbstractController, ControllerComponents, Result}
 import requests.{ProxyImportRequest, SpecificImportRequest}
 import io.circe.generic.auto._
 import io.circe.syntax._
+import org.scanamo.DynamoReadError
 import org.slf4j.LoggerFactory
 import play.api.cache.SyncCacheApi
 import responses.{GenericErrorResponse, ObjectCreatedResponse}
@@ -49,8 +49,7 @@ class ImportController @Inject()(override val config:Configuration,
   private implicit val esClient = esClientMgr.getClient()
 
   private implicit val pathCacheIndexer = new PathCacheIndexer(config.getOptional[String]("externalData.pathCacheIndex").getOrElse("pathcache"), esClient)
-
-  private implicit val ddbAkkaClient = ddbClientMgr.getNewAlpakkaDynamoClient(awsProfile)
+  private implicit val ddbClient = ddbClientMgr.getNewAsyncDynamoClient(awsProfile)
   private implicit val indexer = indexerFactory.get()
 
   def writePathCacheEntries(newCacheEntries:Seq[PathCacheEntry])
@@ -149,13 +148,7 @@ class ImportController @Inject()(override val config:Configuration,
     * @return a Future which completes with the saved record on success and fails on error
     */
   private def wrapSaveProxy(newRecord:ProxyLocation) = {
-    proxyLocationDAO.saveProxy(newRecord).flatMap({
-      case None=>Future(newRecord)
-      case Some(Left(err))=>
-        Future.failed(new RuntimeException(err.toString))
-      case Some(Right(rec))=>
-        Future(rec)
-    })
+    proxyLocationDAO.saveProxy(newRecord).map(_=>newRecord)
   }
 
   /**

@@ -5,6 +5,7 @@ import akka.NotUsed
 import akka.actor.{Actor, ActorSystem, Timers}
 import akka.stream.scaladsl.{GraphDSL, Keep, RunnableGraph, Sink, Source}
 import akka.stream._
+import akka.stream.alpakka.s3.scaladsl.S3
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager}
 import com.amazonaws.regions.{Region, Regions}
 import com.google.inject.Injector
@@ -124,10 +125,9 @@ class BucketScanner @Inject()(override val config:Configuration, ddbClientMgr:Dy
     val completionPromise = Promise[Unit]()
 
     logger.info(s"Started scan for $target")
-    val client = s3ClientMgr.getAlpakkaS3Client(config.getOptional[String]("externalData.awsProfile"), region=Some(target.region))
     val esclient = esClientMgr.getClient()
 
-    val keySource = client.listBucket(target.bucketName, None)
+    val keySource = S3.listBucket(target.bucketName, None)
     val converterFlow = injector.getInstance(classOf[S3ToArchiveEntryFlow])
 
     val indexSink = getElasticSearchSink(esclient, completionPromise)
@@ -146,9 +146,7 @@ class BucketScanner @Inject()(override val config:Configuration, ddbClientMgr:Dy
     logger.warn(s"Configured to do paranoid scan on $target")
 
     val region = Region.getRegion(Regions.fromName(target.region))
-//    val hostname = s"s3-$region.amazonaws.com"
-//    val urlString = s"https://$hostname/${target.bucketName}"
-//
+
     val completionPromise = Promise[Unit]() //this promise will get fulfilled when the stream ends.
 
     val esclient = esClientMgr.getClient()
@@ -178,7 +176,6 @@ class BucketScanner @Inject()(override val config:Configuration, ddbClientMgr:Dy
   def doScanDeleted(target:ScanTarget):Promise[Unit] = {
     val completionPromise = Promise[Unit]()
 
-    val client = s3ClientMgr.getAlpakkaS3Client(config.getOptional[String]("externalData.awsProfile"), region=Some(target.region))
     val esclient = esClientMgr.getClient()
 
     val esSource = Source.fromPublisher(esclient.publisher(search(indexName) query s"bucket.keyword:${target.bucketName} AND beenDeleted:false" scroll "1m"))

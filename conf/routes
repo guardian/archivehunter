@@ -112,7 +112,6 @@ GET     /api/bulk/:tokenValue/get/:fileId   @controllers.BulkDownloadsController
 GET     /api/pathcache/size                 @controllers.PathCacheController.pathCacheSize
 PUT     /api/pathcache/rebuild              @controllers.PathCacheController.startCacheBuild(blankFirst:Boolean ?= false)
 
-POST    /api/rundatamigration                  @controllers.Application.runDataMigration
 POST    /api/import                         @controllers.ImportController.importFromPath
 POST    /api/importProxy                    @controllers.ImportController.importProxy
 

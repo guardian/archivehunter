@@ -12,7 +12,7 @@ import javax.inject.Inject
 import play.api.{Configuration, Logger}
 
 import scala.concurrent.ExecutionContext
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import io.circe.syntax._
 import io.circe.generic.auto._
 
@@ -55,7 +55,7 @@ trait GenericSqsActor[MsgType] extends Actor {
     })
   }
 
-  def handleGeneric(msg: SQSMsg) = msg match {
+  def handleGeneric(msg: SQSMsg):Unit = msg match {
     //dispatched to pull all messages off the queue. This "recurses" by dispatching itself if there are messages left on the queue.
     case HandleNextSqsMessage(rq:ReceiveMessageRequest)=>
       val result = sqsClient.receiveMessage(rq)
@@ -71,14 +71,14 @@ trait GenericSqsActor[MsgType] extends Actor {
             case Left(err)=>
               logger.error(s"Could not decode message from queue: $err")
               logger.error(s"Message was ${msg.getBody}")
-              sender ! Status.Failure
+              sender() ! Status.Failure
             case Right(finalMsg)=>
               ownRef ! HandleDomainMessage(finalMsg, rq, msg.getReceiptHandle)
           }
         })
         ownRef ! HandleNextSqsMessage(rq)
       } else {
-        sender ! Status.Success
+        sender() ! Status.Success
       }
 
     case CheckForNotifications=>
@@ -88,7 +88,7 @@ trait GenericSqsActor[MsgType] extends Actor {
         .withMaxNumberOfMessages(10)
       if(notificationsQueue=="queueUrl"){
         logger.warn("notifications queue not set up in applications.conf")
-        sender ! Status.Failure
+        sender() ! Status.Failure
       } else {
         ownRef ! HandleNextSqsMessage(rq)
       }

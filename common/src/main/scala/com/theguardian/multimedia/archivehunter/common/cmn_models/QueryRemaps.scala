@@ -1,6 +1,6 @@
 package com.theguardian.multimedia.archivehunter.common.cmn_models
 
-import com.gu.scanamo.error.DynamoReadError
+import org.scanamo.DynamoReadError
 
 import scala.concurrent.{ExecutionContext, Future}
 

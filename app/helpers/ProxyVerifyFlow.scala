@@ -25,7 +25,6 @@ class ProxyVerifyFlow @Inject()(config:Configuration, ddbClientMgr:DynamoClientM
   private val out:Outlet[ArchiveEntry] = Outlet.create("ProxyVerifyFlow.in")
 
   private val awsProfile = config.getOptional[String]("externalData.awsProfile")
-  private val proxyTableName = config.get[String]("proxies.tableName")
   val logger = Logger(getClass)
 
   private implicit val ec:ExecutionContext = system.dispatcher
@@ -34,7 +33,7 @@ class ProxyVerifyFlow @Inject()(config:Configuration, ddbClientMgr:DynamoClientM
   override def shape: FlowShape[ArchiveEntry, ArchiveEntry] = FlowShape.of(in,out)
 
   override def createLogic(inheritedAttributes: Attributes): GraphStageLogic = new GraphStageLogic(shape) {
-    private implicit val ddbClient = ddbClientMgr.getNewAlpakkaDynamoClient(awsProfile)
+    private implicit val ddbClient = ddbClientMgr.getNewAsyncDynamoClient(awsProfile)
 
     setHandler(in, new AbstractInHandler {
       override def onPush(): Unit = {

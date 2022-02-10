@@ -2,9 +2,7 @@ package TestFileMove
 
 import java.time.ZonedDateTime
 import akka.actor.Props
-import akka.stream.alpakka.dynamodb.scaladsl.DynamoClient
-import com.amazonaws.services.dynamodbv2.model.DeleteItemResult
-import com.gu.scanamo.error.{DynamoReadError, InvalidPropertiesError, PropertyReadError}
+import org.scanamo.{DynamoReadError, InvalidPropertiesError}
 import com.sksamuel.elastic4s.http.delete.DeleteResponse
 import com.sksamuel.elastic4s.http.{ElasticClient, ElasticError, HttpClient, RequestFailure, Response}
 import com.theguardian.multimedia.archivehunter.common._
@@ -13,6 +11,7 @@ import org.specs2.mock.Mockito
 import org.specs2.mutable.Specification
 import services.FileMove.GenericMoveActor.{FileMoveTransientData, MoveActorMessage, PerformStep, RollbackStep, StepFailed, StepSucceeded}
 import services.FileMove.UpdateIndexRecords
+import software.amazon.awssdk.services.dynamodb.{DynamoDbAsyncClient, DynamoDbClient}
 
 import scala.concurrent.{Await, Future}
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -26,7 +25,7 @@ class UpdateIndexRecordsSpec extends Specification with Mockito {
   "UpdateIndexRecords!PerformStep" should {
     "create a new index record for the copied file, register copied proxies and delete the original record and original proxies" in new AkkaTestkitSpecs2Support {
       implicit val esClient = mock[ElasticClient]
-      implicit val ddbClient = mock[DynamoClient]
+      implicit val ddbClient = mock[DynamoDbAsyncClient]
 
       val mockedIndexer = mock[Indexer]
 
@@ -38,8 +37,8 @@ class UpdateIndexRecordsSpec extends Specification with Mockito {
       mockedIndexer.deleteById(any)(any) returns Future(mock[Response[DeleteResponse]])
 
       val mockedProxyLocationDAO = mock[ProxyLocationDAO]
-      mockedProxyLocationDAO.saveProxy(any)(any) returns Future(None)
-      mockedProxyLocationDAO.deleteProxyRecord(any)(any) returns Future(Right(mock[DeleteItemResult]))
+      mockedProxyLocationDAO.saveProxy(any)(any) returns Future(mock[ProxyLocation])
+      mockedProxyLocationDAO.deleteProxyRecord(any)(any) returns Future(Right( () ))
       val sourceProxyList = Seq(
         ProxyLocation("fake-id","proxyid1",ProxyType.VIDEO,"source-proxy-bucket","path/to/proxy1",None,StorageClass.STANDARD),
         ProxyLocation("fake-id","proxyid2",ProxyType.AUDIO,"source-proxy-bucket","path/to/proxy2",None,StorageClass.STANDARD),
@@ -72,20 +71,20 @@ class UpdateIndexRecordsSpec extends Specification with Mockito {
 
     "not delete the original record if the copy fails" in new AkkaTestkitSpecs2Support {
       implicit val esClient = mock[ElasticClient]
-      implicit val ddbClient = mock[DynamoClient]
+      implicit val ddbClient = mock[DynamoDbAsyncClient]
 
       val mockedIndexer = mock[Indexer]
 
       val testItem = ArchiveEntry("fake-id","sourcebucket","/path/to/file",None,None,1234L,ZonedDateTime.now(),"fake-etag",
-        MimeType.fromString("video/quicktime").right.get,true,StorageClass.STANDARD_IA,Seq(), false,None)
+        MimeType.fromString("video/quicktime").toOption.get,true,StorageClass.STANDARD_IA,Seq(), false,None)
 
       mockedIndexer.getById(any)(any) returns Future(testItem)
       mockedIndexer.indexSingleItem(any,any,any)(any) returns Future(Left(ESError("some-item", ElasticError("kersplat","kersplat",None,None,None,Seq(),None))))
       mockedIndexer.deleteById(any)(any) returns Future(mock[Response[DeleteResponse]])
 
       val mockedProxyLocationDAO = mock[ProxyLocationDAO]
-      mockedProxyLocationDAO.saveProxy(any)(any) returns Future(None)
-      mockedProxyLocationDAO.deleteProxyRecord(any)(any) returns Future(Right(mock[DeleteItemResult]))
+      mockedProxyLocationDAO.saveProxy(any)(any) returns Future(mock[ProxyLocation])
+      mockedProxyLocationDAO.deleteProxyRecord(any)(any) returns Future(Right( () ))
       val sourceProxyList = Seq(
         ProxyLocation("fake-id","proxyid1",ProxyType.VIDEO,"source-proxy-bucket","path/to/proxy1",None,StorageClass.STANDARD),
         ProxyLocation("fake-id","proxyid2",ProxyType.AUDIO,"source-proxy-bucket","path/to/proxy2",None,StorageClass.STANDARD),
@@ -115,7 +114,7 @@ class UpdateIndexRecordsSpec extends Specification with Mockito {
 
     "not delete the original record if any proxy copy fails" in new AkkaTestkitSpecs2Support {
       implicit val esClient = mock[ElasticClient]
-      implicit val ddbClient = mock[DynamoClient]
+      implicit val ddbClient = mock[DynamoDbAsyncClient]
 
       val mockedIndexer = mock[Indexer]
 
@@ -127,8 +126,8 @@ class UpdateIndexRecordsSpec extends Specification with Mockito {
       mockedIndexer.deleteById(any)(any) returns Future(mock[Response[DeleteResponse]])
 
       val mockedProxyLocationDAO = mock[ProxyLocationDAO]
-      mockedProxyLocationDAO.saveProxy(any)(any) returns Future(None) thenReturns Future(None) thenReturns Future(Some(Left(mock[DynamoReadError])))
-      mockedProxyLocationDAO.deleteProxyRecord(any)(any) returns Future(Right(mock[DeleteItemResult]))
+      mockedProxyLocationDAO.saveProxy(any)(any) returns Future(mock[ProxyLocation]) thenReturns Future(mock[ProxyLocation]) thenReturns Future.failed(new RuntimeException("test error"))
+      mockedProxyLocationDAO.deleteProxyRecord(any)(any) returns Future(Right( () ))
       val sourceProxyList = Seq(
         ProxyLocation("fake-id","proxyid1",ProxyType.VIDEO,"source-proxy-bucket","path/to/proxy1",None,StorageClass.STANDARD),
         ProxyLocation("fake-id","proxyid2",ProxyType.AUDIO,"source-proxy-bucket","path/to/proxy2",None,StorageClass.STANDARD),
@@ -160,7 +159,7 @@ class UpdateIndexRecordsSpec extends Specification with Mockito {
 
     "return a failure if at least one of the proxies fails to copy" in new AkkaTestkitSpecs2Support {
       implicit val esClient = mock[ElasticClient]
-      implicit val ddbClient = mock[DynamoClient]
+      implicit val ddbClient = mock[DynamoDbAsyncClient]
 
       val mockedIndexer = mock[Indexer]
 
@@ -172,7 +171,7 @@ class UpdateIndexRecordsSpec extends Specification with Mockito {
 
       val mockedProxyLocationDAO = mock[ProxyLocationDAO]
       val pretendError = mock[DynamoReadError]
-      mockedProxyLocationDAO.saveProxy(any)(any) returns Future(None) thenReturns Future(Some(Left(pretendError)))
+      mockedProxyLocationDAO.saveProxy(any)(any) returns Future(mock[ProxyLocation]) thenReturns Future.failed(new RuntimeException("pretend error"))
       val sourceProxyList = Seq(
         ProxyLocation("fake-id","proxyid1",ProxyType.VIDEO,"source-proxy-bucket","path/to/proxy1",None,StorageClass.STANDARD),
         ProxyLocation("fake-id","proxyid2",ProxyType.AUDIO,"source-proxy-bucket","path/to/proxy2",None,StorageClass.STANDARD),
@@ -205,7 +204,7 @@ class UpdateIndexRecordsSpec extends Specification with Mockito {
   "UpdateIndexRecords!RollbackStep" should {
     "copy the destination ArchiveEntry record back to the original ID and then delete the former destination" in new AkkaTestkitSpecs2Support {
       implicit val esClient = mock[ElasticClient]
-      implicit val ddbClient = mock[DynamoClient]
+      implicit val ddbClient = mock[DynamoDbAsyncClient]
 
       val mockedIndexer = mock[Indexer]
 
@@ -216,8 +215,8 @@ class UpdateIndexRecordsSpec extends Specification with Mockito {
       mockedIndexer.indexSingleItem(any,any,any)(any) returns Future(Right("some-id"))
 
       val mockedProxyLocationDAO = mock[ProxyLocationDAO]
-      mockedProxyLocationDAO.saveProxy(any)(any) returns Future(None)
-      mockedProxyLocationDAO.deleteProxyRecord(any)(any) returns Future(Right(mock[DeleteItemResult]))
+      mockedProxyLocationDAO.saveProxy(any)(any) returns Future(mock[ProxyLocation])
+      mockedProxyLocationDAO.deleteProxyRecord(any)(any) returns Future(Right( () ))
 
       val sourceProxyList = Seq(
         ProxyLocation("fake-id","proxyid1",ProxyType.VIDEO,"source-proxy-bucket","path/to/proxy1",None,StorageClass.STANDARD),

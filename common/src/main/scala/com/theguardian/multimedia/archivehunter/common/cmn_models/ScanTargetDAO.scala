@@ -1,25 +1,25 @@
 package com.theguardian.multimedia.archivehunter.common.cmn_models
 
 import java.time.ZonedDateTime
-
 import akka.actor.ActorSystem
+import akka.stream.scaladsl.Sink
 import akka.stream.{ActorMaterializer, Materializer}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.DynamoClientManager
-import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsync
-import com.gu.scanamo.error.DynamoReadError
-import com.gu.scanamo.{Scanamo, ScanamoAlpakka, Table}
+import org.scanamo.{DynamoReadError, Scanamo, ScanamoAlpakka, Table}
 import com.theguardian.multimedia.archivehunter.common.{ArchiveHunterConfiguration, ExtValueConverters, ZonedDateTimeEncoder}
-import javax.inject.{Inject, Singleton}
 
+import javax.inject.{Inject, Singleton}
 import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.math._
 import io.circe.generic.auto._
 import io.circe.syntax._
-import com.gu.scanamo.syntax._
+import org.scanamo.syntax._
+import org.scanamo.generic.auto._
 import com.theguardian.multimedia.archivehunter.common.cmn_helpers.ZonedTimeFormat
 import org.apache.logging.log4j.LogManager
+import software.amazon.awssdk.services.dynamodb.DynamoDbClient
 
 @Singleton
 class ScanTargetDAO @Inject()(config:ArchiveHunterConfiguration, ddbClientMgr: DynamoClientManager)(implicit actorSystem:ActorSystem)
@@ -35,8 +35,9 @@ class ScanTargetDAO @Inject()(config:ArchiveHunterConfiguration, ddbClientMgr: D
 
   implicit private val materializer:Materializer = ActorMaterializer.create(actorSystem)
 
-  val alpakkaClient = ddbClientMgr.getNewAlpakkaDynamoClient(config.getOptional[String]("externalData.awsProfile"))
-  implicit val client = ddbClientMgr.getNewDynamoClient(config.getOptional[String]("externalData.awsProfile"))
+  val scanamoAlpakka = ScanamoAlpakka(ddbClientMgr.getNewAsyncDynamoClient(config.getOptional[String]("externalData.awsProfile")))
+  implicit val ddbClient : DynamoDbClient = ddbClientMgr.getNewDynamoClient(config.getOptional[String]("externalData.awsProfile"))
+  val scanamo = Scanamo(ddbClient)
 
   private var cachedLookupTable:Map[String, (ScanTarget, ZonedDateTime)] = Map()
 
@@ -64,9 +65,9 @@ class ScanTargetDAO @Inject()(config:ArchiveHunterConfiguration, ddbClientMgr: D
     * @param attempt attempt that we are making
     * @return a Try, with Failure if we have attemped [[maxRetries]] or a [[ScanTarget]] if successful
     */
-  private def doNextRetry(updatedRecord:ScanTarget, delayTime:Double, attempt:Int)(implicit client:AmazonDynamoDBAsync):Try[ScanTarget] = {
-    Scanamo.exec(client)(table.put(updatedRecord)).map({
-      case Left(error)=>
+  private def doNextRetry(updatedRecord:ScanTarget, delayTime:Double, attempt:Int):Try[ScanTarget] = {
+    Try { scanamo.exec(table.put(updatedRecord)) } match {
+      case Failure(error)=>
         logger.warn(s"Could not update record on attempt $attempt: ${error.toString}")
         if(attempt<maxRetries){
           Thread.sleep((delayTime*1000.0).toLong)
@@ -75,8 +76,8 @@ class ScanTargetDAO @Inject()(config:ArchiveHunterConfiguration, ddbClientMgr: D
           logger.error(s"Still can't update record after $attempt attempts, bailing")
           Failure(new RuntimeException(error.toString))
         }
-      case Right(scanTarget)=>Success(scanTarget)
-    }).getOrElse(Success(updatedRecord))  //return the updated record
+      case Success(_)=>Success(updatedRecord)
+    }
   }
 
   /**
@@ -121,9 +122,9 @@ class ScanTargetDAO @Inject()(config:ArchiveHunterConfiguration, ddbClientMgr: D
     * @return a Future, which contains None if no record was found, Left(DynamoReadError) if an error occurred or Right(ScanTarget) if a record was found.
     */
   def targetForBucket(bucketName:String):Future[Option[Either[DynamoReadError,ScanTarget]]] = {
-    ScanamoAlpakka.exec(alpakkaClient)(
-      table.get('bucketName->bucketName)
-    )
+    scanamoAlpakka.exec(
+      table.get("bucketName"===bucketName)
+    ).runWith(Sink.head)
   }
 
   /**
@@ -142,16 +143,22 @@ class ScanTargetDAO @Inject()(config:ArchiveHunterConfiguration, ddbClientMgr: D
     })
   }
 
-  def allScanTargets():Future[List[Either[DynamoReadError,ScanTarget]]] = ScanamoAlpakka.exec(alpakkaClient)(table.scan())
+  def allScanTargets():Future[List[Either[DynamoReadError,ScanTarget]]] = {
+    val sink = Sink.fold[List[Either[DynamoReadError, ScanTarget]], List[Either[DynamoReadError, ScanTarget]]](List())(_ ++ _)
+    scanamoAlpakka.exec(table.scan()).runWith(sink)
+  }
 
   def get(scanTargetName:String) = {
     lookupCachedScanTarget(scanTargetName) match {
       case Some(scanTarget) => Future(Some(Right(scanTarget)))
       case None =>
-        ScanamoAlpakka.exec(alpakkaClient)(table.get('bucketName -> scanTargetName)).map(_.map(_.map(scanTarget=>{
-          addToCache(scanTargetName, scanTarget)
-          scanTarget
-        })))
+        scanamoAlpakka
+          .exec(table.get("bucketName" === scanTargetName))
+          .runWith(Sink.head)
+          .map(_.map(_.map(scanTarget=>{
+            addToCache(scanTargetName, scanTarget)
+            scanTarget
+          })))
     }
   }
 

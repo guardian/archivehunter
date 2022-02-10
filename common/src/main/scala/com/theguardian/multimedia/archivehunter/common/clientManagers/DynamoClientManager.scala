@@ -1,32 +1,23 @@
 package com.theguardian.multimedia.archivehunter.common.clientManagers
 
-import akka.actor.ActorSystem
-import akka.stream.Materializer
-import akka.stream.alpakka.dynamodb.impl.DynamoSettings
-import akka.stream.alpakka.dynamodb.scaladsl.DynamoClient
-import com.amazonaws.auth.profile.ProfileCredentialsProvider
-import com.amazonaws.auth.{AWSCredentialsProviderChain, ContainerCredentialsProvider, InstanceProfileCredentialsProvider}
-import com.amazonaws.services.dynamodbv2.{AmazonDynamoDBAsync, AmazonDynamoDBAsyncClientBuilder}
 import com.theguardian.multimedia.archivehunter.common.ArchiveHunterConfiguration
+import software.amazon.awssdk.services.dynamodb.{DynamoDbAsyncClient, DynamoDbAsyncClientBuilder, DynamoDbClient}
+import software.amazon.awssdk.http.nio.netty.NettyNioAsyncHttpClient
+
 import javax.inject.{Inject, Singleton}
 
 @Singleton
-class DynamoClientManager @Inject() (config:ArchiveHunterConfiguration) extends ClientManagerBase [AmazonDynamoDBAsync]{
+class DynamoClientManager @Inject() (config:ArchiveHunterConfiguration) extends ClientManagerBase [DynamoDbClient]{
+  override def getClient(profileName: Option[String]): DynamoDbClient = getNewDynamoClient(profileName)
 
-  override def getClient(profileName: Option[String]): AmazonDynamoDBAsync = getNewDynamoClient(profileName)
-  def getNewDynamoClient(profileName:Option[String]=None) =
-    AmazonDynamoDBAsyncClientBuilder.standard().withCredentials(credentialsProvider(profileName)).build()
+  def getNewDynamoClient(profileName: Option[String]) =
+    DynamoDbClient.builder().credentialsProvider(newCredentialsProvider(profileName)).build()
 
-
-  def getNewAlpakkaDynamoClient(profileName:Option[String]=None)(implicit system:ActorSystem, mat:Materializer) =
-    DynamoClient(
-      DynamoSettings(
-        config.get[String]("externalData.awsRegion"),
-        config.get[String]("externalData.ddbHost"),
-        443,
-        32,
-        credentialsProvider(profileName)
+  def getNewAsyncDynamoClient(profileName:Option[String]=None) =
+    DynamoDbAsyncClient.builder()
+      .httpClientBuilder(  //we need to specify an explicit client as the runtime won't choose for us
+        NettyNioAsyncHttpClient.builder().maxConcurrency(100).maxPendingConnectionAcquires(10_000)
       )
-    )
-
+      .credentialsProvider(newCredentialsProvider(profileName))
+      .build()
 }

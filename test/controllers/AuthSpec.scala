@@ -3,8 +3,6 @@ package controllers
 import akka.http.scaladsl.HttpExt
 import akka.http.scaladsl.model.{HttpEntity, HttpRequest, HttpResponse, StatusCodes}
 import auth.{BearerTokenAuth, LoginResultOK}
-import com.amazonaws.services.dynamodbv2.model.DeleteItemResult
-import com.google.inject.AbstractModule
 import com.nimbusds.jwt.JWTClaimsSet
 import com.theguardian.multimedia.archivehunter.common.clientManagers.DynamoClientManager
 import controllers.Auth.OAuthResponse
@@ -12,8 +10,6 @@ import helpers.HttpClientFactory
 import models.{OAuthTokenEntry, OAuthTokenEntryDAO, UserProfile, UserProfileDAO}
 import org.specs2.mock.Mockito
 import org.specs2.mutable.Specification
-import play.api.Configuration
-import play.api.inject.Module
 import play.api.inject.guice.{GuiceApplicationBuilder, GuiceableModule}
 import play.api.test.WithApplication
 import play.api.test._
@@ -205,7 +201,7 @@ class AuthSpec extends Specification with Mockito {
 
       mockBearerToken.validateToken(any) returns Right(LoginResultOK(mockClaims))
       mockUserProfileDAO.userProfileForEmail(any) returns Future(None)
-      mockUserProfileDAO.put(any) returns Future(None)
+      mockUserProfileDAO.put(any) returns Future(UserProfile("someuser@mycompany.org",false,None,None,Seq(),true,None,None,None,None,None,None))
       mockOAuthTokenDAO.saveToken(any,any,any) returns Future(mock[OAuthTokenEntry])
 
       new WithApplication(buildMyApp(Some(mockClientFactory), mockUserProfileDAO, Some(mockBearerToken), Some(mockOAuthTokenDAO))) {
@@ -293,7 +289,7 @@ class AuthSpec extends Specification with Mockito {
       mockUserProfileDAO.userProfileForEmail(any) returns Future(Some(Right(fakeUserProfile)))
       mockOAuthTokenDAO.saveToken(any,any,any) returns Future(fakeUpdatedRefreshToken)
       mockOAuthTokenDAO.lookupToken(any) returns Future(Some(fakeExistingRefreshToken))
-      mockOAuthTokenDAO.removeUsedToken(any) returns Future(new DeleteItemResult())
+      mockOAuthTokenDAO.removeUsedToken(any) returns Future( () )
 
       new WithApplication(buildMyApp(Some(mockClientFactory), mockUserProfileDAO, Some(mockBearerToken), Some(mockOAuthTokenDAO))) {
         val result = route(app,
