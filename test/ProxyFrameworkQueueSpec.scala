@@ -53,6 +53,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
       mockedIndexer.getById(any)(any) returns Future(mockedEntry)
       mockedIndexer.indexSingleItem(any,any,any)(any) returns Future(Right("fake-id"))
 
+      implicit val fakeProxyLocationDAO = mock[ProxyLocationDAO]
       val toTest = system.actorOf(Props(new ProxyFrameworkQueue(
         Configuration.from(Map("proxyFramework.notificationsQueue" -> "someQueue", "externalData.indexName" -> "someIndex", "externalData.problemItemsIndex" -> "problem-items")),
         system,
@@ -62,7 +63,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
         mockedJobModelDAO,
         mockedScanTargetDAO,
         mock[ESClientManager]
-      )(mock[ProxyLocationDAO]) {
+      ) {
         override val sqsClient = mockedSqsClient
 
         override def thumbnailJobOriginalMedia(jobDesc: JobModel): Future[Either[String, ArchiveEntry]] = Future(Right(mockedArchiveEntry))
@@ -109,7 +110,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
       mockedIndexer.getById(any)(any) returns Future(mockedEntry)
       mockedIndexer.indexSingleItem(any,any,any)(any) returns Future(Right("fake-id"))
 
-
+      implicit val fakeProxyLocationDAO = mock[ProxyLocationDAO]
       val toTest = system.actorOf(Props(new ProxyFrameworkQueue(
         Configuration.from(Map("proxyFramework.notificationsQueue" -> "someQueue", "externalData.indexName" -> "someIndex", "externalData.problemItemsIndex" -> "problem-items")),
         system,
@@ -119,7 +120,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
         mockedJobModelDAO,
         mockedScanTargetDAO,
         mock[ESClientManager]
-      )(mock[ProxyLocationDAO]) {
+      ){
         override val sqsClient = mockedSqsClient
 
         override def thumbnailJobOriginalMedia(jobDesc: JobModel): Future[Either[String, ArchiveEntry]] = Future(Left("So there"))
@@ -157,6 +158,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
       val mockedSqsClient = mock[AmazonSQS]
       mockedSqsClient.deleteMessage(any) returns new DeleteMessageResult()
 
+      implicit val fakeProxyLocationDAO = mock[ProxyLocationDAO]
       val toTest = system.actorOf(Props(new ProxyFrameworkQueue(
         Configuration.from(Map("proxyFramework.notificationsQueue" -> "someQueue", "externalData.indexName" -> "someIndex", "externalData.problemItemsIndex" -> "problem-items")),
         system,
@@ -166,7 +168,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
         mockedJobModelDAO,
         mockedScanTargetDAO,
         mock[ESClientManager]
-      )(mock[ProxyLocationDAO]) {
+      ) {
         override protected val sqsClient = mockedSqsClient
       }
       ))
@@ -198,6 +200,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
       val mockedSqsClient = mock[AmazonSQS]
       mockedSqsClient.deleteMessage(any) returns new DeleteMessageResult()
 
+      implicit val fakeProxyLocationDAO = mock[ProxyLocationDAO]
       val toTest = system.actorOf(Props(new ProxyFrameworkQueue(
         Configuration.from(Map(
           "proxyFramework.notificationsQueue" -> "someQueue",
@@ -211,7 +214,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
         mockedJobModelDAO,
         mockedScanTargetDAO,
         mock[ESClientManager]
-      )(mock[ProxyLocationDAO]) {
+      ) {
         override protected val sqsClient = mockedSqsClient
       }
       ))
@@ -248,6 +251,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
       val mockedSqsClient = mock[AmazonSQS]
       mockedSqsClient.deleteMessage(any) returns new DeleteMessageResult()
 
+      implicit val fakeProxyLocationDAO = mock[ProxyLocationDAO]
       val toTest = system.actorOf(Props(new ProxyFrameworkQueue(
         Configuration.from(Map("proxyFramework.notificationsQueue" -> "someQueue", "externalData.indexName" -> "someIndex", "externalData.problemItemsIndex" -> "problem-items")),
         system,
@@ -257,7 +261,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
         mockedJobModelDAO,
         mockedScanTargetDAO,
         mock[ESClientManager]
-      )(mock[ProxyLocationDAO]) {
+      ) {
         override protected val sqsClient = mockedSqsClient
         override protected val ownRef = testProbeRef
       }
@@ -294,6 +298,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
       val mockedSqsClient = mock[AmazonSQS]
       mockedSqsClient.deleteMessage(any) returns new DeleteMessageResult()
 
+      implicit val fakeProxyLocationDAO = mock[ProxyLocationDAO]
       val toTest = system.actorOf(Props(new ProxyFrameworkQueue(
         Configuration.from(Map("proxyFramework.notificationsQueue" -> "someQueue", "externalData.indexName" -> "someIndex", "externalData.problemItemsIndex" -> "problem-items")),
         system,
@@ -303,7 +308,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
         mockedJobModelDAO,
         mockedScanTargetDAO,
         mock[ESClientManager]
-      )(mock[ProxyLocationDAO]) {
+      ) {
         override protected val sqsClient = mockedSqsClient
         override protected val ownRef = testProbeRef
       }
@@ -378,6 +383,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
         val mockThumnailJobOriginalMedia = mock[Function1[JobModel, Future[Either[String, ArchiveEntry]]]]
         mockThumnailJobOriginalMedia.apply(any) returns Future(Right(mockedArchiveEntry))
 
+        implicit val fakeProxyLocationDAO = mock[ProxyLocationDAO]
         val toTest = system.actorOf(Props(new ProxyFrameworkQueue(
           Configuration.from(Map("proxyFramework.notificationsQueue" -> "someQueue", "externalData.indexName" -> "someIndex", "externalData.problemItemsIndex" -> "problem-items")),
           system,
@@ -387,7 +393,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
           mockedJobModelDAO,
           mockedScanTargetDAO,
           mock[ESClientManager]
-        )(mock[ProxyLocationDAO]) {
+        ) {
           override protected val sqsClient = mockedSqsClient
 
           override def thumbnailJobOriginalMedia(jobDesc: JobModel): Future[Either[String, ArchiveEntry]] = mockThumnailJobOriginalMedia(jobDesc)
@@ -430,6 +436,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
         val mockThumnailJobOriginalMedia = mock[Function1[JobModel, Future[Either[String, ArchiveEntry]]]]
         mockThumnailJobOriginalMedia.apply(any) returns Future(Right(mockedArchiveEntry))
 
+        implicit val fakeProxyLocationDAO = mock[ProxyLocationDAO]
         val toTest = system.actorOf(Props(new ProxyFrameworkQueue(
           Configuration.from(Map("proxyFramework.notificationsQueue" -> "someQueue", "externalData.indexName" -> "someIndex", "externalData.problemItemsIndex" -> "problem-items")),
           system,
@@ -439,7 +446,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
           mockedJobModelDAO,
           mockedScanTargetDAO,
           mock[ESClientManager]
-        )(mock[ProxyLocationDAO]) {
+        ) {
           override protected val sqsClient = mockedSqsClient
 
           override def thumbnailJobOriginalMedia(jobDesc: JobModel): Future[Either[String, ArchiveEntry]] = mockThumnailJobOriginalMedia(jobDesc)
@@ -499,6 +506,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
       val mockedEsClientManager = mock[ESClientManager]
       mockedEsClientManager.getClient() returns mockedEsClient
 
+      implicit val fakeProxyLocationDAO = mock[ProxyLocationDAO]
       val toTest = system.actorOf(Props(new ProxyFrameworkQueue(
         Configuration.from(Map("proxyFramework.notificationsQueue" -> "someQueue", "externalData.indexName" -> "someIndex", "externalData.problemItemsIndex" -> "problem-items")),
         system,
@@ -508,7 +516,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
         mockedJobModelDAO,
         mockedScanTargetDAO,
         mockedEsClientManager
-      )(mock[ProxyLocationDAO]) {
+      ){
         override val problemItemIndexName = "problem-items"
 
         override val problemItemIndexer = mockedProblemItemIndexer
@@ -569,6 +577,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
       val mockedEsClientManager = mock[ESClientManager]
       mockedEsClientManager.getClient() returns mockedEsClient
 
+      implicit val fakeProxyLocationDAO = mock[ProxyLocationDAO]
       val toTest = system.actorOf(Props(new ProxyFrameworkQueue(
         Configuration.from(Map("proxyFramework.notificationsQueue" -> "someQueue", "externalData.indexName" -> "someIndex", "externalData.problemItemsIndex" -> "problem-items")),
         system,
@@ -578,7 +587,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
         mockedJobModelDAO,
         mockedScanTargetDAO,
         mockedEsClientManager
-      )(mock[ProxyLocationDAO]) {
+      ) {
         override val problemItemIndexName = "problem-items"
 
         override val problemItemIndexer = mockedProblemItemIndexer

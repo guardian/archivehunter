@@ -2,7 +2,7 @@ package services
 
 import akka.actor.{Actor, ActorSystem, Cancellable}
 import akka.stream.scaladsl.{Keep, Source}
-import akka.stream.{ActorMaterializer, KillSwitches}
+import akka.stream.{ActorMaterializer, KillSwitches, Materializer}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager}
 import com.google.inject.Injector
 import com.theguardian.multimedia.archivehunter.common.ProxyLocation
@@ -30,13 +30,12 @@ object LegacyProxiesScanner {
 
 @Singleton
 class LegacyProxiesScanner @Inject()(config:Configuration, ddbClientMgr:DynamoClientManager, s3ClientMgr:S3ClientManager,
-                                     esClientMgr:ESClientManager, scanTargetDAO: ScanTargetDAO, injector:Injector)(implicit system:ActorSystem)extends Actor {
+                                     esClientMgr:ESClientManager, scanTargetDAO: ScanTargetDAO, injector:Injector)(implicit system:ActorSystem, mat:Materializer)extends Actor {
   import LegacyProxiesScanner._
   import com.sksamuel.elastic4s.streams.ReactiveElastic._
   import com.sksamuel.elastic4s.http.ElasticDsl._
 
   private val logger = Logger(getClass)
-  implicit val mat = ActorMaterializer.create(system)
   val indexName = config.getOptional[String]("elasticsearch.index").getOrElse("archivehunter")
   val tableName = config.get[String]("proxies.tableName")
 

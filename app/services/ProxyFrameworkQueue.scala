@@ -73,7 +73,7 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
                                      jobModelDAO: JobModelDAO,
                                      scanTargetDAO: ScanTargetDAO,
                                      esClientMgr:ESClientManager
-                                    )(implicit proxyLocationDAO: ProxyLocationDAO)
+                                    )(implicit proxyLocationDAO: ProxyLocationDAO, override val mat:Materializer)
   extends GenericSqsActor[JobReportNew] with ProxyFrameworkQueueFunctions {
   import ProxyFrameworkQueue._
   import GenericSqsActor._
@@ -83,7 +83,6 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
   override protected val sqsClient = sqsClientManager.getClient(config.getOptional[String]("externalData.awsProfile"))
 
   override protected implicit val implSystem = system
-  override protected implicit val mat: Materializer = ActorMaterializer.create(system)
 
   //override this in testing
   protected val ownRef: ActorRef = self

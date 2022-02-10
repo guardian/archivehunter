@@ -39,6 +39,7 @@ object ProxiesRelinker {
 class ProxiesRelinker @Inject() (config:Configuration,
                                  esClientMgr:ESClientManager, ddbClientMgr:DynamoClientManager, system:ActorSystem,
                                  proxyVerifyFlow: ProxyVerifyFlow, jobModelDAO:JobModelDAO, scanTargetDAO:ScanTargetDAO)
+                                (implicit mat:Materializer)
   extends Actor with ArchiveEntryRequestBuilder {
   import ProxiesRelinker._
   import com.sksamuel.elastic4s.http.ElasticDsl._
@@ -46,7 +47,6 @@ class ProxiesRelinker @Inject() (config:Configuration,
   private val logger = Logger(getClass)
   override val indexName = config.get[String]("externalData.indexName")
   private val indexer = new Indexer(indexName)
-  private implicit val mat:Materializer = ActorMaterializer.create(system)
   private val esClient = esClientMgr.getClient()
 
   protected def getIndexScanSource(targetBucket:Option[String]) = {

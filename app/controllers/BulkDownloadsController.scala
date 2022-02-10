@@ -50,7 +50,7 @@ class BulkDownloadsController @Inject()(override val config:Configuration,
                                         cc:ControllerComponents,
                                         override val bearerTokenAuth:BearerTokenAuth,
                                         @Named("glacierRestoreActor") glacierRestoreActor:ActorRef,
-                                       )(implicit system:ActorSystem)
+                                       )(implicit system:ActorSystem, mat:Materializer)
   extends AbstractController(cc) with Security with Circe with ArchiveEntryHitReader with ZonedDateTimeEncoder with RestoreStatusEncoder {
 
   override protected val logger=LoggerFactory.getLogger(getClass)
@@ -66,8 +66,6 @@ class BulkDownloadsController @Inject()(override val config:Configuration,
   protected implicit val esClient = esClientManager.getClient()
 
   private val indexer = new Indexer(config.get[String]("externalData.indexName"))
-
-  private implicit val mat:Materializer = ActorMaterializer.create(system)
 
   private def errorResponse(updatedToken:ServerTokenEntry) = serverTokenDAO
     .put(updatedToken)

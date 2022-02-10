@@ -19,7 +19,7 @@ trait MainContent extends ProblemItemRequestBuilder with ProblemItemHitReader{
   import com.sksamuel.elastic4s.streams.ReactiveElastic._
 
   implicit val system:ActorSystem = ActorSystem("root")
-  implicit val mat:Materializer = ActorMaterializer.create(system)
+  implicit val mat:Materializer = Materializer.matFromSystem
 
   protected val injector = Guice.createInjector(new Module(system))
 

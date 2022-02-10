@@ -49,10 +49,10 @@ class ProxiesController @Inject()(override val config:Configuration,
                                   override val bearerTokenAuth:BearerTokenAuth,
                                   override val cache:SyncCacheApi,
                                   @Named("proxiesRelinker") proxiesRelinker:ActorRef)
-                                 (implicit actorSystem:ActorSystem, scanTargetDAO:ScanTargetDAO, jobModelDAO:JobModelDAO, proxyLocationDAO:ProxyLocationDAO)
+                                 (implicit actorSystem:ActorSystem, mat:Materializer, scanTargetDAO:ScanTargetDAO, jobModelDAO:JobModelDAO, proxyLocationDAO:ProxyLocationDAO)
   extends AbstractController(controllerComponents) with Circe with ProxyLocationEncoder with Security {
   import akka.pattern.ask
-  implicit private val mat:Materializer = ActorMaterializer.create(actorSystem)
+
   override protected val logger=LoggerFactory.getLogger(getClass)
 
   private val indexName = config.getOptional[String]("elasticsearch.index").getOrElse("archivehunter")

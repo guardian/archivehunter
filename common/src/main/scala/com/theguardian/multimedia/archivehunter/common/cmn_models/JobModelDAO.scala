@@ -23,7 +23,7 @@ import javax.inject.{Inject, Singleton}
 import org.apache.logging.log4j.LogManager
 
 @Singleton
-class JobModelDAO @Inject()(config:ArchiveHunterConfiguration, ddbClientMgr: DynamoClientManager)(implicit actorSystem:ActorSystem)
+class JobModelDAO @Inject()(config:ArchiveHunterConfiguration, ddbClientMgr: DynamoClientManager)(implicit actorSystem:ActorSystem, mat:Materializer)
   extends ZonedDateTimeEncoder with ZonedTimeFormat with JobModelEncoder with ExtValueConverters {
 
   private val logger = LogManager.getLogger(getClass)
@@ -36,8 +36,6 @@ class JobModelDAO @Inject()(config:ArchiveHunterConfiguration, ddbClientMgr: Dyn
   val maxRetries = config.getOptional[Int]("externalData.maxRetries").getOrElse(10)
   val initialRetryDelay = config.getOptional[Int]("externalData.initialRetryDelay").getOrElse(2)
   val retryDelayFactor = config.getOptional[Double]("externalData.retryDelayFactor").getOrElse(1.5)
-
-  implicit val mat:Materializer = ActorMaterializer.create(actorSystem)
 
   private val awsProfile = config.getOptional[String]("externalData.awsProfile")
 

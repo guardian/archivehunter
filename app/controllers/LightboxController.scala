@@ -48,6 +48,7 @@ class LightboxController @Inject() (override val config:Configuration,
                                     dynamoClientManager:DynamoClientManager,
                                     userAvatarHelper:UserAvatarHelper)
                                    (implicit val system:ActorSystem,
+                                    mat:Materializer,
                                     injector:Injector,
                                     lightboxEntryDAO: LightboxEntryDAO,
                                     userProfileDAO: UserProfileDAO)
@@ -59,7 +60,6 @@ class LightboxController @Inject() (override val config:Configuration,
   private val s3Client = s3ClientMgr.getClient(awsProfile)
   private implicit val ec:ExecutionContext  = controllerComponents.executionContext
   private val indexName = config.get[String]("externalData.indexName")
-  private implicit val mat:Materializer = ActorMaterializer.create(system)
 
   implicit val timeout:akka.util.Timeout = 30 seconds
 

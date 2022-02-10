@@ -13,12 +13,10 @@ import javax.inject.Inject
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
-class LightboxBulkEntryDAO @Inject() (config:ArchiveHunterConfiguration, ddbClientMgr:DynamoClientManager)(implicit system:ActorSystem)
+class LightboxBulkEntryDAO @Inject() (config:ArchiveHunterConfiguration, ddbClientMgr:DynamoClientManager)(implicit system:ActorSystem, mat:Materializer)
   extends ZonedDateTimeEncoder with ZonedTimeFormat {
   import org.scanamo.syntax._
   import org.scanamo.generic.auto._
-
-  private implicit val mat:Materializer = ActorMaterializer.create(system)
 
   private val scanamoAlpakka = ScanamoAlpakka(
     ddbClientMgr.getNewAsyncDynamoClient(config.getOptional[String]("externalData.awsProfile"))

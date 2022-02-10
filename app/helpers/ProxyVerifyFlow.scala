@@ -20,7 +20,7 @@ import scala.concurrent.duration._
   * @param ddbClientMgr
   * @param proxyLocationDAO
   */
-class ProxyVerifyFlow @Inject()(config:Configuration, ddbClientMgr:DynamoClientManager)(implicit system:ActorSystem, proxyLocationDAO: ProxyLocationDAO) extends GraphStage[FlowShape[ArchiveEntry,ArchiveEntry]]{
+class ProxyVerifyFlow @Inject()(config:Configuration, ddbClientMgr:DynamoClientManager)(implicit system:ActorSystem, proxyLocationDAO: ProxyLocationDAO, mat:Materializer) extends GraphStage[FlowShape[ArchiveEntry,ArchiveEntry]]{
   private val in:Inlet[ArchiveEntry] = Inlet.create("ProxyVerifyFlow.in")
   private val out:Outlet[ArchiveEntry] = Outlet.create("ProxyVerifyFlow.in")
 
@@ -28,7 +28,6 @@ class ProxyVerifyFlow @Inject()(config:Configuration, ddbClientMgr:DynamoClientM
   val logger = Logger(getClass)
 
   private implicit val ec:ExecutionContext = system.dispatcher
-  private implicit val mat:Materializer = ActorMaterializer.create(system)
 
   override def shape: FlowShape[ArchiveEntry, ArchiveEntry] = FlowShape.of(in,out)
 
