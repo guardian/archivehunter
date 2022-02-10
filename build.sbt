@@ -164,7 +164,7 @@ lazy val proxyStatsGathering = (project in file("ProxyStatsGathering"))
 lazy val autoDowningLambda = (project in file("lambda/autodowning")).settings(commonSettings, name:="autoDowningLambda")
   .dependsOn(common)
   .settings(commonSettings,
-    libraryDependencies ++=Seq(
+    libraryDependencies :=Seq(
       "com.amazonaws" % "aws-java-sdk-lambda" % awsSdkVersion,
       "com.amazonaws" % "aws-lambda-java-events" % "2.1.0",
       "com.amazonaws" % "aws-java-sdk-events" % awsSdkVersion,

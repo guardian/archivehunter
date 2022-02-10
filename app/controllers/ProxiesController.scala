@@ -66,7 +66,6 @@ class ProxiesController @Inject()(override val config:Configuration,
 
   private val s3conn = s3ClientMgr.getClient(awsProfile)
 
-  //private implicit val ddbClient = ddbClientMgr.getClient(awsProfile)
   private implicit val ddbAsync = ddbClientMgr.getNewAsyncDynamoClient(awsProfile)
   private val scanamoAlpakka = ScanamoAlpakka(ddbAsync)
 
