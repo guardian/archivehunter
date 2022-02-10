@@ -52,8 +52,6 @@ class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner
 
   private val profileName = config.getOptional[String]("externalData.awsProfile")
 
-  //private val conventionalClient = ddbClientMgr.getNewDynamoClient(profileName)
-  //private val alpakkaClient = ddbClientMgr.getNewAlpakkaDynamoClient(config.getOptional[String]("externalData.awsProfile"))
   private val scanamo = Scanamo(ddbClientMgr.getNewDynamoClient(profileName))
   private val scanamoAlpakka = ScanamoAlpakka(ddbClientMgr.getNewAsyncDynamoClient(profileName))
 

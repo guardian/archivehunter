@@ -76,10 +76,8 @@ class JobModelDAO @Inject()(config:ArchiveHunterConfiguration, ddbClientMgr: Dyn
     optionalTimeQuery(startingTime, endingTime) { (maybeStartTimeString, currentTimeString)=>
       val alpakkaQuery = maybeStartTimeString match {
         case Some(startTimeString)=>
-          //ScanamoAlpakka.exec(ddbClient)(sourcesIndex.query(('sourceId->sourceId and ('startedAt between Bounds(Bound(startTimeString), Bound(currentTimeString)))).descending))
           scanamoAlpakka.exec(sourcesIndex.query("sourceId"===sourceId and ("startedAt" between startTimeString and currentTimeString)))
         case None=>
-          //ScanamoAlpakka.exec(ddbClient)(sourcesIndex.query(('sourceId->sourceId).descending))
           scanamoAlpakka.exec(sourcesIndex.query("sourceId"===sourceId))
       }
       alpakkaQuery.take(limit.toLong).runWith(makeJobSink)
@@ -90,10 +88,8 @@ class JobModelDAO @Inject()(config:ArchiveHunterConfiguration, ddbClientMgr: Dyn
     optionalTimeQuery(startingTime, endingTime) { (maybeStartTimeString, currentTimeString)=>
       val alpakkaQuery = maybeStartTimeString match {
         case Some(startTimeString)=>
-          //ScanamoAlpakka.exec(ddbClient)(jobStatusIndex.limit(limit).query(('jobStatus->status.toString and ('startedAt between Bounds(Bound(startTimeString), Bound(currentTimeString)))).descending))
           scanamoAlpakka.exec(jobStatusIndex.query("jobStatus"===status.toString and ("startedAt" between startTimeString and currentTimeString)))
         case None=>
-          //ScanamoAlpakka.exec(ddbClient)(jobStatusIndex.limit(limit).query(('jobStatus->status.toString).descending))
           scanamoAlpakka.exec(jobStatusIndex.query("jobStatus"===status.toString))
       }
       alpakkaQuery.take(limit.toLong).runWith(makeJobSink)

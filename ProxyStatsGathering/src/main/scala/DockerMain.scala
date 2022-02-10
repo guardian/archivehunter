@@ -17,7 +17,7 @@ object DockerMain extends MainContent {
       sys.env.get("MODE") match {
         case None=> runit(args)
         case Some("stats")=>runit(args)
-        //case Some("indexfix")=>runFixIndex(args)
+        case Some("indexfix")=>runFixIndex(args)
         case Some("indexfix")=>throw new RuntimeException("indexfix mode is currently disabled")
         case Some(_)=>throw new RuntimeException("Invalid MODE parameter, you should specify stats or indexfix")
       }
@@ -69,7 +69,7 @@ object DockerMain extends MainContent {
     })
   }
 
-//  def runFixIndex(args:Array[String]) : Unit = {
-//    Await.ready(runProblemItemFix, 1.hour)
-//  }
+  def runFixIndex(args:Array[String]) : Unit = {
+    Await.ready(runProblemItemFix, 1.hour)
+  }
 }
