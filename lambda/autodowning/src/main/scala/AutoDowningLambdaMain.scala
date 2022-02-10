@@ -82,11 +82,11 @@ class AutoDowningLambdaMain extends RequestHandler[java.util.LinkedHashMap[Strin
     result.getTags.asScala.toSeq
   }
 
-  def addRecord(rec:InstanceIp) = scanamo.exec(instanceTable.put(rec))
+  def addRecord(rec:InstanceIp) = Try { scanamo.exec(instanceTable.put(rec)) }
 
   def findRecord(instanceId:String) = scanamo.exec(instanceTable.get("instanceId"===instanceId))
 
-  def deleteRecord(rec:InstanceIp) = scanamo.exec(instanceTable.delete("instanceId"->rec.instanceId))
+  def deleteRecord(rec:InstanceIp) = Try { scanamo.exec(instanceTable.delete("instanceId"->rec.instanceId)) }
 
   def findAkkaNode(ipAddress:String, allNodes:Seq[AkkaMember]) =
     allNodes.find(_.node.getHost==ipAddress)
@@ -135,10 +135,10 @@ class AutoDowningLambdaMain extends RequestHandler[java.util.LinkedHashMap[Strin
       case Success(Some(ipAddr)) =>
         val record = InstanceIp(instance.getInstanceId, ipAddr)
         logger.info(s"Got IP address $ipAddr for ${instance.getInstanceId}")
-        try {
-          addRecord(record)
-        } catch {
-          case err:Throwable=>
+
+        addRecord(record) match {
+          case Success(_)=>
+          case Failure(err)=>
             logger.warn(s"Could not contact dynamodb: $err")
             if(attempt>100) throw new RuntimeException(s"Could not contact dynamodb: $err")
             Thread.sleep(1000)

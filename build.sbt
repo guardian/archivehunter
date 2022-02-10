@@ -26,7 +26,7 @@ lazy val commonSettings = Seq(
     "com.amazonaws" % "aws-java-sdk-elastictranscoder"% awsSdkVersion,
     "com.amazonaws" % "aws-java-sdk-sqs"% awsSdkVersion,
     "com.dripower" %% "play-circe" % "2814.2",
-    "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.11.4",
+    "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.13.1",
     "com.sksamuel.elastic4s" %% "elastic4s-http" % elastic4sVersion  exclude("com.fasterxml.jackson.module","jackson-module-scala"),
     "com.sksamuel.elastic4s" %% "elastic4s-circe" % elastic4sVersion,
     "com.sksamuel.elastic4s" %% "elastic4s-http-streams" % elastic4sVersion,
@@ -164,14 +164,22 @@ lazy val proxyStatsGathering = (project in file("ProxyStatsGathering"))
 lazy val autoDowningLambda = (project in file("lambda/autodowning")).settings(commonSettings, name:="autoDowningLambda")
   .dependsOn(common)
   .settings(commonSettings,
-    libraryDependencies :=Seq(
+    libraryDependencies ++=Seq(
       "com.amazonaws" % "aws-java-sdk-lambda" % awsSdkVersion,
       "com.amazonaws" % "aws-lambda-java-events" % "2.1.0",
       "com.amazonaws" % "aws-java-sdk-events" % awsSdkVersion,
       "com.amazonaws" % "aws-java-sdk-ec2" % awsSdkVersion,
       "com.amazonaws" % "aws-lambda-java-core" % "1.0.0",
-      "ch.qos.logback"          %  "logback-classic" % "1.2.3",
-      "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.11.4",
+      "ch.qos.logback" %  "logback-classic" % "1.2.3",
+      "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.13.1",
+      //fix akka version
+      "com.typesafe.akka" %% "akka-actor-typed" % akkaVersion,
+      "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
+      "com.typesafe.akka" %% "akka-protobuf-v3" % akkaVersion,
+      "com.typesafe.akka" %% "akka-stream" % akkaVersion,
+      "com.typesafe.akka" %% "akka-serialization-jackson" % akkaVersion,
+      //vulnerable dependencies
+      "com.typesafe.akka" %% "akka-http-core" % "10.1.15",
       specs2 % Test
     ),
     assembly / assemblyJarName := "autoDowningLambda.jar",
