@@ -23,7 +23,7 @@ class CopyMainFile (s3ClientManager: S3ClientManager, config:Configuration) exte
   import GenericMoveActor._
   //create a separate materializer for this stage, to keep the copy-operation separate from the main server
   val temporaryActorSystem = ActorSystem.create("CopyMainFile")
-  implicit val mat:Materializer = Materializer.createMaterializer(this.context)
+  implicit val mat:Materializer = Materializer.createMaterializer(temporaryActorSystem)
 
   override def postStop(): Unit = {
     temporaryActorSystem.terminate().onComplete({
