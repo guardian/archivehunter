@@ -44,6 +44,32 @@ class CopyMainFile (s3ClientManager: S3ClientManager, config:Configuration)(impl
       MultipartUploadResult(Uri(), destBucket, path, result.getETag, Option(result.getVersionId))
     })
 
+  val defaultPartSize:Int = 50*1024*1024  //default chunk size is 50Mb
+  /**
+    * AWS specifications say that parts must be at least 5Mb in size but no more than 5Gb in size, and that there
+    * must be a maximum of 10,000 parts for an upload.  This makes the effective file size limit 5Tb
+    * @param totalFileSize actual size of the file to upload, in bytes
+    * @return the target path size
+    */
+  def estimatePartSize(totalFileSize:Long):Int = {
+    val maxWantedParts = 500
+
+    var partSize:Int = defaultPartSize
+    var nParts:Int = maxWantedParts + 1
+    var i:Int=1
+    while(true) {
+      nParts = (totalFileSize / partSize).toInt
+      if (nParts > maxWantedParts) {
+        i = i+1
+        partSize = defaultPartSize*i
+      } else {
+        logger.info(s"Part size estimated at $partSize for $nParts target parts")
+        return partSize
+      }
+    }
+    defaultPartSize
+  }
+
   /**
     * Copy a file from one bucket to another by streaming the contents through the application.  This is the only option
     * to copy files larger than 5Gb.
@@ -53,7 +79,8 @@ class CopyMainFile (s3ClientManager: S3ClientManager, config:Configuration)(impl
     * @param path path of the file to copy
     * @return a Future containing a MultipartUploadResult which fails on error.
     */
-  def largeFileCopy(destBucket:String, sourceBucket:String, path:String) = {
+  def largeFileCopy(destBucket:String, sourceBucket:String, path:String, fileSize:Long) = {
+    logger.info(s"Performing large-file copy on s3://$sourceBucket/$path to $destBucket")
       val s3file = S3.download(sourceBucket, path)
       s3file.runWith(Sink.head).flatMap({ //the download method materializes once when the file is found, that passes us another source for streming the data.
         case None=>
@@ -72,7 +99,8 @@ class CopyMainFile (s3ClientManager: S3ClientManager, config:Configuration)(impl
               logger.warn(s"s3://$sourceBucket/$path has no provided content-type, defaulting to application/octet-stream")
               ContentTypes.`application/octet-stream`
           }
-          val sink = S3.multipartUpload(destBucket, path, contentType = ct)
+          logger.info(s"Performing large-file copy for s3://$sourceBucket/$path to $destBucket/path. Content type is $ct")
+          val sink = S3.multipartUpload(destBucket, path, contentType = ct, chunkingParallelism = 1, chunkSize = estimatePartSize(fileSize))
           src.runWith(sink)
       })
   }
@@ -89,7 +117,7 @@ class CopyMainFile (s3ClientManager: S3ClientManager, config:Configuration)(impl
           val copyFuture = if(entry.size<5368709120L) {  //5gb and larger files can't be directly copied and must be re-uploaded
             standardS3Copy(currentState.destBucket, entry.bucket, entry.path)
           } else {
-            largeFileCopy(currentState.destBucket, entry.bucket, entry.path)
+            largeFileCopy(currentState.destBucket, entry.bucket, entry.path, entry.size)
           }
 
           copyFuture.onComplete({
@@ -121,7 +149,7 @@ class CopyMainFile (s3ClientManager: S3ClientManager, config:Configuration)(impl
               standardS3Copy(entry.bucket, currentState.destBucket, entry.path)(destClient).map(result=>Some(result))
             } else {
               logger.info(s"File no longer exists on s3://${entry.bucket}/${entry.path}, copying it back with large-file copy...")
-              largeFileCopy(entry.bucket, currentState.destBucket, entry.path).map(result=>Some(result))
+              largeFileCopy(entry.bucket, currentState.destBucket, entry.path, entry.size).map(result=>Some(result))
             }
           } else {
             logger.info(s"File already exists on s3://${entry.bucket}/${entry.path}, no copy-back required")
