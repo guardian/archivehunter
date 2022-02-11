@@ -429,13 +429,8 @@ Resources:
           - AttributeName: proxyId
             KeyType: HASH
           Projection:
-            ProjectionType: KEYS_ONLY
-          ProvisionedThroughput:
-            WriteCapacityUnits: 1
-            ReadCapacityUnits: 1
-      ProvisionedThroughput:
-        WriteCapacityUnits: 10
-        ReadCapacityUnits: 10
+            ProjectionType: ALL
+      BillingMode: PAY_PER_REQUEST
       Tags:
         - Key: App
           Value: !Sub ${App}-webapp
@@ -741,6 +736,8 @@ Resources:
             Service: ec2.amazonaws.com
           Action: sts:AssumeRole
       Path: "/"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
       Policies:
       - PolicyName: KinesisLogging
         PolicyDocument:
@@ -1166,7 +1163,7 @@ Resources:
 
           cat > /etc/default/archivehunter << EOF
           #exiting on out of memory error should cause either systemd or autoscaling group to restart us
-          JAVA_OPTS="-XX:+ExitOnOutOfMemoryError -Dconfig.file=/usr/share/archivehunter/conf/application.conf"
+          JAVA_OPTS="-XX:+ExitOnOutOfMemoryError -Dconfig.file=/usr/share/archivehunter/conf/application.conf -Dsoftware.amazon.awssdk.http.async.service.impl=software.amazon.awssdk.http.nio.netty.NettySdkAsyncHttpService"
           EOF
 
           sudo mv /lib/systemd/system/archivehunter.service /tmp

@@ -15,7 +15,7 @@ val elastic4sVersion = "6.7.8"
 val awsSdkVersion = "1.12.153"
 val awsSdk2Version = "2.17.124"
 val jacksonVersion = "2.11.4"
-val jacksonCoreVersion = "2.11.4"
+val jacksonCoreVersion = "2.13.1"
 
 lazy val commonSettings = Seq(
   version := "1.0",
@@ -35,10 +35,12 @@ lazy val commonSettings = Seq(
     "com.sksamuel.elastic4s" %% "elastic4s-embedded" % elastic4sVersion % "test",
     "com.typesafe.akka" %% "akka-actor" % akkaVersion,
     "software.amazon.awssdk" % "dynamodb" % awsSdk2Version,
+    "software.amazon.awssdk" % "aws-cbor-protocol" % awsSdk2Version,
     "com.lightbend.akka" %% "akka-stream-alpakka-dynamodb" % "2.0.2",
     "com.lightbend.akka" %% "akka-stream-alpakka-s3" % "2.0.2",
     "org.scanamo" %% "scanamo-alpakka" % "1.0.0-M16",
     "com.fasterxml.jackson.dataformat" % "jackson-dataformat-yaml" % jacksonVersion,
+    "com.fasterxml.jackson.dataformat" % "jackson-dataformat-cbor" % jacksonVersion,
     "com.fasterxml.jackson.core" % "jackson-databind" % jacksonCoreVersion,
     "com.google.guava" % "guava" % "30.0-jre",
       specs2 % Test)
@@ -77,7 +79,7 @@ lazy val `archivehunter` = (project in file("."))
       "com.typesafe.akka" %% "akka-http" % "10.2.7",
       "com.nimbusds" % "nimbus-jose-jwt" % "9.18",
       "com.gu" % "kinesis-logback-appender" % "2.0.3",
-      "com.fasterxml.jackson.dataformat" % "jackson-dataformat-cbor" % "2.11.4",  //fix vulnerable dependency for kinesis-logback-appender
+      "com.fasterxml.jackson.dataformat" % "jackson-dataformat-cbor" % jacksonVersion,
       "org.apache.logging.log4j" % "log4j-api" % "2.17.1",
       "com.typesafe.akka" %% "akka-testkit" % akkaVersion,
       "io.sentry" % "sentry-logback" % "1.7.2",
