@@ -22,8 +22,17 @@ import scala.util.{Failure, Success, Try}
 class CopyMainFile (s3ClientManager: S3ClientManager, config:Configuration) extends GenericMoveActor with DocId {
   import GenericMoveActor._
   //create a separate materializer for this stage, to keep the copy-operation separate from the main server
+  val temporaryActorSystem = ActorSystem.create("CopyMainFile")
   implicit val mat:Materializer = Materializer.createMaterializer(this.context)
 
+  override def postStop(): Unit = {
+    temporaryActorSystem.terminate().onComplete({
+      case Success(_)=>
+        logger.info(s"CopyMainFile sub actor system has been correctly terminated")
+      case Failure(err)=>
+        logger.warn(s"Could not terminate CopyMainFile sub actor system: ${err.getMessage}", err)
+    })
+  }
   /**
     * Request a standard S3 bucket->bucket copy. This only works on files less than 5Gb in size; for larger ones you
     * need to download and re-upload - this is done via streaming in `largeFileCopy`. In order to maintain compatibility
