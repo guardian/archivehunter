@@ -19,9 +19,10 @@ import scala.util.{Failure, Success, Try}
   * this actor copies a file to the requested destination bucket and updates the internal state with the new file ID.
   * when rolling back, it checks that the source file still exists and if so deletes the one it copied earlier.
   */
-class CopyMainFile (s3ClientManager: S3ClientManager, config:Configuration)(implicit actorSystem:ActorSystem) extends GenericMoveActor with DocId {
+class CopyMainFile (s3ClientManager: S3ClientManager, config:Configuration) extends GenericMoveActor with DocId {
   import GenericMoveActor._
-  private implicit lazy val mat:Materializer = Materializer.matFromSystem
+  //create a separate materializer for this stage, to keep the copy-operation separate from the main server
+  implicit val mat:Materializer = Materializer.createMaterializer(this.context)
 
   /**
     * Request a standard S3 bucket->bucket copy. This only works on files less than 5Gb in size; for larger ones you
@@ -80,7 +81,7 @@ class CopyMainFile (s3ClientManager: S3ClientManager, config:Configuration)(impl
     * @return a Future containing a MultipartUploadResult which fails on error.
     */
   def largeFileCopy(destBucket:String, sourceBucket:String, path:String, fileSize:Long) = {
-    logger.info(s"Performing large-file copy on s3://$sourceBucket/$path to $destBucket")
+    logger.info(s"Setting up large-file copy for s3://$sourceBucket/$path into $destBucket")
       val s3file = S3.download(sourceBucket, path)
       s3file.runWith(Sink.head).flatMap({ //the download method materializes once when the file is found, that passes us another source for streming the data.
         case None=>
@@ -99,7 +100,7 @@ class CopyMainFile (s3ClientManager: S3ClientManager, config:Configuration)(impl
               logger.warn(s"s3://$sourceBucket/$path has no provided content-type, defaulting to application/octet-stream")
               ContentTypes.`application/octet-stream`
           }
-          logger.info(s"Performing large-file copy for s3://$sourceBucket/$path to $destBucket/path. Content type is $ct")
+          logger.info(s"Performing large-file copy for s3://$sourceBucket/$path to s3://$destBucket/$path. Content type is $ct")
           val sink = S3.multipartUpload(destBucket, path, contentType = ct, chunkingParallelism = 1, chunkSize = estimatePartSize(fileSize))
           src.runWith(sink)
       })
