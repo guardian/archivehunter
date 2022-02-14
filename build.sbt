@@ -171,8 +171,8 @@ lazy val autoDowningLambda = (project in file("lambda/autodowning")).settings(co
     libraryDependencies :=Seq(
       "com.amazonaws" % "aws-lambda-java-events" % "3.11.0",
       "software.amazon.awssdk" % "ec2" % awsSdk2Version,
+      "software.amazon.awssdk" % "url-connection-client" % awsSdk2Version,
       "com.amazonaws" % "aws-lambda-java-core" % "1.0.0",
-      "ch.qos.logback" %  "logback-classic" % "1.2.3",
       //"com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.13.1",
       //manual dependencies from common so that we don't pull in too much un-needed stuff
       "io.circe" %% "circe-core" % circeVersion,
