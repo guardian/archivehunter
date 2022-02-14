@@ -1,20 +1,14 @@
-import com.amazonaws.services.ec2.model.{Instance, InstanceNetworkInterface, Tag, TagDescription}
-import com.google.inject.AbstractModule
-import com.theguardian.multimedia.archivehunter.common.ArchiveHunterConfiguration
+import com.amazonaws.services.lambda.runtime.LambdaLogger
 import models.{InstanceIp, LifecycleDetails}
 import org.specs2.mock.Mockito
 import org.specs2.mutable._
 import org.mockito.Mockito.{times, verify}
-import org.scanamo.DynamoReadError
+import software.amazon.awssdk.services.ec2.model.{Instance, InstanceNetworkInterface, TagDescription}
 
 import scala.util.{Failure, Success, Try}
 
 class AutodowningLambdaSpec extends Specification with Mockito {
-  class TestInjectorModule extends AbstractModule {
-    override def configure(): Unit = {
-      bind(classOf[ArchiveHunterConfiguration]).to(classOf[ArchiveHunterConfigurationMock])
-    }
-  }
+  implicit val fakeLogger = new FakeLogger
 
   "AutodowningLambdaMain.processInstance" should {
     "raise an exception if getEc2Info consistently fails" in {
@@ -24,9 +18,9 @@ class AutodowningLambdaSpec extends Specification with Mockito {
       val expectedError = new RuntimeException("My hovercraft is full of eels")
 
       val test = new AutoDowningLambdaMain {
-        override def getEc2Info(instanceId: String): Try[Option[Instance]] = Failure(expectedError)
+        override def getInstanceTableName: String = "instances-table"
 
-        override def getInjectorModule = new TestInjectorModule
+        override def getEc2Info(instanceId: String): Try[Option[Instance]] = Failure(expectedError)
 
         override def getLoadBalancerHost: String = "loadbalancer"
 
@@ -40,24 +34,24 @@ class AutodowningLambdaSpec extends Specification with Mockito {
       val fakeDetails = mock[LifecycleDetails]
       fakeDetails.EC2InstanceId returns Some("my-instance-id")
 
-      val fakeInstance = mock[Instance]
+      val fakeInstance = Instance.builder().build()
 
-      val fakeRegisterTerminated = mock[Function2[LifecycleDetails,Int,Unit]]
+      val fakeRegisterTerminated = mock[(LifecycleDetails, Int) => Unit]
       fakeRegisterTerminated.apply(any, any) returns (())
 
-      val fakeRegisterStarted = mock[Function3[LifecycleDetails,Instance,Int,Unit]]
+      val fakeRegisterStarted = mock[(LifecycleDetails, Instance, Int) => Unit]
       fakeRegisterStarted.apply(any, any, any) returns (())
 
       val test = new AutoDowningLambdaMain {
-        override def getEc2Info(instanceId: String): Try[Option[Instance]] = Success(Some(fakeInstance))
+        override def getInstanceTableName: String = "instances-table"
 
-        override def getInjectorModule = new TestInjectorModule
+        override def getEc2Info(instanceId: String): Try[Option[Instance]] = Success(Some(fakeInstance))
 
         override def getLoadBalancerHost: String = "loadbalancer"
 
-        override def registerInstanceStarted(details: LifecycleDetails, instance:Instance, attempt: Int): Unit = fakeRegisterStarted(details, instance, attempt)
+        override def registerInstanceStarted(details: LifecycleDetails, instance:Instance, attempt: Int)(implicit logger:LambdaLogger): Unit = fakeRegisterStarted(details, instance, attempt)
 
-        override def registerInstanceTerminated(details: LifecycleDetails, attempt: Int): Unit = fakeRegisterTerminated(details, attempt)
+        override def registerInstanceTerminated(details: LifecycleDetails, attempt: Int)(implicit logger:LambdaLogger): Unit = fakeRegisterTerminated(details, attempt)
 
         override def shouldHandle(instance: Instance): Boolean = true
 
@@ -74,34 +68,34 @@ class AutodowningLambdaSpec extends Specification with Mockito {
       val fakeDetails = mock[LifecycleDetails]
       fakeDetails.EC2InstanceId returns Some("my-instance-id")
 
-      val fakeInstance = mock[Instance]
+      val fakeInstance = Instance.builder().build()
 
-      val fakeRegisterTerminated = mock[Function2[LifecycleDetails,Int,Unit]]
+      val fakeRegisterTerminated = mock[(LifecycleDetails, Int) => Unit]
       fakeRegisterTerminated.apply(any, any) returns (())
 
-      val fakeRegisterStarted = mock[Function3[LifecycleDetails,Instance,Int,Unit]]
+      val fakeRegisterStarted = mock[(LifecycleDetails, Instance, Int) => Unit]
       fakeRegisterStarted.apply(any, any, any) returns (())
 
       val test = new AutoDowningLambdaMain {
-        override def getEc2Info(instanceId: String): Try[Option[Instance]] = Success(Some(fakeInstance))
+        override def getInstanceTableName: String = "instances-table"
 
-        override def getInjectorModule = new TestInjectorModule
+        override def getEc2Info(instanceId: String): Try[Option[Instance]] = Success(Some(fakeInstance))
 
         override def getLoadBalancerHost: String = "loadbalancer"
 
-        override def registerInstanceStarted(details: LifecycleDetails, instance:Instance, attempt: Int): Unit = fakeRegisterStarted(details, instance, attempt)
+        override def registerInstanceStarted(details: LifecycleDetails, instance:Instance, attempt: Int)(implicit logger:LambdaLogger): Unit = fakeRegisterStarted(details, instance, attempt)
 
-        override def registerInstanceTerminated(details: LifecycleDetails, attempt: Int): Unit = fakeRegisterTerminated(details, attempt)
+        override def registerInstanceTerminated(details: LifecycleDetails, attempt: Int)(implicit logger:LambdaLogger): Unit = fakeRegisterTerminated(details, attempt)
 
         override def shouldHandle(instance: Instance): Boolean = true
 
         override val akkaComms = mock[AkkaComms]
 
         override def getEc2Tags(instance: Instance): Seq[TagDescription] = Seq(
-          new TagDescription().withKey("App").withValue("myapp"),
-          new TagDescription().withKey("Stack").withValue("anotherstack"),
-          new TagDescription().withKey("Stage").withValue("mystage"),
-          new TagDescription().withKey("irrelevant").withValue("irrelevant"),
+          TagDescription.builder().key("App").value("myapp").build(),
+          TagDescription.builder().key("Stack").value("anotherstack").build(),
+          TagDescription.builder().key("Stage").value("mystage").build(),
+          TagDescription.builder().key("irrelevant").value("irrelevant").build(),
         )
       }
       //
@@ -115,34 +109,34 @@ class AutodowningLambdaSpec extends Specification with Mockito {
       val fakeDetails = mock[LifecycleDetails]
       fakeDetails.EC2InstanceId returns Some("my-instance-id")
 
-      val fakeInstance = mock[Instance]
+      val fakeInstance = Instance.builder().build()
 
-      val fakeRegisterTerminated = mock[Function2[LifecycleDetails,Int,Unit]]
+      val fakeRegisterTerminated = mock[(LifecycleDetails, Int) => Unit]
       fakeRegisterTerminated.apply(any, any) returns (())
 
-      val fakeRegisterStarted = mock[Function3[LifecycleDetails,Instance,Int,Unit]]
+      val fakeRegisterStarted = mock[(LifecycleDetails, Instance, Int) => Unit]
       fakeRegisterStarted.apply(any, any, any) returns (())
 
       val test = new AutoDowningLambdaMain {
-        override def getEc2Info(instanceId: String): Try[Option[Instance]] = Success(Some(fakeInstance))
+        override def getInstanceTableName: String = "instances-table"
 
-        override def getInjectorModule = new TestInjectorModule
+        override def getEc2Info(instanceId: String): Try[Option[Instance]] = Success(Some(fakeInstance))
 
         override def getLoadBalancerHost: String = "loadbalancer"
 
-        override def registerInstanceStarted(details: LifecycleDetails, instance:Instance, attempt: Int): Unit = fakeRegisterStarted(details, instance, attempt)
+        override def registerInstanceStarted(details: LifecycleDetails, instance:Instance, attempt: Int)(implicit logger:LambdaLogger): Unit = fakeRegisterStarted(details, instance, attempt)
 
-        override def registerInstanceTerminated(details: LifecycleDetails, attempt: Int): Unit = fakeRegisterTerminated(details, attempt)
+        override def registerInstanceTerminated(details: LifecycleDetails, attempt: Int)(implicit logger:LambdaLogger): Unit = fakeRegisterTerminated(details, attempt)
 
         override def shouldHandle(instance: Instance): Boolean = false
 
         override val akkaComms = mock[AkkaComms]
 
         override def getEc2Tags(instance: Instance): Seq[TagDescription] = Seq(
-          new TagDescription().withKey("App").withValue("myapp"),
-          new TagDescription().withKey("Stack").withValue("anotherstack"),
-          new TagDescription().withKey("Stage").withValue("mystage"),
-          new TagDescription().withKey("irrelevant").withValue("irrelevant"),
+          TagDescription.builder().key("App").value("myapp").build(),
+          TagDescription.builder().key("Stack").value("anotherstack").build(),
+          TagDescription.builder().key("Stage").value("mystage").build(),
+          TagDescription.builder().key("irrelevant").value("irrelevant").build(),
         )
       }
       //
@@ -158,9 +152,8 @@ class AutodowningLambdaSpec extends Specification with Mockito {
 
       val expectedException = new RuntimeException(s"No details returned from EC2 for instance my-instance-id")
       val test = new AutoDowningLambdaMain {
+        override def getInstanceTableName: String = "instances-table"
         override def getEc2Info(instanceId: String): Try[Option[Instance]] = Success(None)
-
-        override def getInjectorModule = new TestInjectorModule
 
         override def getLoadBalancerHost: String = "loadbalancer"
 
@@ -174,17 +167,18 @@ class AutodowningLambdaSpec extends Specification with Mockito {
   "AutoDowningLambdaMain.registerInstanceStarted" should {
     "look up IP address information and save it to dynamo" in {
       val fakeDetails = mock[LifecycleDetails]
-      val fakeInstance = new Instance()
-        .withNetworkInterfaces(new InstanceNetworkInterface().withPrivateIpAddress("10.11.12.13"))
-        .withInstanceId("fake-instance-id")
+      val fakeInstance = Instance.builder()
+        .networkInterfaces(InstanceNetworkInterface.builder().privateIpAddress("10.11.12.13").build())
+        .instanceId("fake-instance-id")
+        .build()
 
       val addRecordMock = mock[(InstanceIp) => Try[Unit]]
 
       addRecordMock.apply(any) returns Success( () )
 
       val test = new AutoDowningLambdaMain {
-        override def getInjectorModule = new TestInjectorModule
 
+        override def getInstanceTableName: String = "instances-table"
         override def getLoadBalancerHost: String = "loadbalancer"
 
         override def addRecord(rec: InstanceIp): Try[Unit] = addRecordMock(rec)
@@ -200,9 +194,10 @@ class AutodowningLambdaSpec extends Specification with Mockito {
     "retry if dynamo returns an error" in {
       val fakeDetails = mock[LifecycleDetails]
 
-      val fakeInstance = new Instance()
-        .withNetworkInterfaces(new InstanceNetworkInterface().withPrivateIpAddress("10.11.12.13"))
-        .withInstanceId("fake-instance-id")
+      val fakeInstance = Instance.builder()
+        .networkInterfaces(InstanceNetworkInterface.builder().privateIpAddress("10.11.12.13").build())
+        .instanceId("fake-instance-id")
+        .build()
 
       val addRecordMock = mock[(InstanceIp) => Try[Unit]]
 
@@ -212,7 +207,7 @@ class AutodowningLambdaSpec extends Specification with Mockito {
       fakeRegisterStarted.apply(any, any, any) returns (())
 
       val test = new AutoDowningLambdaMain {
-        override def getInjectorModule = new TestInjectorModule
+        override def getInstanceTableName: String = "instances-table"
 
         override def getLoadBalancerHost: String = "loadbalancer"
 
@@ -227,9 +222,9 @@ class AutodowningLambdaSpec extends Specification with Mockito {
           * @param instance `Instance` instance from EC2 SDK
           * @param attempt retry attempt; see `registerInstanceTerminated` for details. Leave this off when calling.
           */
-        override def registerInstanceStarted(details: LifecycleDetails, instance: Instance, attempt: Int): Unit = {
+        override def registerInstanceStarted(details: LifecycleDetails, instance: Instance, attempt: Int)(implicit logger:LambdaLogger): Unit = {
           if(attempt==0)
-            super.registerInstanceStarted(details, instance, attempt)
+            super.registerInstanceStarted(details, instance, attempt)(logger)
           else
             fakeRegisterStarted(details, instance, attempt)
         }

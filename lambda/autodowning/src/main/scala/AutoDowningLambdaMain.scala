@@ -1,14 +1,14 @@
-import com.amazonaws.services.lambda.runtime.{Context, RequestHandler}
-import org.apache.logging.log4j.LogManager
-import com.amazonaws.services.ec2.AmazonEC2ClientBuilder
-import com.amazonaws.services.ec2.model._
-import com.google.inject.{AbstractModule, Guice}
+import akka.actor.ActorSystem
+import akka.stream.Materializer
+import com.amazonaws.services.lambda.runtime.{Context, LambdaLogger, RequestHandler}
+import com.typesafe.config.{Config, ConfigFactory}
 import org.scanamo.{Scanamo, Table}
 import org.scanamo.syntax._
 import org.scanamo.generic.auto._
-import com.theguardian.multimedia.archivehunter.common.ArchiveHunterConfiguration
 import models._
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient
+import software.amazon.awssdk.services.ec2.Ec2Client
+import software.amazon.awssdk.services.ec2.model.{DescribeInstancesRequest, DescribeTagsRequest, Filter, Instance, TagDescription}
 
 import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success, Try}
@@ -17,14 +17,23 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
 class AutoDowningLambdaMain extends RequestHandler[java.util.LinkedHashMap[String,Object],Unit] with LifecycleMessageDecoder{
-  private final val logger = LogManager.getLogger(getClass)
+  import EnhancedLambdaLogger._
 
-  private val injector = Guice.createInjector(getInjectorModule)
+  private val actorSystemConfig:Config = ConfigFactory.empty()
+  implicit val actorSystem = ActorSystem("akka-comms",config=actorSystemConfig, classLoader=getClass.getClassLoader)
+  implicit val mat:Materializer = Materializer.matFromSystem
 
-  val config = injector.getInstance(classOf[ArchiveHunterConfiguration])
-  val instanceTableName = config.get("instances.tableName")
+  def getInstanceTableName =
+    sys.env.get("INSTANCES_TABLE") match {
+      case Some(table)=>table
+      case None=>
+        throw new RuntimeException("You must set INSTANCES_TABLE to the dynamodb table that tracks ec2 instances")
+    }
+
+  val instanceTableName = getInstanceTableName
+
   val instanceTable = Table[InstanceIp](instanceTableName)
-  val ec2Client = AmazonEC2ClientBuilder.defaultClient()
+  val ec2Client = Ec2Client.builder().build()
   val ddbClient = DynamoDbClient.builder().build()
   val scanamo = Scanamo(ddbClient)
 
@@ -32,11 +41,6 @@ class AutoDowningLambdaMain extends RequestHandler[java.util.LinkedHashMap[Strin
 
   val tagsComparison = Map("App"->"APP_TAG", "Stack"->"STACK_TAG", "Stage"->"STAGE_TAG")
 
-  /**
-    * provide an instance of the injector configuration module. Implemented like this in order to over-ride when testing.
-    * @return new instance of [[Module]]
-    */
-  protected def getInjectorModule:AbstractModule = new Module
 
   /**
     * provide the hostname of the loadbalancer to contact. Implemented as a seperate method in order to over-ride when testing
@@ -51,10 +55,10 @@ class AutoDowningLambdaMain extends RequestHandler[java.util.LinkedHashMap[Strin
     *         Failure with an error
     */
   def getEc2Info(instanceId:String):Try[Option[Instance]] = Try {
-    val rq = new DescribeInstancesRequest().withInstanceIds(instanceId)
+    val rq = DescribeInstancesRequest.builder().instanceIds(instanceId).build()
     val result = ec2Client.describeInstances(rq)
 
-    result.getReservations.asScala.headOption.flatMap(_.getInstances.asScala.headOption)
+    result.reservations().asScala.headOption.flatMap(_.instances().asScala.headOption)
   }
 
   /**
@@ -64,8 +68,8 @@ class AutoDowningLambdaMain extends RequestHandler[java.util.LinkedHashMap[Strin
     *         an error
     */
   def getEc2Ip(instance:Instance) = Try {
-    val interfaces = instance.getNetworkInterfaces.asScala.headOption
-    interfaces.map(_.getPrivateIpAddress)
+    val interfaces = instance.networkInterfaces().asScala.headOption
+    interfaces.map(_.privateIpAddress())
   }
 
   /**
@@ -74,12 +78,12 @@ class AutoDowningLambdaMain extends RequestHandler[java.util.LinkedHashMap[Strin
     * @return a Sequence of `Tag` instances.
     */
   def getEc2Tags(instance:Instance):Seq[TagDescription] = {
-    val rq = new DescribeTagsRequest().withFilters(
-      new Filter().withName("resource-id").withValues(instance.getInstanceId),
-      new Filter().withName("resource-type").withValues("instance")
-    )
+    val rq = DescribeTagsRequest.builder().filters(
+      Filter.builder().name("resource-id").values(instance.instanceId).build(),
+      Filter.builder().name("resource-type").values("instance").build()
+   ).build()
     val result = ec2Client.describeTags(rq)
-    result.getTags.asScala.toSeq
+    result.tags().asScala.toSeq
   }
 
   def addRecord(rec:InstanceIp) = Try { scanamo.exec(instanceTable.put(rec)) }
@@ -98,7 +102,7 @@ class AutoDowningLambdaMain extends RequestHandler[java.util.LinkedHashMap[Strin
     * @param attempt if communication to AWS services fails for any reason, the process is retried at 5s intervals, incrementing
     *                this parameter. Default value is 0; leave this off when calling.
     */
-  def registerInstanceTerminated(details: LifecycleDetails, attempt:Int=0):Unit =
+  def registerInstanceTerminated(details: LifecycleDetails, attempt:Int=0)(implicit logger: LambdaLogger):Unit =
     findRecord(details.EC2InstanceId.get) match {
       case Some(Right(record))=>
         logger.info(s"Downing node for $record")
@@ -130,11 +134,11 @@ class AutoDowningLambdaMain extends RequestHandler[java.util.LinkedHashMap[Strin
     * @param instance `Instance` instance from EC2 SDK
     * @param attempt retry attempt; see `registerInstanceTerminated` for details. Leave this off when calling.
     */
-  def registerInstanceStarted(details: LifecycleDetails, instance:Instance, attempt:Int=0):Unit =
+  def registerInstanceStarted(details: LifecycleDetails, instance:Instance, attempt:Int=0)(implicit logger: LambdaLogger):Unit =
     getEc2Ip(instance) match {
       case Success(Some(ipAddr)) =>
-        val record = InstanceIp(instance.getInstanceId, ipAddr)
-        logger.info(s"Got IP address $ipAddr for ${instance.getInstanceId}")
+        val record = InstanceIp(instance.instanceId(), ipAddr)
+        logger.info(s"Got IP address $ipAddr for ${instance.instanceId()}")
 
         addRecord(record) match {
           case Success(_)=>
@@ -156,7 +160,7 @@ class AutoDowningLambdaMain extends RequestHandler[java.util.LinkedHashMap[Strin
     * @param state current state of the EC2 instance in question, this is extracted already from `details`
     * @param attempt attempt number. See `registerInstaceTerminated` for details. Leave this off when calling.
     */
-  def processInstance(details: LifecycleDetails, state:String, attempt:Int=0, maxRetries:Int=100):Unit = getEc2Info(details.EC2InstanceId.get) match {
+  def processInstance(details: LifecycleDetails, state:String, attempt:Int=0, maxRetries:Int=100)(implicit logger:LambdaLogger):Unit = getEc2Info(details.EC2InstanceId.get) match {
     case Success(Some(info))=>
       println(s"Got $info")
       if(shouldHandle(info)) {
@@ -226,17 +230,18 @@ class AutoDowningLambdaMain extends RequestHandler[java.util.LinkedHashMap[Strin
 
   def handleRequest(input:java.util.LinkedHashMap[String,Object], context:Context) = {
     val msg = LifecycleMessage.fromLinkedHashMap(input)
+    implicit val logger:LambdaLogger = context.getLogger
 
     msg.detail match {
       case Some(details)=>
         details.state match {
           case Some(state)=>
-            logger.info(s"$state instance; message from ${msg.source} in ${msg.region}")
+            logger.log(s"INFO $state instance; message from ${msg.source} in ${msg.region}")
             processInstance(details, state)
           case None=>
             println(s"Message from ${msg.source} in ${msg.region}")
             println(s"Message details: ${msg.detailType}, ${msg.detail}")
-            logger.error("Received no instance state, can't proceed")
+            logger.log("ERROR Received no instance state, can't proceed")
             throw new RuntimeException("Received no instance state, can't proceed")
         }
       case None=>

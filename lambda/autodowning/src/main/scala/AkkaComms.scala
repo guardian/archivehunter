@@ -1,31 +1,26 @@
 import akka.actor.ActorSystem
 import akka.http.scaladsl._
 import akka.http.scaladsl.model.{Multipart, _}
-import akka.stream.{ActorMaterializer, Materializer}
+import akka.stream.Materializer
 import akka.util.ByteString
-import com.typesafe.config.{Config, ConfigFactory}
+import com.amazonaws.services.lambda.runtime.LambdaLogger
 import io.circe.generic.auto._
 import io.circe.syntax._
 import models.{AkkaMember, AkkaMembersResponse, UriDecoder}
-import org.apache.logging.log4j.LogManager
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
 /**
   * Communicate with Akka cluster management endpoints
   */
-class AkkaComms (contactAddress:String, contactPort:Int) extends UriDecoder {
-  private val logger = LogManager.getLogger(getClass)
-
-  private val actorSystemConfig:Config = ConfigFactory.empty()
-  implicit val actorSystem = ActorSystem("akka-comms",config=actorSystemConfig, classLoader=getClass.getClassLoader)
-  implicit val mat:Materializer = ActorMaterializer.create(actorSystem)
+class AkkaComms (contactAddress:String, contactPort:Int)(implicit actorSystem: ActorSystem, mat:Materializer) extends UriDecoder {
+  import models.EnhancedLambdaLogger._
 
   def consumeResponseEntity(entity:HttpEntity) = {
     entity.dataBytes.runFold(ByteString(""))(_ ++ _).map(_.utf8String)
   }
 
-  def getNodes() = {
+  def getNodes()(implicit logger:LambdaLogger) = {
     logger.debug(s"address is http://$contactAddress:$contactPort/cluster/members")
     Http().singleRequest(HttpRequest(uri=s"http://$contactAddress:$contactPort/cluster/members"))
       .flatMap(response=>{
@@ -48,7 +43,7 @@ class AkkaComms (contactAddress:String, contactPort:Int) extends UriDecoder {
       })
   }
 
-  def downAkkaNode(node:AkkaMember) = {
+  def downAkkaNode(node:AkkaMember)(implicit logger:LambdaLogger) = {
     val addr = s"http://$contactAddress:$contactPort/cluster/members/${node.node.toString}"
     logger.debug(s"address is $addr")
     Http().singleRequest(HttpRequest(HttpMethods.PUT,uri = addr,
