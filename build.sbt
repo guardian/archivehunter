@@ -185,7 +185,6 @@ lazy val autoDowningLambda = (project in file("lambda/autodowning")).settings(co
     assembly / assemblyMergeStrategy := {
       case PathList(ps @ _*) if ps.last=="module-info.class" => MergeStrategy.discard
       case meta(_) => MergeStrategy.discard
-      case PathList("software","amazon", _*) => MergeStrategy.discard  //according to the docs, SDKv2 is supplied by the envionment
       case PathList(ps @ _*) if ps.last=="mime.types" => MergeStrategy.last
       case x=>
         val oldStrategy = (assembly / assemblyMergeStrategy).value
