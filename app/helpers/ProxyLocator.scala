@@ -8,7 +8,7 @@ import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer, P
 import org.slf4j.MDC
 import play.api.Logger
 
-import collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.ExecutionContext.Implicits.global
 

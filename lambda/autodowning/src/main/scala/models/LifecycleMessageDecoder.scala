@@ -2,7 +2,6 @@ package models
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 
-import com.amazonaws.regions.Regions
 import io.circe.Decoder.Result
 import io.circe._
 import io.circe.generic.auto._
@@ -17,7 +16,7 @@ trait LifecycleMessageDecoder {
       ("source", Json.fromString(a.source)),
       ("account", Json.fromString(a.account)),
       ("time", Json.fromString(a.time.format(DateTimeFormatter.ISO_DATE_TIME))),
-      ("region", Json.fromString(a.region.toString)),
+      ("region", Json.fromString(a.region)),
       ("resources", Json.arr(a.resources.map(Json.fromString):_*)),
       ("detail", a.detail.map(_.asJson).getOrElse(Json.Null)
     ))
@@ -42,7 +41,7 @@ trait LifecycleMessageDecoder {
         source,
         account,
         ZonedDateTime.parse(timeStr, DateTimeFormatter.ISO_DATE_TIME),
-        Regions.fromName(regionStr),
+        regionStr,
         resources,
         detail
       )

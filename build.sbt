@@ -15,7 +15,7 @@ val elastic4sVersion = "6.7.8"
 val awsSdkVersion = "1.12.153"
 val awsSdk2Version = "2.17.124"
 val jacksonVersion = "2.11.4"
-val jacksonCoreVersion = "2.11.4"
+val jacksonCoreVersion = "2.13.1"
 
 lazy val commonSettings = Seq(
   version := "1.0",
@@ -35,10 +35,12 @@ lazy val commonSettings = Seq(
     "com.sksamuel.elastic4s" %% "elastic4s-embedded" % elastic4sVersion % "test",
     "com.typesafe.akka" %% "akka-actor" % akkaVersion,
     "software.amazon.awssdk" % "dynamodb" % awsSdk2Version,
+    "software.amazon.awssdk" % "aws-cbor-protocol" % awsSdk2Version,
     "com.lightbend.akka" %% "akka-stream-alpakka-dynamodb" % "2.0.2",
     "com.lightbend.akka" %% "akka-stream-alpakka-s3" % "2.0.2",
     "org.scanamo" %% "scanamo-alpakka" % "1.0.0-M16",
     "com.fasterxml.jackson.dataformat" % "jackson-dataformat-yaml" % jacksonVersion,
+    "com.fasterxml.jackson.dataformat" % "jackson-dataformat-cbor" % jacksonVersion,
     "com.fasterxml.jackson.core" % "jackson-databind" % jacksonCoreVersion,
     "com.google.guava" % "guava" % "30.0-jre",
       specs2 % Test)
@@ -77,7 +79,7 @@ lazy val `archivehunter` = (project in file("."))
       "com.typesafe.akka" %% "akka-http" % "10.2.7",
       "com.nimbusds" % "nimbus-jose-jwt" % "9.18",
       "com.gu" % "kinesis-logback-appender" % "2.0.3",
-      "com.fasterxml.jackson.dataformat" % "jackson-dataformat-cbor" % "2.11.4",  //fix vulnerable dependency for kinesis-logback-appender
+      "com.fasterxml.jackson.dataformat" % "jackson-dataformat-cbor" % jacksonVersion,
       "org.apache.logging.log4j" % "log4j-api" % "2.17.1",
       "com.typesafe.akka" %% "akka-testkit" % akkaVersion,
       "io.sentry" % "sentry-logback" % "1.7.2",
@@ -155,7 +157,6 @@ lazy val proxyStatsGathering = (project in file("ProxyStatsGathering"))
     dockerPermissionStrategy := DockerPermissionStrategy.None,
     Docker / packageName := "andyg42/archivehunter-proxystats",
     packageName := "archivehunter-proxystats",
-//    dockerBaseImage := "openjdk:8-jdk-alpine",
     dockerAlias := docker.DockerAlias(sys.props.get("docker.host"),sys.props.get("docker.username"),"proxy-stats-gathering",Some(sys.props.getOrElse("build.number","DEV"))),
     dockerCommands ++= Seq(
       Cmd("USER", "root"),
@@ -165,24 +166,17 @@ lazy val proxyStatsGathering = (project in file("ProxyStatsGathering"))
   )
 
 lazy val autoDowningLambda = (project in file("lambda/autodowning")).settings(commonSettings, name:="autoDowningLambda")
-  .dependsOn(common)
   .settings(commonSettings,
     libraryDependencies :=Seq(
-      "com.amazonaws" % "aws-java-sdk-lambda" % awsSdkVersion,
-      "com.amazonaws" % "aws-lambda-java-events" % "2.1.0",
-      "com.amazonaws" % "aws-java-sdk-events" % awsSdkVersion,
-      "com.amazonaws" % "aws-java-sdk-ec2" % awsSdkVersion,
+      "com.amazonaws" % "aws-lambda-java-events" % "3.11.0",
+      "software.amazon.awssdk" % "ec2" % awsSdk2Version,
+      "software.amazon.awssdk" % "url-connection-client" % awsSdk2Version,
       "com.amazonaws" % "aws-lambda-java-core" % "1.0.0",
-      "ch.qos.logback" %  "logback-classic" % "1.2.3",
-      "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.13.1",
-      //fix akka version
-      "com.typesafe.akka" %% "akka-actor-typed" % akkaVersion,
-      "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
-      "com.typesafe.akka" %% "akka-protobuf-v3" % akkaVersion,
-      "com.typesafe.akka" %% "akka-stream" % akkaVersion,
-      "com.typesafe.akka" %% "akka-serialization-jackson" % akkaVersion,
-      //vulnerable dependencies
-      "com.typesafe.akka" %% "akka-http-core" % "10.1.15",
+      //manual dependencies from common so that we don't pull in too much un-needed stuff
+      "io.circe" %% "circe-core" % circeVersion,
+      "io.circe" %% "circe-generic" % circeVersion,
+      "io.circe" %% "circe-parser" % circeVersion,
+      "org.scanamo" %% "scanamo" % "1.0.0-M16",
       specs2 % Test
     ),
     assembly / assemblyJarName := "autoDowningLambda.jar",
