@@ -157,7 +157,6 @@ lazy val proxyStatsGathering = (project in file("ProxyStatsGathering"))
     dockerPermissionStrategy := DockerPermissionStrategy.None,
     Docker / packageName := "andyg42/archivehunter-proxystats",
     packageName := "archivehunter-proxystats",
-//    dockerBaseImage := "openjdk:8-jdk-alpine",
     dockerAlias := docker.DockerAlias(sys.props.get("docker.host"),sys.props.get("docker.username"),"proxy-stats-gathering",Some(sys.props.getOrElse("build.number","DEV"))),
     dockerCommands ++= Seq(
       Cmd("USER", "root"),
@@ -173,7 +172,6 @@ lazy val autoDowningLambda = (project in file("lambda/autodowning")).settings(co
       "software.amazon.awssdk" % "ec2" % awsSdk2Version,
       "software.amazon.awssdk" % "url-connection-client" % awsSdk2Version,
       "com.amazonaws" % "aws-lambda-java-core" % "1.0.0",
-      //"com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.13.1",
       //manual dependencies from common so that we don't pull in too much un-needed stuff
       "io.circe" %% "circe-core" % circeVersion,
       "io.circe" %% "circe-generic" % circeVersion,
