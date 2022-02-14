@@ -1,7 +1,4 @@
-import akka.actor.ActorSystem
-import akka.stream.Materializer
 import com.amazonaws.services.lambda.runtime.{Context, LambdaLogger, RequestHandler}
-import com.typesafe.config.{Config, ConfigFactory}
 import org.scanamo.{Scanamo, Table}
 import org.scanamo.syntax._
 import org.scanamo.generic.auto._
@@ -19,9 +16,6 @@ import scala.concurrent.{Await, Future}
 class AutoDowningLambdaMain extends RequestHandler[java.util.LinkedHashMap[String,Object],Unit] with LifecycleMessageDecoder{
   import EnhancedLambdaLogger._
 
-  private val actorSystemConfig:Config = ConfigFactory.empty()
-  implicit val actorSystem = ActorSystem("akka-comms",config=actorSystemConfig, classLoader=getClass.getClassLoader)
-  implicit val mat:Materializer = Materializer.matFromSystem
 
   def getInstanceTableName =
     sys.env.get("INSTANCES_TABLE") match {
@@ -37,7 +31,7 @@ class AutoDowningLambdaMain extends RequestHandler[java.util.LinkedHashMap[Strin
   val ddbClient = DynamoDbClient.builder().build()
   val scanamo = Scanamo(ddbClient)
 
-  val akkaComms = new AkkaComms(getLoadBalancerHost, 8558)
+  val akkaComms = new ApacheComms(getLoadBalancerHost, 8558)
 
   val tagsComparison = Map("App"->"APP_TAG", "Stack"->"STACK_TAG", "Stage"->"STAGE_TAG")
 
@@ -106,17 +100,17 @@ class AutoDowningLambdaMain extends RequestHandler[java.util.LinkedHashMap[Strin
     findRecord(details.EC2InstanceId.get) match {
       case Some(Right(record))=>
         logger.info(s"Downing node for $record")
-        Await.result(akkaComms.getNodes().flatMap(akkaNodes=>{
+        akkaComms.getNodes().flatMap(akkaNodes=>{
           logger.info(s"Got $akkaNodes")
           akkaNodes.foreach(info=>logger.info(s"Got akka node: $info"))
           findAkkaNode(record.ipAddress, akkaNodes) match {
             case None=>
               logger.error(s"Could not find node ${details.EC2InstanceId.get} in the Akka cluster")
-              Future(false)
+              Success(false)
             case Some(akkaNode)=>
               akkaComms.downAkkaNode(akkaNode)
           }
-        }), 60.seconds)
+        })
       case None=>
         throw new RuntimeException(s"No record returned for ${details.EC2InstanceId}")
       case Some(Left(err))=>

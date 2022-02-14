@@ -177,14 +177,6 @@ lazy val autoDowningLambda = (project in file("lambda/autodowning")).settings(co
       "io.circe" %% "circe-generic" % circeVersion,
       "io.circe" %% "circe-parser" % circeVersion,
       "org.scanamo" %% "scanamo" % "1.0.0-M16",
-      //fix akka version
-      "com.typesafe.akka" %% "akka-actor-typed" % akkaVersion,
-      "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
-      "com.typesafe.akka" %% "akka-protobuf-v3" % akkaVersion,
-      "com.typesafe.akka" %% "akka-stream" % akkaVersion,
-      "com.typesafe.akka" %% "akka-serialization-jackson" % akkaVersion,
-      //vulnerable dependencies
-      "com.typesafe.akka" %% "akka-http-core" % "10.1.15",
       specs2 % Test
     ),
     assembly / assemblyJarName := "autoDowningLambda.jar",

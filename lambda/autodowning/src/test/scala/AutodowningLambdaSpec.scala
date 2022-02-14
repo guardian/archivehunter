@@ -24,7 +24,7 @@ class AutodowningLambdaSpec extends Specification with Mockito {
 
         override def getLoadBalancerHost: String = "loadbalancer"
 
-        override val akkaComms = mock[AkkaComms]
+        override val akkaComms = mock[ApacheComms]
       }
 
       test.processInstance(fakeDetails,"starting", maxRetries = 1) must throwA(expectedError)
@@ -55,7 +55,7 @@ class AutodowningLambdaSpec extends Specification with Mockito {
 
         override def shouldHandle(instance: Instance): Boolean = true
 
-        override val akkaComms = mock[AkkaComms]
+        override val akkaComms = mock[ApacheComms]
       }
       //
       test.processInstance(fakeDetails,"terminated", maxRetries = 1)
@@ -89,7 +89,7 @@ class AutodowningLambdaSpec extends Specification with Mockito {
 
         override def shouldHandle(instance: Instance): Boolean = true
 
-        override val akkaComms = mock[AkkaComms]
+        override val akkaComms = mock[ApacheComms]
 
         override def getEc2Tags(instance: Instance): Seq[TagDescription] = Seq(
           TagDescription.builder().key("App").value("myapp").build(),
@@ -130,7 +130,7 @@ class AutodowningLambdaSpec extends Specification with Mockito {
 
         override def shouldHandle(instance: Instance): Boolean = false
 
-        override val akkaComms = mock[AkkaComms]
+        override val akkaComms = mock[ApacheComms]
 
         override def getEc2Tags(instance: Instance): Seq[TagDescription] = Seq(
           TagDescription.builder().key("App").value("myapp").build(),
@@ -157,7 +157,7 @@ class AutodowningLambdaSpec extends Specification with Mockito {
 
         override def getLoadBalancerHost: String = "loadbalancer"
 
-        override val akkaComms = mock[AkkaComms]
+        override val akkaComms = mock[ApacheComms]
       }
 
       test.processInstance(fakeDetails,"starting", maxRetries = 1) must throwA(expectedException)
@@ -183,7 +183,7 @@ class AutodowningLambdaSpec extends Specification with Mockito {
 
         override def addRecord(rec: InstanceIp): Try[Unit] = addRecordMock(rec)
 
-        override val akkaComms = mock[AkkaComms]
+        override val akkaComms = mock[ApacheComms]
       }
 
       test.registerInstanceStarted(fakeDetails, fakeInstance)
@@ -213,7 +213,7 @@ class AutodowningLambdaSpec extends Specification with Mockito {
 
         override def addRecord(rec: InstanceIp): Try[Unit] = addRecordMock(rec)
 
-        override val akkaComms = mock[AkkaComms]
+        override val akkaComms = mock[ApacheComms]
 
         /**
           * the registerInstanceStarted implementation recourses in order to retry. We detect this and redirect to the mock
