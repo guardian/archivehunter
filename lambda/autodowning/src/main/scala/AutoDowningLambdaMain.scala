@@ -3,6 +3,7 @@ import org.scanamo.{Scanamo, Table}
 import org.scanamo.syntax._
 import org.scanamo.generic.auto._
 import models._
+import software.amazon.awssdk.http.urlconnection.UrlConnectionHttpClient
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient
 import software.amazon.awssdk.services.ec2.Ec2Client
 import software.amazon.awssdk.services.ec2.model.{DescribeInstancesRequest, DescribeTagsRequest, Filter, Instance, TagDescription}
@@ -27,8 +28,8 @@ class AutoDowningLambdaMain extends RequestHandler[java.util.LinkedHashMap[Strin
   val instanceTableName = getInstanceTableName
 
   val instanceTable = Table[InstanceIp](instanceTableName)
-  val ec2Client = Ec2Client.builder().build()
-  val ddbClient = DynamoDbClient.builder().build()
+  val ec2Client = Ec2Client.builder().httpClientBuilder(UrlConnectionHttpClient.builder()).build()
+  val ddbClient = DynamoDbClient.builder().httpClientBuilder(UrlConnectionHttpClient.builder()).build()
   val scanamo = Scanamo(ddbClient)
 
   val akkaComms = new ApacheComms(getLoadBalancerHost, 8558)
