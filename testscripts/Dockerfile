@@ -6,6 +6,7 @@ COPY requirements.txt /tmp
 RUN pip3 install -r /tmp/requirements.txt && pip3 install awscli
 COPY build-id-list.py /usr/local/bin/build-id-list.py
 COPY hmac_client.py /usr/local/bin/hmac-client.py
+COPY hmac-search.py /usr/local/bin/hmac-search.py
 COPY request-move-file.py /usr/local/bin/request-move-file.py
 COPY run-migration.sh /usr/local/bin/run-migration.sh
 USER migration

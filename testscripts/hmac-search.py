@@ -87,7 +87,7 @@ if __name__=="__main__":
     parser.add_option("--host", dest="host", help="host to access", default="archivehunter.local.dev-gutools.co.uk")
     parser.add_option("--no-verify", dest="sslnoverify", action="store_true", default="false", help="set this to disable SSL cert checking")
     parser.add_option("-s", "--secret", dest="secret", help="shared secret to use")
-    parser.add_option("-c", "--collection", dest="dest", help="Collection (bucket) name to move the content to")
+    parser.add_option("-c", "--collection", dest="dest", help="Collection (bucket) name to list")
     parser.add_option("--page-size", dest="page_size", default=100, help="page size")
     (options, args) = parser.parse_args()
 
