@@ -38,8 +38,8 @@ echo ------------------------------------------------------
 echo Migration run starting up at $(date "+%Y-%m-%d %H:%M:%S")
 echo ------------------------------------------------------
 
-echo Listing ${BUCKET}...
-python3 /usr/local/bin/build-id-list.py --bucket "${BUCKET}" > "$DATADIR/${BUCKET}.txt"
+echo Building file list for ${BUCKET}...
+python3 /usr/local/bin/hmac-search.py --host="${HOST}" --secret="${SECRET}" --collection="${BUCKET}" > "$DATADIR/${BUCKET}.txt"
 if [ "$?" != "0" ]; then
   echo Bucket list failed with error $?
   exit 1
