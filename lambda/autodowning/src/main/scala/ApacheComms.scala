@@ -19,7 +19,7 @@ import scala.util.{Failure, Success, Try}
 class ApacheComms(contactAddress:String, contactPort:Int) extends UriDecoder {
   import models.EnhancedLambdaLogger._
 
-  private val httpClient = Try { HttpClients.createDefault() }
+  protected val httpClient = Try { HttpClients.createDefault() }
 
   def consumeResponseEntity(e:HttpEntity) = {
     Try { e.getContent } match {

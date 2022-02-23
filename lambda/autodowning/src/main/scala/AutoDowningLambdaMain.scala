@@ -106,7 +106,7 @@ class AutoDowningLambdaMain extends RequestHandler[java.util.LinkedHashMap[Strin
           akkaNodes.foreach(info=>logger.info(s"Got akka node: $info"))
           findAkkaNode(record.ipAddress, akkaNodes) match {
             case None=>
-              logger.error(s"Could not find node ${details.EC2InstanceId.get} in the Akka cluster")
+              logger.error(s"Could not find node ${details.EC2InstanceId.get} (${record.ipAddress}) in the Akka cluster")
               Success(false)
             case Some(akkaNode)=>
               akkaComms.downAkkaNode(akkaNode)
