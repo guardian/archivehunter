@@ -711,7 +711,7 @@ Resources:
       FunctionName: !Sub archivehunter-autodown-${Stage}
       MemorySize: 768
       Role: !GetAtt AutodowningLambdaRole.Arn
-      Runtime: java8
+      Runtime: java11
       Timeout: 60
       VpcConfig:
         SecurityGroupIds:

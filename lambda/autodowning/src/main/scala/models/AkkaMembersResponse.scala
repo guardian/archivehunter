@@ -18,5 +18,5 @@ package models
  }
  */
  */
-case class AkkaMembersResponse (selfNode:String, members:Seq[AkkaMember], unreachable:Seq[AkkaUnreachable], leader:String, oldest:String)
+case class AkkaMembersResponse (selfNode:String, members:Seq[AkkaMember], unreachable:Seq[AkkaUnreachable], leader:String)
 
