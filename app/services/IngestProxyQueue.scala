@@ -40,7 +40,7 @@ class IngestProxyQueue @Inject()(config: Configuration,
                                  s3ClientMgr: S3ClientManager,
                                  dynamoClientMgr: DynamoClientManager,
                                  esClientMgr:ESClientManager,
-                                )(implicit scanTargetDAO: ScanTargetDAO, proxyLocationDAO: ProxyLocationDAO)
+                                )(implicit scanTargetDAO: ScanTargetDAO, proxyLocationDAO: ProxyLocationDAO, override val mat:Materializer)
   extends GenericSqsActor[IngestMessage] with ZonedDateTimeEncoder with StorageClassEncoder {
 
   import IngestProxyQueue._
@@ -51,7 +51,6 @@ class IngestProxyQueue @Inject()(config: Configuration,
   lazy override protected val sqsClient = sqsClientManager.getClient(config.getOptional[String]("externalData.awsProfile"))
 
   override protected implicit val implSystem = system
-  override protected implicit val mat: Materializer = ActorMaterializer.create(system)
 
   private implicit val esClient = esClientMgr.getClient()
   lazy protected implicit val indexer = new Indexer(config.get[String]("externalData.indexName"))

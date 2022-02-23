@@ -42,7 +42,7 @@ class SaveLightboxEntryFlowSpec extends Specification with Mockito {
         ZonedDateTime.now(),"fakeetag",MimeType("application","octet-stream"),false, StorageClass.STANDARD,Seq(), false,None)
       val testUserProfile = UserProfile("userEmail@company.org",false,Some("test"),Some("test"),Seq(),true,None,None,Some(12345678L),None,None,None)
 
-      implicit val mat = ActorMaterializer.create(system)
+      implicit val mat = Materializer.matFromSystem
       implicit val ec:ExecutionContext = system.dispatcher
       implicit val lightboxEntryDAO = mock[LightboxEntryDAO]
       implicit val esClient = mock[ElasticClient]

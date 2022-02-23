@@ -22,7 +22,7 @@ import org.apache.logging.log4j.LogManager
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient
 
 @Singleton
-class ScanTargetDAO @Inject()(config:ArchiveHunterConfiguration, ddbClientMgr: DynamoClientManager)(implicit actorSystem:ActorSystem)
+class ScanTargetDAO @Inject()(config:ArchiveHunterConfiguration, ddbClientMgr: DynamoClientManager)(implicit actorSystem:ActorSystem, mat:Materializer)
   extends ZonedDateTimeEncoder with ZonedTimeFormat with JobModelEncoder with ExtValueConverters {
   private val logger = LogManager.getLogger(getClass)
 
@@ -32,8 +32,6 @@ class ScanTargetDAO @Inject()(config:ArchiveHunterConfiguration, ddbClientMgr: D
   val maxRetries = config.getOptional[Int]("externalData.maxRetries").getOrElse(10)
   val initialRetryDelay = config.getOptional[Int]("externalData.initialRetryDelay").getOrElse(2)
   val retryDelayFactor = config.getOptional[Double]("externalData.retryDelayFactor").getOrElse(1.5)
-
-  implicit private val materializer:Materializer = ActorMaterializer.create(actorSystem)
 
   val scanamoAlpakka = ScanamoAlpakka(ddbClientMgr.getNewAsyncDynamoClient(config.getOptional[String]("externalData.awsProfile")))
   implicit val ddbClient : DynamoDbClient = ddbClientMgr.getNewDynamoClient(config.getOptional[String]("externalData.awsProfile"))

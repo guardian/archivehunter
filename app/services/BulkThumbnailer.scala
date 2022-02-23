@@ -34,7 +34,7 @@ object BulkThumbnailer {
 @Singleton
 class BulkThumbnailer @Inject() (@Named("dynamoCapacityActor") dynamoCapacityActor: ActorRef,
                                   ESClientManager: ESClientManager, hasThumbnailFilter: HasThumbnailFilter,
-                                 createProxySink: CreateProxySink, config:ArchiveHunterConfiguration, system:ActorSystem)
+                                 createProxySink: CreateProxySink, config:ArchiveHunterConfiguration, system:ActorSystem)(implicit mat:Materializer)
   extends Actor{
 
   import com.sksamuel.elastic4s.streams.ReactiveElastic._
@@ -49,7 +49,6 @@ class BulkThumbnailer @Inject() (@Named("dynamoCapacityActor") dynamoCapacityAct
   val jobHistoryTableName = config.get[String]("externalData.jobTable")
   val scanTargetTableName = config.get[String]("externalData.scanTargets")
 
-  implicit val mat:Materializer = ActorMaterializer.create(system)
   implicit val ec:ExecutionContext = system.dispatcher
 
   override def receive: Receive = {

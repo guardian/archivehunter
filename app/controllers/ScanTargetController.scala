@@ -43,10 +43,9 @@ class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner
                                       proxyGenerators:ProxyGenerators,
                                       scanTargetDAO:ScanTargetDAO,
                                       jobModelDAO:JobModelDAO)
-                                     (implicit system:ActorSystem)
+                                     (implicit system:ActorSystem, mat:Materializer)
   extends AbstractController(controllerComponents) with Security with Circe with ZonedDateTimeEncoder with ZonedTimeFormat with JobModelEncoder {
   override protected val logger=LoggerFactory.getLogger(getClass)
-  implicit val mat:Materializer = ActorMaterializer.create(system)
 
   val table = Table[ScanTarget](config.get[String]("externalData.scanTargets"))
 

@@ -35,10 +35,8 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration,
                                  scanTargetDAO:ScanTargetDAO,
                                  jobModelDAO:JobModelDAO,
                                  proxyFrameworkInstanceDAO: ProxyFrameworkInstanceDAO)
-                                (implicit system:ActorSystem) extends RequestModelEncoder {
+                                (implicit system:ActorSystem, mat:Materializer) extends RequestModelEncoder {
   private implicit val logger = LogManager.getLogger(getClass)
-
-  protected implicit val mat:Materializer = ActorMaterializer.create(system)
 
   protected val awsProfile = config.getOptional[String]("externalData.awsProfile")
   protected implicit val s3Client = s3ClientMgr.getClient(awsProfile)

@@ -38,7 +38,7 @@ object BucketScanner {
 @Singleton
 class BucketScanner @Inject()(override val config:Configuration, ddbClientMgr:DynamoClientManager, s3ClientMgr:S3ClientManager,
                               esClientMgr:ESClientManager, scanTargetDAO: ScanTargetDAO, jobModelDAO:JobModelDAO,
-                              injector:Injector)(implicit system:ActorSystem)
+                              injector:Injector)(implicit system:ActorSystem, mat:Materializer)
   extends Actor with BucketScannerFunctions with ZonedTimeFormat with ArchiveEntryRequestBuilder{
   import BucketScanner._
 
@@ -47,7 +47,6 @@ class BucketScanner @Inject()(override val config:Configuration, ddbClientMgr:Dy
 
   protected val logger=Logger(getClass)
 
-  implicit val mat = ActorMaterializer.create(system)
   implicit val ec:ExecutionContext = system.dispatcher
 
   override val indexName: String = config.get[String]("externalData.indexName")

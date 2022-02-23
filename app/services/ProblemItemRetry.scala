@@ -33,12 +33,11 @@ object ProblemItemRetry {
 class ProblemItemRetry @Inject()(config:Configuration, proxyGenerators:ProxyGenerators,
                                  esClientManager:ESClientManager, jobModelDAO:JobModelDAO,
                                  problemItemReproxySink: ProblemItemReproxySink)
-                                (implicit actorSystem: ActorSystem, proxyLocationDAO:ProxyLocationDAO) extends Actor with ProblemItemHitReader{
+                                (implicit actorSystem: ActorSystem, proxyLocationDAO:ProxyLocationDAO, mat:Materializer) extends Actor with ProblemItemHitReader{
   import ProblemItemRetry._
 
   private val logger=Logger(getClass)
 
-  implicit val mat:Materializer = ActorMaterializer.create(actorSystem)
   private val problemItemIndexName = config.get[String]("externalData.problemItemsIndex")
   private val problemItemIndexer = new ProblemItemIndexer(problemItemIndexName)
 
