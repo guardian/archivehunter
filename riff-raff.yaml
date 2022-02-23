@@ -12,6 +12,7 @@ deployments:
     type: autoscaling
     parameters:
       bucket: gnm-multimedia-rr-deployables
+    dependencies: [ multimedia-ami-update ]
 
   archivehunter-input-lambda:
     template: lambda
@@ -24,3 +25,12 @@ deployments:
     parameters:
       functionNames: [archivehunter-autodown-]
       fileName: autoDowningLambda.jar
+
+  multimedia-ami-update:
+    type: ami-cloudformation-parameter
+    app: archivehunter
+    parameters:
+      amiParameter: AmiId
+      amiTags:
+        BuiltBy: amigo
+        Recipe: multimedia-tools-focal-java11
