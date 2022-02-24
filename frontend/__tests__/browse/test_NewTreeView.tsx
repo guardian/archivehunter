@@ -51,7 +51,7 @@ describe("TreeLeaf", ()=>{
     beforeEach(()=>moxios.install());
     afterEach(()=>moxios.uninstall());
 
-    it("should load in data when it is clicked", async (done)=>{
+    it("should load in data when it is clicked",  (done)=>{
         const leafSelectedSpy = sinon.spy();
         const sampleNode:PathEntry = {
             name: "directory",
