@@ -9,6 +9,7 @@ import io.circe.generic.auto._
 import org.apache.http.client.entity.UrlEncodedFormEntity
 import org.apache.http.message.BasicNameValuePair
 
+import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.util
 import scala.util.{Failure, Success, Try}
@@ -76,11 +77,16 @@ class ApacheComms(contactAddress:String, contactPort:Int) extends UriDecoder {
   def downAkkaNode(node:AkkaMember)(implicit logger:LambdaLogger):Try[Boolean] = {
     if(httpClient.isFailure) return Failure(httpClient.failed.get)
     val client = httpClient.get
-    val addr = s"http://$contactAddress:$contactPort/cluster/members/${node.node.toString}"
+    val nodename = URLEncoder.encode(
+      node.node.toString.replace("akka://", ""),
+      StandardCharsets.UTF_8
+    )
+
+    val addr = s"http://$contactAddress:$contactPort/cluster/members/$nodename"
     logger.debug(s"address is $addr")
 
     val nvps = new util.ArrayList[NameValuePair]()
-    nvps.add(new BasicNameValuePair("operation","down"))
+    nvps.add(new BasicNameValuePair("operation","leave"))
     val entity = new UrlEncodedFormEntity(nvps)
     val request = new HttpPut(addr)
     request.setEntity(entity)
