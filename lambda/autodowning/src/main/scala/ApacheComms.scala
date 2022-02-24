@@ -86,7 +86,8 @@ class ApacheComms(contactAddress:String, contactPort:Int) extends UriDecoder {
     logger.debug(s"address is $addr")
 
     val nvps = new util.ArrayList[NameValuePair]()
-    nvps.add(new BasicNameValuePair("operation","leave"))
+    //"down" is usually the best option here - https://discuss.lightbend.com/t/downing-vs-leaving/5203
+    nvps.add(new BasicNameValuePair("operation","down"))
     val entity = new UrlEncodedFormEntity(nvps)
     val request = new HttpPut(addr)
     request.setEntity(entity)
