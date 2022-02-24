@@ -77,7 +77,7 @@ if options.secret is None:
 
 method = "PUT"
 uri = "https://{host}/api/move/{fileid}?to={collection}".format(host=options.host,
-                                                                fileid=urllib.parse.quote(options.entry_id),
+                                                                fileid=urllib.parse.quote(options.entry_id).replace("/", "%2F"),
                                                                 collection=urllib.parse.quote(options.dest))
 
 print("uri is " + uri)
