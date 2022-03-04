@@ -36,12 +36,12 @@ import scala.util.{Failure, Success}
 
 object FileMoveActor {
 
-  case class MoveFile(sourceFileId:String, destination:ScanTarget, async:Boolean) extends MoveActorMessage
+  case class MoveFile(sourceFileId:String, destination:ScanTarget, queueActor:ActorRef) extends MoveActorMessage
 
   //replies
-  case object MoveSuccess extends MoveActorMessage
+  case class MoveSuccess(sourceFileId:String) extends MoveActorMessage
   case class MoveAsync(jobId:String) extends MoveActorMessage
-  case class MoveFailed(reason:String) extends MoveActorMessage
+  case class MoveFailed(sourceFileId:String, reason:String) extends MoveActorMessage
 }
 
 
@@ -103,7 +103,7 @@ class FileMoveActor @Inject() (config:Configuration,
   }
 
   override def receive:Receive = {
-    case MoveFile(sourceFileId, destination, isAsync)=>
+    case MoveFile(sourceFileId, destination, queueActor)=>
       val originalSender = sender()
       val newJob = JobModel.newJob("FileMove",sourceFileId,SourceType.SRC_MEDIA).copy(jobStatus = JobStatus.ST_RUNNING)
       jobModelDAO
@@ -117,26 +117,23 @@ class FileMoveActor @Inject() (config:Configuration,
               logger.info(s"File move for $sourceFileId -> ${destination.bucketName} completed successfully")
               val finalJob = newJob.copy(jobStatus = JobStatus.ST_SUCCESS, completedAt = Some(ZonedDateTime.now()))
               jobModelDAO.putJob(finalJob)
-              originalSender ! MoveSuccess
+              queueActor ! MoveSuccess(sourceFileId)
             case Left(errMsg) =>
               logger.error(s"File move for $sourceFileId -> ${destination.bucketName} failed: ${errMsg.err}")
               val finalJob = newJob.copy(jobStatus = JobStatus.ST_ERROR, log=Some(errMsg.err), completedAt = Some(ZonedDateTime.now()))
               jobModelDAO.putJob(finalJob)
-              originalSender ! MoveFailed(errMsg.err)
+              queueActor ! MoveFailed(sourceFileId, errMsg.err)
           }).recover({
             case err: Throwable =>
               val finalJob = newJob.copy(jobStatus = JobStatus.ST_ERROR, log=Some(err.toString), completedAt = Some(ZonedDateTime.now()))
               jobModelDAO.putJob(finalJob)
               logger.error(s"File move processor crashed: ", err)
-              originalSender ! akka.actor.Status.Failure(err)
+              queueActor ! MoveFailed(sourceFileId, err.getMessage)
           })
-          if(isAsync){
-            originalSender ! MoveAsync(newJob.jobId)
-          }
       }).recover({
         case err:Throwable=>
           logger.error(s"Could not move file with id $sourceFileId to destination $destination: ${err.getMessage}", err)
-          originalSender ! MoveFailed(err.toString)
+          originalSender ! MoveFailed(sourceFileId, err.toString)
       })
   }
 }

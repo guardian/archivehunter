@@ -190,7 +190,6 @@ class IngestProxyQueue @Inject()(config: Configuration,
       })
 
     case HandleDomainMessage(finalMsg:IngestMessage, rq, receiptHandle)=>
-      println(finalMsg)
       logger.info(s"Received notification of new item: ${finalMsg.archiveEntry}")
       ownRef ! CheckRegisteredThumb(finalMsg.archiveEntry)
       ownRef ! CheckRegisteredProxy(finalMsg.archiveEntry)
