@@ -118,7 +118,7 @@ class FileMoveQueueSpec extends Specification with Mockito {
   }
 
   "FileMoveQueue ! MoveSuccess" should {
-    "set the actor state to IDLE" in new AkkaTestkitSpecs2Support {
+    "set the actor state to IDLE amd delete the requesting message from SQS" in new AkkaTestkitSpecs2Support {
       implicit val mat:Materializer = Materializer.matFromSystem
 
       val mockConfig = Configuration.from(Map("filemover.notificationsQueue"->"somequeue"))
@@ -136,8 +136,10 @@ class FileMoveQueueSpec extends Specification with Mockito {
       }))
 
       toTest ! InternalSetIdleState(false)
-      toTest ! MoveSuccess("some-file-id")
+      toTest ! MoveSuccess("some-file-id", Some("receipt"))
+
       fakeSelf.expectMsg(2.seconds, InternalSetIdleState(true))
+      there was one(mockSQSClient).deleteMessage("somequeue", "receipt")
     }
   }
 
@@ -160,7 +162,9 @@ class FileMoveQueueSpec extends Specification with Mockito {
       }))
 
       toTest ! InternalSetIdleState(false)
-      toTest ! MoveFailed("some-file-id", "kersplat")
+      toTest ! MoveFailed("some-file-id", "kersplat", Some("receipt"))
+
+      there was no(mockSQSClient).deleteMessage("somequeue", "receipt")
 
       fakeSelf.expectMsg(2.seconds, InternalSetIdleState(true))
     }
@@ -207,7 +211,7 @@ class FileMoveQueueSpec extends Specification with Mockito {
       val fakeRequest = new ReceiveMessageRequest()
       toTest ! HandleDomainMessage(FileMoveMessage("some-file-id","another-collection"), fakeRequest, "sqs-receipt")
       fakeSelf.expectMsg(2.seconds, InternalSetIdleState(false))
-      fakeMoveActor.expectMsg(2.seconds, MoveFile("some-file-id", fakeScanTarget, fakeSelf.ref))
+      fakeMoveActor.expectMsg(2.seconds, MoveFile("some-file-id", fakeScanTarget, Some("sqs-receipt"), fakeSelf.ref))
     }
 
     "not request a file move if the scan target is disabled" in new AkkaTestkitSpecs2Support {

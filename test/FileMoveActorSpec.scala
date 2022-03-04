@@ -54,7 +54,7 @@ class FileMoveActorSpec extends Specification with Mockito {
       val target = ScanTarget("some-bucket", true, None, 1234L, false, None, "some-proxy-bucket", "eu-west-1", None, None, None, None)
       val requestingActor = TestProbe()
 
-      ac ! MoveFile("somesourcefileId", target, requestingActor.ref)
+      ac ! MoveFile("somesourcefileId", target, Some("receipt"), requestingActor.ref)
       val initialData = FileMoveTransientData.initialise("somesourcefileId", "some-bucket", "some-proxy-bucket", "eu-west-1")
 
       probe1.expectMsg(5.seconds, PerformStep(initialData))
@@ -67,7 +67,7 @@ class FileMoveActorSpec extends Specification with Mockito {
       probe3.expectMsg(5.seconds, PerformStep(updatedData))
       probe3.reply(GenericMoveActor.StepSucceeded(updatedData))
 
-      requestingActor.expectMsg(10.seconds, MoveSuccess("somesourcefileId"))
+      requestingActor.expectMsg(10.seconds, MoveSuccess("somesourcefileId", Some("receipt")))
     }
 
     "stop when an actor reports a failure and roll back the ones that had run before" in new AkkaTestkitSpecs2Support{
@@ -97,7 +97,7 @@ class FileMoveActorSpec extends Specification with Mockito {
           val target = ScanTarget("some-bucket", true, None, 1234L, false, None, "some-proxy-bucket", "eu-west-1", None, None, None, None)
       val requestingActor = TestProbe()
 
-          ac ! MoveFile("somesourcefileId", target, requestingActor.ref)
+          ac ! MoveFile("somesourcefileId", target, Some("receipt"), requestingActor.ref)
           val initialData = FileMoveTransientData.initialise("somesourcefileId", "some-bucket", "some-proxy-bucket","eu-west-1")
 
           probe1.expectMsg(5.seconds, PerformStep(initialData))
@@ -112,7 +112,7 @@ class FileMoveActorSpec extends Specification with Mockito {
 
           probe3.expectNoMessage(5.seconds)
 
-          requestingActor.expectMsg(20.seconds, MoveFailed("somesourcefileId", "Something went splat!"))
+          requestingActor.expectMsg(20.seconds, MoveFailed("somesourcefileId", "Something went splat!", Some("receipt")))
         }
 
      "continue rollback even if a rollback fails" in new AkkaTestkitSpecs2Support{
@@ -142,7 +142,7 @@ class FileMoveActorSpec extends Specification with Mockito {
           val target = ScanTarget("some-bucket", true, None, 1234L, false, None, "some-proxy-bucket", "eu-west-1", None, None, None, None)
           val requestingActor = TestProbe()
 
-          ac ! MoveFile("somesourcefileId", target, requestingActor.ref)
+          ac ! MoveFile("somesourcefileId", target, Some("receipt"), requestingActor.ref)
           val initialData = FileMoveTransientData.initialise("somesourcefileId", "some-bucket", "some-proxy-bucket","eu-west-1")
 
           probe1.expectMsg(5.seconds, PerformStep(initialData))
@@ -156,7 +156,7 @@ class FileMoveActorSpec extends Specification with Mockito {
 
           probe3.expectNoMessage(5.seconds)
 
-          requestingActor.expectMsg(10.seconds, MoveFailed("somesourcefileId", "Fire the blobfish!"))
+          requestingActor.expectMsg(10.seconds, MoveFailed("somesourcefileId", "Fire the blobfish!", Some("receipt")))
         }
       }
 }

@@ -129,13 +129,26 @@ class FileMoveQueue @Inject()(config:Configuration,
       }
 
     //a file move process was completed ok
-    case FileMoveActor.MoveSuccess(fileId)=>
+    case FileMoveActor.MoveSuccess(fileId, remoteMessageId)=>
       logger.info(s"Move of $fileId worked fine")
+      logger.info(s"Notified actor so removing message from queue")
+
+      remoteMessageId match {
+        case Some(receiptHandle) =>
+          try {
+            sqsClient.deleteMessage(notificationsQueue, receiptHandle)
+          } catch {
+            case err: Throwable =>
+              logger.error(s"Could not delete message for ${fileId} with receipt handle $receiptHandle: ${err.getMessage}", err)
+          }
+        case None =>
+          logger.warn("No remote message ID present so can't delete message from SQS")
+      }
       ownRef ! InternalSetIdleState(true)   //flag that we are not busy any more
 
     //a file move process failed
-    case FileMoveActor.MoveFailed(fileId, error)=>
-      logger.error(s"Could not move file $fileId: $error")
+    case FileMoveActor.MoveFailed(fileId, error, remoteMessageId)=>
+      logger.error(s"Could not move file $fileId: $error. Message will be left on queue to retry after a (long) delay")
       ownRef ! InternalSetIdleState(true) //flag that we are not busy any more
 
     //a request for a move came off the queue
@@ -144,19 +157,16 @@ class FileMoveQueue @Inject()(config:Configuration,
 
       scanTargetDAO.withScanTarget(msg.toCollection) { scanTarget=>
         if(scanTarget.enabled) {
-          fileMoveActor ! MoveFile(msg.fileId, scanTarget, ownRef)
+          fileMoveActor ! MoveFile(msg.fileId, scanTarget, Some(receiptHandle), ownRef)
           ownRef ! InternalSetIdleState(false)  //flag that we are busy now
         } else {
           logger.warn(s"Cannot move ${msg.fileId} to ${scanTarget.bucketName} because the scan target is disabled")
-        }
-
-        //FIXME - ideally this would be done after the move???
-        logger.info(s"Notified actor so removing message from queue")
-        try {
-          sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle(receiptHandle))
-        } catch {
-          case err:Throwable=>
-            logger.error(s"Could not delete message for ${msg.fileId} with receipt handle $receiptHandle: ${err.getMessage}", err)
+          try {
+            sqsClient.deleteMessage(notificationsQueue, receiptHandle)
+          } catch {
+            case err: Throwable =>
+              logger.error(s"Could not delete message for ${msg.fileId} with receipt handle $receiptHandle: ${err.getMessage}", err)
+          }
         }
       }
 
