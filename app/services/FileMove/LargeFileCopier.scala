@@ -15,9 +15,9 @@ import scala.concurrent.Future
 
 object LargeFileCopier {
   private val logger = LoggerFactory.getLogger(getClass)
-  //create a separate materializer for this stage, to keep the copy-operation separate from the main server
-  val temporaryActorSystem = ActorSystem.create("CopyMainFile", ConfigFactory.empty())
-  implicit val mat:Materializer = Materializer.createMaterializer(temporaryActorSystem)
+//  //create a separate materializer for this stage, to keep the copy-operation separate from the main server
+//  val temporaryActorSystem = ActorSystem.create("CopyMainFile", ConfigFactory.empty())
+//  implicit val mat:Materializer = Materializer.createMaterializer(temporaryActorSystem)
 
   val defaultPartSize:Int = 10*1024*1024  //default chunk size is 50Mb
 
@@ -55,7 +55,7 @@ object LargeFileCopier {
     * @param path path of the file to copy
     * @return a Future containing a MultipartUploadResult which fails on error.
     */
-  def largeFileCopy(destBucket:String, sourceBucket:String, path:String, fileSize:Long) = {
+  def largeFileCopy(destBucket:String, sourceBucket:String, path:String, fileSize:Long)(implicit actorSystem:ActorSystem,  mat:Materializer) = {
     logger.info(s"Setting up large-file copy for s3://$sourceBucket/$path into $destBucket")
     val s3file = S3.download(sourceBucket, path)
     s3file.runWith(Sink.head).flatMap({ //the download method materializes once when the file is found, that passes us another source for streming the data.
@@ -77,7 +77,7 @@ object LargeFileCopier {
         }
         logger.info(s"Performing large-file copy for s3://$sourceBucket/$path to s3://$destBucket/$path. Content type is $ct")
         val sink = S3.multipartUpload(destBucket, path, contentType = ct, chunkingParallelism = 4, chunkSize = estimatePartSize(fileSize))
-        src.runWith(sink)
+        src.async.runWith(sink)
     })
   }
 }
