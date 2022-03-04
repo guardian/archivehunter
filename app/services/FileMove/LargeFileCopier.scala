@@ -77,7 +77,7 @@ object LargeFileCopier {
         }
         logger.info(s"Performing large-file copy for s3://$sourceBucket/$path to s3://$destBucket/$path. Content type is $ct")
         val sink = S3.multipartUpload(destBucket, path, contentType = ct, chunkingParallelism = 4, chunkSize = estimatePartSize(fileSize))
-        src.async.runWith(sink)
+        src.async.log("LargeFileCopier").runWith(sink)
     })
   }
 }

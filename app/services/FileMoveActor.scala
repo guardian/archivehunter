@@ -68,7 +68,7 @@ class FileMoveActor @Inject() (config:Configuration,
   val indexName = config.getOptional[String]("externalData.indexName").getOrElse("archivehunter")
   private val indexer = new Indexer(indexName)
 
-  private implicit val timeout:akka.util.Timeout = 600 seconds  //time out after 10 minutes
+  private implicit val timeout:akka.util.Timeout = 1200 seconds  //time out after 20 minutes
 
   protected val fileMoveChain:Seq[ActorRef] = Seq(
     system.actorOf(Props(new VerifySource(indexer, proxyLocationDAO))),
