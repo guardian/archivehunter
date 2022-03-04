@@ -28,7 +28,7 @@ object LargeFileCopier {
     * @return the target path size
     */
   def estimatePartSize(totalFileSize:Long):Int = {
-    val maxWantedParts = 500
+    val maxWantedParts = 10000
 
     var partSize:Int = defaultPartSize
     var nParts:Int = maxWantedParts + 1
