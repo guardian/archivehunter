@@ -19,7 +19,7 @@ object LargeFileCopier {
   val temporaryActorSystem = ActorSystem.create("CopyMainFile", ConfigFactory.empty())
   implicit val mat:Materializer = Materializer.createMaterializer(temporaryActorSystem)
 
-  val defaultPartSize:Int = 50*1024*1024  //default chunk size is 50Mb
+  val defaultPartSize:Int = 10*1024*1024  //default chunk size is 50Mb
 
   /**
     * AWS specifications say that parts must be at least 5Mb in size but no more than 5Gb in size, and that there
@@ -76,7 +76,7 @@ object LargeFileCopier {
             ContentTypes.`application/octet-stream`
         }
         logger.info(s"Performing large-file copy for s3://$sourceBucket/$path to s3://$destBucket/$path. Content type is $ct")
-        val sink = S3.multipartUpload(destBucket, path, contentType = ct, chunkingParallelism = 1, chunkSize = estimatePartSize(fileSize))
+        val sink = S3.multipartUpload(destBucket, path, contentType = ct, chunkingParallelism = 4, chunkSize = estimatePartSize(fileSize))
         src.runWith(sink)
     })
   }
