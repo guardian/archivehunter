@@ -18,16 +18,16 @@ class ImprovedLargeFileCopierSpec extends Specification {
       val result = Await.result(toTest.headSourceFile(Regions.EU_WEST_1,None, "gnm-multimedia-cdn","interactive/speedtest/testmpfile.dat",None), 10.seconds)
 
      result must beSome(
-         ImprovedLargeFileCopier.HeadInfo(
-          "gnm-multimedia-cdn",
-           "interactive/speedtest/testmpfile.dat",
-           None,
-           "Thu, 25 Apr 2019 09:39:03 GMT",
-           10485760,
-           Some("\"ee32e01c6f0941f94330fc994dc6f31d-2\""),
-           "binary/octet-stream",
-           None,
-           None
+       ImprovedLargeFileCopier.HeadInfo(
+        "gnm-multimedia-cdn",
+         "interactive/speedtest/testmpfile.dat",
+         None,
+         "Thu, 25 Apr 2019 09:39:03 GMT",
+         10485760,
+         Some("\"ee32e01c6f0941f94330fc994dc6f31d-2\""),
+         "binary/octet-stream",
+         None,
+         None
        )
      )
     }

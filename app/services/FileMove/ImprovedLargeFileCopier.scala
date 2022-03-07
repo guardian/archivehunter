@@ -2,7 +2,7 @@ package services.FileMove
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.headers.Host
+import akka.http.scaladsl.model.headers.{Host, RawHeader}
 import akka.http.scaladsl.model.{ContentType, HttpHeader, HttpMethod, HttpMethods, HttpRequest, HttpResponse, StatusCode, StatusCodes}
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
@@ -11,6 +11,7 @@ import com.amazonaws.auth.AWSCredentialsProvider
 import com.amazonaws.regions.{Region, Regions}
 import helpers.S3Signer
 import org.slf4j.LoggerFactory
+import services.FileMove.ImprovedLargeFileCopier.HeadInfo
 
 import java.nio.file.Paths
 import javax.inject.{Inject, Singleton}
@@ -112,14 +113,25 @@ class ImprovedLargeFileCopier @Inject() (implicit actorSystem:ActorSystem, overr
 
   }
 
-  private def doRequestSigning(reqparts:(HttpRequest, Unit), region:Regions, credentialsProvider:Option[AWSCredentialsProvider]) = {
+  private def doRequestSigning(reqparts:(HttpRequest, Unit), region:Regions, credentialsProvider:Option[AWSCredentialsProvider]) =
       credentialsProvider match {
         case Some(creds)=>
           signHttpRequest(reqparts._1, Region.getRegion(region), "s3", creds)
             .map(signedRequest=>(signedRequest, ()))
         case None=>Future(reqparts)
       }
-  }
+
+  /**
+    * Gets the metadata for a given object
+    * @param region
+    * @param credentialsProvider
+    * @param sourceBucket
+    * @param sourceKey
+    * @param sourceVersion
+    * @param poolClientFlow
+    * @return a Future containing None if the object does not exist, an instance of HeadInfo if it does or a failure if
+    *         another error occurred
+    */
   def headSourceFile(region:Regions, credentialsProvider: Option[AWSCredentialsProvider], sourceBucket: String, sourceKey:String, sourceVersion:Option[Int])(implicit poolClientFlow:HostConnectionPool) = {
     val req = createRequest(HttpMethods.HEAD, region, sourceBucket, sourceKey, sourceVersion)(ImprovedLargeFileCopier.NoRequestCustomisation)
     Source
@@ -165,6 +177,92 @@ class ImprovedLargeFileCopier @Inject() (implicit actorSystem:ActorSystem, overr
       })
   }
 
+  private def loadResponseBody(response:HttpResponse) = response.entity
+    .dataBytes
+    .runWith(Sink.reduce[ByteString](_ ++ _))
+    .map(_.utf8String)
+
+  /**
+    * Initiates a multipart upload to the given object.
+    * @param region AWS region within which to operate
+    * @param credentialsProvider AWS Credentials provider. This can be None, if so then no authentication takes place and the request is made anonymously
+    * @param destBucket bucket to create the object in
+    * @param destKey key to create the object with
+    * @param metadata HeadInfo providing the content type metadata to use
+    * @param poolClientFlow implicitly provided HostConnectionPool instance
+    * @return a Future containing the upload ID. On error, the future will be failed
+    */
+  def initiateMultipartUpload(region:Regions, credentialsProvider:Option[AWSCredentialsProvider], destBucket:String, destKey:String, metadata:HeadInfo)
+                             (implicit poolClientFlow:HostConnectionPool) = {
+    val req = createRequest(HttpMethods.POST, region, destBucket, destKey, None) { partialRequest=>
+      partialRequest
+        .withUri(partialRequest.uri.withRawQueryString("?uploads"))
+        .withHeaders(partialRequest.headers ++ Seq(
+          RawHeader("Content-Type", metadata.contentType),
+          RawHeader("x-amz-acl", "private"),
+        ))
+    }
+
+    Source
+      .single(req)
+      .mapAsync(1)(reqparts=>doRequestSigning(reqparts, region, credentialsProvider))
+      .via(poolClientFlow)
+      .runWith(Sink.head)
+      .flatMap({
+        case (Success(response), _)=>
+          (response.status: @switch) match {
+            case StatusCodes.OK =>
+              loadResponseBody(response)
+                .map(scala.xml.XML.loadString)
+                .map(elems => (elems \\ "UploadId").text)
+                .map(uploadId => {
+                  logger.info(s"Successfully initiated a multipart upload with ID $uploadId")
+                  uploadId
+                })
+            case _=>
+              loadResponseBody(response)
+                .flatMap(errContent=> {
+                  logger.error(s"Could not initiate multipart upload for s3://$destBucket/$destKey: ${response.status}")
+                  logger.error(s"s3://$destBucket/$destKey: $errContent")
+                  Future.failed(new RuntimeException(s"Server error ${response.status}"))
+                })
+          }
+        case (Failure(err), _) =>
+          logger.error(s"Could not initate multipart upload for s3://$destBucket/$destKey: ${err.getMessage}", err)
+          Future.failed(err)
+      })
+  }
+
+  def abortMultipartUpload(region:Regions, credentialsProvider:Option[AWSCredentialsProvider], sourceBucket:String, sourceKey:String, uploadId:String)
+                          (implicit poolClientFlow:HostConnectionPool)= {
+    Source
+      .single(createRequest(HttpMethods.DELETE, region, sourceBucket, sourceKey, None) { partialRequest=>
+        partialRequest.withUri(partialRequest.uri.withRawQueryString(s"?uploadId=$uploadId"))
+      })
+      .mapAsync(1)(reqparts=>doRequestSigning(reqparts, region, credentialsProvider))
+      .via(poolClientFlow)
+      .runWith(Sink.head)
+      .flatMap({
+        case (Success(response), _)=>
+          (response.status: @switch) match {
+            case StatusCodes.OK=>
+              response.discardEntityBytes()
+              logger.info(s"Successfully cancelled upload ID $uploadId")
+              Future( () )
+            case _=>
+              loadResponseBody(response).map(errContent=>{
+                logger.error(s"Could not cancel multipart upload $uploadId: server said ${response.status} $errContent")
+                throw new RuntimeException(s"Server error ${response.status}")
+              })
+          }
+      })
+  }
+
+  /**
+    * Creates a new pool client flow. This should be considered internal and is only used externally in testing.
+    * @param destRegion region to communicate with
+    * @return
+    */
   def newPoolClientFlow(destRegion:Regions) = {
     Http().cachedHostConnectionPoolHttps[Unit](s"s3.${destRegion.getName}.amazonaws.com")
   }
@@ -175,9 +273,9 @@ class ImprovedLargeFileCopier @Inject() (implicit actorSystem:ActorSystem, overr
 
     headSourceFile(destRegion, None, sourceBucket, sourceKey, sourceVersion).flatMap({
       case Some(headInfo)=>
-//        for {
-//          uploadId <- initiateMultipartUpload(destBucket, destKey, destVersion)
-//        } yield uploadId
+        for {
+          uploadId <- initiateMultipartUpload(destBucket, destKey, destVersion)
+        } yield uploadId
         Future.failed(new RuntimeException(s"Not implemented yet"))
       case None=>
         logger.error(s"Can't copy s3://$sourceBucket/$sourceKey@${sourceVersion.getOrElse("LATEST")} because the source file does not exist")
