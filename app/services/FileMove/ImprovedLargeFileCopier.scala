@@ -7,7 +7,9 @@ import akka.http.scaladsl.model.{ContentType, HttpHeader, HttpMethod, HttpMethod
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import akka.util.ByteString
+import com.amazonaws.auth.AWSCredentialsProvider
 import com.amazonaws.regions.{Region, Regions}
+import helpers.S3Signer
 import org.slf4j.LoggerFactory
 
 import java.nio.file.Paths
@@ -73,8 +75,8 @@ object ImprovedLargeFileCopier {
   * Uses the "multipart-copy" AWS API directly via an Akka connection pool
   */
 @Singleton
-class ImprovedLargeFileCopier @Inject() (implicit actorSystem:ActorSystem, mat:Materializer, ec:ExecutionContext) {
-  private final val logger = LoggerFactory.getLogger(getClass)
+class ImprovedLargeFileCopier @Inject() (implicit actorSystem:ActorSystem, override val mat:Materializer, override val ec:ExecutionContext) extends S3Signer {
+  override protected val logger = LoggerFactory.getLogger(getClass)
   //Full type of "poolClientFlow" to save on typing :)
   type HostConnectionPool =  Flow[(HttpRequest, Unit), (Try[HttpResponse], Unit), Http.HostConnectionPool]
 
@@ -110,10 +112,19 @@ class ImprovedLargeFileCopier @Inject() (implicit actorSystem:ActorSystem, mat:M
 
   }
 
-  def headSourceFile(region:Regions, sourceBucket: String, sourceKey:String, sourceVersion:Option[Int])(implicit poolClientFlow:HostConnectionPool) = {
+  private def doRequestSigning(reqparts:(HttpRequest, Unit), region:Regions, credentialsProvider:Option[AWSCredentialsProvider]) = {
+      credentialsProvider match {
+        case Some(creds)=>
+          signHttpRequest(reqparts._1, Region.getRegion(region), "s3", creds)
+            .map(signedRequest=>(signedRequest, ()))
+        case None=>Future(reqparts)
+      }
+  }
+  def headSourceFile(region:Regions, credentialsProvider: Option[AWSCredentialsProvider], sourceBucket: String, sourceKey:String, sourceVersion:Option[Int])(implicit poolClientFlow:HostConnectionPool) = {
     val req = createRequest(HttpMethods.HEAD, region, sourceBucket, sourceKey, sourceVersion)(ImprovedLargeFileCopier.NoRequestCustomisation)
     Source
       .single(req)
+      .mapAsync(1)(reqparts=>doRequestSigning(reqparts, region, credentialsProvider))
       .via(poolClientFlow)
       .runWith(Sink.head)
       .map({
@@ -162,7 +173,7 @@ class ImprovedLargeFileCopier @Inject() (implicit actorSystem:ActorSystem, mat:M
     logger.info(s"Initiating ImprovedLargeFileCopier for region $destRegion")
     implicit val poolClientFlow = newPoolClientFlow(destRegion)
 
-    headSourceFile(destRegion, sourceBucket, sourceKey, sourceVersion).flatMap({
+    headSourceFile(destRegion, None, sourceBucket, sourceKey, sourceVersion).flatMap({
       case Some(headInfo)=>
 //        for {
 //          uploadId <- initiateMultipartUpload(destBucket, destKey, destVersion)

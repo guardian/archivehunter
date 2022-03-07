@@ -15,7 +15,7 @@ class ImprovedLargeFileCopierSpec extends Specification {
     "return file metadata about a known public file" in new AkkaTestkitSpecs2Support {
       val toTest = new ImprovedLargeFileCopier()
       implicit val pool = toTest.newPoolClientFlow(Regions.EU_WEST_1)
-      val result = Await.result(toTest.headSourceFile(Regions.EU_WEST_1,"gnm-multimedia-cdn","interactive/speedtest/testmpfile.dat",None), 10.seconds)
+      val result = Await.result(toTest.headSourceFile(Regions.EU_WEST_1,None, "gnm-multimedia-cdn","interactive/speedtest/testmpfile.dat",None), 10.seconds)
 
      result must beSome(
          ImprovedLargeFileCopier.HeadInfo(

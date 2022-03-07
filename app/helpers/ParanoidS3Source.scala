@@ -3,7 +3,6 @@ package helpers
 import java.net.URLEncoder
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
-
 import akka.actor.ActorSystem
 import akka.http.scaladsl.{Http, model}
 import akka.http.scaladsl.model._
@@ -18,6 +17,7 @@ import com.amazonaws.regions.Region
 import scala.collection.immutable.Seq
 import play.api.Logger
 import akka.http.scaladsl.model.HttpProtocol
+import org.slf4j.LoggerFactory
 
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration._
@@ -36,7 +36,7 @@ class ParanoidS3Source(bucketName:String, region:Region, credsProvider: AWSCrede
   implicit val ec:ExecutionContext = actorSystem.dispatcher
   override def shape: SourceShape[ByteString] = SourceShape.of(out)
 
-  val logger = Logger(getClass)
+  val logger = LoggerFactory.getLogger(getClass)
   /**
     * extract given entries from the XML manually. This is necessary as we are in "paranoid mode", and can't
     * rely on the XML being valid.
