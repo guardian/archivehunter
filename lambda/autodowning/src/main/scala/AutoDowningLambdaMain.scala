@@ -159,17 +159,16 @@ class AutoDowningLambdaMain extends RequestHandler[java.util.LinkedHashMap[Strin
     case Success(Some(info))=>
       println(s"Got $info")
       if(shouldHandle(info)) {
-        if (state == "terminated") {
-          println("registering shutdown")
+        if (state == "shutting-down" || state == "terminated") {
+          logger.info("registering shutdown")
           registerInstanceTerminated(details)
         } else if(state == "running"){
-          println("registering startup")
+          logger.info("registering startup")
           registerInstanceStarted(details, info)
         } else {
-          println(s"don't need to register $state state")
+          logger.info(s"don't need to register $state state")
         }
       } else {
-        println("not handling")
         logger.info(s"We are not interested in this instance, tags are ${getEc2Tags(info)} but we want $tagsComparison")
       }
     case Success(None)=>

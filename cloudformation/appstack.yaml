@@ -584,6 +584,17 @@ Resources:
   ProxyFrameworkDLQ:
     Type: AWS::SQS::Queue
 
+  FileMoveQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt FileMoveDLQ.Arn
+        maxReceiveCount: 10
+      VisibilityTimeout: 3600 #keep message hidden for 1 hour after successful delivery - should be long enough for a move to complete
+
+  FileMoveDLQ:
+    Type: AWS::SQS::Queue
+
   ProxyFrameworkMsgSubs:
     Type: AWS::SQS::QueuePolicy
     Properties:
@@ -846,6 +857,7 @@ Resources:
               - !GetAtt TranscodeUpdateMsg.Arn
               - !GetAtt IngestTranscodeMsg.Arn
               - !GetAtt ProxyFrameworkMsg.Arn
+              - !GetAtt FileMoveQueue.Arn
       - PolicyName: EC2InstanceDiscovery
         PolicyDocument:
           Version: 2012-10-17
@@ -1073,6 +1085,7 @@ Resources:
             trackingTable = "${ProxyFrameworkTable}"
           }
 
+          filemover.notificationsQueue = "${FileMoveQueue}"
           auth {
              deployedUrl = "https://${App}.${DeploymentDomain}"
              domain = "${DeploymentDomain}"

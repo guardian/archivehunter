@@ -23,7 +23,7 @@ import scala.util.{Failure, Success}
 /* see https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-header-based-auth.html*/
 
 trait S3Signer {
-  protected val logger:Logger
+  protected val logger:org.slf4j.Logger
   implicit val mat:Materializer
   implicit val ec:ExecutionContext
 
@@ -145,7 +145,7 @@ trait S3Signer {
       )
 
       logger.debug(s"Final headers are: $finalHeaders")
-      req.copy(headers=finalHeaders)
+      req.withHeaders(finalHeaders)
     })
   }
 

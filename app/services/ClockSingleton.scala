@@ -31,16 +31,17 @@ class ClockSingleton @Inject() (@Named("dynamoCapacityActor") dynamoCapacityActo
                                 @Named("ingestProxyQueue") ingestProxyQueue: ActorRef,
                                 @Named("proxyFrameworkQueue") proxyFrameworkQueue:ActorRef,
                                 @Named("glacierRestoreActor") glacierRestoreActor:ActorRef,
+                                 @Named("fileMoveQueue") fileMoveQueue:ActorRef,
                                 config:ArchiveHunterConfiguration,
                                ) extends Actor with Timers with ExtValueConverters{
   import ClockSingleton._
   private val logger=Logger(getClass)
 
-  timers.startPeriodicTimer(RapidClockTick, RapidClockTick, 30.seconds)
-  timers.startPeriodicTimer(SlowClockTick, SlowClockTick, 10.minutes)
-  timers.startPeriodicTimer(VerySlowClockTick, VerySlowClockTick, 1.hours)
+  timers.startTimerAtFixedRate(RapidClockTick, RapidClockTick, 30.seconds)
+  timers.startTimerAtFixedRate(SlowClockTick, SlowClockTick, 10.minutes)
+  timers.startTimerAtFixedRate(VerySlowClockTick, VerySlowClockTick, 1.hours)
 
-  timers.startPeriodicTimer(ScanTick, ScanTick, Duration(config.get[Long]("scanner.masterSchedule"),SECONDS))
+  timers.startTimerAtFixedRate(ScanTick, ScanTick, Duration(config.get[Long]("scanner.masterSchedule"),SECONDS))
 
   override def receive: Receive = {
     case RapidClockTick=>
@@ -48,6 +49,7 @@ class ClockSingleton @Inject() (@Named("dynamoCapacityActor") dynamoCapacityActo
       dynamoCapacityActor ! DynamoCapacityActor.TimedStateCheck
       ingestProxyQueue ! GenericSqsActor.CheckForNotifications
       proxyFrameworkQueue ! GenericSqsActor.CheckForNotifications
+      fileMoveQueue ! FileMoveQueue.CheckForNotificationsIfIdle
     case SlowClockTick=>
       logger.debug("ClockSingleton: SlowClockTick")
     case VerySlowClockTick=>

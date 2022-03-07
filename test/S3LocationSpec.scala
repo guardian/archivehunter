@@ -1,5 +1,4 @@
 import java.time.{OffsetDateTime, ZoneOffset}
-
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model.HttpHeader.ParsingResult.{Error, Ok}
 import akka.http.scaladsl.model._
@@ -8,6 +7,7 @@ import akka.testkit.{ImplicitSender, TestKit}
 import com.amazonaws.auth.{AWSStaticCredentialsProvider, BasicAWSCredentials, BasicSessionCredentials}
 import com.amazonaws.regions.{Region, Regions}
 import helpers.S3Signer
+import org.slf4j.LoggerFactory
 import org.specs2.mutable._
 import play.api.Logger
 
@@ -17,7 +17,9 @@ import scala.collection.immutable.Seq
 
 class S3LocationSpec extends Specification {
   sequential
-  class TestClass(loggerval:Logger, m:Materializer, ecval:ExecutionContext) extends S3Signer {
+
+  val logger = LoggerFactory.getLogger(getClass)
+  class TestClass(loggerval:org.slf4j.Logger, m:Materializer, ecval:ExecutionContext) extends S3Signer {
     override implicit val mat:Materializer = m
     override protected val logger=loggerval
     override implicit val ec:ExecutionContext = ecval
@@ -26,8 +28,7 @@ class S3LocationSpec extends Specification {
   "S3Signer" should {
     "sign a sample GET request correctly" in new AkkaTestkitSpecs2Support {
       /* example taken from https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-header-based-auth.html */
-      val logger=Logger(getClass)
-      val mat = ActorMaterializer()
+      implicit val mat = Materializer.matFromSystem
       implicit val ec = system.dispatcher
       val test = new TestClass(logger, mat, ec)
 
@@ -51,8 +52,7 @@ class S3LocationSpec extends Specification {
     }
 
     "sign a GET request with parameters correctly" in new AkkaTestkitSpecs2Support {
-      val logger=Logger(getClass)
-      val mat = ActorMaterializer()
+      val mat = Materializer.matFromSystem
       implicit val ec = system.dispatcher
       val test = new TestClass(logger, mat, ec)
 
@@ -76,8 +76,7 @@ class S3LocationSpec extends Specification {
     }
 
     "sign a GET request with value parameters correctly" in new AkkaTestkitSpecs2Support {
-      val logger=Logger(getClass)
-      val mat = ActorMaterializer()
+      val mat = Materializer.matFromSystem
       implicit val ec = system.dispatcher
       val test = new TestClass(logger, mat, ec)
 
@@ -101,8 +100,7 @@ class S3LocationSpec extends Specification {
     }
 
     "sign a PUT request with data correctly" in new AkkaTestkitSpecs2Support {
-      val logger=Logger(getClass)
-      val mat = ActorMaterializer()
+      val mat = Materializer.matFromSystem
       implicit val ec = system.dispatcher
       val test = new TestClass(logger, mat, ec)
 

@@ -92,6 +92,8 @@
     <logger name="services.ProblemItemRetry" level="INFO"/>
     <logger name="requests.JobSearchRequest" level="INFO"/>
 
+    <logger name="services.FileMoveQueue" level="DEBUG"/>
+
     <logger name="ProblemItemRetry" level="INFO"/>
     <logger name="helpers.ProblemItemReproxySink" level="INFO"/>
 

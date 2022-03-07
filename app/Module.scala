@@ -22,6 +22,7 @@ class Module extends AbstractModule with AkkaGuiceSupport {
     bindActor[ProxyFrameworkQueue]("proxyFrameworkQueue")
     bindActor[ProblemItemRetry]("problemItemRetry")
     bindActor[FileMoveActor]("fileMoveActor")
+    bindActor[FileMoveQueue]("fileMoveQueue")
     bind(classOf[AppStartup]).asEagerSingleton() //do app startup
   }
 }

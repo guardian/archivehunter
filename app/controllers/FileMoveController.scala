@@ -1,3 +1,4 @@
+
 package controllers
 
 import akka.actor.{ActorRef, ActorSystem}
@@ -13,7 +14,7 @@ import responses.{GenericErrorResponse, ObjectGetResponse}
 import akka.pattern.ask
 import auth.{BearerTokenAuth, Security}
 import services.FileMove.GenericMoveActor.MoveActorMessage
-import services.FileMoveActor
+import services.{FileMoveActor, FileMoveQueue}
 
 import scala.concurrent.duration._
 import scala.concurrent.Future
@@ -27,9 +28,11 @@ class FileMoveController @Inject()(override val config:Configuration,
                                    override val bearerTokenAuth: BearerTokenAuth,
                                    override val cache:SyncCacheApi,
                                    scanTargetDAO:ScanTargetDAO,
-                                   @Named("fileMoveActor") fileMoveActor:ActorRef)
+                                   @Named("fileMoveQueue") fileMoveQueue:ActorRef)
                                   (implicit actorSystem:ActorSystem)
   extends AbstractController(controllerComponents) with Security with Circe {
+
+  import FileMoveQueue._
 
   override protected val logger=LoggerFactory.getLogger(getClass)
   private implicit val akkaTimeout:akka.util.Timeout = 60 seconds
@@ -48,15 +51,20 @@ class FileMoveController @Inject()(override val config:Configuration,
         logger.error(s"Could not look up scan target in dynamo: ${dbError.toString}")
         Future(InternalServerError(GenericErrorResponse("db_error",dbError.toString).asJson))
       case Some(Right(scanTarget))=>
-        (fileMoveActor ? FileMoveActor.MoveFile(fileId, scanTarget, async=true)).mapTo[MoveActorMessage].map({
-          case FileMoveActor.MoveAsync(jobId)=>
-            Ok(ObjectGetResponse("ok","jobId",jobId).asJson)
-          case FileMoveActor.MoveSuccess=>
-            Ok(GenericErrorResponse("ok","Move succeeded").asJson)
-          case FileMoveActor.MoveFailed(err)=>
-            InternalServerError(GenericErrorResponse("server_error",err).asJson)
-        })
+        if(scanTarget.enabled) {
+          (fileMoveQueue ? EnqueueMove(fileId, scanTarget.bucketName, uid)).mapTo[FileMoveResponse]
+            .map({
+              case EnqueuedOk(_) => Ok(GenericErrorResponse("ok", "move is enqueued").asJson)
+              case EnqueuedProblem(_, problem) => InternalServerError(GenericErrorResponse("error", problem).asJson)
+            })
+            .recover({
+              case err: Throwable =>
+                logger.error(s"Could not enqueue move action: ${err.getMessage}", err)
+                InternalServerError(GenericErrorResponse("error", err.getMessage).asJson)
+            })
+        } else {
+          Future(Conflict(GenericErrorResponse("disabled","this scan target is disabled").asJson))
+        }
     })
-
   }
 }

@@ -1,6 +1,8 @@
 package services.FileMove
 
+import akka.actor.ActorSystem
 import akka.http.scaladsl.model.Uri
+import akka.stream.Materializer
 import akka.stream.alpakka.s3.MultipartUploadResult
 import com.amazonaws.services.s3.AmazonS3
 import com.theguardian.multimedia.archivehunter.common.DocId
@@ -15,7 +17,7 @@ import scala.util.{Failure, Success, Try}
   * this actor copies a file to the requested destination bucket and updates the internal state with the new file ID.
   * when rolling back, it checks that the source file still exists and if so deletes the one it copied earlier.
   */
-class CopyMainFile (s3ClientManager: S3ClientManager, config:Configuration) extends GenericMoveActor with DocId {
+class CopyMainFile (s3ClientManager: S3ClientManager, config:Configuration)(implicit val actorSystem: ActorSystem, mat:Materializer) extends GenericMoveActor with DocId {
   import GenericMoveActor._
 
   /**
