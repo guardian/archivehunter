@@ -145,7 +145,7 @@ trait S3Signer {
       )
 
       logger.debug(s"Final headers are: $finalHeaders")
-      req.copy(headers=finalHeaders)
+      req.withHeaders(finalHeaders)
     })
   }
 
