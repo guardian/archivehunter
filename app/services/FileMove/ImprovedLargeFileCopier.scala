@@ -485,11 +485,11 @@ class ImprovedLargeFileCopier @Inject() (implicit actorSystem:ActorSystem, overr
     logger.info(s"Initiating ImprovedLargeFileCopier for region $destRegion")
     implicit val poolClientFlow = newPoolClientFlow[UploadPart](destRegion)
     implicit val genericPoolFlow = poolClientFlow.asInstanceOf[HostConnectionPool[Any]]
-    headSourceFile(destRegion, None, sourceBucket, sourceKey, sourceVersion)(poolClientFlow.asInstanceOf[HostConnectionPool[Any]]).flatMap({
+    headSourceFile(destRegion, None, sourceBucket, sourceKey, sourceVersion).flatMap({
       case Some(headInfo)=>
         val parts = ImprovedLargeFileCopier.deriveParts(destBucket, destKey, headInfo)
 
-        initiateMultipartUpload(destRegion, credentialsProvider, destBucket, destKey, headInfo)(poolClientFlow.asInstanceOf[HostConnectionPool[Any]])
+        initiateMultipartUpload(destRegion, credentialsProvider, destBucket, destKey, headInfo)
           .flatMap(uploadId=>{
             sendPartCopies(destRegion, credentialsProvider, uploadId, parts, headInfo)
               .flatMap(completedParts=>{
@@ -499,7 +499,7 @@ class ImprovedLargeFileCopier @Inject() (implicit actorSystem:ActorSystem, overr
               .recoverWith({
                 case err:Throwable=>  //if any error occurs ensure that the upload is aborted
                   logger.error(s"Copy to s3://$destBucket/$destKey failed: ${err.getMessage}", err)
-                  abortMultipartUpload(destRegion, credentialsProvider, headInfo.bucket, headInfo.key, uploadId)(poolClientFlow.asInstanceOf[HostConnectionPool[Any]])
+                  abortMultipartUpload(destRegion, credentialsProvider, headInfo.bucket, headInfo.key, uploadId)
                   .flatMap(_=>Future.failed(err))
               })
         })
