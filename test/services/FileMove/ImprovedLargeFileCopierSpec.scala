@@ -4,7 +4,8 @@ import TestFileMove.AkkaTestkitSpecs2Support
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpHeader, HttpMethods, HttpRequest, HttpResponse, StatusCodes}
 import com.amazonaws.regions.Regions
 import org.specs2.mutable.Specification
-import services.FileMove.ImprovedLargeFileCopier.HeadInfo
+import services.FileMove.ImprovedLargeFileCopier.{HeadInfo, UploadPart}
+
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -207,6 +208,199 @@ class ImprovedLargeFileCopierSpec extends Specification {
       headers.get("Content-Type").map(_.value()) must beSome("binary/octet-stream")
       headers.get("x-amz-acl").map(_.value()) must beSome("private")
       result must beAFailedTry
+    }
+  }
+
+  "ImprovedLargeFileCopier.deriveParts" should {
+    "return a list of UploadPart" in {
+      val parts = ImprovedLargeFileCopier.deriveParts("destbucket","path/to/dest",
+        HeadInfo("sourcebucket","path/to/file",None,"last-modtime",12345678L, None, "binary/octet-stream", None, None)
+      )
+
+      parts.length mustEqual 2
+      parts.head.start mustEqual 0
+      parts.head.end mustEqual 10485759
+      parts.head.partNumber mustEqual 1
+      parts.head.key mustEqual "path/to/dest"
+      parts.head.bucket mustEqual "destbucket"
+
+      parts(1).start mustEqual 10485760
+      parts(1).end mustEqual 12345678
+      parts(1).partNumber mustEqual 2
+      parts(1).key mustEqual "path/to/dest"
+      parts(1).bucket mustEqual "destbucket"
+    }
+  }
+
+  "ImprovedLargeFileCopier.sendPartCopies" should {
+    "send an upload-part-copy request for every given chunk" in new AkkaTestkitSpecs2Support {
+      val requests = scala.collection.mutable.ListBuffer[HttpRequest]()
+
+      def validator(ctr:Int, req:HttpRequest, x:Any) = {
+        val partNumber = req.uri.query().get("partNumber").getOrElse("XXX")
+
+        val responseContent = s"""<?xml version="1.0" encoding="UTF-8"?>
+                                |<CopyPartResult>
+                                |   <ETag>etag-$partNumber</ETag>
+                                |   <LastModified>another-timestamp</LastModified>
+                                |</CopyPartResult>""".stripMargin
+        requests.append(req)
+        Success(HttpResponse(StatusCodes.OK, entity = HttpEntity(responseContent)))
+      }
+
+      val toTest = new ImprovedLargeFileCopier()
+      implicit val pool = FakeHostConnectionPool[UploadPart](validator)
+      val fakeMeta = HeadInfo("some-bucket","path/to/some/content",None, "last-mod-time",123456L, Some("etag"), "binary/octet-stream", None, None)
+      val partsList = Seq(
+        UploadPart("destbucket","path/to/dest", 0L, 10*1024*1024L-1, 1),
+        UploadPart("destbucket","path/to/dest", 10*1024*1024L, 20*1024*1024L-1, 2),
+        UploadPart("destbucket","path/to/dest", 20*1024*1024L, 22*1024*1024L, 3),
+      )
+      val result = Await.result(
+        toTest.sendPartCopies(Regions.EU_WEST_1,None,"some-upload-id", partsList, fakeMeta),
+        10.seconds
+      )
+
+      val sortedResult = result.sortBy(_.partNumber)
+      sortedResult.length mustEqual 3
+      sortedResult.head.partNumber mustEqual 1
+      sortedResult.head.uploadedETag mustEqual "etag-1"
+      sortedResult.head.uploadId mustEqual "some-upload-id"
+      sortedResult(1).partNumber mustEqual 2
+      sortedResult(1).uploadedETag mustEqual "etag-2"
+      sortedResult(1).uploadId mustEqual "some-upload-id"
+      sortedResult(2).partNumber mustEqual 3
+      sortedResult(2).uploadedETag mustEqual "etag-3"
+      sortedResult(2).uploadId mustEqual "some-upload-id"
+
+      val requestHeaders = requests.map(rq=>mapOfHeaders(rq.headers))
+      requests.length mustEqual 3
+      requests.head.uri.toString mustEqual "https://s3.eu-west-1.amazonaws.com/destbucket/path/to/dest?partNumber=1&uploadId=some-upload-id"
+      requests.head.method mustEqual HttpMethods.PUT
+      requestHeaders.head.get("x-amz-copy-source").map(_.value()) must beSome("some-bucket%2Fpath%2Fto%2Fsome%2Fcontent")
+      requestHeaders.head.get("x-amz-copy-source-range").map(_.value()) must beSome("bytes 0-10485759")
+      requests(1).uri.toString mustEqual "https://s3.eu-west-1.amazonaws.com/destbucket/path/to/dest?partNumber=2&uploadId=some-upload-id"
+      requests(1).method mustEqual HttpMethods.PUT
+      requestHeaders(1).get("x-amz-copy-source").map(_.value()) must beSome("some-bucket%2Fpath%2Fto%2Fsome%2Fcontent")
+      requestHeaders(1).get("x-amz-copy-source-range").map(_.value()) must beSome("bytes 10485760-20971519")
+      requests(2).uri.toString mustEqual "https://s3.eu-west-1.amazonaws.com/destbucket/path/to/dest?partNumber=3&uploadId=some-upload-id"
+      requests(2).method mustEqual HttpMethods.PUT
+      requestHeaders(2).get("x-amz-copy-source").map(_.value()) must beSome("some-bucket%2Fpath%2Fto%2Fsome%2Fcontent")
+      requestHeaders(2).get("x-amz-copy-source-range").map(_.value()) must beSome("bytes 20971520-23068672")
+    }
+
+    "fail if any of the part uploads fails" in new AkkaTestkitSpecs2Support {
+      val requests = scala.collection.mutable.ListBuffer[HttpRequest]()
+
+      def validator(ctr:Int, req:HttpRequest, x:Any) = {
+        val partNumber = req.uri.query().get("partNumber").getOrElse("XXX")
+
+        val responseContent = s"""<?xml version="1.0" encoding="UTF-8"?>
+                                 |<CopyPartResult>
+                                 |   <ETag>etag-$partNumber</ETag>
+                                 |   <LastModified>another-timestamp</LastModified>
+                                 |</CopyPartResult>""".stripMargin
+        requests.append(req)
+        if(ctr==1) {
+          Success(HttpResponse(StatusCodes.InternalServerError))
+        } else {
+          Success(HttpResponse(StatusCodes.OK, entity = HttpEntity(responseContent)))
+        }
+      }
+
+      val toTest = new ImprovedLargeFileCopier()
+      implicit val pool = FakeHostConnectionPool[UploadPart](validator)
+      val fakeMeta = HeadInfo("some-bucket","path/to/some/content",None, "last-mod-time",123456L, Some("etag"), "binary/octet-stream", None, None)
+      val partsList = Seq(
+        UploadPart("destbucket","path/to/dest", 0L, 10*1024*1024L-1, 1),
+        UploadPart("destbucket","path/to/dest", 10*1024*1024L, 20*1024*1024L-1, 2),
+        UploadPart("destbucket","path/to/dest", 20*1024*1024L, 22*1024*1024L, 3),
+      )
+      val result = Try {
+        Await.result(
+          toTest.sendPartCopies(Regions.EU_WEST_1,None,"some-upload-id", partsList, fakeMeta),
+          10.seconds
+        )
+      }
+
+      result must beAFailedTry
+      requests.length mustEqual 3
+    }
+
+    "fail if akka streams fails" in new AkkaTestkitSpecs2Support {
+      val requests = scala.collection.mutable.ListBuffer[HttpRequest]()
+
+      def validator(ctr:Int, req:HttpRequest, x:Any) = {
+        val partNumber = req.uri.query().get("partNumber").getOrElse("XXX")
+
+        val responseContent = s"""<?xml version="1.0" encoding="UTF-8"?>
+                                 |<CopyPartResult>
+                                 |   <ETag>etag-$partNumber</ETag>
+                                 |   <LastModified>another-timestamp</LastModified>
+                                 |</CopyPartResult>""".stripMargin
+        requests.append(req)
+        if(ctr==1) {
+          Failure(new RuntimeException("something bad happened"))
+        } else {
+          Success(HttpResponse(StatusCodes.OK, entity = HttpEntity(responseContent)))
+        }
+      }
+
+      val toTest = new ImprovedLargeFileCopier()
+      implicit val pool = FakeHostConnectionPool[UploadPart](validator)
+      val fakeMeta = HeadInfo("some-bucket","path/to/some/content",None, "last-mod-time",123456L, Some("etag"), "binary/octet-stream", None, None)
+      val partsList = Seq(
+        UploadPart("destbucket","path/to/dest", 0L, 10*1024*1024L-1, 1),
+        UploadPart("destbucket","path/to/dest", 10*1024*1024L, 20*1024*1024L-1, 2),
+        UploadPart("destbucket","path/to/dest", 20*1024*1024L, 22*1024*1024L, 3),
+      )
+      val result = Try {
+        Await.result(
+          toTest.sendPartCopies(Regions.EU_WEST_1,None,"some-upload-id", partsList, fakeMeta),
+          10.seconds
+        )
+      }
+
+      result must beAFailedTry
+      requests.length mustEqual 3
+    }
+
+    "fail if there is an uncaught exception" in new AkkaTestkitSpecs2Support {
+      val requests = scala.collection.mutable.ListBuffer[HttpRequest]()
+
+      def validator(ctr:Int, req:HttpRequest, x:Any) = {
+        val partNumber = req.uri.query().get("partNumber").getOrElse("XXX")
+
+        val responseContent = s"""<?xml version="1.0" encoding="UTF-8"?>
+                                 |<CopyPartResult>
+                                 |   <ETag>etag-$partNumber</ETag>
+                                 |   <LastModified>another-timestamp</LastModified>
+                                 |</CopyPartResult>""".stripMargin
+        requests.append(req)
+        if(ctr==1) {
+          throw new RuntimeException("this should not happen!!")
+        } else {
+          Success(HttpResponse(StatusCodes.OK, entity = HttpEntity(responseContent)))
+        }
+      }
+
+      val toTest = new ImprovedLargeFileCopier()
+      implicit val pool = FakeHostConnectionPool[UploadPart](validator)
+      val fakeMeta = HeadInfo("some-bucket","path/to/some/content",None, "last-mod-time",123456L, Some("etag"), "binary/octet-stream", None, None)
+      val partsList = Seq(
+        UploadPart("destbucket","path/to/dest", 0L, 10*1024*1024L-1, 1),
+        UploadPart("destbucket","path/to/dest", 10*1024*1024L, 20*1024*1024L-1, 2),
+        UploadPart("destbucket","path/to/dest", 20*1024*1024L, 22*1024*1024L, 3),
+      )
+      val result = Try {
+        Await.result(
+          toTest.sendPartCopies(Regions.EU_WEST_1,None,"some-upload-id", partsList, fakeMeta),
+          10.seconds
+        )
+      }
+
+      result must beAFailedTry
+      requests.length mustEqual 2 //exception means that the last one was not carried out
     }
   }
 }
