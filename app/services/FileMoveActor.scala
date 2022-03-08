@@ -2,16 +2,16 @@ package services
 
 import java.time.ZonedDateTime
 import java.util.UUID
-
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import akka.stream.{ActorMaterializer, Materializer}
 import com.theguardian.multimedia.archivehunter.common.{Indexer, ProxyLocationDAO}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{JobModel, JobModelDAO, JobStatus, ScanTarget, SourceType}
+
 import javax.inject.{Inject, Singleton}
 import play.api.Configuration
 import services.FileMove.GenericMoveActor.MoveActorMessage
-import services.FileMove.{CopyMainFile, CopyProxyFiles, DeleteOriginalFiles, GenericMoveActor, UpdateIndexRecords, VerifySource}
+import services.FileMove.{CopyMainFile, CopyProxyFiles, DeleteOriginalFiles, GenericMoveActor, ImprovedLargeFileCopier, UpdateIndexRecords, VerifySource}
 import akka.pattern.ask
 import org.slf4j.LoggerFactory
 
@@ -55,7 +55,8 @@ class FileMoveActor @Inject() (config:Configuration,
                                esClientManager:ESClientManager,
                                dynamoClientManager: DynamoClientManager,
                                jobModelDAO: JobModelDAO,
-                               s3ClientManager: S3ClientManager)(implicit system:ActorSystem, mat:Materializer)
+                               s3ClientManager: S3ClientManager,
+                               largeFileCopier: ImprovedLargeFileCopier)(implicit system:ActorSystem, mat:Materializer)
   extends Actor {
   import FileMoveActor._
   import GenericMoveActor._
@@ -72,7 +73,7 @@ class FileMoveActor @Inject() (config:Configuration,
 
   protected val fileMoveChain:Seq[ActorRef] = Seq(
     system.actorOf(Props(new VerifySource(indexer, proxyLocationDAO))),
-    system.actorOf(Props(new CopyMainFile(s3ClientManager, config))),
+    system.actorOf(Props(new CopyMainFile(s3ClientManager, config, largeFileCopier))),
     system.actorOf(Props(new CopyProxyFiles(s3ClientManager, config))),
     system.actorOf(Props(new UpdateIndexRecords(indexer, proxyLocationDAO))),
     system.actorOf(Props(new DeleteOriginalFiles(s3ClientManager, indexer, config)))

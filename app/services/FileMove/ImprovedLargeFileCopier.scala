@@ -507,7 +507,5 @@ class ImprovedLargeFileCopier @Inject() (implicit actorSystem:ActorSystem, overr
         logger.error(s"Can't copy s3://$sourceBucket/$sourceKey@${sourceVersion.getOrElse("LATEST")} because the source file does not exist")
         Future.failed(new RuntimeException(s"Source file did not exist"))
     })
-
-
   }
 }

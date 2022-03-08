@@ -1,7 +1,6 @@
 package TestFileMove
 
 import java.time.ZonedDateTime
-
 import akka.actor.Props
 import com.amazonaws.AmazonClientException
 import com.amazonaws.services.s3.AmazonS3
@@ -12,7 +11,7 @@ import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, DocId, Mim
 import org.specs2.mock.Mockito
 import org.specs2.mutable.Specification
 import play.api.Configuration
-import services.FileMove.CopyMainFile
+import services.FileMove.{CopyMainFile, ImprovedLargeFileCopier}
 import services.FileMove.GenericMoveActor._
 
 import scala.concurrent.Await
@@ -27,6 +26,7 @@ class CopyMainFileSpec extends Specification with Mockito with DocId {
       val mockedClientMgr = mock[S3ClientManager]
       val mockedS3Client = mock[AmazonS3]
       val mockedCopyResult = mock[CopyObjectResult]
+      val mockedLargeFileCopier = mock[ImprovedLargeFileCopier]
 
       mockedClientMgr.getS3Client(any,any) returns mockedS3Client
       mockedS3Client.copyObject(any, any, any, any) returns mockedCopyResult
@@ -36,7 +36,7 @@ class CopyMainFileSpec extends Specification with Mockito with DocId {
 
       val request = FileMoveTransientData("fake-id",Some(testItem),None,None,None,"destBucket","destProxies","dest-region")
 
-      val actor = system.actorOf(Props(new CopyMainFile(mockedClientMgr, Configuration.empty)))
+      val actor = system.actorOf(Props(new CopyMainFile(mockedClientMgr, Configuration.empty, mockedLargeFileCopier)))
 
       val result = Await.result(actor ? PerformStep(request), 30 seconds).asInstanceOf[MoveActorMessage]
 
@@ -48,6 +48,7 @@ class CopyMainFileSpec extends Specification with Mockito with DocId {
     "reply with step failed if the S3 copy raises an exception" in new AkkaTestkitSpecs2Support {
       val mockedClientMgr = mock[S3ClientManager]
       val mockedS3Client = mock[AmazonS3]
+      val mockedLargeFileCopier = mock[ImprovedLargeFileCopier]
       mockedClientMgr.getS3Client(any,any) returns mockedS3Client
 
       mockedS3Client.copyObject(any, any, any, any) throws new RuntimeException("test")
@@ -57,7 +58,7 @@ class CopyMainFileSpec extends Specification with Mockito with DocId {
 
       val request = FileMoveTransientData("fake-id",Some(testItem),None,None,None,"destBucket","destProxies", "dest-region")
 
-      val actor = system.actorOf(Props(new CopyMainFile(mockedClientMgr, Configuration.empty)))
+      val actor = system.actorOf(Props(new CopyMainFile(mockedClientMgr, Configuration.empty, mockedLargeFileCopier)))
 
       val result = Await.result(actor ? PerformStep(request), 30 seconds).asInstanceOf[MoveActorMessage]
 
@@ -74,6 +75,7 @@ class CopyMainFileSpec extends Specification with Mockito with DocId {
       mockedClientMgr.getS3Client(any,any) returns mockedS3Client
       val mockedGetResponse = mock[ObjectMetadata]
       val mockedDeleteResponse = mock[DeleteObjectsResponse]
+      val mockedLargeFileCopier = mock[ImprovedLargeFileCopier]
 
       mockedS3Client.deleteObject(any, any)
       mockedS3Client.doesObjectExist(any, any) returns true
@@ -83,7 +85,7 @@ class CopyMainFileSpec extends Specification with Mockito with DocId {
 
       val request = FileMoveTransientData("fake-id",Some(testItem),None,None,None,"destBucket","destProxies","dest-region")
 
-      val actor = system.actorOf(Props(new CopyMainFile(mockedClientMgr, Configuration.empty)))
+      val actor = system.actorOf(Props(new CopyMainFile(mockedClientMgr, Configuration.empty, mockedLargeFileCopier)))
 
       val result = Await.result(actor ? RollbackStep(request), 30 seconds).asInstanceOf[MoveActorMessage]
 
@@ -97,6 +99,7 @@ class CopyMainFileSpec extends Specification with Mockito with DocId {
       val mockedClientMgr = mock[S3ClientManager]
       val mockedS3Client = mock[AmazonS3]
       mockedClientMgr.getS3Client(any,any) returns mockedS3Client
+      val mockedLargeFileCopier = mock[ImprovedLargeFileCopier]
 
       mockedS3Client.doesObjectExist(any,any) returns false
       val mockedCopyResult = new CopyObjectResult()
@@ -108,7 +111,7 @@ class CopyMainFileSpec extends Specification with Mockito with DocId {
 
       val request = FileMoveTransientData("fake-id",Some(testItem),None,None,None,"destBucket","destProxies","dest-region")
 
-      val actor = system.actorOf(Props(new CopyMainFile(mockedClientMgr, Configuration.empty)))
+      val actor = system.actorOf(Props(new CopyMainFile(mockedClientMgr, Configuration.empty, mockedLargeFileCopier)))
 
       val result = Await.result(actor ? RollbackStep(request), 30 seconds).asInstanceOf[MoveActorMessage]
 

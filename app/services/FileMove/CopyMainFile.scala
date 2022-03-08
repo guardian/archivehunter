@@ -4,6 +4,7 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.model.Uri
 import akka.stream.Materializer
 import akka.stream.alpakka.s3.MultipartUploadResult
+import com.amazonaws.regions.Regions
 import com.amazonaws.services.s3.AmazonS3
 import com.theguardian.multimedia.archivehunter.common.DocId
 import com.theguardian.multimedia.archivehunter.common.clientManagers.S3ClientManager
@@ -17,7 +18,8 @@ import scala.util.{Failure, Success, Try}
   * this actor copies a file to the requested destination bucket and updates the internal state with the new file ID.
   * when rolling back, it checks that the source file still exists and if so deletes the one it copied earlier.
   */
-class CopyMainFile (s3ClientManager: S3ClientManager, config:Configuration)(implicit val actorSystem: ActorSystem, mat:Materializer) extends GenericMoveActor with DocId {
+class CopyMainFile (s3ClientManager: S3ClientManager, config:Configuration, largeFileCopier:ImprovedLargeFileCopier)
+                   (implicit val actorSystem: ActorSystem, mat:Materializer) extends GenericMoveActor with DocId {
   import GenericMoveActor._
 
   /**
@@ -38,12 +40,14 @@ class CopyMainFile (s3ClientManager: S3ClientManager, config:Configuration)(impl
 
       val result = s3Client.copyObject(sourceBucket, path, destBucket, path)
       logger.info("Copy succeeded")
-      MultipartUploadResult(Uri(), destBucket, path, result.getETag, Option(result.getVersionId))
+      ImprovedLargeFileCopier.CompletedUpload(s"s3://${destBucket}/$path", destBucket, path, result.getETag, None, None, None, None)
     })
+
+  val maybeProfile = config.getOptional[String]("externalData.awsProfile")
 
   override def receive: Receive = {
     case PerformStep(currentState)=>
-      implicit val s3Client = s3ClientManager.getS3Client(region=Some(currentState.destRegion),profileName=config.getOptional[String]("externalData.awsProfile"))
+      implicit val s3Client = s3ClientManager.getS3Client(region=Some(currentState.destRegion),profileName=maybeProfile)
       currentState.entry match {
         case None=>
           sender() ! StepFailed(currentState, "No archive entry source")
@@ -53,7 +57,10 @@ class CopyMainFile (s3ClientManager: S3ClientManager, config:Configuration)(impl
           val copyFuture = if(entry.size<5368709120L) {  //5gb and larger files can't be directly copied and must be re-uploaded
             standardS3Copy(currentState.destBucket, entry.bucket, entry.path)
           } else {
-            LargeFileCopier.largeFileCopy(currentState.destBucket, entry.bucket, entry.path, entry.size)
+            val rgn = entry.region.map(Regions.valueOf).getOrElse(Regions.EU_WEST_1)
+            largeFileCopier.performCopy(rgn,
+              Some(s3ClientManager.credentialsProvider(maybeProfile)),
+              entry.bucket, entry.path, None, currentState.destBucket, entry.path)
           }
 
           copyFuture.onComplete({
@@ -85,7 +92,10 @@ class CopyMainFile (s3ClientManager: S3ClientManager, config:Configuration)(impl
               standardS3Copy(entry.bucket, currentState.destBucket, entry.path)(destClient).map(result=>Some(result))
             } else {
               logger.info(s"File no longer exists on s3://${entry.bucket}/${entry.path}, copying it back with large-file copy...")
-              LargeFileCopier.largeFileCopy(entry.bucket, currentState.destBucket, entry.path, entry.size).map(result=>Some(result))
+              val rgn = entry.region.map(Regions.valueOf).getOrElse(Regions.EU_WEST_1)
+              largeFileCopier.performCopy(rgn,
+                Some(s3ClientManager.credentialsProvider(maybeProfile)),
+                entry.bucket, entry.path, None, currentState.destBucket, entry.path)
             }
           } else {
             logger.info(s"File already exists on s3://${entry.bucket}/${entry.path}, no copy-back required")
