@@ -1,12 +1,10 @@
 package services.FileMove
 
 import TestFileMove.AkkaTestkitSpecs2Support
-import akka.http.scaladsl.ConnectionContext
-import akka.http.scaladsl.model.{HttpMethods, HttpRequest, HttpResponse, StatusCodes}
+import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpHeader, HttpMethods, HttpRequest, HttpResponse, StatusCodes}
 import com.amazonaws.regions.Regions
 import org.specs2.mutable.Specification
-
-import javax.net.ssl.{SSLContext, SSLEngine}
+import services.FileMove.ImprovedLargeFileCopier.HeadInfo
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -38,6 +36,15 @@ class ImprovedLargeFileCopierSpec extends Specification {
        )
      )
     }
+  }
+
+  /**
+    * takes a list of headers and returns a map of them, keyed by header name
+    * @param headers sequence of headers
+    * @return
+    */
+  def mapOfHeaders(headers:Seq[HttpHeader]):Map[String, HttpHeader] = {
+    headers.foldLeft(Map[String, HttpHeader]())((m, h)=>m + (h.name()->h))
   }
 
   "ImprovedLargeFileCopier.abortMultipartUpload" should {
@@ -107,6 +114,98 @@ class ImprovedLargeFileCopierSpec extends Specification {
 
       lastRequest.uri.toString() mustEqual "https://s3.eu-west-1.amazonaws.com/source/path/to/source?uploadId=abcde"
       lastRequest.method mustEqual HttpMethods.DELETE
+      result must beAFailedTry
+    }
+  }
+
+  "ImprovedLargeFileCopier.initiateMultipartUpload" should {
+    "send the initiate request to S3" in new AkkaTestkitSpecs2Support {
+      var lastRequest:HttpRequest = _
+
+      def validator(ctr:Int, req:HttpRequest, x:Any) = {
+        val xmlReply=
+          """<?xml version="1.0" encoding="UTF-8"?>
+            |<InitiateMultipartUploadResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+              <Bucket>example-bucket</Bucket>
+              <Key>example-object</Key>
+              <UploadId>VXBsb2FkIElEIGZvciA2aWWpbmcncyBteS1tb3ZpZS5tMnRzIHVwbG9hZA</UploadId>
+            </InitiateMultipartUploadResult>""".stripMargin
+
+        lastRequest = req
+        Success(HttpResponse(StatusCodes.OK, entity = HttpEntity(xmlReply)))
+      }
+
+      val toTest = new ImprovedLargeFileCopier()
+      implicit val pool = FakeHostConnectionPool[Any](validator)
+
+      val fakeMeta = HeadInfo("some-bucket","path/to/some/content",None, "last-mod-time",123456L, Some("etag"), "binary/octet-stream", None, None)
+
+      val result = Await.result(
+        toTest
+          .initiateMultipartUpload(Regions.EU_WEST_1, None, "source","/path/to/source",fakeMeta),
+        5.seconds
+      )
+
+      val headers = mapOfHeaders(lastRequest.headers)
+      lastRequest.uri.toString() mustEqual "https://s3.eu-west-1.amazonaws.com/source/path/to/source?uploads"
+      lastRequest.method mustEqual HttpMethods.POST
+      headers.get("Content-Type").map(_.value()) must beSome("binary/octet-stream")
+      headers.get("x-amz-acl").map(_.value()) must beSome("private")
+    }
+
+    "fail the returned future if a server error occurs" in new AkkaTestkitSpecs2Support {
+      var lastRequest:HttpRequest = _
+
+      def validator(ctr:Int, req:HttpRequest, x:Any) = {
+        lastRequest = req
+        Success(HttpResponse(StatusCodes.InternalServerError))
+      }
+
+      val toTest = new ImprovedLargeFileCopier()
+      implicit val pool = FakeHostConnectionPool[Any](validator)
+      val fakeMeta = HeadInfo("some-bucket","path/to/some/content",None, "last-mod-time",123456L, Some("etag"), "binary/octet-stream", None, None)
+
+      val result = Try {
+        Await.result(
+          toTest
+            .initiateMultipartUpload(Regions.EU_WEST_1, None, "source","/path/to/source",fakeMeta),
+          5.seconds
+        )
+      }
+
+      val headers = mapOfHeaders(lastRequest.headers)
+      lastRequest.uri.toString() mustEqual "https://s3.eu-west-1.amazonaws.com/source/path/to/source?uploads"
+      lastRequest.method mustEqual HttpMethods.POST
+      headers.get("Content-Type").map(_.value()) must beSome("binary/octet-stream")
+      headers.get("x-amz-acl").map(_.value()) must beSome("private")
+      result must beAFailedTry
+    }
+
+    "fail the returned future if a akka-http aborts" in new AkkaTestkitSpecs2Support {
+      var lastRequest:HttpRequest = _
+
+      def validator(ctr:Int, req:HttpRequest, x:Any) = {
+        lastRequest = req
+        Failure(new RuntimeException("something went wrong"))
+      }
+
+      val toTest = new ImprovedLargeFileCopier()
+      implicit val pool = FakeHostConnectionPool[Any](validator)
+      val fakeMeta = HeadInfo("some-bucket","path/to/some/content",None, "last-mod-time",123456L, Some("etag"), "binary/octet-stream", None, None)
+
+      val result = Try {
+        Await.result(
+          toTest
+            .initiateMultipartUpload(Regions.EU_WEST_1, None, "source","/path/to/source",fakeMeta),
+          5.seconds
+        )
+      }
+
+      val headers = mapOfHeaders(lastRequest.headers)
+      lastRequest.uri.toString() mustEqual "https://s3.eu-west-1.amazonaws.com/source/path/to/source?uploads"
+      lastRequest.method mustEqual HttpMethods.POST
+      headers.get("Content-Type").map(_.value()) must beSome("binary/octet-stream")
+      headers.get("x-amz-acl").map(_.value()) must beSome("private")
       result must beAFailedTry
     }
   }

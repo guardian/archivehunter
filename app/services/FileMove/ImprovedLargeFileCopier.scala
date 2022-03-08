@@ -304,7 +304,7 @@ class ImprovedLargeFileCopier @Inject() (implicit actorSystem:ActorSystem, overr
                              (implicit poolClientFlow:HostConnectionPool[Any]) = {
     val req = createRequest(HttpMethods.POST, region, destBucket, destKey, None) { partialRequest=>
       partialRequest
-        .withUri(partialRequest.uri.withRawQueryString("?uploads"))
+        .withUri(partialRequest.uri.withRawQueryString("uploads"))
         .withHeaders(partialRequest.headers ++ Seq(
           RawHeader("Content-Type", metadata.contentType),
           RawHeader("x-amz-acl", "private"),
