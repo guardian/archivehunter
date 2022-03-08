@@ -2,9 +2,11 @@ package services.FileMove
 
 import TestFileMove.AkkaTestkitSpecs2Support
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpHeader, HttpMethods, HttpRequest, HttpResponse, StatusCodes}
+import akka.stream.scaladsl.Sink
+import akka.util.ByteString
 import com.amazonaws.regions.Regions
 import org.specs2.mutable.Specification
-import services.FileMove.ImprovedLargeFileCopier.{HeadInfo, UploadPart}
+import services.FileMove.ImprovedLargeFileCopier.{CompletedUpload, HeadInfo, UploadPart, UploadedPart}
 
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -401,6 +403,107 @@ class ImprovedLargeFileCopierSpec extends Specification {
 
       result must beAFailedTry
       requests.length mustEqual 2 //exception means that the last one was not carried out
+    }
+  }
+
+  "ImprovedLargeFileCopier.completeMultipartUpload" should {
+    "send the complete upload request with the correct payload" in new AkkaTestkitSpecs2Support {
+      var lastRequest:HttpRequest = _
+      def validator(ctr:Int, req:HttpRequest, x:Any) = {
+        lastRequest = req
+        val responseContent = """<?xml version="1.0" encoding="UTF-8"?>
+                              |<CompleteMultipartUploadResult>
+                              |   <Location>s3://somebucket/path/to/file</Location>
+                              |   <Bucket>somebucket</Bucket>
+                              |   <Key>path/to/file</Key>
+                              |   <ETag>some-etag-here</ETag>
+                              |</CompleteMultipartUploadResult>""".stripMargin
+
+        Success(HttpResponse(StatusCodes.OK, entity=HttpEntity(responseContent)))
+      }
+
+      val toTest = new ImprovedLargeFileCopier()
+      implicit val pool = FakeHostConnectionPool[Any](validator)
+      val partsList = Seq(
+        UploadedPart(1, "some-id", "etag-1"),
+        UploadedPart(2, "some-id", "etag-2"),
+        UploadedPart(3, "some-id", "etag-3"),
+        UploadedPart(4, "some-id", "etag-4"),
+        UploadedPart(5, "some-id", "etag-5"),
+      )
+      val result = Await.result(
+        toTest.completeMultipartUpload(Regions.EU_WEST_1,None, "somebucket", "path/to/file", "some-id", partsList),
+        10.seconds
+      )
+
+      result mustEqual CompletedUpload("s3://somebucket/path/to/file","somebucket","path/to/file","some-etag-here",None,None,None,None)
+      val requestContent = Await.result(
+        lastRequest.entity.dataBytes
+          .runWith(Sink.fold(ByteString.empty)(_ ++ _))
+          .map(_.utf8String)
+          .map(scala.xml.XML.loadString),
+        2.seconds
+      )
+
+      lastRequest.uri.toString() mustEqual "https://s3.eu-west-1.amazonaws.com/somebucket/path/to/file?uploadId=some-id"
+      lastRequest.method mustEqual HttpMethods.POST
+
+      (requestContent \\ "Part").length mustEqual partsList.length
+      ((requestContent \\ "Part").head \\ "PartNumber").text mustEqual "1"
+      ((requestContent \\ "Part").head \\ "ETag").text mustEqual "etag-1"
+      ((requestContent \\ "Part")(1) \\ "PartNumber").text mustEqual "2"
+      ((requestContent \\ "Part")(1) \\ "ETag").text mustEqual "etag-2"
+      ((requestContent \\ "Part")(2) \\ "PartNumber").text mustEqual "3"
+      ((requestContent \\ "Part")(2) \\ "ETag").text mustEqual "etag-3"
+    }
+  }
+
+  "CompletedUpload.fromXML" should {
+    "parse the example given in the AWS docs" in {
+      val content = """<?xml version="1.0" encoding="UTF-8"?>
+                      |<CompleteMultipartUploadResult>
+                      |   <Location>location</Location>
+                      |   <Bucket>bucket</Bucket>
+                      |   <Key>key</Key>
+                      |   <ETag>etag</ETag>
+                      |   <ChecksumCRC32>crc32</ChecksumCRC32>
+                      |   <ChecksumCRC32C>crc32c</ChecksumCRC32C>
+                      |   <ChecksumSHA1>sha1</ChecksumSHA1>
+                      |   <ChecksumSHA256>sha256</ChecksumSHA256>
+                      |</CompleteMultipartUploadResult>""".stripMargin
+
+      val result = ImprovedLargeFileCopier.CompletedUpload.fromXMLString(content)
+      result must beASuccessfulTry
+      result.get.location mustEqual "location"
+      result.get.bucket mustEqual "bucket"
+      result.get.key mustEqual "key"
+      result.get.eTag mustEqual "etag"
+      result.get.crc32 must beSome("crc32")
+      result.get.crc32c must beSome("crc32c")
+      result.get.sha1 must beSome("sha1")
+      result.get.sha256 must beSome("sha256")
+    }
+
+    "not fail on missing checksums" in {
+      val content = """<?xml version="1.0" encoding="UTF-8"?>
+                      |<CompleteMultipartUploadResult>
+                      |   <Location>location</Location>
+                      |   <Bucket>bucket</Bucket>
+                      |   <Key>key</Key>
+                      |   <ETag>etag</ETag>
+                      |   <ChecksumSHA1>sha1</ChecksumSHA1>
+                      |</CompleteMultipartUploadResult>""".stripMargin
+
+      val result = ImprovedLargeFileCopier.CompletedUpload.fromXMLString(content)
+      result must beASuccessfulTry
+      result.get.location mustEqual "location"
+      result.get.bucket mustEqual "bucket"
+      result.get.key mustEqual "key"
+      result.get.eTag mustEqual "etag"
+      result.get.crc32 must beNone
+      result.get.crc32c must beNone
+      result.get.sha1 must beSome("sha1")
+      result.get.sha256 must beNone
     }
   }
 }

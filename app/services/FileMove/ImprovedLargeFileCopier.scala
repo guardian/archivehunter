@@ -4,7 +4,7 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.HostConnectionPool
 import akka.http.scaladsl.model.headers.{Host, RawHeader}
-import akka.http.scaladsl.model.{ContentType, HttpHeader, HttpMethod, HttpMethods, HttpRequest, HttpResponse, StatusCode, StatusCodes}
+import akka.http.scaladsl.model.{ContentType, HttpEntity, HttpHeader, HttpMethod, HttpMethods, HttpRequest, HttpResponse, StatusCode, StatusCodes}
 import akka.stream.{KillSwitches, Materializer}
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import akka.util.ByteString
@@ -12,7 +12,7 @@ import com.amazonaws.auth.AWSCredentialsProvider
 import com.amazonaws.regions.{Region, Regions}
 import helpers.S3Signer
 import org.slf4j.LoggerFactory
-import services.FileMove.ImprovedLargeFileCopier.{HeadInfo, UploadPart, UploadedPart, copySourcePath}
+import services.FileMove.ImprovedLargeFileCopier.{CompletedUpload, HeadInfo, UploadPart, UploadedPart, copySourcePath}
 
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
@@ -79,6 +79,27 @@ object ImprovedLargeFileCopier {
       } else {
         withContentType
       }
+    }
+  }
+
+  case class CompletedUpload(location:String, bucket:String, key:String, eTag:String, crc32:Option[String], crc32c:Option[String], sha1:Option[String], sha256:Option[String])
+  object CompletedUpload {
+    def fromXMLString(xmlString:String) = {
+      for {
+        parsed <- Try { scala.xml.XML.loadString(xmlString) }
+        result <- Try {
+          new CompletedUpload(
+            (parsed \\ "Location").text,
+            (parsed \\ "Bucket").text,
+            (parsed \\ "Key").text,
+            (parsed \\ "ETag").text,
+            (parsed \\ "ChecksumCRC32").headOption.map(_.text),
+            (parsed \\ "ChecksumCRC32C").headOption.map(_.text),
+            (parsed \\ "ChecksumSHA1").headOption.map(_.text),
+            (parsed \\ "ChecksumSHA256").headOption.map(_.text),
+          )
+        }
+      } yield result
     }
   }
 
@@ -349,6 +370,61 @@ class ImprovedLargeFileCopier @Inject() (implicit actorSystem:ActorSystem, overr
   }
 
   /**
+    * completes an in-progress multipart upload.  This tells S3 to combine all the parts into one file and verify it.
+    * @param region AWS region within which to operate
+    * @param credentialsProvider AWS credentials provider for authentication. If None then no authentication is performed.
+    * @param destBucket bucket that is being written to
+    * @param destKey file that is being written to
+    * @param uploadId upload ID of the in-progress upload
+    * @param parts a list of `UploadedPart` giving details of the individual part copies
+    * @param poolClientFlow implicitly provided HostConnectionPool instance
+    * @return a Future containing a CompletedUpload instance. On error, the future will be failed.
+    */
+  def completeMultipartUpload(region:Regions, credentialsProvider:Option[AWSCredentialsProvider], destBucket:String, destKey:String, uploadId:String, parts:Seq[UploadedPart])
+                             (implicit poolClientFlow:HostConnectionPool[Any]) = {
+    val xmlContent = <CompleteMultipartUpload xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+      {
+      parts.map(_.toXml)
+      }
+    </CompleteMultipartUpload>
+
+    val req = createRequest(HttpMethods.POST, region, destBucket, destKey, None) { partialReq=>
+      partialReq
+        .withUri(partialReq.uri.withRawQueryString(s"uploadId=$uploadId"))
+        .withEntity(HttpEntity(xmlContent.toString()))
+    }
+
+    Source
+      .single(req)
+      .mapAsync(1)(reqparts=>doRequestSigning(reqparts._1, region, credentialsProvider).map(rq=>(rq, ())))
+      .via(poolClientFlow)
+      .runWith(Sink.head)
+      .flatMap({
+        case (Success(response), _)=>
+          loadResponseBody(response).map(content=>{
+            (response.status: @switch) match {
+              case StatusCodes.OK=>
+                CompletedUpload.fromXMLString(content) match {
+                  case Success(completedUpload)=>
+                    logger.info(s"Copy to s3://$destBucket/$destKey completed with eTag ${completedUpload.eTag}")
+                    completedUpload
+                  case Failure(err)=>
+                    logger.error(s"Copy to s3://$destBucket/$destKey completed but could not parse the response: ${err.getMessage}")
+                    logger.error(s"s3://$destBucket/$destKey raw response was $content")
+                    throw new RuntimeException("Could not parse completed-upload response")
+                }
+              case _=>
+                logger.error(s"Copy to s3://$destBucket/$destKey failed with error ${response.status}: $content")
+                throw new RuntimeException(s"Server error ${response.status}")
+            }
+          })
+        case (Failure(err), _)=>
+          logger.error(s"Could not complete copy to s3://$destBucket/$destKey: ${err.getMessage}", err)
+          Future.failed(err)
+      })
+  }
+
+  /**
     * Cancels an in-progress multpart upload. This should always be called when aborting to minimise charges
     * @param region AWS region to operate in
     * @param credentialsProvider AWS credentials provider. If None the request is attempted without authentication
@@ -392,11 +468,23 @@ class ImprovedLargeFileCopier @Inject() (implicit actorSystem:ActorSystem, overr
     Http().cachedHostConnectionPoolHttps[T](s"s3.${destRegion.getName}.amazonaws.com")
   }
 
-  def performUpload(destRegion:Regions, credentialsProvider: Option[AWSCredentialsProvider], sourceBucket:String, sourceKey:String,
+  /**
+    * Performs a multipart copy operation
+    * @param destRegion Region to operate in. This method does not currently support cross-region copying
+    * @param credentialsProvider AWSCredentialsProvider used for signing requests. If this is None then the requests are attempted unauthenticated
+    * @param sourceBucket bucket to copy from
+    * @param sourceKey file to copy from
+    * @param sourceVersion optional version of the file to copy from
+    * @param destBucket bucket to copy to
+    * @param destKey file to copy to.  You can't specify a specific version, if versioning is enabled on destBucket then a version
+    *                is created and if not an existing file is overwritten
+    * @return a Future, containing a CompletedUpload object.  On error, the partial upload is aborted and a failed future is returned.
+    */
+  def performCopy(destRegion:Regions, credentialsProvider: Option[AWSCredentialsProvider], sourceBucket:String, sourceKey:String,
                     sourceVersion:Option[String], destBucket:String, destKey:String) = {
     logger.info(s"Initiating ImprovedLargeFileCopier for region $destRegion")
     implicit val poolClientFlow = newPoolClientFlow[UploadPart](destRegion)
-
+    implicit val genericPoolFlow = poolClientFlow.asInstanceOf[HostConnectionPool[Any]]
     headSourceFile(destRegion, None, sourceBucket, sourceKey, sourceVersion)(poolClientFlow.asInstanceOf[HostConnectionPool[Any]]).flatMap({
       case Some(headInfo)=>
         val parts = ImprovedLargeFileCopier.deriveParts(destBucket, destKey, headInfo)
@@ -404,14 +492,15 @@ class ImprovedLargeFileCopier @Inject() (implicit actorSystem:ActorSystem, overr
         initiateMultipartUpload(destRegion, credentialsProvider, destBucket, destKey, headInfo)(poolClientFlow.asInstanceOf[HostConnectionPool[Any]])
           .flatMap(uploadId=>{
             sendPartCopies(destRegion, credentialsProvider, uploadId, parts, headInfo)
-              .map(completedParts=>{
+              .flatMap(completedParts=>{
                 //send the complete-upload confirmation
-                throw new RuntimeException("Not implemented yet")
+                completeMultipartUpload(destRegion, credentialsProvider, destBucket, destKey, uploadId, completedParts)
               })
               .recoverWith({
                 case err:Throwable=>  //if any error occurs ensure that the upload is aborted
                   logger.error(s"Copy to s3://$destBucket/$destKey failed: ${err.getMessage}", err)
                   abortMultipartUpload(destRegion, credentialsProvider, headInfo.bucket, headInfo.key, uploadId)(poolClientFlow.asInstanceOf[HostConnectionPool[Any]])
+                  .flatMap(_=>Future.failed(err))
               })
         })
       case None=>
