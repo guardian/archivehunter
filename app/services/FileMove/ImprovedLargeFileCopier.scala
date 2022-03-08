@@ -2,17 +2,20 @@ package services.FileMove
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
+import akka.http.scaladsl.Http.HostConnectionPool
 import akka.http.scaladsl.model.headers.{Host, RawHeader}
 import akka.http.scaladsl.model.{ContentType, HttpHeader, HttpMethod, HttpMethods, HttpRequest, HttpResponse, StatusCode, StatusCodes}
-import akka.stream.Materializer
+import akka.stream.{KillSwitches, Materializer}
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import akka.util.ByteString
 import com.amazonaws.auth.AWSCredentialsProvider
 import com.amazonaws.regions.{Region, Regions}
 import helpers.S3Signer
 import org.slf4j.LoggerFactory
-import services.FileMove.ImprovedLargeFileCopier.HeadInfo
+import services.FileMove.ImprovedLargeFileCopier.{HeadInfo, UploadPart, UploadedPart, copySourcePath}
 
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 import java.nio.file.Paths
 import javax.inject.{Inject, Singleton}
 import scala.annotation.switch
@@ -23,10 +26,17 @@ import scala.util.{Failure, Success, Try}
 object ImprovedLargeFileCopier {
   def NoRequestCustomisation(httpRequest: HttpRequest) = httpRequest
 
+  /**
+    * returns a path suitable for the `x-amz-copy-source` header. This is URL-encoded.
+    */
+  def copySourcePath(bucket:String, key:String, version:Option[String]) = {
+    URLEncoder.encode(s"$bucket/$key${version.map(v=>s"?versionId=$v").getOrElse("")}", StandardCharsets.UTF_8)
+  }
+
   case class HeadInfo(
                      bucket:String,
                      key:String,
-                     version:Option[Int],
+                     version:Option[String],
                      lastModified:String,
                      contentLength:Long,
                      eTag:Option[String],
@@ -44,7 +54,7 @@ object ImprovedLargeFileCopier {
       * @param headers
       * @return
       */
-    def apply(bucket:String, key:String, version:Option[Int], headers:Seq[HttpHeader], entityContentType:ContentType, entityContentLength:Option[Long]) = {
+    def apply(bucket:String, key:String, version:Option[String], headers:Seq[HttpHeader], entityContentType:ContentType, entityContentLength:Option[Long]) = {
       def updateHeadInfo(existing:HeadInfo, nextHeader:HttpHeader) = (nextHeader.name(): @switch) match {
         case "Last-Modified"=>existing.copy(lastModified=nextHeader.value())
         case "Content-Length"=>existing.copy(contentLength=Try { nextHeader.value().toLong}.toOption.getOrElse(-1L))
@@ -70,6 +80,9 @@ object ImprovedLargeFileCopier {
       }
     }
   }
+
+  case class UploadPart(bucket:String, key:String, start:Long, end:Long, partNumber:Int)
+  case class UploadedPart(partNumber:Int, uploadId:String, uploadedETag:String)
 }
 
 /**
@@ -79,7 +92,7 @@ object ImprovedLargeFileCopier {
 class ImprovedLargeFileCopier @Inject() (implicit actorSystem:ActorSystem, override val mat:Materializer, override val ec:ExecutionContext) extends S3Signer {
   override protected val logger = LoggerFactory.getLogger(getClass)
   //Full type of "poolClientFlow" to save on typing :)
-  type HostConnectionPool =  Flow[(HttpRequest, Unit), (Try[HttpResponse], Unit), Http.HostConnectionPool]
+  type HostConnectionPool[T] =  Flow[(HttpRequest, T), (Try[HttpResponse], T), Http.HostConnectionPool]
 
   /**
     * Creates a generic Akka HttpRequest object with the given parameters.  If further customisation is required, provide
@@ -94,7 +107,7 @@ class ImprovedLargeFileCopier @Inject() (implicit actorSystem:ActorSystem, overr
     * @param customiser callback function that can be used to update the request model and return it
     * @return a tuple of HttpRequest and Unit
     */
-  protected def createRequest(method:HttpMethod, region:Regions, sourceBucket:String, sourceKey:String, sourceVersion:Option[Int])
+  protected def createRequestFull[T](method:HttpMethod, region:Regions, sourceBucket:String, sourceKey:String, sourceVersion:Option[String], extraData:T)
                    (customiser:((HttpRequest)=>HttpRequest)) = (
     {
       val bucketAndKey = Paths.get(sourceBucket, sourceKey).toString
@@ -104,21 +117,115 @@ class ImprovedLargeFileCopier @Inject() (implicit actorSystem:ActorSystem, overr
       }
       val targetUri = s"https://s3.${region.getName}.amazonaws.com/$params"
       logger.info(s"Target URI is $targetUri")
-      customiser(HttpRequest(method, uri=targetUri, headers=Seq()))//Host(s"$sourceBucket.s3.amazonaws.com"))))
+      customiser(HttpRequest(method, uri=targetUri, headers=Seq()))
     },
-    ()
+    extraData
   )
 
-  def uploadParts(region:Regions, sourceBucket:String, sourceKey:String, sourceVersion:Option[Int]) = {
+  protected def createRequest(method:HttpMethod, region:Regions, sourceBucket:String, sourceKey:String, sourceVersion:Option[String])
+                             (customiser:((HttpRequest)=>HttpRequest)) =
+    createRequestFull[Unit](method, region, sourceBucket, sourceKey, sourceVersion, ())(customiser)
 
+
+  /**
+    * builds a list of UploadPart instances corresponding to the given file
+    * @param metadata HeadInfo describing the _source_ file
+    * @return a sequence of UploadPart instances, representing the start and end points of each chunk of the upload
+    */
+  def deriveParts(destBucket:String, destKey:String, metadata:HeadInfo):Seq[UploadPart] = {
+    val partSize = LargeFileCopier.estimatePartSize(metadata.contentLength)
+    var ptr:Long = 0
+    var ctr:Int = 0
+    var output = scala.collection.mutable.ListBuffer[UploadPart]()
+    while(ptr<metadata.contentLength) {
+      val chunkEnd = if(ptr+partSize>metadata.contentLength) {
+        metadata.contentLength
+      } else {
+        ptr+partSize
+      }
+      output = output :+ UploadPart(destBucket, destKey, ptr, chunkEnd, ctr)
+      ctr += 1
+      ptr += partSize
+    }
+    logger.info(s"s3://${destBucket}/${destKey} - ${output.length} parts of ${partSize} bytes each")
+    output.toSeq
   }
 
-  private def doRequestSigning(reqparts:(HttpRequest, Unit), region:Regions, credentialsProvider:Option[AWSCredentialsProvider]) =
+  /**
+    * Builds a stream and performs a chunked copy
+    * @param region AWS region to work in
+    * @param credentialsProvider AWS credentials provider. If not given then no authentication is used
+    * @param uploadId multipart upload ID. This must be created with `InitiateMultipartUpload`
+    * @param parts a list of `UploadPart` instances describing the chunks to copy the file with
+    * @param metadata HeadInfo object describing the _source_ file
+    * @param poolClientFlow implicitly provided HostConnectionPool
+    * @return a Future that completes when all parts are confirmed. If any parts fail then errors are logged and the future fails.
+    *         On success, the Future contains a sequence of `UploadPart` objects which have the etag of the completed part.
+    *         NOTE: these are not necessarily in order!
+    */
+  def uploadParts(region:Regions, credentialsProvider:Option[AWSCredentialsProvider], uploadId:String, parts:Seq[UploadPart], metadata:HeadInfo)
+                 (implicit poolClientFlow:HostConnectionPool[UploadPart]) = {
+
+    Source.fromIterator(()=>parts.iterator)
+      .map(uploadPart=>createRequestFull(HttpMethods.PUT, region, uploadPart.bucket, uploadPart.key, None, uploadPart) {partialReq=>
+        partialReq
+          .withUri(partialReq.uri.withRawQueryString(s"?partNumber=${uploadPart.partNumber}&uploadId=$uploadId"))
+          .withHeaders(partialReq.headers ++ Seq(
+            RawHeader("x-amz-copy-source", copySourcePath(metadata.bucket, metadata.key, metadata.version)),
+            RawHeader("x-amz-copy-range", s"bytes ${uploadPart.start}-${uploadPart.end}"),
+            RawHeader("partNumber", uploadPart.partNumber.toString),
+            RawHeader("uploadId", uploadId),
+          ))
+      })
+      .mapAsync(4)(reqparts=>doRequestSigning(reqparts._1, region, credentialsProvider).map(req=>(req, reqparts._2)))
+      .via(poolClientFlow)
+      .mapAsyncUnordered(4)({
+        case (Success(response), uploadPart)=>
+          loadResponseBody(response).map(responseBody=>{
+            (response.status: @switch) match {
+              case StatusCodes.OK=>
+                val maybeEtag = for {
+                  xmlContent <- Try { scala.xml.XML.loadString(responseBody) }
+                  etag <- Try { (xmlContent \\ "ETag").text }
+                } yield etag
+
+                maybeEtag match {
+                  case Success(contentEtag)=>
+                    logger.info(s"s3://${metadata.bucket}/${metadata.key}: Uploaded part ${uploadPart.partNumber} successfully, etag was $contentEtag.")
+                    Some(UploadedPart(uploadPart.partNumber, uploadId, contentEtag))
+                  case Failure(err)=>
+                    logger.error(s"s3://${metadata.bucket}/${metadata.key}: could not understand XML content. Error was ${err.getMessage}")
+                    logger.error(s"s3://${metadata.bucket}/${metadata.key}: content was $responseBody")
+                    None
+                }
+              case _=>
+                logger.error(s"s3://${metadata.bucket}/${metadata.key}: server returned error ${response.status}")
+                logger.error(s"s3://${metadata.bucket}/${metadata.key}: $responseBody")
+                None
+            }
+          })
+        case (Failure(err), _)=>
+          logger.error(s"s3://${metadata.bucket}/${metadata.key}: could not complete upload part request: ${err.getMessage}", err)
+          Future(None)
+      })
+      .toMat(Sink.seq)(Keep.right)
+      .run()
+      .map(results=>{
+        val failures = results.count(_.isEmpty)
+        if(failures>0) {
+          logger.error(s"s3://${metadata.bucket}/${metadata.key}: $failures parts out of ${results.length} failed")
+          throw new RuntimeException(s"s3://${metadata.bucket}/${metadata.key}: $failures parts out of ${results.length} failed")
+        } else {
+          results.collect({case Some(part)=>part})
+        }
+      })
+  }
+
+  private def doRequestSigning(req:HttpRequest, region:Regions, credentialsProvider:Option[AWSCredentialsProvider]) =
       credentialsProvider match {
         case Some(creds)=>
-          signHttpRequest(reqparts._1, Region.getRegion(region), "s3", creds)
-            .map(signedRequest=>(signedRequest, ()))
-        case None=>Future(reqparts)
+          signHttpRequest(req, Region.getRegion(region), "s3", creds)
+        case None=>Future(req)
       }
 
   /**
@@ -132,11 +239,12 @@ class ImprovedLargeFileCopier @Inject() (implicit actorSystem:ActorSystem, overr
     * @return a Future containing None if the object does not exist, an instance of HeadInfo if it does or a failure if
     *         another error occurred
     */
-  def headSourceFile(region:Regions, credentialsProvider: Option[AWSCredentialsProvider], sourceBucket: String, sourceKey:String, sourceVersion:Option[Int])(implicit poolClientFlow:HostConnectionPool) = {
+  def headSourceFile(region:Regions, credentialsProvider: Option[AWSCredentialsProvider], sourceBucket: String, sourceKey:String, sourceVersion:Option[String])
+                    (implicit poolClientFlow:HostConnectionPool[Any]) = {
     val req = createRequest(HttpMethods.HEAD, region, sourceBucket, sourceKey, sourceVersion)(ImprovedLargeFileCopier.NoRequestCustomisation)
     Source
       .single(req)
-      .mapAsync(1)(reqparts=>doRequestSigning(reqparts, region, credentialsProvider))
+      .mapAsync(1)(reqparts=>doRequestSigning(reqparts._1, region, credentialsProvider).map(req=>(req, reqparts._2)))
       .via(poolClientFlow)
       .runWith(Sink.head)
       .map({
@@ -193,7 +301,7 @@ class ImprovedLargeFileCopier @Inject() (implicit actorSystem:ActorSystem, overr
     * @return a Future containing the upload ID. On error, the future will be failed
     */
   def initiateMultipartUpload(region:Regions, credentialsProvider:Option[AWSCredentialsProvider], destBucket:String, destKey:String, metadata:HeadInfo)
-                             (implicit poolClientFlow:HostConnectionPool) = {
+                             (implicit poolClientFlow:HostConnectionPool[Any]) = {
     val req = createRequest(HttpMethods.POST, region, destBucket, destKey, None) { partialRequest=>
       partialRequest
         .withUri(partialRequest.uri.withRawQueryString("?uploads"))
@@ -205,7 +313,7 @@ class ImprovedLargeFileCopier @Inject() (implicit actorSystem:ActorSystem, overr
 
     Source
       .single(req)
-      .mapAsync(1)(reqparts=>doRequestSigning(reqparts, region, credentialsProvider))
+      .mapAsync(1)(reqparts=>doRequestSigning(reqparts._1, region, credentialsProvider).map(rq=>(rq, ())))
       .via(poolClientFlow)
       .runWith(Sink.head)
       .flatMap({
@@ -233,13 +341,23 @@ class ImprovedLargeFileCopier @Inject() (implicit actorSystem:ActorSystem, overr
       })
   }
 
+  /**
+    * Cancels an in-progress multpart upload. This should always be called when aborting to minimise charges
+    * @param region AWS region to operate in
+    * @param credentialsProvider AWS credentials provider. If None the request is attempted without authentication
+    * @param sourceBucket bucket containing the file being upload
+    * @param sourceKey path to the file being uploaded
+    * @param uploadId multipart upload ID
+    * @param poolClientFlow implicitly provided HostConnectionPool
+    * @return a Future with no value. On error, the Future will fail.
+    */
   def abortMultipartUpload(region:Regions, credentialsProvider:Option[AWSCredentialsProvider], sourceBucket:String, sourceKey:String, uploadId:String)
-                          (implicit poolClientFlow:HostConnectionPool)= {
+                          (implicit poolClientFlow:HostConnectionPool[Any])= {
     Source
       .single(createRequest(HttpMethods.DELETE, region, sourceBucket, sourceKey, None) { partialRequest=>
-        partialRequest.withUri(partialRequest.uri.withRawQueryString(s"?uploadId=$uploadId"))
+        partialRequest.withUri(partialRequest.uri.withRawQueryString(s"uploadId=$uploadId"))
       })
-      .mapAsync(1)(reqparts=>doRequestSigning(reqparts, region, credentialsProvider))
+      .mapAsync(1)(reqparts=>doRequestSigning(reqparts._1, region, credentialsProvider).map(rq=>(rq, ())))
       .via(poolClientFlow)
       .runWith(Sink.head)
       .flatMap({
@@ -263,20 +381,24 @@ class ImprovedLargeFileCopier @Inject() (implicit actorSystem:ActorSystem, overr
     * @param destRegion region to communicate with
     * @return
     */
-  def newPoolClientFlow(destRegion:Regions) = {
-    Http().cachedHostConnectionPoolHttps[Unit](s"s3.${destRegion.getName}.amazonaws.com")
+  def newPoolClientFlow[T](destRegion:Regions) = {
+    Http().cachedHostConnectionPoolHttps[T](s"s3.${destRegion.getName}.amazonaws.com")
   }
 
-  def performUpload(sourceBucket:String, sourceKey:String, sourceVersion:Option[Int], destBucket:String, destKey:String, destVersion:Option[Int], destRegion:Regions) = {
+  def performUpload(destRegion:Regions, credentialsProvider: Option[AWSCredentialsProvider], sourceBucket:String, sourceKey:String,
+                    sourceVersion:Option[String], destBucket:String, destKey:String) = {
     logger.info(s"Initiating ImprovedLargeFileCopier for region $destRegion")
-    implicit val poolClientFlow = newPoolClientFlow(destRegion)
+    implicit val poolClientFlow = newPoolClientFlow[UploadPart](destRegion)
 
-    headSourceFile(destRegion, None, sourceBucket, sourceKey, sourceVersion).flatMap({
+    headSourceFile(destRegion, None, sourceBucket, sourceKey, sourceVersion)(poolClientFlow.asInstanceOf[HostConnectionPool[Any]]).flatMap({
       case Some(headInfo)=>
-        for {
-          uploadId <- initiateMultipartUpload(destBucket, destKey, destVersion)
-        } yield uploadId
-        Future.failed(new RuntimeException(s"Not implemented yet"))
+        val parts = deriveParts(destBucket, destKey, headInfo)
+
+        initiateMultipartUpload(destRegion, credentialsProvider, destBucket, destKey, headInfo)(poolClientFlow.asInstanceOf[HostConnectionPool[Any]])
+          .flatMap(uploadId=>{
+
+          Future.failed(new RuntimeException(s"Not implemented yet"))
+        })
       case None=>
         logger.error(s"Can't copy s3://$sourceBucket/$sourceKey@${sourceVersion.getOrElse("LATEST")} because the source file does not exist")
         Future.failed(new RuntimeException(s"Source file did not exist"))
