@@ -251,8 +251,11 @@ class ImprovedLargeFileCopier @Inject() (implicit actorSystem:ActorSystem, overr
   private def doRequestSigning(req:HttpRequest, region:Regions, credentialsProvider:Option[AwsCredentialsProvider]) =
       credentialsProvider match {
         case Some(creds)=>
+          logger.info(s"Signing request from ${creds.resolveCredentials().accessKeyId()}")
           signHttpRequest(req, Region.getRegion(region), "s3", creds)
-        case None=>Future(req)
+        case None=>
+          logger.warn(s"No credentials provider, attempting un-authenticated access")
+          Future(req)
       }
 
   /**
@@ -273,7 +276,7 @@ class ImprovedLargeFileCopier @Inject() (implicit actorSystem:ActorSystem, overr
       .single(req)
       .mapAsync(1)(reqparts=>doRequestSigning(reqparts._1, region, credentialsProvider).map(req=>(req, reqparts._2)))
       .map(reqparts=>{
-        logger.info(s"Signed request headers:")
+        logger.info(s"Request to send has ${reqparts._1.headers.length} headers.  Signed request headers:")
         reqparts._1.headers.foreach(hdr=>logger.info(s"\t${hdr.name()}: ${hdr.value()}"))
         reqparts
       })
@@ -489,7 +492,7 @@ class ImprovedLargeFileCopier @Inject() (implicit actorSystem:ActorSystem, overr
     logger.info(s"Initiating ImprovedLargeFileCopier for region $destRegion")
     implicit val poolClientFlow = newPoolClientFlow[UploadPart](destRegion)
     implicit val genericPoolFlow = poolClientFlow.asInstanceOf[HostConnectionPool[Any]]
-    headSourceFile(destRegion, None, sourceBucket, sourceKey, sourceVersion).flatMap({
+    headSourceFile(destRegion, credentialsProvider, sourceBucket, sourceKey, sourceVersion).flatMap({
       case Some(headInfo)=>
         val parts = ImprovedLargeFileCopier.deriveParts(destBucket, destKey, headInfo)
 
