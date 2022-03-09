@@ -10,6 +10,7 @@ import helpers.S3Signer
 import org.slf4j.LoggerFactory
 import org.specs2.mutable._
 import play.api.Logger
+import software.amazon.awssdk.auth.credentials.{AwsBasicCredentials, StaticCredentialsProvider}
 
 import scala.concurrent.{Await, ExecutionContext}
 import scala.concurrent.duration._
@@ -32,7 +33,7 @@ class S3LocationSpec extends Specification {
       implicit val ec = system.dispatcher
       val test = new TestClass(logger, mat, ec)
 
-      val credentialsProvider = new AWSStaticCredentialsProvider(new BasicAWSCredentials("AKIAIOSFODNN7EXAMPLE", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"))
+      val credentialsProvider = StaticCredentialsProvider.create(AwsBasicCredentials.create("AKIAIOSFODNN7EXAMPLE", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"))
 
       val headers = Seq(HttpHeader.parse("Range", "bytes=0-9"),HttpHeader.parse("Host", "examplebucket.s3.amazonaws.com")).map({
         case Ok(result, errors)=>result
@@ -56,7 +57,7 @@ class S3LocationSpec extends Specification {
       implicit val ec = system.dispatcher
       val test = new TestClass(logger, mat, ec)
 
-      val credentialsProvider = new AWSStaticCredentialsProvider(new BasicAWSCredentials("AKIAIOSFODNN7EXAMPLE", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"))
+      val credentialsProvider = StaticCredentialsProvider.create(AwsBasicCredentials.create("AKIAIOSFODNN7EXAMPLE", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"))
 
       val headers = Seq(HttpHeader.parse("Host", "examplebucket.s3.amazonaws.com")).map({
         case Ok(result, errors)=>result
@@ -80,7 +81,7 @@ class S3LocationSpec extends Specification {
       implicit val ec = system.dispatcher
       val test = new TestClass(logger, mat, ec)
 
-      val credentialsProvider = new AWSStaticCredentialsProvider(new BasicAWSCredentials("AKIAIOSFODNN7EXAMPLE", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"))
+      val credentialsProvider = StaticCredentialsProvider.create(AwsBasicCredentials.create("AKIAIOSFODNN7EXAMPLE", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"))
 
       val headers = Seq(HttpHeader.parse("Host", "examplebucket.s3.amazonaws.com")).map({
         case Ok(result, errors)=>result
@@ -104,7 +105,7 @@ class S3LocationSpec extends Specification {
       implicit val ec = system.dispatcher
       val test = new TestClass(logger, mat, ec)
 
-      val credentialsProvider = new AWSStaticCredentialsProvider(new BasicAWSCredentials("AKIAIOSFODNN7EXAMPLE", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"))
+      val credentialsProvider = StaticCredentialsProvider.create(AwsBasicCredentials.create("AKIAIOSFODNN7EXAMPLE", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"))
 
       val headers = Seq(
         HttpHeader.parse("Host", "examplebucket.s3.amazonaws.com"),

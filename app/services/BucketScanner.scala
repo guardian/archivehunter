@@ -150,7 +150,7 @@ class BucketScanner @Inject()(override val config:Configuration, ddbClientMgr:Dy
 
     val esclient = esClientMgr.getClient()
 
-    val source = new ParanoidS3Source(target.bucketName,region, s3ClientMgr.credentialsProvider(config.getOptional[String]("externalData.awsProfile")))(system)
+    val source = new ParanoidS3Source(target.bucketName,region, s3ClientMgr.newCredentialsProvider(config.getOptional[String]("externalData.awsProfile")))
     val processor = new S3XMLProcessor()
     val converterFlow = injector.getInstance(classOf[S3ToArchiveEntryFlow])
 

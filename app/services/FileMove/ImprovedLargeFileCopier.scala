@@ -8,11 +8,11 @@ import akka.http.scaladsl.model.{ContentType, HttpEntity, HttpHeader, HttpMethod
 import akka.stream.{KillSwitches, Materializer}
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import akka.util.ByteString
-import com.amazonaws.auth.AWSCredentialsProvider
 import com.amazonaws.regions.{Region, Regions}
 import helpers.S3Signer
 import org.slf4j.LoggerFactory
 import services.FileMove.ImprovedLargeFileCopier.{CompletedUpload, HeadInfo, UploadPart, UploadedPart, copySourcePath}
+import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider
 
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
@@ -193,7 +193,7 @@ class ImprovedLargeFileCopier @Inject() (implicit actorSystem:ActorSystem, overr
     *         On success, the Future contains a sequence of `UploadPart` objects which have the etag of the completed part.
     *         NOTE: these are not necessarily in order!
     */
-  def sendPartCopies(region:Regions, credentialsProvider:Option[AWSCredentialsProvider], uploadId:String, parts:Seq[UploadPart], metadata:HeadInfo)
+  def sendPartCopies(region:Regions, credentialsProvider:Option[AwsCredentialsProvider], uploadId:String, parts:Seq[UploadPart], metadata:HeadInfo)
                  (implicit poolClientFlow:HostConnectionPool[UploadPart]) = {
 
     Source.fromIterator(()=>parts.iterator)
@@ -249,7 +249,7 @@ class ImprovedLargeFileCopier @Inject() (implicit actorSystem:ActorSystem, overr
       })
   }
 
-  private def doRequestSigning(req:HttpRequest, region:Regions, credentialsProvider:Option[AWSCredentialsProvider]) =
+  private def doRequestSigning(req:HttpRequest, region:Regions, credentialsProvider:Option[AwsCredentialsProvider]) =
       credentialsProvider match {
         case Some(creds)=>
           signHttpRequest(req, Region.getRegion(region), "s3", creds)
@@ -267,7 +267,7 @@ class ImprovedLargeFileCopier @Inject() (implicit actorSystem:ActorSystem, overr
     * @return a Future containing None if the object does not exist, an instance of HeadInfo if it does or a failure if
     *         another error occurred
     */
-  def headSourceFile(region:Regions, credentialsProvider: Option[AWSCredentialsProvider], sourceBucket: String, sourceKey:String, sourceVersion:Option[String])
+  def headSourceFile(region:Regions, credentialsProvider: Option[AwsCredentialsProvider], sourceBucket: String, sourceKey:String, sourceVersion:Option[String])
                     (implicit poolClientFlow:HostConnectionPool[Any]) = {
     val req = createRequest(HttpMethods.HEAD, region, sourceBucket, sourceKey, sourceVersion)(ImprovedLargeFileCopier.NoRequestCustomisation)
     Source
@@ -328,7 +328,7 @@ class ImprovedLargeFileCopier @Inject() (implicit actorSystem:ActorSystem, overr
     * @param poolClientFlow implicitly provided HostConnectionPool instance
     * @return a Future containing the upload ID. On error, the future will be failed
     */
-  def initiateMultipartUpload(region:Regions, credentialsProvider:Option[AWSCredentialsProvider], destBucket:String, destKey:String, metadata:HeadInfo)
+  def initiateMultipartUpload(region:Regions, credentialsProvider:Option[AwsCredentialsProvider], destBucket:String, destKey:String, metadata:HeadInfo)
                              (implicit poolClientFlow:HostConnectionPool[Any]) = {
     val req = createRequest(HttpMethods.POST, region, destBucket, destKey, None) { partialRequest=>
       partialRequest
@@ -380,7 +380,7 @@ class ImprovedLargeFileCopier @Inject() (implicit actorSystem:ActorSystem, overr
     * @param poolClientFlow implicitly provided HostConnectionPool instance
     * @return a Future containing a CompletedUpload instance. On error, the future will be failed.
     */
-  def completeMultipartUpload(region:Regions, credentialsProvider:Option[AWSCredentialsProvider], destBucket:String, destKey:String, uploadId:String, parts:Seq[UploadedPart])
+  def completeMultipartUpload(region:Regions, credentialsProvider:Option[AwsCredentialsProvider], destBucket:String, destKey:String, uploadId:String, parts:Seq[UploadedPart])
                              (implicit poolClientFlow:HostConnectionPool[Any]) = {
     val xmlContent = <CompleteMultipartUpload xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
       {
@@ -434,7 +434,7 @@ class ImprovedLargeFileCopier @Inject() (implicit actorSystem:ActorSystem, overr
     * @param poolClientFlow implicitly provided HostConnectionPool
     * @return a Future with no value. On error, the Future will fail.
     */
-  def abortMultipartUpload(region:Regions, credentialsProvider:Option[AWSCredentialsProvider], sourceBucket:String, sourceKey:String, uploadId:String)
+  def abortMultipartUpload(region:Regions, credentialsProvider:Option[AwsCredentialsProvider], sourceBucket:String, sourceKey:String, uploadId:String)
                           (implicit poolClientFlow:HostConnectionPool[Any])= {
     Source
       .single(createRequest(HttpMethods.DELETE, region, sourceBucket, sourceKey, None) { partialRequest=>
@@ -471,7 +471,7 @@ class ImprovedLargeFileCopier @Inject() (implicit actorSystem:ActorSystem, overr
   /**
     * Performs a multipart copy operation
     * @param destRegion Region to operate in. This method does not currently support cross-region copying
-    * @param credentialsProvider AWSCredentialsProvider used for signing requests. If this is None then the requests are attempted unauthenticated
+    * @param credentialsProvider AwsCredentialsProvider used for signing requests. If this is None then the requests are attempted unauthenticated
     * @param sourceBucket bucket to copy from
     * @param sourceKey file to copy from
     * @param sourceVersion optional version of the file to copy from
@@ -480,7 +480,7 @@ class ImprovedLargeFileCopier @Inject() (implicit actorSystem:ActorSystem, overr
     *                is created and if not an existing file is overwritten
     * @return a Future, containing a CompletedUpload object.  On error, the partial upload is aborted and a failed future is returned.
     */
-  def performCopy(destRegion:Regions, credentialsProvider: Option[AWSCredentialsProvider], sourceBucket:String, sourceKey:String,
+  def performCopy(destRegion:Regions, credentialsProvider: Option[AwsCredentialsProvider], sourceBucket:String, sourceKey:String,
                     sourceVersion:Option[String], destBucket:String, destKey:String) = {
     logger.info(s"Initiating ImprovedLargeFileCopier for region $destRegion")
     implicit val poolClientFlow = newPoolClientFlow[UploadPart](destRegion)

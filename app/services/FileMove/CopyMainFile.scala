@@ -59,7 +59,7 @@ class CopyMainFile (s3ClientManager: S3ClientManager, config:Configuration, larg
           } else {
             val rgn = entry.region.map(regionString=>Regions.valueOf(regionString.toUpperCase)).getOrElse(Regions.EU_WEST_1)
             largeFileCopier.performCopy(rgn,
-              Some(s3ClientManager.credentialsProvider(maybeProfile)),
+              Some(s3ClientManager.newCredentialsProvider(maybeProfile)),
               entry.bucket, entry.path, None, currentState.destBucket, entry.path)
           }
 
@@ -94,7 +94,7 @@ class CopyMainFile (s3ClientManager: S3ClientManager, config:Configuration, larg
               logger.info(s"File no longer exists on s3://${entry.bucket}/${entry.path}, copying it back with large-file copy...")
               val rgn = entry.region.map(regionString=>Regions.valueOf(regionString.toUpperCase)).getOrElse(Regions.EU_WEST_1)
               largeFileCopier.performCopy(rgn,
-                Some(s3ClientManager.credentialsProvider(maybeProfile)),
+                Some(s3ClientManager.newCredentialsProvider(maybeProfile)),
                 entry.bucket, entry.path, None, currentState.destBucket, entry.path)
             }
           } else {

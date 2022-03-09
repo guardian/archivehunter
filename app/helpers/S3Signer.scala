@@ -4,7 +4,6 @@ import java.net.URLEncoder
 import java.security.MessageDigest
 import java.time.{OffsetDateTime, ZoneOffset, ZonedDateTime}
 import java.time.format.DateTimeFormatter
-
 import akka.http.scaladsl.model.HttpHeader.ParsingResult.{Error, Ok}
 import akka.http.scaladsl.model.{HttpHeader, HttpRequest}
 import akka.stream.Materializer
@@ -12,9 +11,11 @@ import akka.stream.scaladsl.{Flow, Keep, Sink}
 import akka.util.ByteString
 import com.amazonaws.auth.{AWSCredentialsProvider, AWSSessionCredentials}
 import com.amazonaws.regions.Region
+
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 import play.api.Logger
+import software.amazon.awssdk.auth.credentials.{AwsCredentialsProvider, AwsSessionCredentials}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
@@ -79,7 +80,7 @@ trait S3Signer {
     * @param credsProvider AWSCredentialsProvider instance (or chain) that gives us credentials
     * @return a Future with the updated [[HttpRequest]]
     */
-  def signHttpRequest(req:HttpRequest, region:Region, serviceName:String, credsProvider:AWSCredentialsProvider, timestamp:Option[OffsetDateTime]=None) = {
+  def signHttpRequest(req:HttpRequest, region:Region, serviceName:String, credsProvider:AwsCredentialsProvider, timestamp:Option[OffsetDateTime]=None) = {
     import scala.collection.immutable.Seq
     val checksummer = MessageDigest.getInstance("SHA-256")
     val requestTime = timestamp.getOrElse(OffsetDateTime.now(ZoneOffset.UTC))
@@ -101,12 +102,13 @@ trait S3Signer {
       case Failure(err)=>logger.error(s"failed to generate content hash", err)
     })
 
-    val credentials = credsProvider.getCredentials
+    val credentials = credsProvider.resolveCredentials()
 
-    val sessionTokenHeaders = if(credentials.isInstanceOf[AWSSessionCredentials]){
-      Seq(makeHttpHeader("x-amz-security-token", credentials.asInstanceOf[AWSSessionCredentials].getSessionToken))
-    } else {
-      Seq()
+    val sessionTokenHeaders = credentials match {
+      case session:AwsSessionCredentials=>
+        Seq(makeHttpHeader("x-amz-security-token", session.sessionToken()))
+      case _=>
+        Seq()
     }
 
     val updatedHeadersFuture = contentHashHexFuture.map(hash=>
@@ -133,7 +135,7 @@ trait S3Signer {
       case Failure(err)=>logger.error(s"stringToSign failed", err)
     })
 
-    val signingKeyResult = signingKey(credentials.getAWSSecretKey, serviceName, region.getName, requestTime)
+    val signingKeyResult = signingKey(credentials.secretAccessKey(), serviceName, region.getName, requestTime)
     val sig = stringToSignFuture.map(sts=>finalSignature(signingKeyResult, sts))
 
     Future.sequence(Seq(sig, updatedHeadersFuture)).map(results=>{
@@ -141,7 +143,7 @@ trait S3Signer {
       val signedHeaders = results(1).asInstanceOf[Seq[HttpHeader]]
       val signedHeadersString = signedHeaders.map(_.name().toLowerCase()).sorted.mkString(";")
       val finalHeaders =  signedHeaders ++ Seq(
-        makeHttpHeader("Authorization", s"AWS4-HMAC-SHA256 Credential=${credentials.getAWSAccessKeyId}/${requestTime.format(aws_compatible_date)}/$region/$serviceName/aws4_request,SignedHeaders=$signedHeadersString,Signature=$finalSig")
+        makeHttpHeader("Authorization", s"AWS4-HMAC-SHA256 Credential=${credentials.accessKeyId()}/${requestTime.format(aws_compatible_date)}/$region/$serviceName/aws4_request,SignedHeaders=$signedHeadersString,Signature=$finalSig")
       )
 
       logger.debug(s"Final headers are: $finalHeaders")
