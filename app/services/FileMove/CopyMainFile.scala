@@ -57,7 +57,7 @@ class CopyMainFile (s3ClientManager: S3ClientManager, config:Configuration, larg
           val copyFuture = if(entry.size<5368709120L) {  //5gb and larger files can't be directly copied and must be re-uploaded
             standardS3Copy(currentState.destBucket, entry.bucket, entry.path)
           } else {
-            val rgn = entry.region.map(regionString=>Regions.valueOf(regionString.toUpperCase)).getOrElse(Regions.EU_WEST_1)
+            val rgn = entry.region.map(Regions.fromName).getOrElse(Regions.EU_WEST_1)
             largeFileCopier.performCopy(rgn,
               Some(s3ClientManager.newCredentialsProvider(maybeProfile)),
               entry.bucket, entry.path, None, currentState.destBucket, entry.path)
@@ -92,7 +92,7 @@ class CopyMainFile (s3ClientManager: S3ClientManager, config:Configuration, larg
               standardS3Copy(entry.bucket, currentState.destBucket, entry.path)(destClient).map(result=>Some(result))
             } else {
               logger.info(s"File no longer exists on s3://${entry.bucket}/${entry.path}, copying it back with large-file copy...")
-              val rgn = entry.region.map(regionString=>Regions.valueOf(regionString.toUpperCase)).getOrElse(Regions.EU_WEST_1)
+              val rgn = entry.region.map(Regions.fromName).getOrElse(Regions.EU_WEST_1)
               largeFileCopier.performCopy(rgn,
                 Some(s3ClientManager.newCredentialsProvider(maybeProfile)),
                 entry.bucket, entry.path, None, currentState.destBucket, entry.path)
