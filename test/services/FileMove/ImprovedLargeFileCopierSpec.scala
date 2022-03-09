@@ -1,10 +1,13 @@
 package services.FileMove
 
 import TestFileMove.AkkaTestkitSpecs2Support
+import akka.actor.ActorSystem
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpHeader, HttpMethods, HttpRequest, HttpResponse, StatusCodes}
+import akka.stream.Materializer
 import akka.stream.scaladsl.Sink
 import akka.util.ByteString
 import com.amazonaws.regions.Regions
+import org.specs2.mock.Mockito
 import org.specs2.mutable.Specification
 import services.FileMove.ImprovedLargeFileCopier.{CompletedUpload, HeadInfo, UploadPart, UploadedPart}
 
@@ -13,9 +16,19 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
-class ImprovedLargeFileCopierSpec extends Specification {
+class ImprovedLargeFileCopierSpec extends Specification with Mockito {
   sequential
 
+  "ImprovedLargeFileCopier.makeS3Uri" should {
+    "url-encode paths" in {
+      implicit val actorSystem:ActorSystem = mock[ActorSystem]
+      implicit val mat:Materializer = mock[Materializer]
+
+      val toTest = new ImprovedLargeFileCopier()
+      toTest.makeS3Uri(Regions.EU_WEST_1, "somebucket","path to a/very long/file.mxf", Some("vvvvvv")) mustEqual "https://s3.eu-west-1.amazonaws.com/somebucket/path%20to%20a/very%20long/file.mxf?versionId=vvvvvv"
+
+    }
+  }
   "ImprovedLargeFileCopier.headSourceFile" should {
     "return file metadata about a known public file" in new AkkaTestkitSpecs2Support {
       val toTest = new ImprovedLargeFileCopier()

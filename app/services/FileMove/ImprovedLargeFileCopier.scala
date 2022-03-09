@@ -13,7 +13,7 @@ import org.slf4j.LoggerFactory
 import services.FileMove.ImprovedLargeFileCopier.{CompletedUpload, HeadInfo, UploadPart, UploadedPart, copySourcePath}
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider
 
-import java.net.URLEncoder
+import java.net.{URI, URLEncoder}
 import java.nio.charset.StandardCharsets
 import java.nio.file.Paths
 import javax.inject.{Inject, Singleton}
@@ -148,6 +148,11 @@ class ImprovedLargeFileCopier @Inject() (implicit actorSystem:ActorSystem, overr
   //Full type of "poolClientFlow" to save on typing :)
   type HostConnectionPool[T] =  Flow[(HttpRequest, T), (Try[HttpResponse], T), Http.HostConnectionPool]
 
+  def makeS3Uri(region:Regions, bucket:String, key:String, maybeVersion:Option[String]) = {
+    val bucketAndKey = Paths.get("/", bucket, key).toString
+    new URI("https", s"s3.${region.getName}.amazonaws.com", bucketAndKey, maybeVersion.map(v => s"versionId=$v").orNull, null).toString
+  }
+
   /**
     * Creates a generic Akka HttpRequest object with the given parameters.  If further customisation is required, provide
     * a callback which will take the built HttpRequest and change it, returning the updated copy. If not, then pass
@@ -164,12 +169,7 @@ class ImprovedLargeFileCopier @Inject() (implicit actorSystem:ActorSystem, overr
   protected def createRequestFull[T](method:HttpMethod, region:Regions, sourceBucket:String, sourceKey:String, sourceVersion:Option[String], extraData:T)
                    (customiser:((HttpRequest)=>HttpRequest)) = (
     {
-      val bucketAndKey = Paths.get(sourceBucket, sourceKey).toString
-      val params = sourceVersion match {
-        case Some(version)=> bucketAndKey + s"?versionId=$version"
-        case None=> bucketAndKey
-      }
-      val targetUri = s"https://s3.${region.getName}.amazonaws.com/$params"
+      val targetUri = makeS3Uri(region, sourceBucket, sourceKey, sourceVersion)
       logger.info(s"Target URI is $targetUri")
       customiser(HttpRequest(method, uri=targetUri, headers=Seq()))
     },
