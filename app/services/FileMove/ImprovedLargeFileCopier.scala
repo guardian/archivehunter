@@ -272,6 +272,11 @@ class ImprovedLargeFileCopier @Inject() (implicit actorSystem:ActorSystem, overr
     Source
       .single(req)
       .mapAsync(1)(reqparts=>doRequestSigning(reqparts._1, region, credentialsProvider).map(req=>(req, reqparts._2)))
+      .map(reqparts=>{
+        logger.info(s"Signed request headers:")
+        reqparts._1.headers.foreach(hdr=>logger.info(s"\t${hdr.name()}: ${hdr.value()}"))
+        reqparts
+      })
       .via(poolClientFlow)
       .runWith(Sink.head)
       .map({
@@ -298,7 +303,7 @@ class ImprovedLargeFileCopier @Inject() (implicit actorSystem:ActorSystem, overr
               //only for debugging!!
               val content = Await.result(contentFut, 10.seconds)
 
-              logger.error(s"Access was forbidden to $sourceBucket/$sourceKey@${sourceVersion.getOrElse("LATEST")}: ${content.utf8String}")
+              logger.error(s"Access was forbidden to $sourceBucket/$sourceKey@${sourceVersion.getOrElse("LATEST")}: '${content.utf8String}'")
               throw new RuntimeException("Access forbidden")
             case _=>
               result.discardEntityBytes()
