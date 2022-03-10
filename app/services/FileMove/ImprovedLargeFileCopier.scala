@@ -13,7 +13,7 @@ import org.slf4j.LoggerFactory
 import services.FileMove.ImprovedLargeFileCopier.{CompletedUpload, HeadInfo, UploadPart, UploadedPart, copySourcePath}
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider
 
-import java.net.{IDN, URI, URLEncoder}
+import java.net.{URI, URLEncoder}
 import java.nio.charset.StandardCharsets
 import java.nio.file.Paths
 import javax.inject.{Inject, Singleton}
@@ -163,8 +163,14 @@ class ImprovedLargeFileCopier @Inject() (implicit actorSystem:ActorSystem, overr
   type HostConnectionPool[T] =  Flow[(HttpRequest, T), (Try[HttpResponse], T), Http.HostConnectionPool]
 
   def makeS3Uri(region:Regions, bucket:String, key:String, maybeVersion:Option[String]) = {
-    val bucketAndKey = Paths.get("/", bucket, key).toString
-    new URI("https", s"s3.${region.getName}.amazonaws.com", IDN.toASCII(bucketAndKey), maybeVersion.map(v => s"versionId=$v").orNull, null).toString
+    val bucketAndKey = Paths
+      .get("/", bucket, key)
+      .toString
+      .split("/")
+      .map(URLEncoder.encode(_, StandardCharsets.UTF_8))
+      .mkString("/")
+
+    new URI("https", s"s3.${region.getName}.amazonaws.com", bucketAndKey, maybeVersion.map(v => s"versionId=$v").orNull, null).toString
   }
 
   /**

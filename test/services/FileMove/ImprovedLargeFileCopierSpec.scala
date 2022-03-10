@@ -25,8 +25,15 @@ class ImprovedLargeFileCopierSpec extends Specification with Mockito {
       implicit val mat:Materializer = mock[Materializer]
 
       val toTest = new ImprovedLargeFileCopier()
-      toTest.makeS3Uri(Regions.EU_WEST_1, "somebucket","path to a/very long/file.mxf", Some("vvvvvv")) mustEqual "https://s3.eu-west-1.amazonaws.com/somebucket/path%20to%20a/very%20long/file.mxf?versionId=vvvvvv"
+      toTest.makeS3Uri(Regions.EU_WEST_1, "somebucket","path to a/very long/file.mxf", Some("vvvvvv")) mustEqual "https://s3.eu-west-1.amazonaws.com/somebucket/path+to+a/very+long/file.mxf?versionId=vvvvvv"
+    }
 
+    "handle non-ascii characters" in {
+      implicit val actorSystem:ActorSystem = mock[ActorSystem]
+      implicit val mat:Materializer = mock[Materializer]
+
+      val toTest = new ImprovedLargeFileCopier()
+      toTest.makeS3Uri(Regions.EU_WEST_1, "somebucket","path to a/arsène wenger est alleé en vacances.mxf", None) mustEqual "https://s3.eu-west-1.amazonaws.com/somebucket/path+to+a/ars%25C3%25A8ne+wenger+est+alle%25C3%25A9+en+vacances.mxf"
     }
   }
   "ImprovedLargeFileCopier.headSourceFile" should {
