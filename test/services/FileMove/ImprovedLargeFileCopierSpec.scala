@@ -247,6 +247,12 @@ class ImprovedLargeFileCopierSpec extends Specification with Mockito {
     }
   }
 
+  "ImprovedLargeFileCopier.estimatePartSize" should {
+    "allow forcing of a certain number of parts" in {
+      LargeFileCopier.estimatePartSize(5368709120L, None) mustEqual 10485760  //512 parts
+      LargeFileCopier.estimatePartSize(5368709120L, Some(256)) mustEqual 20971520
+    }
+  }
   "ImprovedLargeFileCopier.sendPartCopies" should {
     "send an upload-part-copy request for every given chunk" in new AkkaTestkitSpecs2Support {
       val requests = scala.collection.mutable.ListBuffer[HttpRequest]()
@@ -517,6 +523,14 @@ class ImprovedLargeFileCopierSpec extends Specification with Mockito {
       result.get.crc32c must beNone
       result.get.sha1 must beSome("sha1")
       result.get.sha256 must beNone
+    }
+  }
+
+  "ImprovedLargeFileCopier.partsFromEtag" should {
+    "return the part count from an etag" in {
+      ImprovedLargeFileCopier.partsFromEtag("fc6e35aabd934c06676927da84b6a4d5-7") must beSome(7)
+      ImprovedLargeFileCopier.partsFromEtag("\"fc6e35aabd934c06676927da84b6a4d5-7\"") must beSome(7)
+
     }
   }
 }

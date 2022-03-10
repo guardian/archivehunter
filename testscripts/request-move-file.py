@@ -76,7 +76,7 @@ if options.secret is None:
     exit(1)
 
 method = "PUT"
-uri = "http://{host}:9000/api/move/{fileid}?to={collection}".format(host=options.host,
+uri = "https://{host}/api/move/{fileid}?to={collection}".format(host=options.host,
                                                                 fileid=urllib.parse.quote(options.entry_id).replace("/", "%2F"),
                                                                 collection=urllib.parse.quote(options.dest))
 

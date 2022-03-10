@@ -19,7 +19,7 @@ object LargeFileCopier {
 //  val temporaryActorSystem = ActorSystem.create("CopyMainFile", ConfigFactory.empty())
 //  implicit val mat:Materializer = Materializer.createMaterializer(temporaryActorSystem)
 
-  val defaultPartSize:Int = 10*1024*1024  //default chunk size is 50Mb
+  val defaultPartSize:Long = 10*1024*1024  //default chunk size is 10Mb
 
   /**
     * AWS specifications say that parts must be at least 5Mb in size but no more than 5Gb in size, and that there
@@ -27,17 +27,21 @@ object LargeFileCopier {
     * @param totalFileSize actual size of the file to upload, in bytes
     * @return the target path size
     */
-  def estimatePartSize(totalFileSize:Long):Int = {
+  def estimatePartSize(totalFileSize:Long, maybePartCount:Option[Int]):Long = {
     val maxWantedParts = 10000
 
-    var partSize:Int = defaultPartSize
+    var partSize:Long = defaultPartSize
     var nParts:Int = maxWantedParts + 1
     var i:Int=1
     while(true) {
-      nParts = (totalFileSize / partSize).toInt
+      nParts = Math.ceil(totalFileSize.toDouble / partSize.toDouble).toInt
       if (nParts > maxWantedParts) {
+        i = i + 1
+        partSize = defaultPartSize * i
+      } else if(maybePartCount.isDefined && nParts != maybePartCount.get) {
+        logger.debug(s"part size of $partSize is appropriate but does not match requested part count of ${maybePartCount.get}")
         i = i+1
-        partSize = defaultPartSize*i
+        partSize = defaultPartSize * i
       } else {
         logger.info(s"Part size estimated at $partSize for $nParts target parts")
         return partSize
@@ -76,7 +80,7 @@ object LargeFileCopier {
             ContentTypes.`application/octet-stream`
         }
         logger.info(s"Performing large-file copy for s3://$sourceBucket/$path to s3://$destBucket/$path. Content type is $ct")
-        val sink = S3.multipartUpload(destBucket, path, contentType = ct, chunkingParallelism = 4, chunkSize = estimatePartSize(fileSize))
+        val sink = S3.multipartUpload(destBucket, path, contentType = ct, chunkingParallelism = 4, chunkSize = estimatePartSize(fileSize, None).toInt)
         src.async.log("LargeFileCopier").runWith(sink)
     })
   }

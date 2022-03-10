@@ -114,21 +114,34 @@ object ImprovedLargeFileCopier {
       </Part>
   }
 
+  private val etagPartsXtractor = "\"*.*-(\\d)\"*$".r
+
+  def partsFromEtag(etag:String) = etag match {
+    case etagPartsXtractor(partCount)=>
+      val partCountInt = partCount.toInt  //this should be safe because the regex ensures that partCount is only digits
+      logger.debug(s"etag of $etag gives partCount of $partCountInt")
+      Some(partCountInt)
+    case _=>
+      logger.error(s"Could not get parts count from etag $etag")
+      None
+  }
   /**
     * builds a list of UploadPart instances corresponding to the given file
     * @param metadata HeadInfo describing the _source_ file
     * @return a sequence of UploadPart instances, representing the start and end points of each chunk of the upload
     */
   def deriveParts(destBucket:String, destKey:String, metadata:HeadInfo):Seq[UploadPart] = {
-    val partSize = LargeFileCopier.estimatePartSize(metadata.contentLength)
-    var ptr:Long = 0
-    var ctr:Int = 1 //partNumber starts from 1 according to the AWS spec
+    val maybePartCount = metadata.eTag.flatMap(partsFromEtag)
+
+    val partSize = LargeFileCopier.estimatePartSize(metadata.contentLength, maybePartCount)
+    var ptr: Long = 0
+    var ctr: Int = 1 //partNumber starts from 1 according to the AWS spec
     var output = scala.collection.mutable.ListBuffer[UploadPart]()
-    while(ptr<metadata.contentLength) {
-      val chunkEnd = if(ptr+partSize>metadata.contentLength) {
-        metadata.contentLength-1 //range is zero-based so the last byte is contentLength-1
+    while (ptr < metadata.contentLength) {
+      val chunkEnd = if (ptr + partSize > metadata.contentLength) {
+        metadata.contentLength - 1 //range is zero-based so the last byte is contentLength-1
       } else {
-        ptr+partSize-1
+        ptr + partSize - 1
       }
       output = output :+ UploadPart(destBucket, destKey, ptr, chunkEnd, ctr)
       ctr += 1
@@ -137,6 +150,7 @@ object ImprovedLargeFileCopier {
     logger.info(s"s3://${destBucket}/${destKey} - ${output.length} parts of ${partSize} bytes each")
     output.toSeq
   }
+
 }
 
 /**
