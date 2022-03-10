@@ -167,7 +167,8 @@ trait S3Signer {
     val canonicalUrl = if(uriPath.length<=1) {
       "/"
     } else {
-      uriPath.split("/").map(section=>URLEncoder.encode(section,"UTF-8")).mkString("/")
+      //uriPath.split("/").map(section=>URLEncoder.encode(section,"UTF-8")).mkString("/")
+      uriPath
     }
     logger.debug(s"encodedUrl: $canonicalUrl")
 
