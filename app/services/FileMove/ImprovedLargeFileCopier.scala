@@ -170,7 +170,7 @@ class ImprovedLargeFileCopier @Inject() (implicit actorSystem:ActorSystem, overr
                    (customiser:((HttpRequest)=>HttpRequest)) = (
     {
       val targetUri = makeS3Uri(region, sourceBucket, sourceKey, sourceVersion)
-      logger.info(s"Target URI is $targetUri")
+      logger.debug(s"Target URI is $targetUri")
       customiser(HttpRequest(method, uri=targetUri, headers=Seq()))
     },
     extraData
@@ -194,6 +194,7 @@ class ImprovedLargeFileCopier @Inject() (implicit actorSystem:ActorSystem, overr
     */
   def sendPartCopies(region:Regions, credentialsProvider:Option[AwsCredentialsProvider], uploadId:String, parts:Seq[UploadPart], metadata:HeadInfo)
                  (implicit poolClientFlow:HostConnectionPool[UploadPart]) = {
+    val partCount = parts.length
 
     Source.fromIterator(()=>parts.iterator)
       .map(uploadPart=>createRequestFull(HttpMethods.PUT, region, uploadPart.bucket, uploadPart.key, None, uploadPart) {partialReq=>
@@ -218,7 +219,7 @@ class ImprovedLargeFileCopier @Inject() (implicit actorSystem:ActorSystem, overr
 
                 maybeEtag match {
                   case Success(contentEtag)=>
-                    logger.info(s"s3://${metadata.bucket}/${metadata.key}: Uploaded part ${uploadPart.partNumber} successfully, etag was $contentEtag.")
+                    logger.info(s"s3://${metadata.bucket}/${metadata.key}: Uploaded part ${uploadPart.partNumber}/$partCount successfully, etag was $contentEtag.")
                     Some(UploadedPart(uploadPart.partNumber, uploadId, contentEtag))
                   case Failure(err)=>
                     logger.error(s"s3://${metadata.bucket}/${metadata.key}: could not understand XML content. Error was ${err.getMessage}")
