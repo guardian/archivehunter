@@ -52,7 +52,8 @@ object FileMoveQueue {
   /**
     * Updates the "idle" flag to the given state
     */
-  final case class InternalSetIdleState(newState:Boolean) extends FileMoveMsg
+  final case object InternalMarkDone extends FileMoveMsg
+  final case object InternalMarkBusy extends FileMoveMsg
 
   /**
     * Request the current value of the 'Idle' flag. Used for testing and debugging.
@@ -85,7 +86,7 @@ class FileMoveQueue @Inject()(config:Configuration,
   import FileMoveQueue._
 
   private val logger = LoggerFactory.getLogger(getClass)
-  private var isIdle = true
+  private var countInProgress = 0
 
   override protected val sqsClient: AmazonSQS = sqsClientMgr.getClient(config.getOptional[String]("externalData.awsProfile"))
   override protected implicit val implSystem: ActorSystem = actorSystem
@@ -98,10 +99,27 @@ class FileMoveQueue @Inject()(config:Configuration,
     io.circe.parser.parse(body).flatMap(_.as[FileMoveMessage])
   }
 
+  /**
+    * `concurrency` gives a limit of the number of copies that can take place at one time
+    * @return the configured concurrency or default value of 5
+    */
+  def concurrency:Int = config.getOptional[Int]("filemover.concurrency").getOrElse(5)
+
+  /**
+    * simple boolean indicator of whether the queue is empty
+    * @return
+    */
+  def isIdle:Boolean = countInProgress==0
+
   override def receive: Receive = {
-    //update the internal "idle" flag
-    case InternalSetIdleState(newValue)=>
-      isIdle = newValue
+    case InternalMarkDone=>
+      if(countInProgress>0) countInProgress-=1
+      logger.info(s"Currently $countInProgress copy jobs in progress")
+      sender() ! Success( () )
+
+    case InternalMarkBusy=>
+      countInProgress+=1
+      logger.info(s"Currently $countInProgress copy jobs in progress")
       sender() ! Success( () )
 
     //used for testing/debugging to show 'current' idle state. Note that this may be stale by the time it reaches the sender!
@@ -144,14 +162,14 @@ class FileMoveQueue @Inject()(config:Configuration,
         case None =>
           logger.warn("No remote message ID present so can't delete message from SQS")
       }
-      ownRef ! InternalSetIdleState(true)   //flag that we are not busy any more
+      ownRef ! InternalMarkDone
       ownRef ! ReadyForNextMessage
 
     //a file move process failed
     case FileMoveActor.MoveFailed(fileId, error, remoteMessageId)=>
       logger.error(s"Could not move file $fileId: $error. Message will be left on queue to retry after a (long) delay")
-      ownRef ! InternalSetIdleState(true) //flag that we are not busy any more
-    ownRef ! ReadyForNextMessage
+      ownRef ! InternalMarkDone
+      ownRef ! ReadyForNextMessage
 
     //a request for a move came off the queue
     case HandleDomainMessage(msg:FileMoveMessage, queueUrl, receiptHandle)=>
@@ -160,7 +178,8 @@ class FileMoveQueue @Inject()(config:Configuration,
       scanTargetDAO.withScanTarget(msg.toCollection) { scanTarget=>
         if(scanTarget.enabled) {
           fileMoveActor ! MoveFile(msg.fileId, scanTarget, Some(receiptHandle), ownRef)
-          ownRef ! InternalSetIdleState(false)  //flag that we are busy now
+          ownRef ! InternalMarkBusy //increment the busy counter
+          if(countInProgress+1<concurrency) ownRef ! ReadyForNextMessage  //we can process up to this number of messages
         } else {
           logger.warn(s"Cannot move ${msg.fileId} to ${scanTarget.bucketName} because the scan target is disabled")
           try {

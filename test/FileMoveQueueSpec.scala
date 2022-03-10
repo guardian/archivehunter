@@ -37,7 +37,6 @@ class FileMoveQueueSpec extends Specification with Mockito {
         override protected val ownRef = fakeSelf.ref
       }))
 
-      toTest ! FileMoveQueue.InternalSetIdleState(true)
       toTest ! FileMoveQueue.CheckForNotificationsIfIdle
 
       fakeSelf.expectMsg(5.seconds, GenericSqsActor.CheckForNotifications)
@@ -59,7 +58,7 @@ class FileMoveQueueSpec extends Specification with Mockito {
         override protected val ownRef = fakeSelf.ref
       }))
 
-      toTest ! FileMoveQueue.InternalSetIdleState(false)
+      toTest ! FileMoveQueue.InternalMarkBusy //pretend that there is a job being processed
       toTest ! FileMoveQueue.CheckForNotificationsIfIdle
 
       fakeSelf.expectNoMessage(2.seconds)
@@ -135,10 +134,10 @@ class FileMoveQueueSpec extends Specification with Mockito {
         override protected val ownRef = fakeSelf.ref
       }))
 
-      toTest ! InternalSetIdleState(false)
+      toTest ! InternalMarkBusy
       toTest ! MoveSuccess("some-file-id", Some("receipt"))
 
-      fakeSelf.expectMsg(2.seconds, InternalSetIdleState(true))
+      fakeSelf.expectMsg(2.seconds, InternalMarkDone)
       there was one(mockSQSClient).deleteMessage("somequeue", "receipt")
     }
   }
@@ -161,12 +160,12 @@ class FileMoveQueueSpec extends Specification with Mockito {
         override protected val ownRef = fakeSelf.ref
       }))
 
-      toTest ! InternalSetIdleState(false)
+      toTest ! InternalMarkBusy
       toTest ! MoveFailed("some-file-id", "kersplat", Some("receipt"))
 
       there was no(mockSQSClient).deleteMessage("somequeue", "receipt")
 
-      fakeSelf.expectMsg(2.seconds, InternalSetIdleState(true))
+      fakeSelf.expectMsg(2.seconds, InternalMarkDone)
     }
   }
 
@@ -208,9 +207,8 @@ class FileMoveQueueSpec extends Specification with Mockito {
         override protected val ownRef = fakeSelf.ref
       }))
 
-      val fakeRequest = new ReceiveMessageRequest()
       toTest ! HandleDomainMessage(FileMoveMessage("some-file-id","another-collection"), "some-queue", "sqs-receipt")
-      fakeSelf.expectMsg(2.seconds, InternalSetIdleState(false))
+      fakeSelf.expectMsg(2.seconds, InternalMarkBusy)
       fakeMoveActor.expectMsg(2.seconds, MoveFile("some-file-id", fakeScanTarget, Some("sqs-receipt"), fakeSelf.ref))
     }
 
