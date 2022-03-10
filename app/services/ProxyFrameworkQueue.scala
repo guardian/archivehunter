@@ -22,18 +22,18 @@ import scala.util.{Failure, Success}
 object ProxyFrameworkQueue extends GenericSqsActorMessages {
   trait PFQMsg extends SQSMsg
 
-  case class HandleSuccess(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
-  case class HandleCheckSetup(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
-  case class HandleGenericSuccess(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
-  case class HandleTranscodingSetup(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
-  case class HandleSuccessfulProxy(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
-  case class HandleSuccessfulAnalyse(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
+  case class HandleSuccess(msg:JobReportNew, jobDesc:JobModel, queueUrl:String, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
+  case class HandleCheckSetup(msg:JobReportNew, jobDesc:JobModel, queueUrl:String, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
+  case class HandleGenericSuccess(msg:JobReportNew, jobDesc:JobModel, queueUrl:String, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
+  case class HandleTranscodingSetup(msg:JobReportNew, jobDesc:JobModel, queueUrl:String, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
+  case class HandleSuccessfulProxy(msg:JobReportNew, jobDesc:JobModel, queueUrl:String, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
+  case class HandleSuccessfulAnalyse(msg:JobReportNew, jobDesc:JobModel, queueUrl:String, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
 
-  case class UpdateProblemsIndexSuccess(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
+  case class UpdateProblemsIndexSuccess(msg:JobReportNew, jobDesc:JobModel, queueUrl:String, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
 
-  case class HandleFailure(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
-  case class HandleWarning(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
-  case class HandleRunning(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
+  case class HandleFailure(msg:JobReportNew, jobDesc:JobModel, queueUrl:String, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
+  case class HandleWarning(msg:JobReportNew, jobDesc:JobModel, queueUrl:String, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
+  case class HandleRunning(msg:JobReportNew, jobDesc:JobModel, queueUrl:String, receiptHandle:String, originalSender:ActorRef) extends PFQMsg
 }
 
 trait ProxyFrameworkQueueFunctions extends ProxyTypeEncoder with JobReportStatusEncoder with MediaMetadataEncoder {
@@ -130,7 +130,7 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
     * @param block
     * @return
     */
-  def withArchiveEntry(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef)(block:ArchiveEntry=>Unit) = {
+  def withArchiveEntry(msg:JobReportNew, jobDesc:JobModel, queueUrl:String, receiptHandle:String, originalSender:ActorRef)(block:ArchiveEntry=>Unit) = {
     indexer.getById(jobDesc.sourceId)
       .map(entry=>block(entry))
       .recover({
@@ -143,7 +143,7 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
 
           val updatedJobDesc = jobDesc.copy(jobStatus = JobStatus.ST_ERROR, log = Some(updatedLog))
           jobModelDAO.putJob(updatedJobDesc)
-          ownRef ! HandleFailure(msg, jobDesc, rq, receiptHandle, originalSender)
+          ownRef ! HandleFailure(msg, jobDesc, queueUrl, receiptHandle, originalSender)
           originalSender ! akka.actor.Status.Failure(err)
       })
   }
@@ -159,7 +159,7 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
     * @param block block to call if ScanTarget can be found.  Must accept the ScanTarget as its only argument, and return unit (i.e. nothing)
     * @return Future of Unit.
     */
-  def withScanTarget(msg:JobReportNew, jobDesc:JobModel, rq:ReceiveMessageRequest, receiptHandle:String, originalSender:ActorRef)(block:ScanTarget=>Unit) =
+  def withScanTarget(msg:JobReportNew, jobDesc:JobModel, queueUrl:String, receiptHandle:String, originalSender:ActorRef)(block:ScanTarget=>Unit) =
     scanTargetDAO.waitingForJobId(jobDesc.jobId).map({
       case Left(errList) =>
         logger.error(s"Could not find scan target: $errList")
@@ -170,7 +170,7 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
 
         val updatedJobDesc = jobDesc.copy(jobStatus = JobStatus.ST_ERROR, log = Some(updatedLog))
         jobModelDAO.putJob(updatedJobDesc)
-        ownRef ! HandleFailure(msg, jobDesc, rq, receiptHandle, originalSender)
+        ownRef ! HandleFailure(msg, jobDesc, queueUrl, receiptHandle, originalSender)
         originalSender ! akka.actor.Status.Failure(new RuntimeException(s"Could not locate scan target: $errList"))
       case Right(None) =>
         logger.error(s"No scanTarget is waiting for ${jobDesc.jobId} so nothing to update")
@@ -182,7 +182,7 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
         val updatedJobDesc = jobDesc.copy(jobStatus = JobStatus.ST_ERROR, log = Some(updatedLog))
         jobModelDAO.putJob(updatedJobDesc)
 
-        ownRef ! HandleFailure(msg, jobDesc, rq, receiptHandle, originalSender)
+        ownRef ! HandleFailure(msg, jobDesc, queueUrl, receiptHandle, originalSender)
         originalSender ! akka.actor.Status.Failure(new RuntimeException(s"No scanTarget is waiting for ${jobDesc.jobId} so nothing to update"))
       case Right(Some(scanTarget)) =>
         block(scanTarget)
@@ -350,7 +350,7 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
         jobModelDAO.putJob(updatedJobDesc).onComplete({
           case Success(_)=>
             logger.info(s"Updated job ${jobDesc.jobId}")
-            sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle(receiptHandle))
+            sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq).withReceiptHandle(receiptHandle))
           case Failure(err)=>
             logger.error(s"Could not update job ${jobDesc.jobId}: ${err.getMessage}", err)
         })
@@ -401,7 +401,7 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
       }))
       jobModelDAO.putJob(updatedJob).map(_=> {
         logger.info(s"Job ${jobDesc.jobId} updated")
-        sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle(receiptHandle))
+        sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq).withReceiptHandle(receiptHandle))
         originalSender ! akka.actor.Status.Success
       }).recover({
         case err:Throwable=>
@@ -431,7 +431,7 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
       val updatedJd = jobDesc.copy(jobStatus = JobStatus.ST_RUNNING)
       jobModelDAO.putJob(updatedJd).onComplete({
         case Success(_)=>
-          sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle(receiptHandle))
+          sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq).withReceiptHandle(receiptHandle))
           originalSender ! akka.actor.Status.Success
         case Failure(err)=>
           logger.error("Could not update job model in database", err)
@@ -478,7 +478,7 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
         case Right(_) =>
           jobModelDAO.putJob(updatedJd).onComplete({
             case Success(_)=>
-              sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle(receiptHandle))
+              sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq).withReceiptHandle(receiptHandle))
               originalSender ! akka.actor.Status.Success
             case Failure(err)=>
               logger.error("Could not update job model in database", err)
@@ -505,22 +505,23 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
 
       jobModelDAO.putJob(updatedJd).onComplete({
         case Success(_)=>
-          sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle(receiptHandle))
+          sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq).withReceiptHandle(receiptHandle))
           originalSender ! akka.actor.Status.Success
         case Failure(err)=>
           logger.error("Could not update job model in database", err)
           originalSender ! akka.actor.Status.Failure(err)
       })
 
-    case HandleDomainMessage(msg: JobReportNew, rq, receiptHandle)=>
+    case HandleDomainMessage(msg: JobReportNew, queueUrl, receiptHandle)=>
       logger.debug(s"HandleDomainMessage: $msg")
+      sender () ! ReadyForNextMessage //replicate old behaviour by immediately acknowledging
       val originalSender=sender()
       jobModelDAO.jobForId(msg.jobId).map({
         case None =>
           logger.error(s"Could not process $msg: No job found for ${msg.jobId}")
           if(msg.jobId == "test-job"){
             //delete out "test-job" which are used for manual testing
-            sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle(receiptHandle))
+            sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(queueUrl).withReceiptHandle(receiptHandle))
           }
           originalSender ! akka.actor.Status.Failure(new RuntimeException(s"Could not process $msg: No job found for ${msg.jobId}"))
         case Some(Left(err)) =>
@@ -532,18 +533,18 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
 
           if(isMessageOutOfDate(jobDesc.lastUpdatedTS, msg.timestamp)){
             logger.info(s"Received outdated message update: job  ${jobDesc.jobId} had ${jobDesc.lastUpdatedTS}, message had ${msg.timestamp}")
-            sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle(receiptHandle))
+            sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(queueUrl).withReceiptHandle(receiptHandle))
           } else {
             val updatedJobDesc = if(msg.timestamp.isDefined) jobDesc.copy(lastUpdatedTS = msg.timestamp) else jobDesc
 
             if (updatedJobDesc.jobType == "CheckSetup" || updatedJobDesc.jobType == "SetupTranscoding") {
-              ownRef ! HandleCheckSetup(msg, updatedJobDesc, rq, receiptHandle, originalSender)
+              ownRef ! HandleCheckSetup(msg, updatedJobDesc, queueUrl, receiptHandle, originalSender)
             } else {
               msg.status match {
-                case JobReportStatus.SUCCESS => ownRef ! HandleSuccess(msg, updatedJobDesc, rq, receiptHandle, originalSender)
-                case JobReportStatus.FAILURE => ownRef ! HandleFailure(msg, updatedJobDesc, rq, receiptHandle, originalSender)
-                case JobReportStatus.RUNNING => ownRef ! HandleRunning(msg, updatedJobDesc, rq, receiptHandle, originalSender)
-                case JobReportStatus.WARNING => ownRef ! HandleWarning(msg, updatedJobDesc, rq, receiptHandle, originalSender)
+                case JobReportStatus.SUCCESS => ownRef ! HandleSuccess(msg, updatedJobDesc, queueUrl, receiptHandle, originalSender)
+                case JobReportStatus.FAILURE => ownRef ! HandleFailure(msg, updatedJobDesc, queueUrl, receiptHandle, originalSender)
+                case JobReportStatus.RUNNING => ownRef ! HandleRunning(msg, updatedJobDesc, queueUrl, receiptHandle, originalSender)
+                case JobReportStatus.WARNING => ownRef ! HandleWarning(msg, updatedJobDesc, queueUrl, receiptHandle, originalSender)
               }
             }
           }

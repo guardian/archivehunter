@@ -189,12 +189,13 @@ class IngestProxyQueue @Inject()(config: Configuration,
           originalSender ! Status.Failure
       })
 
-    case HandleDomainMessage(finalMsg:IngestMessage, rq, receiptHandle)=>
+    case HandleDomainMessage(finalMsg:IngestMessage, queueUrl, receiptHandle)=>
       logger.info(s"Received notification of new item: ${finalMsg.archiveEntry}")
       ownRef ! CheckRegisteredThumb(finalMsg.archiveEntry)
       ownRef ! CheckRegisteredProxy(finalMsg.archiveEntry)
       ownRef ! StartAnalyse(finalMsg.archiveEntry)
-      sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(rq.getQueueUrl).withReceiptHandle(receiptHandle))
+      sqsClient.deleteMessage(new DeleteMessageRequest().withQueueUrl(queueUrl).withReceiptHandle(receiptHandle))
+      ownRef ! ReadyForNextMessage  //tell the superclass we are ready for the next message
 
     case other:GenericSqsActor.SQSMsg => handleGeneric(other)
   }

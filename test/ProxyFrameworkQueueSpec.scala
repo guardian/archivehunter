@@ -40,7 +40,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
 
       val testProbe = TestProbe()
       val fakeIncoming = JobReportNew(JobReportStatus.SUCCESS, None, "fake-job-id", Some("input-uri"), Some("output-uri"), None, None, None)
-      val fakeMessage = ProxyFrameworkQueue.HandleSuccessfulProxy(fakeIncoming, mockedJd, mock[ReceiveMessageRequest], "receipt-handle", testProbe.ref)
+      val fakeMessage = ProxyFrameworkQueue.HandleSuccessfulProxy(fakeIncoming, mockedJd, "some-queue", "receipt-handle", testProbe.ref)
 
       val mockedSqsClient = mock[AmazonSQS]
       mockedSqsClient.deleteMessage(any) returns new DeleteMessageResult()
@@ -98,7 +98,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
       val testProbe = TestProbe()
       val fakeIncoming = JobReportNew(JobReportStatus.SUCCESS, None, "fake-job-id", Some("input-uri"), Some("output-uri"), None, None, None)
 
-      val fakeMessage = ProxyFrameworkQueue.HandleSuccessfulProxy(fakeIncoming, mockedJd, mock[ReceiveMessageRequest], "receipt-handle", testProbe.ref)
+      val fakeMessage = ProxyFrameworkQueue.HandleSuccessfulProxy(fakeIncoming, mockedJd, "some-queue", "receipt-handle", testProbe.ref)
 
       val mockedSqsClient = mock[AmazonSQS]
       mockedSqsClient.deleteMessage(any) returns new DeleteMessageResult()
@@ -153,7 +153,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
       val testProbe = TestProbe()
       val fakeIncoming = JobReportNew(JobReportStatus.RUNNING, None, "fake-job-id", Some("input-uri"), None, None, None, None)
 
-      val fakeMessage = ProxyFrameworkQueue.HandleRunning(fakeIncoming, mockedJd, mock[ReceiveMessageRequest], "receipt-handle", testProbe.ref)
+      val fakeMessage = ProxyFrameworkQueue.HandleRunning(fakeIncoming, mockedJd, "some-queue", "receipt-handle", testProbe.ref)
 
       val mockedSqsClient = mock[AmazonSQS]
       mockedSqsClient.deleteMessage(any) returns new DeleteMessageResult()
@@ -195,7 +195,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
       val testProbe = TestProbe()
       val fakeIncoming = JobReportNew(JobReportStatus.RUNNING, None, "fake-job-id", Some("input-uri"), None, None, None, None)
 
-      val fakeMessage = ProxyFrameworkQueue.HandleRunning(fakeIncoming, mockedJd, mock[ReceiveMessageRequest], "receipt-handle", testProbe.ref)
+      val fakeMessage = ProxyFrameworkQueue.HandleRunning(fakeIncoming, mockedJd,"some-queue", "receipt-handle", testProbe.ref)
 
       val mockedSqsClient = mock[AmazonSQS]
       mockedSqsClient.deleteMessage(any) returns new DeleteMessageResult()
@@ -246,7 +246,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
       val fakeIncoming = JobReportNew(JobReportStatus.RUNNING, None, "fake-job-id", Some("input-uri"),
         None, None, None, Some(ZonedDateTime.parse("2019-01-02T01:02:04.000Z")))
 
-      val fakeMessage = GenericSqsActor.HandleDomainMessage(fakeIncoming, mockedRq, "receipt-handle")
+      val fakeMessage = GenericSqsActor.HandleDomainMessage(fakeIncoming, "some-queue", "receipt-handle")
 
       val mockedSqsClient = mock[AmazonSQS]
       mockedSqsClient.deleteMessage(any) returns new DeleteMessageResult()
@@ -269,7 +269,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
 
       toTest ! fakeMessage
 
-      testProbe.expectMsgAllClassOf(HandleRunning(fakeIncoming, mockedJd, mockedRq, "receipt-handle", testProbeRef).getClass)
+      testProbe.expectMsgAllClassOf(HandleRunning(fakeIncoming, mockedJd, "some-queue", "receipt-handle", testProbeRef).getClass)
       there was no(mockedSqsClient).deleteMessage(any)
     }
 
@@ -293,7 +293,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
 
       val fakeIncoming = JobReportNew(JobReportStatus.RUNNING, None, "fake-job-id", Some("input-uri"), None, None, None, Some(ZonedDateTime.parse("2019-01-02T01:02:03.000Z")))
 
-      val fakeMessage = GenericSqsActor.HandleDomainMessage(fakeIncoming, mockedRq, "receipt-handle")
+      val fakeMessage = GenericSqsActor.HandleDomainMessage(fakeIncoming, "fake-queue-url", "receipt-handle")
 
       val mockedSqsClient = mock[AmazonSQS]
       mockedSqsClient.deleteMessage(any) returns new DeleteMessageResult()
@@ -373,7 +373,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
         val testProbe = TestProbe()
         val fakeIncoming = JobReportNew(JobReportStatus.WARNING, None, "fake-job-id", Some("input-uri"), Some("s3://proxybucket/path/to/file.mp4"), None, None, None)
 
-        val fakeMessage = ProxyFrameworkQueue.HandleWarning(fakeIncoming, mockedJd, mock[ReceiveMessageRequest], "receipt-handle", testProbe.ref)
+        val fakeMessage = ProxyFrameworkQueue.HandleWarning(fakeIncoming, mockedJd, "some-queue", "receipt-handle", testProbe.ref)
 
         val mockUpdateProxyRef = mock[Function3[String, ArchiveEntry, ProxyType.Value, Future[Either[String, ProxyLocation]]]]
         mockUpdateProxyRef.apply(any, any, any) returns Future(Right(ProxyLocation("xxxfileid", "xxxproxyId", ProxyType.VIDEO, "proxybucket", "/path/to/proxy.mp4", Some("myregion"), StorageClass.STANDARD)))
@@ -425,7 +425,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
         val testProbe = TestProbe()
         val fakeIncoming = JobReportNew(JobReportStatus.WARNING, None, "fake-job-id", Some("input-uri"), None, None, None, None)
 
-        val fakeMessage = ProxyFrameworkQueue.HandleWarning(fakeIncoming, mockedJd, mock[ReceiveMessageRequest], "receipt-handle", testProbe.ref)
+        val fakeMessage = ProxyFrameworkQueue.HandleWarning(fakeIncoming, mockedJd, "some-queue", "receipt-handle", testProbe.ref)
 
         val mockUpdateProxyRef = mock[(String, ArchiveEntry, ProxyType.Value) => Future[Either[String, ProxyLocation]]]
         mockUpdateProxyRef.apply(any, any, any) returns Future(Right(ProxyLocation("xxxfileid", "xxxproxyId", ProxyType.VIDEO, "proxybucket", "/path/to/proxy.mp4", Some("myregion"), StorageClass.STANDARD)))
@@ -490,7 +490,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
 
       val testProbe = TestProbe()
       val fakeIncoming = JobReportNew(JobReportStatus.SUCCESS, None, "fake-job-id", Some("input-uri"), Some("output-uri"), Some(ProxyType.VIDEO), None, None)
-      val fakeMessage = ProxyFrameworkQueue.UpdateProblemsIndexSuccess(fakeIncoming, mockedJd, mock[ReceiveMessageRequest], "receipt-handle", testProbe.ref)
+      val fakeMessage = ProxyFrameworkQueue.UpdateProblemsIndexSuccess(fakeIncoming, mockedJd, "some-queue", "receipt-handle", testProbe.ref)
 
       val mockedSqsClient = mock[AmazonSQS]
       mockedSqsClient.deleteMessage(any) returns new DeleteMessageResult()
@@ -561,7 +561,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
 
       val testProbe = TestProbe()
       val fakeIncoming = JobReportNew(JobReportStatus.SUCCESS, None, "fake-job-id", Some("input-uri"), Some("output-uri"), Some(ProxyType.VIDEO), None, None)
-      val fakeMessage = ProxyFrameworkQueue.UpdateProblemsIndexSuccess(fakeIncoming, mockedJd, mock[ReceiveMessageRequest], "receipt-handle", testProbe.ref)
+      val fakeMessage = ProxyFrameworkQueue.UpdateProblemsIndexSuccess(fakeIncoming, mockedJd, "some-queue", "receipt-handle", testProbe.ref)
 
       val mockedSqsClient = mock[AmazonSQS]
       mockedSqsClient.deleteMessage(any) returns new DeleteMessageResult()

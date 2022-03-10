@@ -145,14 +145,16 @@ class FileMoveQueue @Inject()(config:Configuration,
           logger.warn("No remote message ID present so can't delete message from SQS")
       }
       ownRef ! InternalSetIdleState(true)   //flag that we are not busy any more
+      ownRef ! ReadyForNextMessage
 
     //a file move process failed
     case FileMoveActor.MoveFailed(fileId, error, remoteMessageId)=>
       logger.error(s"Could not move file $fileId: $error. Message will be left on queue to retry after a (long) delay")
       ownRef ! InternalSetIdleState(true) //flag that we are not busy any more
+    ownRef ! ReadyForNextMessage
 
     //a request for a move came off the queue
-    case HandleDomainMessage(msg:FileMoveMessage, rq, receiptHandle)=>
+    case HandleDomainMessage(msg:FileMoveMessage, queueUrl, receiptHandle)=>
       logger.info(s"Received copy request for ${msg.fileId} to ${msg.toCollection}")
 
       scanTargetDAO.withScanTarget(msg.toCollection) { scanTarget=>
@@ -167,6 +169,8 @@ class FileMoveQueue @Inject()(config:Configuration,
             case err: Throwable =>
               logger.error(s"Could not delete message for ${msg.fileId} with receipt handle $receiptHandle: ${err.getMessage}", err)
           }
+
+          ownRef ! ReadyForNextMessage
         }
       }
 

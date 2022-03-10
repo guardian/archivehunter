@@ -11,7 +11,7 @@ import services.{FileMoveMessage, FileMoveQueue, GenericSqsActor}
 import akka.pattern.ask
 import com.amazonaws.services.sqs.model.ReceiveMessageRequest
 import services.FileMoveActor.{MoveFailed, MoveFile, MoveSuccess}
-import services.GenericSqsActor.HandleDomainMessage
+import services.GenericSqsActor.{HandleDomainMessage, ReadyForNextMessage}
 
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration._
@@ -209,7 +209,7 @@ class FileMoveQueueSpec extends Specification with Mockito {
       }))
 
       val fakeRequest = new ReceiveMessageRequest()
-      toTest ! HandleDomainMessage(FileMoveMessage("some-file-id","another-collection"), fakeRequest, "sqs-receipt")
+      toTest ! HandleDomainMessage(FileMoveMessage("some-file-id","another-collection"), "some-queue", "sqs-receipt")
       fakeSelf.expectMsg(2.seconds, InternalSetIdleState(false))
       fakeMoveActor.expectMsg(2.seconds, MoveFile("some-file-id", fakeScanTarget, Some("sqs-receipt"), fakeSelf.ref))
     }
@@ -251,9 +251,8 @@ class FileMoveQueueSpec extends Specification with Mockito {
         override protected val ownRef = fakeSelf.ref
       }))
 
-      val fakeRequest = new ReceiveMessageRequest()
-      toTest ! HandleDomainMessage(FileMoveMessage("some-file-id","another-collection"), fakeRequest, "sqs-receipt")
-      fakeSelf.expectNoMessage(2.seconds)
+      toTest ! HandleDomainMessage(FileMoveMessage("some-file-id","another-collection"), "some-queue", "sqs-receipt")
+      fakeSelf.expectMsg(2.seconds, ReadyForNextMessage)
       fakeMoveActor.expectNoMessage(2.seconds)
     }
   }
