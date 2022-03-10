@@ -114,7 +114,7 @@ object ImprovedLargeFileCopier {
       </Part>
   }
 
-  private val etagPartsXtractor = "\"*.*-(\\d)\"*$".r
+  private val etagPartsXtractor = "\"*.*-(\\d+)\"*$".r
 
   def partsFromEtag(etag:String) = etag match {
     case etagPartsXtractor(partCount)=>
