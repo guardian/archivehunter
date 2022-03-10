@@ -252,7 +252,8 @@ class ImprovedLargeFileCopier @Inject() (implicit actorSystem:ActorSystem, overr
       credentialsProvider match {
         case Some(creds)=>
           logger.info(s"Signing request from ${creds.resolveCredentials().accessKeyId()}")
-          signHttpRequest(req, Region.getRegion(region), "s3", creds)
+          val reqWithHost = req.withHeaders(req.headers :+ Host(req.uri.authority))
+          signHttpRequest(reqWithHost, Region.getRegion(region), "s3", creds)
         case None=>
           logger.warn(s"No credentials provider, attempting un-authenticated access")
           Future(req)
