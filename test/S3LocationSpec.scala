@@ -118,8 +118,9 @@ class S3LocationSpec extends Specification {
 
       val testData = HttpEntity("Welcome to Amazon S3.")
 
+      //using the java.net.Uri constructor like this ensures that url-encoding is performed on the values
       val testInput = HttpRequest(HttpMethods.PUT,
-        Uri("https://examplebucket.s3.amazonaws.com/test$file.text"),
+        new java.net.URI("https", "examplebucket.s3.amazonaws.com", "/test$file.text", null, null).toString,
         headers,
         entity = testData
       )
@@ -128,7 +129,7 @@ class S3LocationSpec extends Specification {
       val result = Await.result(test.signHttpRequest(testInput,Region.getRegion(Regions.US_EAST_1),"s3", credentialsProvider, Some(fakeTime)), 10 seconds)
 
       val headerMap = result.headers.map(hdr=>Tuple2(hdr.name(), hdr.value())).toMap
-      headerMap("Authorization") mustEqual "AWS4-HMAC-SHA256 Credential=AKIAIOSFODNN7EXAMPLE/20130524/us-east-1/s3/aws4_request,SignedHeaders=date;host;x-amz-content-sha256;x-amz-date;x-amz-storage-class,Signature=98ad721746da40c64f1a55b78f14c238d841ea1380cd77a1b5971af0ece108bd"
+      headerMap("Authorization") mustEqual "AWS4-HMAC-SHA256 Credential=AKIAIOSFODNN7EXAMPLE/20130524/us-east-1/s3/aws4_request,SignedHeaders=date;host;x-amz-content-sha256;x-amz-date;x-amz-storage-class,Signature=b34099c0e352465cff1a5957d94a2c97473337c0dc30aa3ce793435a81c6ecf4"
     }
   }
 }

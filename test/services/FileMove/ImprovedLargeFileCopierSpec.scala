@@ -165,7 +165,7 @@ class ImprovedLargeFileCopierSpec extends Specification with Mockito {
       val headers = mapOfHeaders(lastRequest.headers)
       lastRequest.uri.toString() mustEqual "https://s3.eu-west-1.amazonaws.com/source/path/to/source?uploads"
       lastRequest.method mustEqual HttpMethods.POST
-      headers.get("Content-Type").map(_.value()) must beSome("binary/octet-stream")
+      lastRequest.entity.contentType.toString() mustEqual "binary/octet-stream"
       headers.get("x-amz-acl").map(_.value()) must beSome("private")
     }
 
@@ -192,7 +192,7 @@ class ImprovedLargeFileCopierSpec extends Specification with Mockito {
       val headers = mapOfHeaders(lastRequest.headers)
       lastRequest.uri.toString() mustEqual "https://s3.eu-west-1.amazonaws.com/source/path/to/source?uploads"
       lastRequest.method mustEqual HttpMethods.POST
-      headers.get("Content-Type").map(_.value()) must beSome("binary/octet-stream")
+      lastRequest.entity.contentType.toString() mustEqual "binary/octet-stream"
       headers.get("x-amz-acl").map(_.value()) must beSome("private")
       result must beAFailedTry
     }
@@ -220,7 +220,7 @@ class ImprovedLargeFileCopierSpec extends Specification with Mockito {
       val headers = mapOfHeaders(lastRequest.headers)
       lastRequest.uri.toString() mustEqual "https://s3.eu-west-1.amazonaws.com/source/path/to/source?uploads"
       lastRequest.method mustEqual HttpMethods.POST
-      headers.get("Content-Type").map(_.value()) must beSome("binary/octet-stream")
+      lastRequest.entity.contentType.toString() mustEqual "binary/octet-stream"
       headers.get("x-amz-acl").map(_.value()) must beSome("private")
       result must beAFailedTry
     }
@@ -240,7 +240,7 @@ class ImprovedLargeFileCopierSpec extends Specification with Mockito {
       parts.head.bucket mustEqual "destbucket"
 
       parts(1).start mustEqual 10485760
-      parts(1).end mustEqual 12345678
+      parts(1).end mustEqual 12345677
       parts(1).partNumber mustEqual 2
       parts(1).key mustEqual "path/to/dest"
       parts(1).bucket mustEqual "destbucket"
@@ -293,15 +293,15 @@ class ImprovedLargeFileCopierSpec extends Specification with Mockito {
       requests.head.uri.toString mustEqual "https://s3.eu-west-1.amazonaws.com/destbucket/path/to/dest?partNumber=1&uploadId=some-upload-id"
       requests.head.method mustEqual HttpMethods.PUT
       requestHeaders.head.get("x-amz-copy-source").map(_.value()) must beSome("some-bucket%2Fpath%2Fto%2Fsome%2Fcontent")
-      requestHeaders.head.get("x-amz-copy-source-range").map(_.value()) must beSome("bytes 0-10485759")
+      requestHeaders.head.get("x-amz-copy-source-range").map(_.value()) must beSome("bytes=0-10485759")
       requests(1).uri.toString mustEqual "https://s3.eu-west-1.amazonaws.com/destbucket/path/to/dest?partNumber=2&uploadId=some-upload-id"
       requests(1).method mustEqual HttpMethods.PUT
       requestHeaders(1).get("x-amz-copy-source").map(_.value()) must beSome("some-bucket%2Fpath%2Fto%2Fsome%2Fcontent")
-      requestHeaders(1).get("x-amz-copy-source-range").map(_.value()) must beSome("bytes 10485760-20971519")
+      requestHeaders(1).get("x-amz-copy-source-range").map(_.value()) must beSome("bytes=10485760-20971519")
       requests(2).uri.toString mustEqual "https://s3.eu-west-1.amazonaws.com/destbucket/path/to/dest?partNumber=3&uploadId=some-upload-id"
       requests(2).method mustEqual HttpMethods.PUT
       requestHeaders(2).get("x-amz-copy-source").map(_.value()) must beSome("some-bucket%2Fpath%2Fto%2Fsome%2Fcontent")
-      requestHeaders(2).get("x-amz-copy-source-range").map(_.value()) must beSome("bytes 20971520-23068672")
+      requestHeaders(2).get("x-amz-copy-source-range").map(_.value()) must beSome("bytes=20971520-23068672")
     }
 
     "fail if any of the part uploads fails" in new AkkaTestkitSpecs2Support {
