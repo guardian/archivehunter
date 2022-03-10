@@ -3,7 +3,7 @@ package services.FileMove
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.headers.{Host, RawHeader}
-import akka.http.scaladsl.model.{ContentType, HttpEntity, HttpHeader, HttpMethod, HttpMethods, HttpRequest, HttpResponse, StatusCode, StatusCodes}
+import akka.http.scaladsl.model.{ContentType, ContentTypes, HttpEntity, HttpHeader, HttpMethod, HttpMethods, HttpRequest, HttpResponse, StatusCode, StatusCodes}
 import akka.stream.{KillSwitches, Materializer}
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import akka.util.ByteString
@@ -126,7 +126,7 @@ object ImprovedLargeFileCopier {
     var output = scala.collection.mutable.ListBuffer[UploadPart]()
     while(ptr<metadata.contentLength) {
       val chunkEnd = if(ptr+partSize>metadata.contentLength) {
-        metadata.contentLength
+        metadata.contentLength-1 //range is zero-based so the last byte is contentLength-1
       } else {
         ptr+partSize-1
       }
@@ -201,7 +201,7 @@ class ImprovedLargeFileCopier @Inject() (implicit actorSystem:ActorSystem, overr
           .withUri(partialReq.uri.withRawQueryString(s"partNumber=${uploadPart.partNumber}&uploadId=$uploadId"))
           .withHeaders(partialReq.headers ++ Seq(
             RawHeader("x-amz-copy-source", copySourcePath(metadata.bucket, metadata.key, metadata.version)),
-            RawHeader("x-amz-copy-source-range", s"bytes ${uploadPart.start}-${uploadPart.end}"),
+            RawHeader("x-amz-copy-source-range", s"bytes=${uploadPart.start}-${uploadPart.end}"),
           ))
       })
       .mapAsync(4)(reqparts=>doRequestSigning(reqparts._1, region, credentialsProvider).map(req=>(req, reqparts._2)))
@@ -339,12 +339,19 @@ class ImprovedLargeFileCopier @Inject() (implicit actorSystem:ActorSystem, overr
   def initiateMultipartUpload(region:Regions, credentialsProvider:Option[AwsCredentialsProvider], destBucket:String, destKey:String, metadata:HeadInfo)
                              (implicit poolClientFlow:HostConnectionPool[Any]) = {
     val req = createRequest(HttpMethods.POST, region, destBucket, destKey, None) { partialRequest=>
+      val contentType = ContentType.parse(metadata.contentType) match {
+        case Right(ct)=>ct
+        case Left(errs)=>
+          logger.warn(s"S3 provided content-type '${metadata.contentType}' was not acceptable to Akka: ${errs.mkString(";")}'")
+          ContentTypes.`application/octet-stream`
+      }
+
       partialRequest
         .withUri(partialRequest.uri.withRawQueryString("uploads"))
         .withHeaders(partialRequest.headers ++ Seq(
-          RawHeader("Content-Type", metadata.contentType),
           RawHeader("x-amz-acl", "private"),
         ))
+        .withEntity(HttpEntity.empty(contentType))
     }
 
     Source
@@ -392,7 +399,7 @@ class ImprovedLargeFileCopier @Inject() (implicit actorSystem:ActorSystem, overr
                              (implicit poolClientFlow:HostConnectionPool[Any]) = {
     val xmlContent = <CompleteMultipartUpload xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
       {
-      parts.map(_.toXml)
+      parts.sortBy(_.partNumber).map(_.toXml) //must put the parts into ascending order
       }
     </CompleteMultipartUpload>
 
@@ -446,7 +453,10 @@ class ImprovedLargeFileCopier @Inject() (implicit actorSystem:ActorSystem, overr
                           (implicit poolClientFlow:HostConnectionPool[Any])= {
     Source
       .single(createRequest(HttpMethods.DELETE, region, sourceBucket, sourceKey, None) { partialRequest=>
-        partialRequest.withUri(partialRequest.uri.withRawQueryString(s"uploadId=$uploadId"))
+        partialRequest.withUri(
+          partialRequest.uri
+            .withRawQueryString(s"uploadId=${URLEncoder.encode(uploadId, StandardCharsets.UTF_8)}")
+        )
       })
       .mapAsync(1)(reqparts=>doRequestSigning(reqparts._1, region, credentialsProvider).map(rq=>(rq, ())))
       .via(poolClientFlow)

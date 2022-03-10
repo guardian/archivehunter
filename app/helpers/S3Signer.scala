@@ -181,12 +181,13 @@ trait S3Signer {
     val updatedHeaders = if(headers.keys.exists(_=="x-amz-content-sha256")){
       headers
     } else {
-      headers ++ "x-amz-content-sha256"->checksummer.digest("".getBytes("UTF-8")).map("%02x".format(_)).mkString
+      headers + ("x-amz-content-sha256"->checksummer.digest("".getBytes("UTF-8")).map("%02x".format(_)).mkString)
     }
+
 
     checksummer.reset()
 
-    val canonicalHeaders = headers.keys.toList.sorted.map(header=>{
+    val canonicalHeaders = updatedHeaders.keys.toList.sorted.map(header=>{
       header.toLowerCase + ":" + headers(header).trim
     }).mkString("\n") + "\n"
     logger.debug(s"canonicalHeaders: $canonicalHeaders")

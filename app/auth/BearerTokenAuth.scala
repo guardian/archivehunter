@@ -209,6 +209,7 @@ class BearerTokenAuth @Inject() (config:Configuration) {
                   valid
               }
             } else {
+              logger.error(s"JWT did not verify")
               Left(LoginResultInvalid(token.content))
             }
           case None =>
