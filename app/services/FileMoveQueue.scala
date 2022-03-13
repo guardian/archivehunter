@@ -148,8 +148,7 @@ class FileMoveQueue @Inject()(config:Configuration,
 
     //a file move process was completed ok
     case FileMoveActor.MoveSuccess(fileId, remoteMessageId)=>
-      logger.info(s"Move of $fileId worked fine")
-      logger.info(s"Notified actor so removing message from queue")
+      logger.info(s"Move of $fileId worked fine, removing message from queue")
 
       remoteMessageId match {
         case Some(receiptHandle) =>
