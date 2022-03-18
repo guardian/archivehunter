@@ -1,5 +1,4 @@
 import java.time.{OffsetDateTime, ZoneOffset}
-
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model.HttpHeader.ParsingResult.{Error, Ok}
 import akka.http.scaladsl.model._
@@ -8,8 +7,10 @@ import akka.testkit.{ImplicitSender, TestKit}
 import com.amazonaws.auth.{AWSStaticCredentialsProvider, BasicAWSCredentials, BasicSessionCredentials}
 import com.amazonaws.regions.{Region, Regions}
 import helpers.S3Signer
+import org.slf4j.LoggerFactory
 import org.specs2.mutable._
 import play.api.Logger
+import software.amazon.awssdk.auth.credentials.{AwsBasicCredentials, StaticCredentialsProvider}
 
 import scala.concurrent.{Await, ExecutionContext}
 import scala.concurrent.duration._
@@ -17,7 +18,9 @@ import scala.collection.immutable.Seq
 
 class S3LocationSpec extends Specification {
   sequential
-  class TestClass(loggerval:Logger, m:Materializer, ecval:ExecutionContext) extends S3Signer {
+
+  val logger = LoggerFactory.getLogger(getClass)
+  class TestClass(loggerval:org.slf4j.Logger, m:Materializer, ecval:ExecutionContext) extends S3Signer {
     override implicit val mat:Materializer = m
     override protected val logger=loggerval
     override implicit val ec:ExecutionContext = ecval
@@ -26,12 +29,11 @@ class S3LocationSpec extends Specification {
   "S3Signer" should {
     "sign a sample GET request correctly" in new AkkaTestkitSpecs2Support {
       /* example taken from https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-header-based-auth.html */
-      val logger=Logger(getClass)
-      val mat = ActorMaterializer()
+      implicit val mat = Materializer.matFromSystem
       implicit val ec = system.dispatcher
       val test = new TestClass(logger, mat, ec)
 
-      val credentialsProvider = new AWSStaticCredentialsProvider(new BasicAWSCredentials("AKIAIOSFODNN7EXAMPLE", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"))
+      val credentialsProvider = StaticCredentialsProvider.create(AwsBasicCredentials.create("AKIAIOSFODNN7EXAMPLE", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"))
 
       val headers = Seq(HttpHeader.parse("Range", "bytes=0-9"),HttpHeader.parse("Host", "examplebucket.s3.amazonaws.com")).map({
         case Ok(result, errors)=>result
@@ -51,12 +53,11 @@ class S3LocationSpec extends Specification {
     }
 
     "sign a GET request with parameters correctly" in new AkkaTestkitSpecs2Support {
-      val logger=Logger(getClass)
-      val mat = ActorMaterializer()
+      val mat = Materializer.matFromSystem
       implicit val ec = system.dispatcher
       val test = new TestClass(logger, mat, ec)
 
-      val credentialsProvider = new AWSStaticCredentialsProvider(new BasicAWSCredentials("AKIAIOSFODNN7EXAMPLE", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"))
+      val credentialsProvider = StaticCredentialsProvider.create(AwsBasicCredentials.create("AKIAIOSFODNN7EXAMPLE", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"))
 
       val headers = Seq(HttpHeader.parse("Host", "examplebucket.s3.amazonaws.com")).map({
         case Ok(result, errors)=>result
@@ -76,12 +77,11 @@ class S3LocationSpec extends Specification {
     }
 
     "sign a GET request with value parameters correctly" in new AkkaTestkitSpecs2Support {
-      val logger=Logger(getClass)
-      val mat = ActorMaterializer()
+      val mat = Materializer.matFromSystem
       implicit val ec = system.dispatcher
       val test = new TestClass(logger, mat, ec)
 
-      val credentialsProvider = new AWSStaticCredentialsProvider(new BasicAWSCredentials("AKIAIOSFODNN7EXAMPLE", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"))
+      val credentialsProvider = StaticCredentialsProvider.create(AwsBasicCredentials.create("AKIAIOSFODNN7EXAMPLE", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"))
 
       val headers = Seq(HttpHeader.parse("Host", "examplebucket.s3.amazonaws.com")).map({
         case Ok(result, errors)=>result
@@ -101,12 +101,11 @@ class S3LocationSpec extends Specification {
     }
 
     "sign a PUT request with data correctly" in new AkkaTestkitSpecs2Support {
-      val logger=Logger(getClass)
-      val mat = ActorMaterializer()
+      val mat = Materializer.matFromSystem
       implicit val ec = system.dispatcher
       val test = new TestClass(logger, mat, ec)
 
-      val credentialsProvider = new AWSStaticCredentialsProvider(new BasicAWSCredentials("AKIAIOSFODNN7EXAMPLE", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"))
+      val credentialsProvider = StaticCredentialsProvider.create(AwsBasicCredentials.create("AKIAIOSFODNN7EXAMPLE", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"))
 
       val headers = Seq(
         HttpHeader.parse("Host", "examplebucket.s3.amazonaws.com"),
@@ -119,8 +118,9 @@ class S3LocationSpec extends Specification {
 
       val testData = HttpEntity("Welcome to Amazon S3.")
 
+      //using the java.net.Uri constructor like this ensures that url-encoding is performed on the values
       val testInput = HttpRequest(HttpMethods.PUT,
-        Uri("https://examplebucket.s3.amazonaws.com/test$file.text"),
+        new java.net.URI("https", "examplebucket.s3.amazonaws.com", "/test$file.text", null, null).toString,
         headers,
         entity = testData
       )
@@ -129,7 +129,7 @@ class S3LocationSpec extends Specification {
       val result = Await.result(test.signHttpRequest(testInput,Region.getRegion(Regions.US_EAST_1),"s3", credentialsProvider, Some(fakeTime)), 10 seconds)
 
       val headerMap = result.headers.map(hdr=>Tuple2(hdr.name(), hdr.value())).toMap
-      headerMap("Authorization") mustEqual "AWS4-HMAC-SHA256 Credential=AKIAIOSFODNN7EXAMPLE/20130524/us-east-1/s3/aws4_request,SignedHeaders=date;host;x-amz-content-sha256;x-amz-date;x-amz-storage-class,Signature=98ad721746da40c64f1a55b78f14c238d841ea1380cd77a1b5971af0ece108bd"
+      headerMap("Authorization") mustEqual "AWS4-HMAC-SHA256 Credential=AKIAIOSFODNN7EXAMPLE/20130524/us-east-1/s3/aws4_request,SignedHeaders=date;host;x-amz-content-sha256;x-amz-date;x-amz-storage-class,Signature=b34099c0e352465cff1a5957d94a2c97473337c0dc30aa3ce793435a81c6ecf4"
     }
   }
 }

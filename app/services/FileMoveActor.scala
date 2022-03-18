@@ -2,16 +2,16 @@ package services
 
 import java.time.ZonedDateTime
 import java.util.UUID
-
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import akka.stream.{ActorMaterializer, Materializer}
 import com.theguardian.multimedia.archivehunter.common.{Indexer, ProxyLocationDAO}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{JobModel, JobModelDAO, JobStatus, ScanTarget, SourceType}
+
 import javax.inject.{Inject, Singleton}
 import play.api.Configuration
 import services.FileMove.GenericMoveActor.MoveActorMessage
-import services.FileMove.{CopyMainFile, CopyProxyFiles, DeleteOriginalFiles, GenericMoveActor, UpdateIndexRecords, VerifySource}
+import services.FileMove.{CopyMainFile, CopyProxyFiles, DeleteOriginalFiles, GenericMoveActor, ImprovedLargeFileCopier, UpdateIndexRecords, VerifySource}
 import akka.pattern.ask
 import org.slf4j.LoggerFactory
 
@@ -35,13 +35,13 @@ import scala.util.{Failure, Success}
 //step seven: remove original files
 
 object FileMoveActor {
-
-  case class MoveFile(sourceFileId:String, destination:ScanTarget, async:Boolean) extends MoveActorMessage
+  case class MoveFile(sourceFileId:String, destination:ScanTarget, remoteMessageId:Option[String], queueActor:ActorRef) extends MoveActorMessage
 
   //replies
-  case object MoveSuccess extends MoveActorMessage
+  case class MoveSuccess(sourceFileId:String, remoteMessageId:Option[String]) extends MoveActorMessage
+  @deprecated
   case class MoveAsync(jobId:String) extends MoveActorMessage
-  case class MoveFailed(reason:String) extends MoveActorMessage
+  case class MoveFailed(sourceFileId:String, reason:String, remoteMessageId:Option[String]) extends MoveActorMessage
 }
 
 
@@ -55,7 +55,8 @@ class FileMoveActor @Inject() (config:Configuration,
                                esClientManager:ESClientManager,
                                dynamoClientManager: DynamoClientManager,
                                jobModelDAO: JobModelDAO,
-                               s3ClientManager: S3ClientManager)(implicit system:ActorSystem, mat:Materializer)
+                               s3ClientManager: S3ClientManager,
+                               largeFileCopier: ImprovedLargeFileCopier)(implicit system:ActorSystem, mat:Materializer)
   extends Actor {
   import FileMoveActor._
   import GenericMoveActor._
@@ -68,11 +69,11 @@ class FileMoveActor @Inject() (config:Configuration,
   val indexName = config.getOptional[String]("externalData.indexName").getOrElse("archivehunter")
   private val indexer = new Indexer(indexName)
 
-  private implicit val timeout:akka.util.Timeout = 600 seconds  //time out after 10 minutes
+  private implicit val timeout:akka.util.Timeout = 1200 seconds  //time out after 20 minutes
 
   protected val fileMoveChain:Seq[ActorRef] = Seq(
     system.actorOf(Props(new VerifySource(indexer, proxyLocationDAO))),
-    system.actorOf(Props(new CopyMainFile(s3ClientManager, config))),
+    system.actorOf(Props(new CopyMainFile(s3ClientManager, config, largeFileCopier))),
     system.actorOf(Props(new CopyProxyFiles(s3ClientManager, config))),
     system.actorOf(Props(new UpdateIndexRecords(indexer, proxyLocationDAO))),
     system.actorOf(Props(new DeleteOriginalFiles(s3ClientManager, indexer, config)))
@@ -103,7 +104,7 @@ class FileMoveActor @Inject() (config:Configuration,
   }
 
   override def receive:Receive = {
-    case MoveFile(sourceFileId, destination, isAsync)=>
+    case MoveFile(sourceFileId, destination, remoteMessageId, queueActor)=>
       val originalSender = sender()
       val newJob = JobModel.newJob("FileMove",sourceFileId,SourceType.SRC_MEDIA).copy(jobStatus = JobStatus.ST_RUNNING)
       jobModelDAO
@@ -117,26 +118,23 @@ class FileMoveActor @Inject() (config:Configuration,
               logger.info(s"File move for $sourceFileId -> ${destination.bucketName} completed successfully")
               val finalJob = newJob.copy(jobStatus = JobStatus.ST_SUCCESS, completedAt = Some(ZonedDateTime.now()))
               jobModelDAO.putJob(finalJob)
-              originalSender ! MoveSuccess
+              queueActor ! MoveSuccess(sourceFileId,remoteMessageId)
             case Left(errMsg) =>
               logger.error(s"File move for $sourceFileId -> ${destination.bucketName} failed: ${errMsg.err}")
               val finalJob = newJob.copy(jobStatus = JobStatus.ST_ERROR, log=Some(errMsg.err), completedAt = Some(ZonedDateTime.now()))
               jobModelDAO.putJob(finalJob)
-              originalSender ! MoveFailed(errMsg.err)
+              queueActor ! MoveFailed(sourceFileId, errMsg.err, remoteMessageId)
           }).recover({
             case err: Throwable =>
               val finalJob = newJob.copy(jobStatus = JobStatus.ST_ERROR, log=Some(err.toString), completedAt = Some(ZonedDateTime.now()))
               jobModelDAO.putJob(finalJob)
               logger.error(s"File move processor crashed: ", err)
-              originalSender ! akka.actor.Status.Failure(err)
+              queueActor ! MoveFailed(sourceFileId, err.getMessage, remoteMessageId)
           })
-          if(isAsync){
-            originalSender ! MoveAsync(newJob.jobId)
-          }
       }).recover({
         case err:Throwable=>
           logger.error(s"Could not move file with id $sourceFileId to destination $destination: ${err.getMessage}", err)
-          originalSender ! MoveFailed(err.toString)
+          originalSender ! MoveFailed(sourceFileId, err.toString, remoteMessageId)
       })
   }
 }

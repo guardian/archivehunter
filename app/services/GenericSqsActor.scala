@@ -27,7 +27,10 @@ object GenericSqsActor extends GenericSqsActorMessages {
   case class HandleNextSqsMessage(rq:ReceiveMessageRequest) extends SQSMsg
 
   /* implement this in an extending actor to be provided with decoded message */
-  case class HandleDomainMessage[T](msg:T, rq:ReceiveMessageRequest, receiptHandle:String) extends SQSMsg
+  case class HandleDomainMessage[T](msg:T, queueUrl:String, receiptHandle:String) extends SQSMsg
+
+  /* this must be sent to indicate that the consumer is ready for the next message */
+  case object ReadyForNextMessage extends SQSMsg
 }
 
 trait GenericSqsActor[MsgType] extends Actor {
@@ -45,6 +48,9 @@ trait GenericSqsActor[MsgType] extends Actor {
 
   protected implicit val ec:ExecutionContext
 
+  protected var msgList:Seq[(Message, String)] = Seq()
+  protected var isReady = true
+
   //override this when implementing, like this: io.circe.parser.parse(body).flatMap(_.as[MessageType])
   def convertMessageBody(body:String):Either[io.circe.Error,MsgType]
 
@@ -59,26 +65,36 @@ trait GenericSqsActor[MsgType] extends Actor {
     //dispatched to pull all messages off the queue. This "recurses" by dispatching itself if there are messages left on the queue.
     case HandleNextSqsMessage(rq:ReceiveMessageRequest)=>
       val result = sqsClient.receiveMessage(rq)
-      val msgList = result.getMessages.asScala
-      if(msgList.nonEmpty){
-        msgList.foreach(msg=> {
+      msgList = msgList ++ result.getMessages.asScala.map(m=>(m, rq.getQueueUrl))
+
+      if(isReady && msgList.nonEmpty) ownRef ! ReadyForNextMessage
+      if(msgList.isEmpty) {
+        sender() ! Status.Success
+      }
+
+    case ReadyForNextMessage=>  //sent by the subclass to indicate that it is ready for more content
+      msgList.headOption match {
+        case Some((msg, queueUrl)) =>
+          isReady = false
+          msgList = msgList.tail
+
           logger.debug(s"Received message ${msg.getMessageId}:")
           logger.debug(s"\tAttributes: ${msg.getAttributes.asScala}")
           logger.debug(s"\tReceipt Handle: ${msg.getReceiptHandle}")
           logger.debug(s"\tBody: ${msg.getBody}")
 
-           convertMessageBody(msg.getBody) match {
-            case Left(err)=>
+          convertMessageBody(msg.getBody) match {
+            case Left(err) =>
               logger.error(s"Could not decode message from queue: $err")
               logger.error(s"Message was ${msg.getBody}")
               sender() ! Status.Failure
-            case Right(finalMsg)=>
-              ownRef ! HandleDomainMessage(finalMsg, rq, msg.getReceiptHandle)
+            case Right(finalMsg) =>
+              ownRef ! HandleDomainMessage(finalMsg, queueUrl, msg.getReceiptHandle)
           }
-        })
-        ownRef ! HandleNextSqsMessage(rq)
-      } else {
-        sender() ! Status.Success
+        case None =>
+          logger.info(s"No more messages to consume")
+          isReady = true
+          ownRef ! CheckForNotifications
       }
 
     case CheckForNotifications=>

@@ -475,7 +475,7 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
       mockSqsClient.receiveMessage(rq) returns msgResponse
       mockSqsClient.deleteMessage(any) returns new DeleteMessageResult()
 
-      toTest ! GenericSqsActor.HandleDomainMessage(IngestMessage(fakeEntry1,"fake-id-1"), rq, "fake1")
+      toTest ! GenericSqsActor.HandleDomainMessage(IngestMessage(fakeEntry1,"fake-id-1"), "some-queue", "fake1")
 
       mockedSelf.expectMsg(IngestProxyQueue.CheckRegisteredThumb(fakeEntry1))
       mockedSelf.expectMsg(IngestProxyQueue.CheckRegisteredProxy(fakeEntry1))

@@ -69,7 +69,8 @@
     <logger name="helpers.UserAvatarHelper" level="INFO"/>
     <logger name="controllers.BulkDownloadsController" level="INFO"/>
 
-    <logger name="com.gu.pandomainauth.action.AuthActions" level="INFO"/>
+    <logger name="auth.HMAC" level="DEBUG"/>
+    <logger name="auth" level="INFO"/>
 
     <logger name="helpers.DDBSink" level="INFO"/>
     <logger name="helpers.S3ToProxyLocationFlow" level="INFO"/>
@@ -91,6 +92,8 @@
     <logger name="services.ProblemItemRetry" level="INFO"/>
     <logger name="requests.JobSearchRequest" level="INFO"/>
 
+    <logger name="services.FileMoveQueue" level="DEBUG"/>
+
     <logger name="ProblemItemRetry" level="INFO"/>
     <logger name="helpers.ProblemItemReproxySink" level="INFO"/>
 
@@ -109,6 +112,7 @@
 
     <logger name="services.FileMoveActor" level="DEBUG"/>
     <logger name="services.FileMove" level="DEBUG"/>
+    <logger name="services.FileMove.LargeFileCopier" level="INFO"/>
     <logger name-="FileMoveActorSpec" level="DEBUG"/>
 
     <root level="WARN">

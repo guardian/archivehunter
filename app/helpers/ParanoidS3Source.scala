@@ -3,7 +3,6 @@ package helpers
 import java.net.URLEncoder
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
-
 import akka.actor.ActorSystem
 import akka.http.scaladsl.{Http, model}
 import akka.http.scaladsl.model._
@@ -12,12 +11,13 @@ import akka.stream.stage.{AbstractOutHandler, GraphStage, GraphStageLogic}
 import akka.http.scaladsl.model.HttpHeader.ParsingResult._
 import akka.stream.scaladsl.Sink
 import akka.util.ByteString
-import com.amazonaws.auth.AWSCredentialsProvider
 import com.amazonaws.regions.Region
 
 import scala.collection.immutable.Seq
 import play.api.Logger
 import akka.http.scaladsl.model.HttpProtocol
+import org.slf4j.LoggerFactory
+import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider
 
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration._
@@ -28,15 +28,14 @@ import scala.concurrent.duration._
   * @param region AWS region that the bucket lives in
   * @param actorSystem implicitly provided ActorSystem for akka http
   */
-class ParanoidS3Source(bucketName:String, region:Region, credsProvider: AWSCredentialsProvider)(implicit actorSystem:ActorSystem)
+class ParanoidS3Source(bucketName:String, region:Region, credsProvider: AwsCredentialsProvider)(implicit actorSystem:ActorSystem, override val mat:Materializer)
   extends GraphStage[SourceShape[ByteString]] with S3Signer {
   private val out:Outlet[ByteString] = Outlet.create("ParanoidS3Source.out")
 
-  implicit val mat:Materializer = ActorMaterializer()
   implicit val ec:ExecutionContext = actorSystem.dispatcher
   override def shape: SourceShape[ByteString] = SourceShape.of(out)
 
-  val logger = Logger(getClass)
+  val logger = LoggerFactory.getLogger(getClass)
   /**
     * extract given entries from the XML manually. This is necessary as we are in "paranoid mode", and can't
     * rely on the XML being valid.

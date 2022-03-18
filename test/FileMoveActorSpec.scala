@@ -1,6 +1,5 @@
 import java.sql.Timestamp
 import java.time.{LocalDateTime, ZonedDateTime}
-
 import akka.actor.{ActorRef, ActorSystem, Props}
 import org.specs2.mutable._
 import akka.testkit._
@@ -10,7 +9,7 @@ import com.theguardian.multimedia.archivehunter.common.ProxyLocationDAO
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{JobModelDAO, ScanTarget}
 import org.specs2.mock.Mockito
-import services.FileMove.GenericMoveActor
+import services.FileMove.{GenericMoveActor, ImprovedLargeFileCopier}
 import services.FileMove.GenericMoveActor.{FileMoveTransientData, PerformStep}
 import services.FileMoveActor
 import services.FileMoveActor.{MoveFailed, MoveFile, MoveSuccess}
@@ -34,6 +33,7 @@ class FileMoveActorSpec extends Specification with Mockito {
       val mockedDynamoClientMgr = mock[DynamoClientManager]
       val mockedS3ClientMgr = mock[S3ClientManager]
       val mockedJobModelDAO = mock[JobModelDAO]
+      val mockedLargeFileCopier = mock[ImprovedLargeFileCopier]
       mockedJobModelDAO.putJob(any) returns Future(None)
       val probe1 = TestProbe()
       val probe2 = TestProbe()
@@ -46,14 +46,16 @@ class FileMoveActorSpec extends Specification with Mockito {
         mockedESClientMgr,
         mockedDynamoClientMgr,
         mockedJobModelDAO,
-        mockedS3ClientMgr
+        mockedS3ClientMgr,
+        mockedLargeFileCopier
       ) {
         override protected val fileMoveChain: Seq[ActorRef] = Seq(probe1.ref, probe2.ref, probe3.ref)
       }))
 
       val target = ScanTarget("some-bucket", true, None, 1234L, false, None, "some-proxy-bucket", "eu-west-1", None, None, None, None)
+      val requestingActor = TestProbe()
 
-      val resultFuture = ac ? MoveFile("somesourcefileId", target, async=false)
+      ac ! MoveFile("somesourcefileId", target, Some("receipt"), requestingActor.ref)
       val initialData = FileMoveTransientData.initialise("somesourcefileId", "some-bucket", "some-proxy-bucket", "eu-west-1")
 
       probe1.expectMsg(5.seconds, PerformStep(initialData))
@@ -66,17 +68,17 @@ class FileMoveActorSpec extends Specification with Mockito {
       probe3.expectMsg(5.seconds, PerformStep(updatedData))
       probe3.reply(GenericMoveActor.StepSucceeded(updatedData))
 
-      val result = Await.result(resultFuture, 90.seconds)
-      result mustEqual MoveSuccess
+      requestingActor.expectMsg(10.seconds, MoveSuccess("somesourcefileId", Some("receipt")))
     }
 
-        "stop when an actor reports a failure and roll back the ones that had run before" in new AkkaTestkitSpecs2Support{
+    "stop when an actor reports a failure and roll back the ones that had run before" in new AkkaTestkitSpecs2Support{
           val config = Configuration.empty
           val mockedProxyLocationDAO = mock[ProxyLocationDAO]
           val mockedESClientMgr = mock[ESClientManager]
           val mockedDynamoClientMgr = mock[DynamoClientManager]
           val mockedS3ClientMgr = mock[S3ClientManager]
           val mockedJobModelDAO = mock[JobModelDAO]
+          val mockedLargeFileCopier = mock[ImprovedLargeFileCopier]
           mockedJobModelDAO.putJob(any) returns Future(None)
           val probe1 = TestProbe()
           val probe2 = TestProbe()
@@ -89,14 +91,16 @@ class FileMoveActorSpec extends Specification with Mockito {
             mockedESClientMgr,
             mockedDynamoClientMgr,
             mockedJobModelDAO,
-            mockedS3ClientMgr
+            mockedS3ClientMgr,
+            mockedLargeFileCopier
           ) {
             override protected val fileMoveChain: Seq[ActorRef] = Seq(probe1.ref, probe2.ref, probe3.ref)
           }))
 
           val target = ScanTarget("some-bucket", true, None, 1234L, false, None, "some-proxy-bucket", "eu-west-1", None, None, None, None)
+      val requestingActor = TestProbe()
 
-          val resultFuture = ac ? MoveFile("somesourcefileId", target, async=false)
+          ac ! MoveFile("somesourcefileId", target, Some("receipt"), requestingActor.ref)
           val initialData = FileMoveTransientData.initialise("somesourcefileId", "some-bucket", "some-proxy-bucket","eu-west-1")
 
           probe1.expectMsg(5.seconds, PerformStep(initialData))
@@ -111,18 +115,17 @@ class FileMoveActorSpec extends Specification with Mockito {
 
           probe3.expectNoMessage(5.seconds)
 
-          val result = Await.result(resultFuture, 15.seconds)
-          result mustEqual MoveFailed("Something went splat!")
-
+          requestingActor.expectMsg(20.seconds, MoveFailed("somesourcefileId", "Something went splat!", Some("receipt")))
         }
 
-        "continue rollback even if a rollback fails" in new AkkaTestkitSpecs2Support{
+     "continue rollback even if a rollback fails" in new AkkaTestkitSpecs2Support{
           val config = Configuration.empty
           val mockedProxyLocationDAO = mock[ProxyLocationDAO]
           val mockedESClientMgr = mock[ESClientManager]
           val mockedDynamoClientMgr = mock[DynamoClientManager]
           val mockedS3ClientMgr = mock[S3ClientManager]
           val mockedJobModelDAO = mock[JobModelDAO]
+          val mockedLargeFileCopier = mock[ImprovedLargeFileCopier]
           mockedJobModelDAO.putJob(any) returns Future(None)
           val probe1 = TestProbe()
           val probe2 = TestProbe()
@@ -135,14 +138,16 @@ class FileMoveActorSpec extends Specification with Mockito {
             mockedESClientMgr,
             mockedDynamoClientMgr,
             mockedJobModelDAO,
-            mockedS3ClientMgr
+            mockedS3ClientMgr,
+            mockedLargeFileCopier
           ) {
             override protected val fileMoveChain: Seq[ActorRef] = Seq(probe1.ref, probe2.ref, probe3.ref)
           }))
 
           val target = ScanTarget("some-bucket", true, None, 1234L, false, None, "some-proxy-bucket", "eu-west-1", None, None, None, None)
+          val requestingActor = TestProbe()
 
-          val resultFuture = ac ? MoveFile("somesourcefileId", target,async=false)
+          ac ! MoveFile("somesourcefileId", target, Some("receipt"), requestingActor.ref)
           val initialData = FileMoveTransientData.initialise("somesourcefileId", "some-bucket", "some-proxy-bucket","eu-west-1")
 
           probe1.expectMsg(5.seconds, PerformStep(initialData))
@@ -156,8 +161,7 @@ class FileMoveActorSpec extends Specification with Mockito {
 
           probe3.expectNoMessage(5.seconds)
 
-          val result = Await.result(resultFuture,15.seconds)
-          result mustEqual MoveFailed("Fire the blobfish!")
+          requestingActor.expectMsg(10.seconds, MoveFailed("somesourcefileId", "Fire the blobfish!", Some("receipt")))
         }
       }
 }

@@ -1,2 +1,3 @@
-<!-- silence logback during testing! https://www.mkyong.com/logging/logback-disable-logging-in-unit-test/ -->
+<?xml version="1.0" encoding="UTF-8"?>
+
 <configuration/>

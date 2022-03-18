@@ -37,7 +37,8 @@ $settings_mapping = {
     "lightbox.tableName" => "LightboxTable",
     "lightbox.bulkTableName" => "LightboxBulkEntryTable",
     "serverToken.serverTokenTable" => "ServerTokensTable",
-    "oAuth.oAuthTokensTable" => "OAuthTokensTable"
+    "oAuth.oAuthTokensTable" => "OAuthTokensTable",
+    "filemover.notificationsQueue" => "FileMoveQueue"
 }
 
 
