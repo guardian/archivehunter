@@ -65,11 +65,17 @@ Parameters:
     Description: What type of instance to launch
     AllowedValues:
     - t3.nano
+    - t4g.nano
     - t3.micro
+    - t4g.micro
     - t3.small
+    - t4g.small
     - t3.medium
+    - t4g.medium
     - t3.large
+    - t4g.large
     - t3.xlarge
+    - t4g.xlargs
     Default: t3.medium
   KeyPair:
     Type: AWS::EC2::KeyPair::KeyName
