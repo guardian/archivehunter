@@ -13,6 +13,7 @@ import play.api.Configuration
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
+import javax.inject.Singleton
 
 /**
   * this actor copies a file to the requested destination bucket and updates the internal state with the new file ID.
