@@ -255,11 +255,11 @@ class ImprovedLargeFileCopierSpec extends Specification with Mockito {
   }
 
   "ImprovedLargeFileCopier.estimatePartSize" should {
-    "allow forcing of a certain number of parts" in {
-      LargeFileCopier.estimatePartSize(5368709120L, None) mustEqual 10485760  //512 parts
-      LargeFileCopier.estimatePartSize(5368709120L, Some(256)) mustEqual 20971520
+    "calculate the part size for a given file size to deliver an acceptable number of parts" in {
+      ImprovedLargeFileCopier.estimatePartSize(9354920280L) mustEqual 10485760
     }
   }
+
   "ImprovedLargeFileCopier.sendPartCopies" should {
     "send an upload-part-copy request for every given chunk" in new AkkaTestkitSpecs2Support {
       val requests = scala.collection.mutable.ListBuffer[HttpRequest]()

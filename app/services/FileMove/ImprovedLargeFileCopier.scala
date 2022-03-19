@@ -26,6 +26,33 @@ object ImprovedLargeFileCopier {
   private val logger = LoggerFactory.getLogger(getClass)
   def NoRequestCustomisation(httpRequest: HttpRequest) = httpRequest
 
+  val defaultPartSize:Long = 10*1024*1024  //default chunk size is 10Mb
+
+  /**
+    * AWS specifications say that parts must be at least 5Mb in size but no more than 5Gb in size, and that there
+    * must be a maximum of 10,000 parts for an upload.  This makes the effective file size limit 5Tb
+    * @param totalFileSize actual size of the file to upload, in bytes
+    * @return the target path size
+    */
+  def estimatePartSize(totalFileSize:Long):Long = {
+    val maxWantedParts = 10000
+
+    var partSize:Long = defaultPartSize
+    var nParts:Int = maxWantedParts + 1
+    var i:Int=1
+    while(true) {
+      nParts = Math.ceil(totalFileSize.toDouble / partSize.toDouble).toInt
+      if (nParts > maxWantedParts) {
+        i = i + 1
+        partSize = defaultPartSize * i
+      } else {
+        logger.info(s"Part size estimated at $partSize for $nParts target parts")
+        return partSize
+      }
+    }
+    defaultPartSize
+  }
+
   /**
     * returns a path suitable for the `x-amz-copy-source` header. This is URL-encoded.
     */
@@ -131,9 +158,7 @@ object ImprovedLargeFileCopier {
     * @return a sequence of UploadPart instances, representing the start and end points of each chunk of the upload
     */
   def deriveParts(destBucket:String, destKey:String, metadata:HeadInfo):Seq[UploadPart] = {
-    val maybePartCount = metadata.eTag.flatMap(partsFromEtag)
-
-    val partSize = LargeFileCopier.estimatePartSize(metadata.contentLength, maybePartCount)
+    val partSize = estimatePartSize(metadata.contentLength)
     var ptr: Long = 0
     var ctr: Int = 1 //partNumber starts from 1 according to the AWS spec
     var output = scala.collection.mutable.ListBuffer[UploadPart]()
