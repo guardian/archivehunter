@@ -28,10 +28,8 @@ object ClockSingleton {
 class ClockSingleton @Inject() (@Named("dynamoCapacityActor") dynamoCapacityActor:ActorRef,
                                 @Named("bucketScannerActor") bucketScanner:ActorRef,
                                 @Named("jobPurgerActor") jobPurgerActor: ActorRef,
-                                @Named("ingestProxyQueue") ingestProxyQueue: ActorRef,
-                                @Named("proxyFrameworkQueue") proxyFrameworkQueue:ActorRef,
+                               //FIXME: this feels wrong, think it should be called, needs investigation
                                 @Named("glacierRestoreActor") glacierRestoreActor:ActorRef,
-                                 @Named("fileMoveQueue") fileMoveQueue:ActorRef,
                                 config:ArchiveHunterConfiguration,
                                ) extends Actor with Timers with ExtValueConverters{
   import ClockSingleton._
@@ -47,9 +45,6 @@ class ClockSingleton @Inject() (@Named("dynamoCapacityActor") dynamoCapacityActo
     case RapidClockTick=>
       logger.debug("ClockSingleton: RapidClockTick")
       dynamoCapacityActor ! DynamoCapacityActor.TimedStateCheck
-      ingestProxyQueue ! GenericSqsActor.CheckForNotifications
-      proxyFrameworkQueue ! GenericSqsActor.CheckForNotifications
-      fileMoveQueue ! FileMoveQueue.CheckForNotificationsIfIdle
     case SlowClockTick=>
       logger.debug("ClockSingleton: SlowClockTick")
     case VerySlowClockTick=>
