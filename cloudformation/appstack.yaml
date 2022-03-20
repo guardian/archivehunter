@@ -1095,7 +1095,7 @@ Resources:
           }
 
           filemover.notificationsQueue = "${FileMoveQueue}"
-          filemover.concurrency = 4
+          filemover.concurrency = 1
 
           auth {
              deployedUrl = "https://${App}.${DeploymentDomain}"

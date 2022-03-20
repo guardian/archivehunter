@@ -167,8 +167,10 @@ trait S3Signer {
     val canonicalUrl = if(uriPath.length<=1) {
       "/"
     } else {
-      //uriPath.split("/").map(section=>URLEncoder.encode(section,"UTF-8")).mkString("/")
-      uriPath
+      //Note that the spec at https://docs.aws.amazon.com/general/latest/gr/sigv4-create-canonical-request.html demands that spaces should
+      //be double-encoded for all services with the EXCEPTION of s3. So we encode once and make sure that + gets replaced
+      //with %20
+      uriPath.replaceAll("\\+","%20")
     }
     logger.debug(s"encodedUrl: $canonicalUrl")
 
