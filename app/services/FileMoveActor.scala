@@ -11,7 +11,7 @@ import com.theguardian.multimedia.archivehunter.common.cmn_models.{JobModel, Job
 import javax.inject.{Inject, Singleton}
 import play.api.Configuration
 import services.FileMove.GenericMoveActor.MoveActorMessage
-import services.FileMove.{CopyMainFile, CopyProxyFiles, DeleteOriginalFiles, GenericMoveActor, ImprovedLargeFileCopier, UpdateIndexRecords, VerifySource}
+import services.FileMove.{CopyMainFile, CopyProxyFiles, DeleteOriginalFiles, GenericMoveActor, ImprovedLargeFileCopier, UpdateIndexRecords, VerifyChecksum, VerifySource}
 import akka.pattern.ask
 import org.slf4j.LoggerFactory
 
@@ -74,6 +74,7 @@ class FileMoveActor @Inject() (config:Configuration,
   protected val fileMoveChain:Seq[ActorRef] = Seq(
     system.actorOf(Props(new VerifySource(indexer, proxyLocationDAO))),
     system.actorOf(Props(new CopyMainFile(s3ClientManager, config, largeFileCopier))),
+    system.actorOf(Props(new VerifyChecksum(s3ClientManager, config))),
     system.actorOf(Props(new CopyProxyFiles(s3ClientManager, config))),
     system.actorOf(Props(new UpdateIndexRecords(indexer, proxyLocationDAO))),
     system.actorOf(Props(new DeleteOriginalFiles(s3ClientManager, indexer, config)))
