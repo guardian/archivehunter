@@ -63,6 +63,7 @@ class VerifyChecksum (s3ClientManager:S3ClientManager, config:Configuration)(imp
               logger.error(s"INVALID COPY s3://${entry.bucket}/${entry.path} has a checksum of $sourceCS and s3://${state.destBucket}/${entry.path} has $destCS")
               originalSender ! StepFailed(state, "Checksums did not match")
             } else {
+              logger.info(s"Checksums $sourceCS and file size ${destMeta.contentLength} match for s3://${entry.bucket}/${entry.path} -> s3://${state.destBucket}/${entry.path}")
               originalSender ! StepSucceeded(state)
             }
           case Failure(err)=>
