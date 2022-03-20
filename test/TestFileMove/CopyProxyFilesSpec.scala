@@ -2,7 +2,7 @@ package TestFileMove
 
 import akka.actor.Props
 import com.amazonaws.services.s3.AmazonS3
-import com.amazonaws.services.s3.model.CopyObjectResult
+import com.amazonaws.services.s3.model.{CopyObjectResult, ObjectMetadata}
 import com.theguardian.multimedia.archivehunter.common.{DocId, ProxyLocation, ProxyType, StorageClass}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.S3ClientManager
 import org.specs2.mock.Mockito
@@ -25,8 +25,10 @@ class CopyProxyFilesSpec extends Specification with Mockito with DocId {
       val mockedClientMgr = mock[S3ClientManager]
       val mockedS3Client = mock[AmazonS3]
       val mockedCopyResult = mock[CopyObjectResult]
+      val mockedMetadata = mock[ObjectMetadata]
 
       mockedClientMgr.getS3Client(any,any) returns mockedS3Client
+      mockedS3Client.getObjectMetadata(any,any) returns mockedMetadata
       mockedS3Client.copyObject(any, any, any, any) returns mockedCopyResult
 
       val sourceProxyList = Seq(
@@ -73,8 +75,9 @@ class CopyProxyFilesSpec extends Specification with Mockito with DocId {
       val mockedClientMgr = mock[S3ClientManager]
       val mockedS3Client = mock[AmazonS3]
       val mockedCopyResult = mock[CopyObjectResult]
-
+      val mockedMetadata = mock[ObjectMetadata]
       mockedClientMgr.getS3Client(any,any) returns mockedS3Client
+      mockedS3Client.getObjectMetadata(any,any) returns mockedMetadata
       mockedS3Client.deleteObject("dest-proxy-bucket","path/to/proxy2") throws new RuntimeException("bleagh")
       mockedS3Client.doesObjectExist(any, any) returns true
       mockedS3Client.copyObject(any, any, any, any) returns mockedCopyResult
