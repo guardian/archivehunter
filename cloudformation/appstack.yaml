@@ -75,7 +75,10 @@ Parameters:
     - t3.large
     - t4g.large
     - t3.xlarge
-    - t4g.xlargs
+    - t4g.xlarge
+    - t4g.2xlarge
+    - c6g.4xlarge
+    - c6g.8xlarge
     Default: t3.medium
   KeyPair:
     Type: AWS::EC2::KeyPair::KeyName
@@ -1092,6 +1095,8 @@ Resources:
           }
 
           filemover.notificationsQueue = "${FileMoveQueue}"
+          filemover.concurrency = 4
+
           auth {
              deployedUrl = "https://${App}.${DeploymentDomain}"
              domain = "${DeploymentDomain}"
