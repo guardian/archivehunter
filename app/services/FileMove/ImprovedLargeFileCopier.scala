@@ -195,6 +195,7 @@ class ImprovedLargeFileCopier @Inject() (implicit actorSystem:ActorSystem, overr
       .map(URLEncoder.encode(_, StandardCharsets.UTF_8))
       .mkString("/")
 
+    logger.debug(s"makeS3Uri - URL path is $bucketAndKey")
     new URI("https", s"s3.${region.getName}.amazonaws.com", bucketAndKey, maybeVersion.map(v => s"versionId=$v").orNull, null).toString
   }
 
