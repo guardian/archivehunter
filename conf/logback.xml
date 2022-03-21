@@ -14,12 +14,15 @@
         </encoder>
     </appender>
 
+    <!--
     <appender name="Sentry" class="io.sentry.logback.SentryAppender">
         <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
             <level>WARN</level>
         </filter>
     </appender>
+    -->
 
+    <!--
     <appender name="FILE" class="ch.qos.logback.core.FileAppender">
         <file>/var/log/archivehunter/application.log</file>
         <encoder>
@@ -30,6 +33,7 @@
     <appender name="ASYNCFILE" class="ch.qos.logback.classic.AsyncAppender">
         <appender-ref ref="FILE" />
     </appender>
+    -->
 
     <!-- Configure the Sentry appender, overriding the logging threshold to the WARN level -->
     <!--<appender name="Sentry" class="io.sentry.logback.SentryAppender">
@@ -104,8 +108,8 @@
     <logger name="helpers.LightboxHelper" level="INFO"/>
 
     <logger name="services.FileMoveActor" level="DEBUG"/>
-    <logger name="services.FileMove" level="DEBUG"/>
-    <logger name-="FileMoveActorSpec" level="DEBUG"/>
+    <logger name="services.FileMove" level="INFO"/>
+    <logger name="services.ClockPerInstance" level="DEBUG"/>
 
     <root level="WARN">
         <appender-ref ref="STDOUT" />
