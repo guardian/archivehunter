@@ -26,7 +26,7 @@ class VerifySource(indexer:Indexer, proxyLocationDAO:ProxyLocationDAO)(implicit 
       indexer.getByIdFull(currentState.sourceFileId).flatMap({
         case Left(ItemNotFound(_))=>
           logger.warn(s"Requested file id ${currentState.sourceFileId} does not exist")
-          originalSender ! StepFailed(currentState, s"Requested file id ${currentState.sourceFileId} does not exist")
+          originalSender ! StepFailed(currentState, "Source file did not exist")
           Future( () )
         case Left(err)=>
           logger.error(s"Could not look up ${currentState.sourceFileId}: $err")
