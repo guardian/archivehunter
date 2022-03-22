@@ -166,7 +166,7 @@ class FileMoveQueue @Inject()(config:Configuration,
 
     //a file move process failed
     case FileMoveActor.MoveFailed(fileId, error, remoteMessageId)=>
-      if(error=="Source file did not exist") {  //noqa: yeah i don't like it much either but the alternative is very long-winded
+      if(error=="Source file did not exist" || error.contains("has been deleted in the storage")) {  //noqa: yeah i don't like it much either but the alternative is very long-winded
         logger.error(s"Could not move file $fileId: $error. Message will be removed from the queue")
         remoteMessageId match {
           case Some(receiptHandle) =>

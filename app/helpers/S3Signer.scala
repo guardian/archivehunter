@@ -188,7 +188,6 @@ trait S3Signer {
       headers + ("x-amz-content-sha256"->checksummer.digest("".getBytes("UTF-8")).map("%02x".format(_)).mkString)
     }
 
-
     checksummer.reset()
 
     val canonicalHeaders = updatedHeaders.keys.toList.sorted.map(header=>{
