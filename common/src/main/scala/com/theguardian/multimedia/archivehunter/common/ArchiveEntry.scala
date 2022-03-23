@@ -1,7 +1,6 @@
 package com.theguardian.multimedia.archivehunter.common
 
 import java.time.{ZoneId, ZonedDateTime}
-import akka.stream.alpakka.dynamodb.scaladsl.DynamoDb
 import com.amazonaws.services.s3.{AmazonS3, AmazonS3Client}
 import com.sksamuel.elastic4s.http.{ElasticClient, HttpClient}
 import com.theguardian.multimedia.archivehunter.common.StorageClass.StorageClass
@@ -10,8 +9,9 @@ import com.theguardian.multimedia.archivehunter.common.cmn_models.{IndexerError,
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 import org.apache.logging.log4j.LogManager
-import io.circe.generic.semiauto._
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
+
+import scala.util.{Failure, Success, Try}
 
 object ArchiveEntry extends ((String, String, String, Option[String], Option[String], Long, ZonedDateTime, String, MimeType, Boolean, StorageClass, Seq[LightboxIndex], Boolean, Option[MediaMetadata])=>ArchiveEntry) with DocId {
   private val logger = LogManager.getLogger(getClass)
@@ -33,27 +33,34 @@ object ArchiveEntry extends ((String, String, String, Option[String], Option[Str
     * @return a (blocking) Future, containing an [[ArchiveEntry]] if successful
     */
   def fromS3Sync(bucket: String, key: String, region:String)(implicit client:AmazonS3):ArchiveEntry = {
-    val meta = client.getObjectMetadata(bucket,key)
-    val mimeType = Option(meta.getContentType) match {
-      case Some(mimeTypeString) =>
-        MimeType.fromString(mimeTypeString) match {
-          case Right(mt) => mt
-          case Left(error) =>
-            logger.warn(error)
+    Try {
+      client.getObjectMetadata(bucket, key)
+    } match {
+      case Success(meta) =>
+        val mimeType = Option(meta.getContentType) match {
+          case Some(mimeTypeString) =>
+            MimeType.fromString(mimeTypeString) match {
+              case Right(mt) => mt
+              case Left(error) =>
+                logger.warn(error)
+                MimeType("application", "octet-stream")
+            }
+          case None =>
+            logger.warn(s"received no content type from S3 for s3://$bucket/$key")
             MimeType("application", "octet-stream")
         }
-      case None =>
-        logger.warn(s"received no content type from S3 for s3://$bucket/$key")
-        MimeType("application","octet-stream")
-    }
 
-    val storageClass = Option(meta.getStorageClass) match {
-      case Some(sc)=>sc
-      case None=>
-        logger.warn(s"s3://$bucket/$key has no storage class! Assuming STANDARD.")
-        "STANDARD"
+        val storageClass = Option(meta.getStorageClass) match {
+          case Some(sc) => sc
+          case None =>
+            logger.warn(s"s3://$bucket/$key has no storage class! Assuming STANDARD.")
+            "STANDARD"
+        }
+        ArchiveEntry(makeDocId(bucket, key), bucket, key, Some(region), getFileExtension(key), meta.getContentLength, ZonedDateTime.ofInstant(meta.getLastModified.toInstant, ZoneId.systemDefault()), meta.getETag, mimeType, proxied = false, StorageClass.withName(storageClass), Seq(), beenDeleted = false, None)
+      case Failure(err) =>
+        logger.error(s"Could not look up metadata for s3://$bucket/$key in region $region: ${err.getMessage}")
+        throw err
     }
-    ArchiveEntry(makeDocId(bucket, key), bucket, key, Some(region), getFileExtension(key), meta.getContentLength, ZonedDateTime.ofInstant(meta.getLastModified.toInstant, ZoneId.systemDefault()), meta.getETag, mimeType, proxied = false, StorageClass.withName(storageClass), Seq(), beenDeleted = false, None)
   }
 
   def fromS3(bucket: String, key: String, region:String)(implicit client:AmazonS3):Future[ArchiveEntry] = Future {

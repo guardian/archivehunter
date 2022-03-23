@@ -11,6 +11,7 @@ import org.specs2.mock.Mockito
 import org.specs2.mutable.Specification
 import services.FileMove.ImprovedLargeFileCopier.{CompletedUpload, HeadInfo, UploadPart, UploadedPart}
 
+import java.nio.charset.StandardCharsets
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -25,7 +26,7 @@ class ImprovedLargeFileCopierSpec extends Specification with Mockito {
       implicit val mat:Materializer = mock[Materializer]
 
       val toTest = new ImprovedLargeFileCopier()
-      toTest.makeS3Uri(Regions.EU_WEST_1, "somebucket","path to a/very long/file.mxf", Some("vvvvvv")) mustEqual "https://s3.eu-west-1.amazonaws.com/somebucket/path+to+a/very+long/file.mxf?versionId=vvvvvv"
+      toTest.makeS3Uri(Regions.EU_WEST_1, "somebucket","path to a/very long/file.mxf", Some("vvvvvv")) mustEqual "https://s3.eu-west-1.amazonaws.com/somebucket/path%20to%20a/very%20long/file.mxf?versionId=vvvvvv"
     }
 
     "handle non-ascii characters" in {
@@ -33,9 +34,10 @@ class ImprovedLargeFileCopierSpec extends Specification with Mockito {
       implicit val mat:Materializer = mock[Materializer]
 
       val toTest = new ImprovedLargeFileCopier()
-      toTest.makeS3Uri(Regions.EU_WEST_1, "somebucket","path to a/arsène wenger est alleé en vacances.mxf", None) mustEqual "https://s3.eu-west-1.amazonaws.com/somebucket/path+to+a/ars%25C3%25A8ne+wenger+est+alle%25C3%25A9+en+vacances.mxf"
+      toTest.makeS3Uri(Regions.EU_WEST_1, "somebucket","path to a/arsène wenger est alleé en vacances.mxf", None) mustEqual "https://s3.eu-west-1.amazonaws.com/somebucket/path%20to%20a/ars%C3%A8ne%20wenger%20est%20alle%C3%A9%20en%20vacances.mxf"
     }
   }
+
   "ImprovedLargeFileCopier.headSourceFile" should {
     "return file metadata about a known public file" in new AkkaTestkitSpecs2Support {
       val toTest = new ImprovedLargeFileCopier()
@@ -255,11 +257,11 @@ class ImprovedLargeFileCopierSpec extends Specification with Mockito {
   }
 
   "ImprovedLargeFileCopier.estimatePartSize" should {
-    "allow forcing of a certain number of parts" in {
-      LargeFileCopier.estimatePartSize(5368709120L, None) mustEqual 10485760  //512 parts
-      LargeFileCopier.estimatePartSize(5368709120L, Some(256)) mustEqual 20971520
+    "calculate the part size for a given file size to deliver an acceptable number of parts" in {
+      ImprovedLargeFileCopier.estimatePartSize(9354920280L) mustEqual 10485760
     }
   }
+
   "ImprovedLargeFileCopier.sendPartCopies" should {
     "send an upload-part-copy request for every given chunk" in new AkkaTestkitSpecs2Support {
       val requests = scala.collection.mutable.ListBuffer[HttpRequest]()

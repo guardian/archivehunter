@@ -13,11 +13,13 @@ import play.api.Configuration
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
+import javax.inject.Singleton
 
 /**
   * this actor copies a file to the requested destination bucket and updates the internal state with the new file ID.
   * when rolling back, it checks that the source file still exists and if so deletes the one it copied earlier.
   */
+@Singleton
 class CopyMainFile (s3ClientManager: S3ClientManager, config:Configuration, largeFileCopier:ImprovedLargeFileCopier)
                    (implicit val actorSystem: ActorSystem, mat:Materializer) extends GenericMoveActor with DocId {
   import GenericMoveActor._
@@ -114,19 +116,6 @@ class CopyMainFile (s3ClientManager: S3ClientManager, config:Configuration, larg
               logger.error(s"Could not rollback copy for $entry: ${err.getMessage}", err)
               originalSender ! StepFailed(currentState, err.toString)
           })
-//          try {
-//
-//            if(!sourceClient.doesObjectExist(entry.bucket, entry.path)){
-//              sourceClient.copyObject(currentState.destBucket, entry.path, entry.bucket, entry.path)  //raises if the copy-back fails
-//            }
-//            destClient.deleteObject(currentState.destBucket,entry.path)
-//            logger.info(s"Rollback succeeded")
-//            sender() ! StepSucceeded(currentState.copy(destFileId = None))
-//          } catch {
-//            case err:Throwable=>
-//              logger.error(s"Could not rollback copy for $entry", err)
-//              sender() ! StepFailed(currentState, err.toString)
-//          }
       }
   }
 }

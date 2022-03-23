@@ -31,13 +31,20 @@ class AppStartup @Inject()(injector:Injector)(implicit system:ActorSystem){
   ), name="ClockSingleton"
   )
 
+  logger.info("Starting up per-instance timer")
+  system.actorOf(Props(injector.instanceOf(classOf[ClockPerInstance])))
+
   def doTestCreateIndex():Unit = {
     val indexMgt = injector.instanceOf(classOf[IndexManagement])
 
     indexMgt.doIndexCreate().onComplete({
       case Success(response)=>
-        if(response.isError && response.error.`type`!="resource_already_exists_exception")  {
-          logger.error(s"Index create request failed: ${response.status} ${response.error.reason}")
+        if(response.isError)  {
+          if(response.error.`type`=="resource_already_exists_exception") {
+            logger.info("Index already exists")
+          } else {
+            logger.error(s"Index create request failed: ${response.status} ${response.error.reason}")
+          }
         } else {
           logger.info(s"Index create successful: $response")
         }

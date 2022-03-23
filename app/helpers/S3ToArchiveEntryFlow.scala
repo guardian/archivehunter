@@ -111,7 +111,7 @@ class S3ToArchiveEntryFlow @Inject() (s3ClientMgr: S3ClientManager, config:Confi
 
           } catch {
             case ex:Throwable=>
-              logger.error(s"Could not create ArchiveEntry: ", ex)
+              logger.error(s"Could not create ArchiveEntry for s3://${elem.bucketName}/${elem.key}: ", ex)
               failStage(ex)
           }
         }

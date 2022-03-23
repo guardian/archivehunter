@@ -7,19 +7,19 @@ trait DocId {
     * @param key path to the file in `bucket`
     */
   def makeDocId(bucket: String, key:String):String = {
-    val maxIdLength=512
+    val maxIdLength=512 //the base64 representation always comes out larger than the incoming string. ElasticSearch limits to 512 chars so we must chop a bit shorter
     val encoder = java.util.Base64.getEncoder
 
     val initialString = bucket + ":" + key
-    if(initialString.length<=maxIdLength){
-      encoder.encodeToString(initialString.toCharArray.map(_.toByte))
+    val initialEncoded = encoder.encodeToString(initialString.toCharArray.map(_.toByte))
+    if(initialEncoded.length<=maxIdLength){
+      initialEncoded
     } else {
       /* I figure that the best way to get something that should be unique for a long path is to chop out the middle */
-      val chunkLength = initialString.length/3
-      val stringParts = initialString.grouped(chunkLength).toList
+      val chunkLength = initialEncoded.length/3
+      val stringParts = initialEncoded.grouped(chunkLength).toList
       val midSectionLength = maxIdLength - chunkLength*2  //FIXME: what if chunkLength*2>512??
-      val finalString = stringParts.head + stringParts(1).substring(0, midSectionLength) + stringParts(2)
-      encoder.encodeToString(finalString.toCharArray.map(_.toByte))
+      stringParts.head + stringParts(1).substring(0, midSectionLength) + stringParts(2)
     }
   }
 

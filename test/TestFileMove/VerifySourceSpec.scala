@@ -106,7 +106,7 @@ class VerifySourceSpec extends Specification with Mockito {
       val s = result.asInstanceOf[StepFailed]
 
       s.updatedData mustEqual initialData
-      s.err mustEqual "Requested file id source-entry-id does not exist"
+      s.err mustEqual "Source file did not exist"
       there was one(mockedIndexer).getByIdFull("source-entry-id")
       there was no(mockedProxyDAO).getAllProxiesFor("source-entry-id")
     }

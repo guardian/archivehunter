@@ -5,7 +5,7 @@ import com.theguardian.multimedia.archivehunter.common.clientManagers.S3ClientMa
 import com.theguardian.multimedia.archivehunter.common.{DocId, ProxyLocation}
 import play.api.Configuration
 
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 /**
   * this actor copies a file to the requested destination bucket and updates the internal state with the new file ID.
@@ -43,7 +43,15 @@ class CopyProxyFiles (s3ClientManager:S3ClientManager, config:Configuration) ext
 
             proxyList.map(proxy => {
               logger.debug(s"Copying from ${proxy.bucketName}:${proxy.bucketPath} to ${currentState.destProxyBucket}:${proxy.bucketPath}")
-              s3Client.copyObject(proxy.bucketName, proxy.bucketPath, currentState.destProxyBucket, proxy.bucketPath)
+              //does the proxy still exist?
+              Try { s3Client.getObjectMetadata(proxy.bucketName, proxy.bucketPath) } match {
+                case Success(meta)=>
+                  logger.info(s"Proxy ${proxy.bucketName}/${proxy.bucketPath} exists with size ${meta.getContentLength} and eTag ${meta.getETag}")
+                  Some(s3Client.copyObject(proxy.bucketName, proxy.bucketPath, currentState.destProxyBucket, proxy.bucketPath))
+                case Failure(err)=>
+                  logger.warn(s"Could not find proxy ${proxy.bucketName}/${proxy.bucketPath}: ${err.getMessage}.  Assuming that it does not exist any more.")
+                  None
+              }
             })
 
             sender() ! StepSucceeded(currentState.copy(destFileProxy = Some(updatedProxyList)))

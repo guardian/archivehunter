@@ -166,7 +166,17 @@ class FileMoveQueue @Inject()(config:Configuration,
 
     //a file move process failed
     case FileMoveActor.MoveFailed(fileId, error, remoteMessageId)=>
-      logger.error(s"Could not move file $fileId: $error. Message will be left on queue to retry after a (long) delay")
+      if(error=="Source file did not exist" || error.contains("has been deleted in the storage")) {  //noqa: yeah i don't like it much either but the alternative is very long-winded
+        logger.error(s"Could not move file $fileId: $error. Message will be removed from the queue")
+        remoteMessageId match {
+          case Some(receiptHandle) =>
+            Try { sqsClient.deleteMessage(notificationsQueue, receiptHandle) }
+          case None=>
+            logger.warn("No remove message ID so can't delete message from SQS")
+        }
+      } else {
+        logger.error(s"Could not move file $fileId: $error. Message will be left on queue to retry after a (long) delay")
+      }
       ownRef ! InternalMarkDone
       ownRef ! ReadyForNextMessage
 
