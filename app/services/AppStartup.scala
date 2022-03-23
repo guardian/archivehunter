@@ -40,7 +40,7 @@ class AppStartup @Inject()(injector:Injector)(implicit system:ActorSystem){
     indexMgt.doIndexCreate().onComplete({
       case Success(response)=>
         if(response.isError)  {
-          if(response.error.`type`!="resource_already_exists_exception") {
+          if(response.error.`type`=="resource_already_exists_exception") {
             logger.info("Index already exists")
           } else {
             logger.error(s"Index create request failed: ${response.status} ${response.error.reason}")

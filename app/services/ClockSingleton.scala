@@ -28,7 +28,7 @@ object ClockSingleton {
 class ClockSingleton @Inject() (@Named("dynamoCapacityActor") dynamoCapacityActor:ActorRef,
                                 @Named("bucketScannerActor") bucketScanner:ActorRef,
                                 @Named("jobPurgerActor") jobPurgerActor: ActorRef,
-                               //FIXME: this feels wrong, think it should be called, needs investigation
+                               //FIXME: this feels wrong, think it should be called, needs investigation - GP-727
                                 @Named("glacierRestoreActor") glacierRestoreActor:ActorRef,
                                 config:ArchiveHunterConfiguration,
                                ) extends Actor with Timers with ExtValueConverters{
