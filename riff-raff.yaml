@@ -33,4 +33,4 @@ deployments:
       amiParameter: AmiId
       amiTags:
         BuiltBy: amigo
-        Recipe: multimedia-tools-focal-java11
+        Recipe: multimedia-tools-focal-java11-arm
