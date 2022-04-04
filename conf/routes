@@ -25,6 +25,8 @@ POST    /api/scanTarget/:id/legacyProxiesScan @controllers.ScanTargetController.
 POST    /api/scanTarget/:id/genProxies  @controllers.ScanTargetController.genProxies(id)
 POST    /api/scanTarget/:id/checkTranscoder @controllers.ScanTargetController.initiateCheckJob(id)
 POST    /api/scanTarget/:id/createPipelines @controllers.ScanTargetController.createPipelines(id, force:Boolean ?=false)
+GET     /api/scanTarget/:id/monitoringConfiguration @controllers.ScanTargetController.checkNotificationConfiguration(id)
+POST     /api/scanTarget/:id/monitoringConfiguration @controllers.ScanTargetController.fixNotificationConfiguration(id)
 
 GET     /api/search/basic      @controllers.SearchController.simpleStringSearch(q:Option[String],start:Option[Int],length:Option[Int])
 GET     /api/entry/:id                  @controllers.SearchController.getEntry(id)
