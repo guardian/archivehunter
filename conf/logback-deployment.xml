@@ -109,6 +109,7 @@
     <logger name="helpers.LightboxHelper$" level="INFO"/>
     <logger name="helpers.LightboxHelper" level="INFO"/>
 
+    <logger name="services.BucketNotificationConfigurations" level="DEBUG"/>
 
     <logger name="services.FileMoveActor" level="DEBUG"/>
     <logger name="services.FileMove" level="DEBUG"/>

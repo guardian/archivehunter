@@ -23,7 +23,7 @@ const useStyles = makeStyles((theme)=>({
         color: theme.palette.warning.main
     },
     ok: {
-        color: theme.palette.info.main
+        color: theme.palette.success.main
     }
 }))
 
@@ -35,6 +35,7 @@ const MonitoringSetupCheck:React.FC<MonitoringSetupCheckProps> = (props) => {
     const classes = useStyles();
 
     const request = async (test:boolean)=> {
+        setLoading(true);
         try {
             const url = `/api/scanTarget/${encodeURIComponent(props.scanTarget)}/monitoringConfiguration`;
             const response = test ?
@@ -77,7 +78,7 @@ const MonitoringSetupCheck:React.FC<MonitoringSetupCheckProps> = (props) => {
                     </Tooltip>
                     </Grid>
                 </> : <>
-                    <Grid item><CheckCircle className={clsx(classes.ok, classes.inlineIcon)}/></Grid>
+                    <Grid item className={classes.extraMargin}><CheckCircle className={clsx(classes.ok, classes.inlineIcon)}/></Grid>
                     <Grid item><Typography>Configuration is valid</Typography></Grid>
                 </>
             }
