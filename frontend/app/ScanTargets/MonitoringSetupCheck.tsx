@@ -34,17 +34,22 @@ const MonitoringSetupCheck:React.FC<MonitoringSetupCheckProps> = (props) => {
 
     const classes = useStyles();
 
-    const request = async (test:boolean)=> {
+    const request = async (testOnly:boolean)=> {
         setLoading(true);
         try {
             const url = `/api/scanTarget/${encodeURIComponent(props.scanTarget)}/monitoringConfiguration`;
-            const response = test ?
+            const response = testOnly ?
                 await axios.get<MonitoringConfigurationResponse>(url) :
                 await axios.post<MonitoringConfigurationResponse>(url);
 
-            setLoading(false);
             setLastError("");
-            setNeedsAttention(response.data.updatesRequired);
+            if(testOnly) {
+                setLoading(false);
+                setNeedsAttention(response.data.updatesRequired);
+            } else {
+                window.setTimeout(()=>request(true), 800);  //if we updated the configuration, refresh after a short delay
+            }
+
         } catch(err) {
             console.error(`Could not get monitoring configuration for scan target ${encodeURIComponent(props.scanTarget)}: `, err);
             setLoading(false);
@@ -77,13 +82,13 @@ const MonitoringSetupCheck:React.FC<MonitoringSetupCheckProps> = (props) => {
                         <IconButton onClick={fixConfig}><Build/></IconButton>
                     </Tooltip>
                     </Grid>
-                </> : <>
+                </> : !lastError ? <>
                     <Grid item className={classes.extraMargin}><CheckCircle className={clsx(classes.ok, classes.inlineIcon)}/></Grid>
                     <Grid item><Typography>Configuration is valid</Typography></Grid>
-                </>
+                </> : undefined
             }
             {
-                lastError ? <Grid item><Typography>{lastError}</Typography></Grid> : undefined
+                lastError ? <Grid item className={classes.extraMargin}><Typography>{lastError}</Typography></Grid> : undefined
             }
             {
                 <Grid item>

@@ -888,6 +888,8 @@ Resources:
               - s3:ListBucket
               - s3:GetObject
               - s3:RestoreObject
+              - s3:GetBucketNotification
+              - s3:PutBucketNotification
             Resource:
               - arn:aws:s3:::*
               - arn:aws:s3:::*/*
