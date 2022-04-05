@@ -261,20 +261,60 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
 
       val path = URLDecoder.decode(rec.getS3.getObject.getKey,"UTF-8")
 
-      println(s"Source object is s3://${rec.getS3.getBucket.getName}/$path in ${rec.getAwsRegion}")
+      println(s"Source object is s3://${rec.getS3.getBucket.getName}/$path version ${rec.getS3.getObject.getVersionId} in ${rec.getAwsRegion}")
       println(s"Event was sent by ${rec.getUserIdentity.getPrincipalId}")
 
       rec.getEventName match {
+        /*
+        All of these events indicate new content
+         */
         case "ObjectCreated:Put"=>
+          handleCreated(rec, path)
+        case "ObjectCreated:Post"=>
           handleCreated(rec, path)
         case "ObjectCreated:CompleteMultipartUpload"=>
           handleCreated(rec, path)
         case "ObjectCreated:Copy"=>
           handleCreated(rec, path)
-        case "ObjectRemoved:Delete"=>
+
+        /*
+        All of these events indicate something was deleted, or an deletion attempt
+         */
+        case "ObjectRemoved:Delete"=> //object was _actually_ deleted
           handleRemoved(rec, path)
-        case "ObjectRestore:Completed"=>
+        case "ReducedRedundancyLostObject"=>
+          handleRemoved(rec, path)
+        case "LifecycleExpiration:Delete"=>
+          handleRemoved(rec, path)
+        case "ObjectRemoved:DeleteMarkerCreated"=> //object was _apparently_ deleted, leaving versions behind
+          println("ERROR ObjectRemoved:DeleteMarkerCreated not implemented")
+          throw new RuntimeException("event was not implemented")
+        case "LifecycleExpiration:DeleteMarkerCreated"=>  //lifecycle rule 'deleted' the object, leaving versions behind
+          println("ERROR LifecycleExpiration:DeleteMarkerCreated not implemented")
+          throw new RuntimeException("event was not implemented")
+
+        /*
+        All of these events relate to Glacier restores
+         */
+        case "ObjectRestore:Post"=> //restore has been initiated
+          println("ERROR ObjectRestore:Post not implemented")
+          throw new RuntimeException("event was not implemented")
+        case "ObjectRestore:Completed"=>  //restore has been completed
           handleRestored(rec, path)
+        case "ObjectRestore:Delete"=>     //restore has expired and been dropped back
+          println("ERROR ObjectRestore:Delete not implemented")
+          throw new RuntimeException("event was not implemented")
+
+        /*
+        This relates to Standard -> IA -> Glacier -> Glacier Deep transitions
+         */
+        case "LifecycleTransition"=>      //s3 changed the storage tier
+          println("ERROR LifecycleTransition not implemented")
+          throw new RuntimeException("event was not implemented")
+
+        /*
+        Default catch-all that shows an error
+         */
         case other:String=>
           println(s"ERROR: received unknown event $other")
           throw new RuntimeException(s"unknown event $other received")
