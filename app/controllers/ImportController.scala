@@ -100,7 +100,7 @@ class ImportController @Inject()(override val config:Configuration,
             if(scanTarget.enabled) {
               implicit val s3client:AmazonS3 = s3ClientMgr.getClient(awsProfile)
               if(s3client.doesObjectExist(scanTarget.bucketName, importRequest.itemPath)) {
-                val entry = ArchiveEntry.fromS3Sync(scanTarget.bucketName, importRequest.itemPath, scanTarget.region)
+                val entry = ArchiveEntry.fromS3Sync(scanTarget.bucketName, importRequest.itemPath, None, scanTarget.region) //importing from path => take latest version
                 indexer.indexSingleItem(entry).flatMap({
                   case Left(err)=>
                     logger.error(s"Could not index new item $entry: $err")

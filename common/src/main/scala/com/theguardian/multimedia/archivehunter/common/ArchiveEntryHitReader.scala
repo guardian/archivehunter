@@ -44,6 +44,7 @@ trait ArchiveEntryHitReader extends MediaMetadataMapConverters {
           hit.sourceField("id").asInstanceOf[String],
           hit.sourceField("bucket").asInstanceOf[String],
           hit.sourceField("path").asInstanceOf[String],
+          Option(hit.sourceField("version").asInstanceOf[String]),
           Option(hit.sourceField("region").asInstanceOf[String]),
           Option(hit.sourceField("file_extension").asInstanceOf[String]),
           size,

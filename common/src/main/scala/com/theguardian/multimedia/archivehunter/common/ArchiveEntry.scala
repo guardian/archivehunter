@@ -1,5 +1,7 @@
 package com.theguardian.multimedia.archivehunter.common
 
+import com.amazonaws.services.s3.model.GetObjectMetadataRequest
+
 import java.time.{ZoneId, ZonedDateTime}
 import com.amazonaws.services.s3.{AmazonS3, AmazonS3Client}
 import com.sksamuel.elastic4s.http.{ElasticClient, HttpClient}
@@ -13,7 +15,7 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
 
 import scala.util.{Failure, Success, Try}
 
-object ArchiveEntry extends ((String, String, String, Option[String], Option[String], Long, ZonedDateTime, String, MimeType, Boolean, StorageClass, Seq[LightboxIndex], Boolean, Option[MediaMetadata])=>ArchiveEntry) with DocId {
+object ArchiveEntry extends ((String, String, String, Option[String], Option[String], Option[String], Long, ZonedDateTime, String, MimeType, Boolean, StorageClass, Seq[LightboxIndex], Boolean, Option[MediaMetadata])=>ArchiveEntry) with DocId {
   private val logger = LogManager.getLogger(getClass)
 
   def getFileExtension(str: String):Option[String] = {
@@ -32,9 +34,13 @@ object ArchiveEntry extends ((String, String, String, Option[String], Option[Str
     * @param client implicitly provided instance of AmazonS3Client to use
     * @return a (blocking) Future, containing an [[ArchiveEntry]] if successful
     */
-  def fromS3Sync(bucket: String, key: String, region:String)(implicit client:AmazonS3):ArchiveEntry = {
+  def fromS3Sync(bucket: String, key: String, maybeVersion:Option[String], region:String)(implicit client:AmazonS3):ArchiveEntry = {
     Try {
-      client.getObjectMetadata(bucket, key)
+      val req = maybeVersion match {
+        case None=>new GetObjectMetadataRequest(bucket, key)
+        case Some(ver)=>new GetObjectMetadataRequest(bucket, key, ver)
+      }
+      client.getObjectMetadata(req)
     } match {
       case Success(meta) =>
         val mimeType = Option(meta.getContentType) match {
@@ -56,15 +62,21 @@ object ArchiveEntry extends ((String, String, String, Option[String], Option[Str
             logger.warn(s"s3://$bucket/$key has no storage class! Assuming STANDARD.")
             "STANDARD"
         }
-        ArchiveEntry(makeDocId(bucket, key), bucket, key, Some(region), getFileExtension(key), meta.getContentLength, ZonedDateTime.ofInstant(meta.getLastModified.toInstant, ZoneId.systemDefault()), meta.getETag, mimeType, proxied = false, StorageClass.withName(storageClass), Seq(), beenDeleted = false, None)
+        //prefer the version as obtained from s3 metadata over the one we are given
+        val versionToStore = (Option(meta.getVersionId), maybeVersion) match {
+          case (Some(v), _)=>Some(v)
+          case (_, Some(v))=>Some(v)
+          case (None, None)=>None
+        }
+        ArchiveEntry(makeDocId(bucket, key), bucket, key, versionToStore, Some(region), getFileExtension(key), meta.getContentLength, ZonedDateTime.ofInstant(meta.getLastModified.toInstant, ZoneId.systemDefault()), meta.getETag, mimeType, proxied = false, StorageClass.withName(storageClass), Seq(), beenDeleted = false, None)
       case Failure(err) =>
         logger.error(s"Could not look up metadata for s3://$bucket/$key in region $region: ${err.getMessage}")
         throw err
     }
   }
 
-  def fromS3(bucket: String, key: String, region:String)(implicit client:AmazonS3):Future[ArchiveEntry] = Future {
-    fromS3Sync(bucket, key,region)
+  def fromS3(bucket: String, key: String, maybeVersion:Option[String], region:String)(implicit client:AmazonS3):Future[ArchiveEntry] = Future {
+    fromS3Sync(bucket, key, maybeVersion, region)
   }
 
   def fromIndex(bucket:String, key:String)(implicit indexer:Indexer, httpClient: ElasticClient):Future[ArchiveEntry] =
@@ -74,7 +86,7 @@ object ArchiveEntry extends ((String, String, String, Option[String], Option[Str
     indexer.getByIdFull(makeDocId(bucket, key))
 }
 
-case class ArchiveEntry(id:String, bucket: String, path: String, region:Option[String], file_extension: Option[String], size: scala.Long, last_modified: ZonedDateTime, etag: String, mimeType: MimeType, proxied: Boolean, storageClass:StorageClass, lightboxEntries:Seq[LightboxIndex], beenDeleted:Boolean=false, mediaMetadata:Option[MediaMetadata]) {
+case class ArchiveEntry(id:String, bucket: String, path: String, maybeVersion:Option[String], region:Option[String], file_extension: Option[String], size: scala.Long, last_modified: ZonedDateTime, etag: String, mimeType: MimeType, proxied: Boolean, storageClass:StorageClass, lightboxEntries:Seq[LightboxIndex], beenDeleted:Boolean=false, mediaMetadata:Option[MediaMetadata]) {
   private val logger = LogManager.getLogger(getClass)
   def getProxy(proxyType: ProxyType.Value)(implicit proxyLocationDAO:ProxyLocationDAO, client:DynamoDbAsyncClient) = proxyLocationDAO.getProxy(id,proxyType)
 
