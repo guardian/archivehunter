@@ -12,7 +12,12 @@ interface MonitoringSetupCheckProps {
 const useStyles = makeStyles((theme)=>({
     inlineIcon: {
         height: "24px",
+        width: "24px",
+        verticalAlign: "bottom",
         marginRight: "0.4em"
+    },
+    extraMargin: {
+        marginLeft: "0.4em"
     },
     warning: {
         color: theme.palette.warning.main
@@ -37,11 +42,13 @@ const MonitoringSetupCheck:React.FC<MonitoringSetupCheckProps> = (props) => {
                 await axios.post<MonitoringConfigurationResponse>(url);
 
             setLoading(false);
+            setLastError("");
             setNeedsAttention(response.data.updatesRequired);
         } catch(err) {
             console.error(`Could not get monitoring configuration for scan target ${encodeURIComponent(props.scanTarget)}: `, err);
             setLoading(false);
             setLastError("Could not check monitoring configuration, consult the browser console logs for more information");
+            setNeedsAttention(false);
         }
     }
 
@@ -50,26 +57,23 @@ const MonitoringSetupCheck:React.FC<MonitoringSetupCheckProps> = (props) => {
     const fixConfig = async ()=>request(false);
 
     useEffect(()=>{
-        updateInfo();
+        if(props.scanTarget) updateInfo();
     }, [props.scanTarget]);
 
     return (
-        <Grid container>
+        <Grid container spacing={3} alignItems="baseline">
             {
-                loading ? <Grid item><CircularProgress className={classes.inlineIcon}/></Grid> : undefined
+                loading ? <Grid item className={classes.extraMargin}><CircularProgress className={classes.inlineIcon}/></Grid> : undefined
             }
             {
-                needsAttention ? <>
-                    <Grid item><WarningRounded className={clsx(classes.warning, classes.inlineIcon)}/></Grid>
-                    <Grid item><Typography>Configuration is not valid</Typography></Grid>
-                    <Grid item>
-                    <Tooltip title="Try to fix">
-                        <IconButton onClick={fixConfig}><Build className={classes.inlineIcon}/></IconButton>
-                    </Tooltip>
+                needsAttention && !lastError ? <>
+                    <Grid item className={classes.extraMargin}>
+                        <WarningRounded className={clsx(classes.warning, classes.inlineIcon)}/>
+                        <Typography style={{display: "inline"}}>Configuration is not valid</Typography>
                     </Grid>
                     <Grid item>
-                    <Tooltip title="Check again">
-                        <IconButton onClick={updateInfo}><Refresh className={classes.inlineIcon}/></IconButton>
+                    <Tooltip title="Try to fix">
+                        <IconButton onClick={fixConfig}><Build/></IconButton>
                     </Tooltip>
                     </Grid>
                 </> : <>
@@ -83,7 +87,7 @@ const MonitoringSetupCheck:React.FC<MonitoringSetupCheckProps> = (props) => {
             {
                 <Grid item>
                     <Tooltip title="Check again">
-                        <IconButton onClick={updateInfo}><Refresh className={classes.inlineIcon}/></IconButton>
+                        <IconButton onClick={updateInfo}><Refresh/></IconButton>
                     </Tooltip>
                 </Grid>
             }
