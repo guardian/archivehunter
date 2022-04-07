@@ -29,7 +29,7 @@ class UpdateIndexRecordsSpec extends Specification with Mockito {
 
       val mockedIndexer = mock[Indexer]
 
-      val testItem = ArchiveEntry("fake-id","sourcebucket","/path/to/file",None,None,1234L,ZonedDateTime.now(),"fake-etag",
+      val testItem = ArchiveEntry("fake-id","sourcebucket","/path/to/file",None,None,None,1234L,ZonedDateTime.now(),"fake-etag",
         MimeType.fromString("video/quicktime").right.get,true,StorageClass.STANDARD_IA,Seq(), false,None)
 
       mockedIndexer.getById(any)(any) returns Future(testItem)
@@ -75,7 +75,7 @@ class UpdateIndexRecordsSpec extends Specification with Mockito {
 
       val mockedIndexer = mock[Indexer]
 
-      val testItem = ArchiveEntry("fake-id","sourcebucket","/path/to/file",None,None,1234L,ZonedDateTime.now(),"fake-etag",
+      val testItem = ArchiveEntry("fake-id","sourcebucket","/path/to/file",None,None,None,1234L,ZonedDateTime.now(),"fake-etag",
         MimeType.fromString("video/quicktime").toOption.get,true,StorageClass.STANDARD_IA,Seq(), false,None)
 
       mockedIndexer.getById(any)(any) returns Future(testItem)
@@ -118,7 +118,7 @@ class UpdateIndexRecordsSpec extends Specification with Mockito {
 
       val mockedIndexer = mock[Indexer]
 
-      val testItem = ArchiveEntry("fake-id","sourcebucket","/path/to/file",None,None,1234L,ZonedDateTime.now(),"fake-etag",
+      val testItem = ArchiveEntry("fake-id","sourcebucket","/path/to/file",None,None,None,1234L,ZonedDateTime.now(),"fake-etag",
         MimeType.fromString("video/quicktime").right.get,true,StorageClass.STANDARD_IA,Seq(), false,None)
 
       mockedIndexer.getById(any)(any) returns Future(testItem)
@@ -163,7 +163,7 @@ class UpdateIndexRecordsSpec extends Specification with Mockito {
 
       val mockedIndexer = mock[Indexer]
 
-      val testItem = ArchiveEntry("fake-id","sourcebucket","/path/to/file",None,None,1234L,ZonedDateTime.now(),"fake-etag",
+      val testItem = ArchiveEntry("fake-id","sourcebucket","/path/to/file",None,None,None,1234L,ZonedDateTime.now(),"fake-etag",
         MimeType.fromString("video/quicktime").right.get,true,StorageClass.STANDARD_IA,Seq(), false,None)
 
       mockedIndexer.getById(any)(any) returns Future(testItem)
@@ -208,7 +208,7 @@ class UpdateIndexRecordsSpec extends Specification with Mockito {
 
       val mockedIndexer = mock[Indexer]
 
-      val testItem = ArchiveEntry("fake-id","sourcebucket","/path/to/file",None,None,1234L,ZonedDateTime.now(),"fake-etag",
+      val testItem = ArchiveEntry("fake-id","sourcebucket","/path/to/file",None,None,None,1234L,ZonedDateTime.now(),"fake-etag",
         MimeType.fromString("video/quicktime").right.get,true,StorageClass.STANDARD_IA,Seq(), false,None)
 
       mockedIndexer.getById(any)(any) returns Future(testItem)

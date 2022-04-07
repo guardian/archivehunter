@@ -5,11 +5,11 @@ import java.util.UUID
 import java.net.URLEncoder
 import akka.actor.ActorSystem
 import akka.stream.{ActorMaterializer, Materializer}
-import com.amazonaws.services.elastictranscoder.model.CreatePipelineRequest
-import com.amazonaws.services.s3.AmazonS3
+import com.amazonaws.services.s3.model.GetObjectRequest
 import com.amazonaws.services.sns.model.PublishRequest
 import com.theguardian.multimedia.archivehunter.common.clientManagers._
 import com.theguardian.multimedia.archivehunter.common._
+import com.theguardian.multimedia.archivehunter.common.cmn_helpers.S3RestoreHeader
 import com.theguardian.multimedia.archivehunter.common.cmn_models._
 import com.theguardian.multimedia.archivehunter.common.errors.{ExternalSystemError, NothingFoundError}
 
@@ -18,6 +18,8 @@ import org.apache.logging.log4j.{LogManager, Logger}
 import io.circe.syntax._
 import io.circe.generic.auto._
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
+import software.amazon.awssdk.services.s3.S3Client
+import software.amazon.awssdk.services.s3.model.HeadObjectRequest
 
 import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
@@ -45,28 +47,22 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration,
   protected val indexer = new Indexer(config.get[String]("externalData.indexName"))
 
 
-  protected def haveGlacierRestore(entry:ArchiveEntry)(implicit s3Client:AmazonS3) = Try {
-    val meta =s3Client.getObjectMetadata(entry.bucket, entry.path)
-    Option(meta.getOngoingRestore).map(_.booleanValue()) match {
+  protected def haveGlacierRestore(entry:ArchiveEntry)(implicit s3Client:S3Client) = Try {
+    val meta = s3Client.headObject(HeadObjectRequest.builder().bucket(entry.bucket).key(entry.path).build())
+    Option(meta.restore()).flatMap(S3RestoreHeader.apply(_).toOption) match {
       case None=> //no restore has been requested
         logger.debug("No restore requested")
         false
-      case Some(true)=> //restore is ongoing but not ready
+      case Some(S3RestoreHeader(true, _))=> //restore is ongoing but not ready
         logger.debug("Restore is ongoing")
         false
-      case Some(false)=>
-        Option(meta.getRestoreExpirationTime) match {
-          case Some(expiry)=>
-            if(expiry.toInstant.isAfter(Instant.now())){ //i.e., expiry.toInstant is greater than now()
-              logger.debug("Restore has completed and item is available")
-              true
-            } else {
-              logger.debug(s"Item expired at ${expiry.toString}")
-              false
-            }
-          case None=>
-            logger.warn("ongoing restore is FALSE but no expiration time - this is not expected")
-            false
+      case Some(S3RestoreHeader(_, Some(expiry)))=>
+        if(expiry.toInstant.isAfter(Instant.now())){ //i.e., expiry.toInstant is greater than now()
+          logger.debug("Restore has completed and item is available")
+          true
+        } else {
+          logger.debug(s"Item expired at ${expiry.toString}")
+          false
         }
     }
   }

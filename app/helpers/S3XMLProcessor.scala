@@ -51,7 +51,7 @@ class S3XMLProcessor (skipZeroLength:Boolean=true) extends GraphStage[FlowShape[
 
   private def captureFromXml(xml:XMLEventReader, currNode:List[String],allCaptures:Map[String,String]):Map[String,String] =
     if(xml.hasNext){
-      xml.next match {
+      xml.next() match {
         case EvElemStart(_, label, attrs, scope)=>
           logger.debug(s"\telem start: $label")
           captureFromXml(xml, label :: currNode, allCaptures)
@@ -94,7 +94,7 @@ class S3XMLProcessor (skipZeroLength:Boolean=true) extends GraphStage[FlowShape[
       logger.debug(s"in loop: $currNode")
       logger.debug(s"xml.hasNext: ${xml.hasNext}")
       if(xml.hasNext){
-        xml.next match {
+        xml.next() match {
           case EvElemStart(prefix, label, attrs, scope)=>
             logger.debug(s"start element: $label")
             if(label=="Contents"){

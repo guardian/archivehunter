@@ -5,8 +5,10 @@ import akka.stream.stage.{AbstractInHandler, AbstractOutHandler, GraphStage, Gra
 import com.theguardian.multimedia.archivehunter.common.clientManagers.S3ClientManager
 import com.theguardian.multimedia.archivehunter.common.cmn_models.ScanTargetDAO
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ProxyLocation}
+
 import javax.inject.Inject
 import play.api.{Configuration, Logger}
+import software.amazon.awssdk.regions.Region
 
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -30,7 +32,7 @@ class ProxyLocatorFlow @Inject() (playConfig:Configuration, s3ClientManager: S3C
       override def onPush(): Unit = {
         val elem = grab(in)
         logger.debug(s"Got archive entry $elem")
-        implicit val s3Client = s3ClientManager.getS3Client(awsProfile, elem.region)
+        implicit val s3Client = s3ClientManager.getS3Client(awsProfile, elem.region.map(Region.of))
         val potentialProxyLocationsResult = Await.result(ProxyLocator.findProxyLocation(elem), 10 seconds)
 
         val potentialProxyLocations = potentialProxyLocationsResult.collect({case Right(thing)=>thing})

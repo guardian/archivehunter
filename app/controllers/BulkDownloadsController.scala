@@ -30,6 +30,7 @@ import scala.util.{Failure, Success}
 import akka.pattern.ask
 import akka.util.ByteString
 import auth.{BearerTokenAuth, Security}
+import com.amazonaws.regions.{Region, Regions}
 import com.sksamuel.elastic4s.streams.ScrollPublisher
 import org.slf4j.LoggerFactory
 import play.api.cache.SyncCacheApi
@@ -266,7 +267,7 @@ class BulkDownloadsController @Inject()(override val config:Configuration,
         Future(Forbidden(GenericErrorResponse("forbidden", "invalid or expired token").asJson))
       case Some(Right(_))=>
         indexer.getById(fileId).flatMap(archiveEntry=>{
-          val s3Client = s3ClientManager.getS3Client(profileName,archiveEntry.region)
+          val s3Client = s3ClientManager.getS3Client(profileName,archiveEntry.region.map(software.amazon.awssdk.regions.Region.of))
           val response = (glacierRestoreActor ? GlacierRestoreActor.CheckRestoreStatusBasic(archiveEntry)).mapTo[GlacierRestoreActor.GRMsg]
 
           response.map({

@@ -14,6 +14,8 @@ import com.theguardian.multimedia.archivehunter.common.cmn_models.ItemNotFound
 
 import javax.inject.Inject
 import play.api.{Configuration, Logger}
+import software.amazon.awssdk.regions.Region
+import software.amazon.awssdk.services.s3.S3Client
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -32,7 +34,7 @@ class S3ToArchiveEntryFlow @Inject() (s3ClientMgr: S3ClientManager, config:Confi
       //over-riding the element name to provide the region is a bit hacky but it works.
       val region = inheritedAttributes.nameOrDefault(config.getOptional[String]("externalData.awsRegion").getOrElse("eu-west-1"))
 
-      implicit val s3Client:AmazonS3 = s3ClientMgr.getS3Client(config.getOptional[String]("externalData.awsProfile"),Some(region))
+      implicit val s3Client:S3Client = s3ClientMgr.getS3Client(config.getOptional[String]("externalData.awsProfile"),Some(Region.of(region)))
       private implicit val indexer = new Indexer(config.get[String]("externalData.indexName"))
       private implicit val esClient = esClientManager.getClient()
       private val logger=Logger(getClass)
@@ -84,7 +86,7 @@ class S3ToArchiveEntryFlow @Inject() (s3ClientMgr: S3ClientManager, config:Confi
           try {
             //we need to do a metadata lookup to get the MIME type anyway, so we may as well just call out here.
             //it appears that you can't push() to a port from in a Future thread, so doing it the crappy way and blocking here.
-            val mappedElem = ArchiveEntry.fromS3Sync(elem.bucketName, elem.key, region)
+            val mappedElem = ArchiveEntry.fromS3Sync(elem.bucketName, elem.key, None, region)
             logger.debug(s"Mapped $elem to $mappedElem")
 
             val maybeExistingEntry = ArchiveEntry.fromIndexFull(elem.bucketName, elem.key)

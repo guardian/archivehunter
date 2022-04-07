@@ -1,5 +1,4 @@
 import akka.actor.Props
-import com.amazonaws.services.s3.AmazonS3
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{ESClientManager, S3ClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{JobModel, JobModelDAO, LightboxEntry, LightboxEntryDAO}
 import org.specs2.mock.Mockito
@@ -8,8 +7,9 @@ import play.api.Configuration
 import services.GlacierRestoreActor
 import akka.pattern.ask
 import akka.util.Timeout
-import com.amazonaws.services.s3.model.{RestoreObjectRequest, RestoreObjectResult}
 import com.theguardian.multimedia.archivehunter.common.ArchiveEntry
+import software.amazon.awssdk.services.s3.S3Client
+import software.amazon.awssdk.services.s3.model.{RequestCharged, RestoreObjectRequest, RestoreObjectResponse, RestoreRequest}
 
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration._
@@ -24,11 +24,13 @@ class GlacierRestoreActorSpec extends Specification with Mockito {
       val mockedEsClientMgr = mock[ESClientManager]
       mockedConfig.getOptional[Int]("archive.restoresExpireAfter") returns Some(3)
       val mockedS3ClientManager = mock[S3ClientManager]
-      val mockedS3Client = mock[AmazonS3]
-      val mockedRestoreResult = new RestoreObjectResult()
-      mockedRestoreResult.setRequesterCharged(true)
-      mockedRestoreResult.setRestoreOutputPath("/some/test/path")
-      mockedS3Client.restoreObjectV2(any) returns mockedRestoreResult
+      val mockedS3Client = mock[S3Client]
+      val mockedRestoreResult = RestoreObjectResponse.builder()
+        .requestCharged(RequestCharged.REQUESTER)
+        .restoreOutputPath("/some/test/path")
+        .build()
+
+      mockedS3Client.restoreObject(org.mockito.ArgumentMatchers.any[RestoreObjectRequest]) returns mockedRestoreResult
       mockedS3ClientManager.getClient(any) returns mockedS3Client
       val mockedJobModelDAO = mock[JobModelDAO]
       mockedJobModelDAO.putJob(any[JobModel]) returns Future(None)
@@ -46,7 +48,12 @@ class GlacierRestoreActorSpec extends Specification with Mockito {
       val result = Await.result(toTest ? GlacierRestoreActor.InitiateRestore(mockedEntry, mockedLbEntry, None), 30 seconds)
       result mustEqual GlacierRestoreActor.RestoreSuccess
 
-      there was one(mockedS3Client).restoreObjectV2(new RestoreObjectRequest(mockedEntry.bucket, mockedEntry.path, 3))
+      val expectedReq = RestoreObjectRequest.builder
+        .bucket(mockedEntry.bucket)
+        .key(mockedEntry.path)
+        .restoreRequest(RestoreRequest.builder().days(3).build())
+        .build()
+      there was one(mockedS3Client).restoreObject(expectedReq)
 
       there was one(mockedJobModelDAO).putJob(any[JobModel])
       there was one(mockedLightboxEntryDAO).put(any[LightboxEntry])(any)

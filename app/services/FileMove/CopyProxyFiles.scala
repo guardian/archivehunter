@@ -4,6 +4,9 @@ import com.amazonaws.services.s3.AmazonS3
 import com.theguardian.multimedia.archivehunter.common.clientManagers.S3ClientManager
 import com.theguardian.multimedia.archivehunter.common.{DocId, ProxyLocation}
 import play.api.Configuration
+import software.amazon.awssdk.regions.Region
+import software.amazon.awssdk.services.s3.S3Client
+import software.amazon.awssdk.services.s3.model.{CopyObjectRequest, DeleteObjectRequest, HeadObjectRequest}
 
 import scala.util.{Failure, Success, Try}
 
@@ -13,23 +16,31 @@ import scala.util.{Failure, Success, Try}
   */
 class CopyProxyFiles (s3ClientManager:S3ClientManager, config:Configuration) extends GenericMoveActor with DocId {
   import GenericMoveActor._
+  import com.theguardian.multimedia.archivehunter.common.cmn_helpers.S3ClientExtensions._
 
-  def deleteCopiedProxies(currentState:FileMoveTransientData, proxyList:Seq[ProxyLocation])(implicit s3Client:AmazonS3) =
-    proxyList.foreach(loc=>
-      if(s3Client.doesObjectExist(currentState.destProxyBucket, loc.bucketPath)){
-        logger.info(s"Deleting copied proxy at ${currentState.destProxyBucket}:${loc.bucketPath}")
-        try {
-          s3Client.deleteObject(currentState.destProxyBucket, loc.bucketPath)
-        } catch {
-          case deleteErr:Throwable=>
-            logger.error("Could not delete copied proxy: ", deleteErr)
+  def deleteCopiedProxies(currentState:FileMoveTransientData, proxyList:Seq[ProxyLocation])(implicit s3Client:S3Client) =
+    proxyList.foreach(loc=> {
+      val deletion = for {
+        exists <- s3Client.doesObjectExist(currentState.destProxyBucket, loc.bucketPath)
+        result <- if (exists) {
+          Try {
+            s3Client.deleteObject(DeleteObjectRequest.builder().bucket(currentState.destProxyBucket).key(loc.bucketPath).build())
+          }.map(Some.apply)
+        } else {
+          Success(None)
         }
+      } yield result
+      deletion match {
+        case Success(_)=>
+          logger.info(s"Deleted copied proxy at ${currentState.destProxyBucket}:${loc.bucketPath}")
+        case Failure(err)=>
+          logger.error("Could not delete copied proxy: ", err)
       }
-    )
+    })
 
   override def receive: Receive = {
     case PerformStep(currentState)=>
-      implicit val s3Client = s3ClientManager.getS3Client(region=Some(currentState.destRegion),profileName=config.getOptional[String]("externalData.awsProfile"))
+      implicit val s3Client = s3ClientManager.getS3Client(region=Some(Region.of(currentState.destRegion)),profileName=config.getOptional[String]("externalData.awsProfile"))
       currentState.sourceFileProxies match {
         case Some(proxyList) =>
           try {
@@ -44,10 +55,21 @@ class CopyProxyFiles (s3ClientManager:S3ClientManager, config:Configuration) ext
             proxyList.map(proxy => {
               logger.debug(s"Copying from ${proxy.bucketName}:${proxy.bucketPath} to ${currentState.destProxyBucket}:${proxy.bucketPath}")
               //does the proxy still exist?
-              Try { s3Client.getObjectMetadata(proxy.bucketName, proxy.bucketPath) } match {
-                case Success(meta)=>
-                  logger.info(s"Proxy ${proxy.bucketName}/${proxy.bucketPath} exists with size ${meta.getContentLength} and eTag ${meta.getETag}")
-                  Some(s3Client.copyObject(proxy.bucketName, proxy.bucketPath, currentState.destProxyBucket, proxy.bucketPath))
+              val copyResult = for {
+                meta <- Try { s3Client.headObject(HeadObjectRequest.builder().bucket(proxy.bucketName).key(proxy.bucketPath).build()) }
+                copyResult <- Try {
+                  logger.info(s"Proxy ${proxy.bucketName}/${proxy.bucketPath} exists with size ${meta.contentLength()} and eTag ${meta.eTag()}")
+                  s3Client.copyObject(CopyObjectRequest.builder()
+                    .sourceBucket(proxy.bucketName)
+                    .sourceKey(proxy.bucketPath)
+                    .destinationBucket(currentState.destProxyBucket)
+                    .destinationKey(proxy.bucketPath)
+                    .build()
+                  )
+                }
+              } yield copyResult
+              copyResult match {
+                case Success(result)=>Some(result)
                 case Failure(err)=>
                   logger.warn(s"Could not find proxy ${proxy.bucketName}/${proxy.bucketPath}: ${err.getMessage}.  Assuming that it does not exist any more.")
                   None
@@ -69,7 +91,7 @@ class CopyProxyFiles (s3ClientManager:S3ClientManager, config:Configuration) ext
       }
 
     case RollbackStep(currentState)=>
-      implicit val s3Client = s3ClientManager.getS3Client(region=Some(currentState.destRegion),profileName=config.getOptional[String]("externalData.awsProfile"))
+      implicit val s3Client = s3ClientManager.getS3Client(region=Some(Region.of(currentState.destRegion)),profileName=config.getOptional[String]("externalData.awsProfile"))
       currentState.sourceFileProxies match {
         case Some(proxyList) =>
           logger.info(s"Rolling back proxy copy for $proxyList")

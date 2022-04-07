@@ -12,6 +12,8 @@ import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 import org.apache.logging.log4j.LogManager
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
+import software.amazon.awssdk.services.s3.S3Client
+import software.amazon.awssdk.services.s3.model.HeadObjectRequest
 
 import scala.util.{Failure, Success, Try}
 
@@ -34,16 +36,16 @@ object ArchiveEntry extends ((String, String, String, Option[String], Option[Str
     * @param client implicitly provided instance of AmazonS3Client to use
     * @return a (blocking) Future, containing an [[ArchiveEntry]] if successful
     */
-  def fromS3Sync(bucket: String, key: String, maybeVersion:Option[String], region:String)(implicit client:AmazonS3):ArchiveEntry = {
+  def fromS3Sync(bucket: String, key: String, maybeVersion:Option[String], region:String)(implicit client:S3Client):ArchiveEntry = {
     Try {
       val req = maybeVersion match {
-        case None=>new GetObjectMetadataRequest(bucket, key)
-        case Some(ver)=>new GetObjectMetadataRequest(bucket, key, ver)
+        case None=>HeadObjectRequest.builder().bucket(bucket).key(key).build()
+        case Some(ver)=>HeadObjectRequest.builder().bucket(bucket).key(key).versionId(ver).build()
       }
-      client.getObjectMetadata(req)
+      client.headObject(req)
     } match {
       case Success(meta) =>
-        val mimeType = Option(meta.getContentType) match {
+        val mimeType = Option(meta.contentType()) match {
           case Some(mimeTypeString) =>
             MimeType.fromString(mimeTypeString) match {
               case Right(mt) => mt
@@ -56,26 +58,26 @@ object ArchiveEntry extends ((String, String, String, Option[String], Option[Str
             MimeType("application", "octet-stream")
         }
 
-        val storageClass = Option(meta.getStorageClass) match {
+        val storageClass = Option(meta.storageClassAsString()) match {
           case Some(sc) => sc
           case None =>
             logger.warn(s"s3://$bucket/$key has no storage class! Assuming STANDARD.")
             "STANDARD"
         }
         //prefer the version as obtained from s3 metadata over the one we are given
-        val versionToStore = (Option(meta.getVersionId), maybeVersion) match {
+        val versionToStore = (Option(meta.versionId()), maybeVersion) match {
           case (Some(v), _)=>Some(v)
           case (_, Some(v))=>Some(v)
           case (None, None)=>None
         }
-        ArchiveEntry(makeDocId(bucket, key), bucket, key, versionToStore, Some(region), getFileExtension(key), meta.getContentLength, ZonedDateTime.ofInstant(meta.getLastModified.toInstant, ZoneId.systemDefault()), meta.getETag, mimeType, proxied = false, StorageClass.withName(storageClass), Seq(), beenDeleted = false, None)
+        ArchiveEntry(makeDocId(bucket, key), bucket, key, versionToStore, Some(region), getFileExtension(key), meta.contentLength(), ZonedDateTime.ofInstant(meta.lastModified(), ZoneId.systemDefault()), meta.eTag(), mimeType, proxied = false, StorageClass.withName(storageClass), Seq(), beenDeleted = false, None)
       case Failure(err) =>
         logger.error(s"Could not look up metadata for s3://$bucket/$key in region $region: ${err.getMessage}")
         throw err
     }
   }
 
-  def fromS3(bucket: String, key: String, maybeVersion:Option[String], region:String)(implicit client:AmazonS3):Future[ArchiveEntry] = Future {
+  def fromS3(bucket: String, key: String, maybeVersion:Option[String], region:String)(implicit client:S3Client):Future[ArchiveEntry] = Future {
     fromS3Sync(bucket, key, maybeVersion, region)
   }
 

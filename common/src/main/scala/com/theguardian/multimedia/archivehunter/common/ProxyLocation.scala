@@ -1,13 +1,15 @@
 package com.theguardian.multimedia.archivehunter.common
 
 import java.net.URI
-
 import com.amazonaws.services.s3.AmazonS3
 import com.amazonaws.services.s3.model.ObjectMetadata
 import org.scanamo.DynamoFormat
 import com.theguardian.multimedia.archivehunter.common.clientManagers.S3ClientManager
 import io.circe.{Decoder, Encoder}
 import org.apache.logging.log4j.LogManager
+import software.amazon.awssdk.regions.Region
+import software.amazon.awssdk.services.s3.S3Client
+import software.amazon.awssdk.services.s3.model.{HeadObjectRequest, HeadObjectResponse}
 
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -36,12 +38,12 @@ object ProxyLocation extends DocId {
     new URI(proto, host, "/"+path, "")
   }
 
-  def fromS3(bucket:String, path:String, mainMediaId:String, meta:ObjectMetadata, maybeRegion:Option[String], proxyType:ProxyType.Value) = {
-    val storageClass = Option(meta.getStorageClass).map(actualClass=>StorageClass.withName(actualClass)).getOrElse(StorageClass.STANDARD)
+  def fromS3(bucket:String, path:String, mainMediaId:String, meta:HeadObjectResponse, maybeRegion:Option[String], proxyType:ProxyType.Value) = {
+    val storageClass = Option(meta.storageClassAsString()).map(actualClass=>StorageClass.withName(actualClass)).getOrElse(StorageClass.STANDARD)
     new ProxyLocation(mainMediaId, makeDocId(bucket,path), proxyType,bucket,path,maybeRegion,storageClass)
   }
 
-  def newInS3(proxyLocationString:String, mainMediaId:String, region:String, proxyType:ProxyType.Value)(implicit s3Client:AmazonS3) = Try {
+  def newInS3(proxyLocationString:String, mainMediaId:String, region:String, proxyType:ProxyType.Value)(implicit s3Client:S3Client) = Try {
     val proxyLocationURI = getUrlElems(proxyLocationString)
     logger.debug(s"newInS3: bucket is ${proxyLocationURI.getHost} path is ${proxyLocationURI.getPath}")
     val fixedPath = if(proxyLocationURI.getPath.startsWith("/")){
@@ -50,18 +52,18 @@ object ProxyLocation extends DocId {
       proxyLocationURI.getPath
     }
 
-    val storageClassValue = s3Client.getObjectMetadata(proxyLocationURI.getHost,fixedPath).getStorageClass
+    val storageClassValue = s3Client.headObject(HeadObjectRequest.builder().bucket(proxyLocationURI.getHost).key(fixedPath).build()).storageClassAsString()
     new ProxyLocation(mainMediaId, makeDocId(proxyLocationURI.getHost, fixedPath),proxyType, proxyLocationURI.getHost,fixedPath, Some(region), StorageClass.safeWithName(storageClassValue))
   }
 
-  def fromS3(proxyUri: String, mainMediaUri: String, proxyType:Option[ProxyType.Value])(implicit client:AmazonS3):Future[Either[String, ProxyLocation]] = {
+  def fromS3(proxyUri: String, mainMediaUri: String, proxyType:Option[ProxyType.Value], region:Region)(implicit client:S3Client):Future[Either[String, ProxyLocation]] = {
     val proxyUriDecoded = getUrlElems(proxyUri)
     val mainMediaUriDecoded = getUrlElems(mainMediaUri)
 
     if(proxyUriDecoded.getScheme!="s3" || mainMediaUriDecoded.getScheme!="s3"){
       Future(Left("either proxyUri or mainMediaUri is not an S3 url"))
     } else {
-      fromS3(proxyUriDecoded.getHost, proxyUriDecoded.getPath.replaceAll("^\\/*",""), mainMediaUriDecoded.getHost, mainMediaUriDecoded.getPath.replaceAll("^\\/*",""), proxyType)
+      fromS3(proxyUriDecoded.getHost, proxyUriDecoded.getPath.replaceAll("^\\/*",""), mainMediaUriDecoded.getHost, mainMediaUriDecoded.getPath.replaceAll("^\\/*",""), proxyType, region)
     }
   }
 
@@ -72,11 +74,11 @@ object ProxyLocation extends DocId {
     * @param client implicitly provided instance of AmazonS3Client to use
     * @return a (blocking) Future, containing a [[ProxyLocation]] if successful
     */
-  def fromS3(proxyBucket: String, key: String, mainMediaBucket: String, mediaItemKey:String, proxyType:Option[ProxyType.Value] = None)(implicit client:AmazonS3):Future[Either[String, ProxyLocation]] = Future {
+  def fromS3(proxyBucket: String, key: String, mainMediaBucket: String, mediaItemKey:String, proxyType:Option[ProxyType.Value] = None, region:Region)(implicit client:S3Client):Future[Either[String, ProxyLocation]] = Future {
     try {
       logger.debug(s"Looking up proxy location for s3://$proxyBucket/$key")
-      val meta = client.getObjectMetadata(proxyBucket, key)
-      val mimeType = Option(meta.getContentType) match {
+      val meta = client.headObject(HeadObjectRequest.builder().bucket(proxyBucket).key(key).build())
+      val mimeType = Option(meta.contentType()) match {
         case Some(mimeTypeString) =>
           MimeType.fromString(mimeTypeString) match {
             case Right(mt) => mt
@@ -108,7 +110,7 @@ object ProxyLocation extends DocId {
         case Some(value) => value
       }
       logger.debug(s"doc ID is ${makeDocId(mainMediaBucket, mediaItemKey)} from $mainMediaBucket and $key")
-      Right(new ProxyLocation(makeDocId(mainMediaBucket, mediaItemKey), makeDocId(proxyBucket, key), pt, proxyBucket, key, Option(client.getRegionName), StorageClass.safeWithName(meta.getStorageClass)))
+      Right(new ProxyLocation(makeDocId(mainMediaBucket, mediaItemKey), makeDocId(proxyBucket, key), pt, proxyBucket, key, Some(region.toString), StorageClass.safeWithName(meta.storageClassAsString())))
     } catch {
       case ex:Throwable=>
         logger.error("could not find proxyLocation in s3: ", ex)

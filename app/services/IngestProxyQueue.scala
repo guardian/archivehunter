@@ -10,9 +10,11 @@ import com.theguardian.multimedia.archivehunter.common.{cmn_models, _}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager, SQSClientManager}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{IngestMessage, ScanTargetDAO}
 import helpers.ProxyLocator
+
 import javax.inject.{Inject, Named, Singleton}
 import models.AwsSqsMsg
 import play.api.{Configuration, Logger}
+import software.amazon.awssdk.regions.Region
 
 import scala.collection.JavaConverters._
 import scala.concurrent.{ExecutionContext, Future}
@@ -101,7 +103,7 @@ class IngestProxyQueue @Inject()(config: Configuration,
 
     case CheckNonRegisteredThumb(entry) =>
       val originalSender = sender()
-      implicit val s3Client = s3ClientMgr.getS3Client(config.getOptional[String]("externalData.awsProfile"), entry.region)
+      implicit val s3Client = s3ClientMgr.getS3Client(config.getOptional[String]("externalData.awsProfile"), entry.region.map(Region.of))
       ProxyLocator.findProxyLocation(entry).map(results => {
         val foundProxies = results.collect({ case Right(loc) => loc }).filter(loc => loc.proxyType == ProxyType.THUMBNAIL)
         if (foundProxies.isEmpty) {
@@ -140,7 +142,7 @@ class IngestProxyQueue @Inject()(config: Configuration,
 
     case CheckNonRegisteredProxy(entry) =>
       val originalSender = sender()
-      implicit val s3Client = s3ClientMgr.getS3Client(config.getOptional[String]("externalData.awsProfile"), entry.region)
+      implicit val s3Client = s3ClientMgr.getS3Client(config.getOptional[String]("externalData.awsProfile"), entry.region.map(Region.of))
       ProxyLocator.findProxyLocation(entry).flatMap(results => {
         val foundProxies = results.collect({ case Right(loc) => loc }).filter(loc => loc.proxyType != ProxyType.THUMBNAIL)
         if (foundProxies.isEmpty) {

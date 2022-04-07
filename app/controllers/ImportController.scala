@@ -3,7 +3,6 @@ package controllers
 import akka.actor.{ActorRef, ActorSystem}
 import akka.stream.Materializer
 import auth.{BearerTokenAuth, Security}
-import com.amazonaws.services.s3.AmazonS3
 import io.circe.generic.auto._
 import com.sksamuel.elastic4s.http.ElasticClient
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer, ProxyLocation, ProxyLocationDAO, ProxyTypeEncoder}
@@ -22,6 +21,8 @@ import org.slf4j.LoggerFactory
 import play.api.cache.SyncCacheApi
 import responses.{GenericErrorResponse, ObjectCreatedResponse}
 import services.IngestProxyQueue
+import software.amazon.awssdk.regions.Region
+import software.amazon.awssdk.services.s3.S3Client
 
 import javax.inject.{Inject, Named, Singleton}
 import scala.concurrent.Future
@@ -42,6 +43,7 @@ class ImportController @Inject()(override val config:Configuration,
                                    @Named("ingestProxyQueue") ingestProxyQueue:ActorRef)
                                   (implicit actorSystem:ActorSystem, mat:Materializer)
   extends AbstractController(controllerComponents) with Security with Circe with ProxyTypeEncoder {
+  import com.theguardian.multimedia.archivehunter.common.cmn_helpers.S3ClientExtensions._
 
   override protected val logger = LoggerFactory.getLogger(getClass)
 
@@ -98,8 +100,8 @@ class ImportController @Inject()(override val config:Configuration,
             Future(InternalServerError(GenericErrorResponse("db_error","Could not look up scan target").asJson))
           case Some(Right(scanTarget))=>
             if(scanTarget.enabled) {
-              implicit val s3client:AmazonS3 = s3ClientMgr.getClient(awsProfile)
-              if(s3client.doesObjectExist(scanTarget.bucketName, importRequest.itemPath)) {
+              implicit val s3client:S3Client = s3ClientMgr.getClient(awsProfile)
+              if(s3client.doesObjectExist(scanTarget.bucketName, importRequest.itemPath).get) {
                 val entry = ArchiveEntry.fromS3Sync(scanTarget.bucketName, importRequest.itemPath, None, scanTarget.region) //importing from path => take latest version
                 indexer.indexSingleItem(entry).flatMap({
                   case Left(err)=>
@@ -159,10 +161,10 @@ class ImportController @Inject()(override val config:Configuration,
     * @return a Future, containing a Play result
     */
   private def performProxyImport(importRequest:ProxyImportRequest, item:ArchiveEntry, correctProxyBucket:String) = {
-    implicit val s3client:AmazonS3 = s3ClientMgr.getS3Client(region = item.region)
-    Future.fromTry(Try {
-      s3client.doesObjectExist(correctProxyBucket, importRequest.proxyPath)
-    }).flatMap({
+    implicit val s3client:S3Client = s3ClientMgr.getS3Client(item.region)
+    Future
+      .fromTry(s3client.doesObjectExist(correctProxyBucket, importRequest.proxyPath))
+      .flatMap({
       case false => Future(BadRequest(GenericErrorResponse("error", "that proxy does not exist").asJson))
       case true =>
         ProxyLocation.fromS3(
@@ -170,7 +172,8 @@ class ImportController @Inject()(override val config:Configuration,
           importRequest.proxyPath,
           item.bucket,
           item.path,
-          Some(importRequest.proxyType)
+          Some(importRequest.proxyType),
+          Region.of(item.region.getOrElse("eu-west-1"))
         ).flatMap({
           case Left(err)=>
             Future(InternalServerError(GenericErrorResponse("error",s"Could not get proxy location from s3 $err").asJson))
