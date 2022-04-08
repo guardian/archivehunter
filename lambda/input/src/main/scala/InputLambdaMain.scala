@@ -3,8 +3,6 @@ import java.time.ZonedDateTime
 import com.amazonaws.services.lambda.runtime.{Context, RequestHandler}
 import com.amazonaws.services.lambda.runtime.events.S3Event
 import com.amazonaws.services.s3.event.S3EventNotification
-import com.amazonaws.services.s3.model.{ObjectMetadata, S3Object}
-import com.amazonaws.services.s3.{AmazonS3, AmazonS3ClientBuilder}
 import com.amazonaws.services.sqs.AmazonSQSClientBuilder
 import com.amazonaws.services.sqs.model.SendMessageRequest
 import com.google.inject.Guice
@@ -17,12 +15,16 @@ import org.apache.http.HttpHost
 import org.elasticsearch.client.RestClient
 import io.circe.syntax._
 import io.circe.generic.auto._
+import software.amazon.awssdk.services.s3.S3Client
 
-import collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
 import scala.concurrent.ExecutionContext.Implicits.global
+import com.theguardian.multimedia.archivehunter.common.cmn_helpers.S3ClientExtensions._
+import software.amazon.awssdk.regions.Region
+import software.amazon.awssdk.services.s3.model.{HeadObjectResponse, NoSuchKeyException}
 
 class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with ZonedDateTimeEncoder with StorageClassEncoder {
   private final val logger = LogManager.getLogger(getClass)
@@ -30,11 +32,13 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
   private val injector = Guice.createInjector(new Module)
   val maxRetries = 20
 
+  def getRegionFromEnvironment:Option[Region] = Option(System.getenv("AWS_REGION")).map(Region.of)
+
   /**
     * these are extracted out as individual accessors to make over-riding them easier in unit tests
     * @return
     */
-  protected def getS3Client = AmazonS3ClientBuilder.defaultClient()
+  protected def getS3Client = S3Client.builder().build()
   protected def getElasticClient(clusterEndpoint:String) = {
     val esClient = RestClient.builder(HttpHost.create(clusterEndpoint)).build()
     ElasticClient.fromRestClient(esClient)
@@ -68,20 +72,18 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
   def dumpEventData(event: S3Event, indentChar:Option[String]=None) =
     event.getRecords.asScala.foldLeft("")((acc,record)=>acc + s"${indentChar.getOrElse("")}${record.getEventName} on ${record.getEventSource} in ${record.getAwsRegion} at ${record.getEventTime} with ${URLDecoder.decode(record.getS3.getObject.getKey,"UTF-8")}\n")
 
-  def getMetadataWithRetry(bucket:String, key:String, retryNumber:Int=0)(implicit s3Client:AmazonS3):ObjectMetadata = {
-    try{
-      s3Client.getObjectMetadata(bucket, key)
-    } catch {
-      case ex:com.amazonaws.services.s3.model.AmazonS3Exception=>
-        if(ex.getMessage.contains("Not Found")){
-          logger.warn(s"Could not find s3://$bucket/$key on attempt $retryNumber")
-          if(retryNumber+1>maxRetries) throw ex
-          Thread.sleep(500)
-          getMetadataWithRetry(bucket, key, retryNumber+1)
+  def getMetadataWithRetry(bucket:String, key:String, maybeVersion:Option[String], retryNumber:Int=0)(implicit s3Client:S3Client):Try[HeadObjectResponse] = {
+      s3Client.getObjectMetadata(bucket, key,maybeVersion) match {
+      case Failure(ex:NoSuchKeyException)=>
+        logger.warn(s"Could not find s3://$bucket/$key on attempt $retryNumber")
+        if(retryNumber+1>maxRetries) {
+          Failure(ex)
         } else {
-          throw ex
+          Thread.sleep(500)
+          getMetadataWithRetry(bucket, key, maybeVersion, retryNumber + 1)
         }
-      case other:Throwable=>throw other
+      case err@Failure(_)=>err
+      case ok@Success(_)=>ok
     }
   }
 
@@ -113,11 +115,7 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
     * @param elasticElasticClient implicitly provided ElasticClient instance for Elastic Search
     * @return a Future, containing the ID of the new/updated record as a String.  If the operation fails, the Future will fail; pick this up with .onComplete or .recover
     */
-  def handleCreated(rec:S3EventNotification.S3EventNotificationRecord,path: String)(implicit i:Indexer, pathCacheIndexer:PathCacheIndexer, s3Client:AmazonS3, elasticElasticClient:ElasticClient):Future[String] = {
-    import com.sksamuel.elastic4s.http.ElasticDsl._
-    import io.circe.generic.auto._
-    import com.sksamuel.elastic4s.circe._
-
+  def handleCreated(rec:S3EventNotification.S3EventNotificationRecord,path: String)(implicit i:Indexer, pathCacheIndexer:PathCacheIndexer, s3Client:S3Client, elasticElasticClient:ElasticClient):Future[String] = {
     //build a list of entries to add to the path cache
     val pathParts = path.split("/").init  //the last element is the filename, which we are not interested in.
 
@@ -129,7 +127,7 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
 
     println(s"going to update ${newCacheEntries.length} path cache entries")
     writePathCacheEntries(newCacheEntries).flatMap(_=> {
-      ArchiveEntry.fromS3(rec.getS3.getBucket.getName, path, s3Client.getRegionName).flatMap(entry => {
+      ArchiveEntry.fromS3(rec.getS3.getBucket.getName, path, Option(rec.getS3.getObject.getVersionId), getRegionFromEnvironment.get.toString).flatMap(entry => {
         println(s"Going to index $entry")
         i.indexSingleItem(entry).map({
           case Right(indexid) =>
@@ -251,7 +249,7 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
 
     val clusterEndpoint = getClusterEndpoint
 
-    implicit val s3Client:AmazonS3 = getS3Client
+    implicit val s3Client:S3Client = getS3Client
     implicit val elasticClient:ElasticClient = getElasticClient(clusterEndpoint)
     implicit val i:Indexer = getIndexer(indexName)
     implicit val pc:PathCacheIndexer = getPathCacheIndexer(getPathCacheIndexName, elasticClient)
