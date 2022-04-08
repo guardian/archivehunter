@@ -349,3 +349,9 @@ interface GenericResponse {
     status: string;
     detail: string;
 }
+
+interface MonitoringConfigurationResponse {
+    status: string;
+    updatesRequired: boolean;
+    didUpdate: boolean;
+}

@@ -27,6 +27,7 @@ import {baseStyles} from "../BaseStyles";
 import ScanTargetActionsBox from "./ScanTargetActionsBox";
 import {Helmet} from "react-helmet";
 import {BugReport, Tune} from "@material-ui/icons";
+import MonitoringSetupCheck from "./MonitoringSetupCheck";
 
 const styles = (theme) => Object.assign(createStyles({
     formContainer: {
@@ -313,6 +314,10 @@ class ScanTargetEdit extends React.Component {
                         />
                     </Tooltip>
                         </td>
+                </tr>
+                <tr>
+                    <td>Monitoring setup</td>
+                    <td><MonitoringSetupCheck scanTarget={this.state.idToLoad}/></td>
                 </tr>
                 <tr>
                     <td style={{verticalAlign: "top"}}>Transcode Setup</td>

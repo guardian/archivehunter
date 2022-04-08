@@ -91,7 +91,6 @@
     <logger name="services.IngestProxyQueue" level="INFO"/>
     <logger name="services.ProblemItemRetry" level="INFO"/>
     <logger name="requests.JobSearchRequest" level="INFO"/>
-    <logger name="services.FileMoveQueue" level="DEBUG"/>
     <logger name="ProblemItemRetry" level="INFO"/>
     <logger name="helpers.ProblemItemReproxySink" level="INFO"/>
 
@@ -107,10 +106,10 @@
     <logger name="helpers.LightboxHelper$" level="INFO"/>
     <logger name="helpers.LightboxHelper" level="INFO"/>
 
-    <logger name="services.FileMoveActor" level="DEBUG"/>
+    <logger name="services.FileMoveActor" level="INFO"/>
     <logger name="services.FileMove" level="INFO"/>
-    <logger name="services.ClockPerInstance" level="DEBUG"/>
-
+    <logger name="services.ClockPerInstance" level="INFO"/>
+    <logger name="services.BucketNotificationConfigurations" level="DEBUG"/>
     <root level="WARN">
         <appender-ref ref="STDOUT" />
         <appender-ref ref="ASYNCFILE"/>

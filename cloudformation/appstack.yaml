@@ -138,6 +138,10 @@ Parameters:
     Description: Shared secret for script->server communication
     Type: String
     NoEcho: true
+  BucketNotificationLambda:
+    Description: Optional ARN of the bucket notifications lambda. Specify this so that it can be configured automatically by the app
+    Type: String
+    AllowedPattern: ^arn:[^:\n]*:[^:\n]*:[^:\n]*:[^:\n]*:[^:\/\n]*[:\/]?.*$
 Resources:
   AccessorSG: #this group is exported and used by bucketmonitor yaml. defined here so that it can be marked for access to ES
     Type: AWS::EC2::SecurityGroup
@@ -884,6 +888,8 @@ Resources:
               - s3:ListBucket
               - s3:GetObject
               - s3:RestoreObject
+              - s3:GetBucketNotification
+              - s3:PutBucketNotification
             Resource:
               - arn:aws:s3:::*
               - arn:aws:s3:::*/*
@@ -1049,6 +1055,7 @@ Resources:
             problemItemsIndex="proxy-issues"
             problemSummaryIndex="proxy-issues-summary"
             avatarBucket="${AvatarBucket}"
+            bucketMonitorLambdaARN="${BucketNotificationLambda}"
           }
 
           scanner {

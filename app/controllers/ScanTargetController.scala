@@ -18,14 +18,14 @@ import play.api.mvc._
 import io.circe.generic.auto._
 import io.circe.syntax._
 import play.api.libs.circe.Circe
-import responses.{GenericErrorResponse, ObjectCreatedResponse, ObjectGetResponse, ObjectListResponse}
+import responses.{CheckNotificationResponse, GenericErrorResponse, ObjectCreatedResponse, ObjectGetResponse, ObjectListResponse}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.DynamoClientManager
 import com.theguardian.multimedia.archivehunter.common.ProxyTranscodeFramework.ProxyGenerators
 import com.theguardian.multimedia.archivehunter.common.cmn_helpers.ZonedTimeFormat
 import com.theguardian.multimedia.archivehunter.common.cmn_models._
 import org.slf4j.LoggerFactory
 import play.api.cache.SyncCacheApi
-import services.{BucketScanner, BulkThumbnailer, LegacyProxiesScanner}
+import services.{BucketNotificationConfigurations, BucketScanner, BulkThumbnailer, LegacyProxiesScanner}
 
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -42,7 +42,8 @@ class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner
                                       ddbClientMgr:DynamoClientManager,
                                       proxyGenerators:ProxyGenerators,
                                       scanTargetDAO:ScanTargetDAO,
-                                      jobModelDAO:JobModelDAO)
+                                      jobModelDAO:JobModelDAO,
+                                      bucketNotifications:BucketNotificationConfigurations)
                                      (implicit system:ActorSystem, mat:Materializer)
   extends AbstractController(controllerComponents) with Security with Circe with ZonedDateTimeEncoder with ZonedTimeFormat with JobModelEncoder {
   override protected val logger=LoggerFactory.getLogger(getClass)
@@ -229,6 +230,21 @@ class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner
             case Failure(err)=>InternalServerError(GenericErrorResponse("error", err.toString).asJson)
           }
       })
+    }
+  }
+
+  def fixNotificationConfiguration(targetName:String) = notificationConfiguration(targetName, true)
+  def checkNotificationConfiguration(targetName:String) = notificationConfiguration(targetName, false)
+
+  def notificationConfiguration(targetName:String, shouldUpdate:Boolean) = IsAdmin { _=> _=>
+    withLookup(targetName) { tgt=>
+      bucketNotifications.verifyNotificationSetup(tgt.bucketName, Some(tgt.region), shouldUpdate) match {
+        case Success((updatesRequired, didUpdate))=>
+          Ok(CheckNotificationResponse("ok",updatesRequired,didUpdate).asJson)
+        case Failure(err)=>
+          logger.error(s"Could not check notification configuration on target $targetName (${tgt.bucketName} in ${tgt.region}): ${err.getClass.getCanonicalName} ${err.getMessage}", err)
+          InternalServerError(GenericErrorResponse("error", err.toString).asJson)
+      }
     }
   }
 }
