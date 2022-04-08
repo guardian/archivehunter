@@ -20,6 +20,7 @@ class ItemFolderHelperSpec extends Specification with Mockito {
     pathString,
     None,
     None,
+    None,
     1234L,
     ZonedDateTime.now(),
     "",

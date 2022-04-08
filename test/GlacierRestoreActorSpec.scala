@@ -20,9 +20,9 @@ class GlacierRestoreActorSpec extends Specification with Mockito {
   "GlacierRestoreActor.InitiateRestore" should {
     "create a job model instance, update a lightbox entry instance and tell S3 to initiate restore" in new AkkaTestkitSpecs2Support {
       implicit val ec:ExecutionContext = system.getDispatcher
-      val mockedConfig = mock[Configuration]
+      val mockedConfig = Configuration.from(Map("externalData.awsRegion"->"ap-east-1","externalData.indexName"->"fred","archive.restoresExpireAfter"->3))
       val mockedEsClientMgr = mock[ESClientManager]
-      mockedConfig.getOptional[Int]("archive.restoresExpireAfter") returns Some(3)
+
       val mockedS3ClientManager = mock[S3ClientManager]
       val mockedS3Client = mock[S3Client]
       val mockedRestoreResult = RestoreObjectResponse.builder()
@@ -31,7 +31,7 @@ class GlacierRestoreActorSpec extends Specification with Mockito {
         .build()
 
       mockedS3Client.restoreObject(org.mockito.ArgumentMatchers.any[RestoreObjectRequest]) returns mockedRestoreResult
-      mockedS3ClientManager.getClient(any) returns mockedS3Client
+      mockedS3ClientManager.getS3Client(any,any) returns mockedS3Client
       val mockedJobModelDAO = mock[JobModelDAO]
       mockedJobModelDAO.putJob(any[JobModel]) returns Future(None)
       val mockedLightboxEntryDAO = mock[LightboxEntryDAO]
@@ -41,6 +41,9 @@ class GlacierRestoreActorSpec extends Specification with Mockito {
       mockedEntry.id returns "mock-entry-id"
       mockedEntry.bucket returns "testbucket"
       mockedEntry.path returns "testpath"
+      mockedEntry.region returns Some("ap-east-1")
+      mockedEntry.maybeVersion returns None
+
       val mockedLbEntry = mock[LightboxEntry]
 
       val toTest = system.actorOf(Props(new GlacierRestoreActor(mockedConfig, mockedEsClientMgr, mockedS3ClientManager, mockedJobModelDAO, mockedLightboxEntryDAO, system)))

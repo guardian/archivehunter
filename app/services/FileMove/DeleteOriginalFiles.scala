@@ -142,9 +142,10 @@ class DeleteOriginalFiles(s3ClientMgr:S3ClientManager, indexer:Indexer, config:C
   override def receive: Receive = {
     case PerformStep(state)=>
       //verify new media and proxy files. only if both match do the deletion
-      val sourceClient:S3Client = s3ClientMgr.getS3Client(
-        profileName=config.getOptional[String]("externalData.awsProfile"),
-        region=state.entry.flatMap(_.region).map(Region.of))
+      try {
+        val sourceClient:S3Client = s3ClientMgr.getS3Client(
+          profileName=config.getOptional[String]("externalData.awsProfile"),
+          region=state.entry.flatMap(_.region).map(Region.of))
       val destClient:S3Client = s3ClientMgr.getS3Client(
         profileName=config.getOptional[String]("externalData.awsProfile"),
         region=Some(state.destRegion).map(Region.of))
@@ -165,6 +166,10 @@ class DeleteOriginalFiles(s3ClientMgr:S3ClientManager, indexer:Indexer, config:C
               logger.error(s"Deletion thread(s) failed: ", err)
               originalSender ! StepFailed(state, err.getMessage)
           })
+      }
+      } catch {
+        case err:Throwable=>
+          logger.error("aaaagh")
       }
     case RollbackStep(state)=>
       logger.error(s"Can't roll back file deletion!")

@@ -4,6 +4,7 @@ import akka.actor.ActorSystem
 import akka.stream.Materializer
 import com.theguardian.multimedia.archivehunter.common.clientManagers.S3ClientManager
 import org.specs2.mock.Mockito
+import org.specs2.mock.mockito.MockitoMatchers
 import org.specs2.mutable.Specification
 import play.api.Configuration
 import software.amazon.awssdk.regions.Region
@@ -36,17 +37,30 @@ class UserAvatarHelperSpec extends Specification with Mockito {
         "externalData.awsRegion"->"ap-east-1"
       ))
 
-      val returnedUrl = new URL("https://some-presigned-url")
-
-      val mockS3Client = mock[S3Client]
-      mockS3Client.generatePresignedUrl(any,any,any,any) returns Success(returnedUrl)
       val mockS3ClientManager = mock[S3ClientManager]
-      mockS3ClientManager.getClient(any) returns mockS3Client
 
       val toTest = new UserAvatarHelper(testConfig, mockS3ClientManager)(mock[ActorSystem], mock[Materializer])
 
-      toTest.getPresignedUrl(new URI("s3://test-bucket/someuser"), Some(900)) must beASuccessfulTry(returnedUrl)
-      there was one(mockS3Client).generatePresignedUrl("test-bucket","someuser", Some(900), Region.AP_EAST_1)
+      val result = toTest.getPresignedUrl(new URI("s3://test-bucket/someuser"), Some(900))
+      result must beASuccessfulTry
+      result.get.getHost mustEqual "test-bucket.s3.ap-east-1.amazonaws.com"
+      result.get.getPath mustEqual "/someuser"
+      val queryParts = result.get
+        .getQuery
+        .stripPrefix("?")
+        .split("&")
+        .map(elem=>{
+          val parts = elem.split("=")
+          (parts.head, if(parts.length>1) Some(parts(1)) else None)
+        })
+        .toMap
+
+      queryParts.get("X-Amz-Algorithm").flatten must beSome
+      queryParts.get("X-Amz-Date").flatten must beSome
+      queryParts.get("X-Amz-SignedHeaders").flatten must beSome
+      queryParts.get("X-Amz-Expires").flatten must beSome
+      queryParts.get("X-Amz-Credential").flatten must beSome
+      queryParts.get("X-Amz-Signature").flatten must beSome
     }
 
     "reject the request if the bucket in the incoming url is not what we expect" in {
@@ -54,17 +68,10 @@ class UserAvatarHelperSpec extends Specification with Mockito {
         "externalData.avatarBucket"->"another-bucket"
       ))
 
-      val returnedUrl = new URL("https://some-presigned-url")
-
-      val mockS3Client = mock[S3Client]
-      mockS3Client.generatePresignedUrl(any,any,any,any) returns Success(returnedUrl)
       val mockS3ClientManager = mock[S3ClientManager]
-      mockS3ClientManager.getClient(any) returns mockS3Client
-
       val toTest = new UserAvatarHelper(testConfig, mockS3ClientManager)(mock[ActorSystem], mock[Materializer])
 
       toTest.getPresignedUrl(new URI("s3://test-bucket/someuser"), Some(900)) must beAFailedTry
-      there was no(mockS3Client).generatePresignedUrl(any,any,any,any)
     }
   }
 }

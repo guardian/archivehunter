@@ -161,7 +161,7 @@ class ImportController @Inject()(override val config:Configuration,
     * @return a Future, containing a Play result
     */
   private def performProxyImport(importRequest:ProxyImportRequest, item:ArchiveEntry, correctProxyBucket:String) = {
-    implicit val s3client:S3Client = s3ClientMgr.getS3Client(item.region)
+    implicit val s3client:S3Client = s3ClientMgr.getS3Client(region=item.region.map(Region.of))
     Future
       .fromTry(s3client.doesObjectExist(correctProxyBucket, importRequest.proxyPath))
       .flatMap({
@@ -173,7 +173,7 @@ class ImportController @Inject()(override val config:Configuration,
           item.bucket,
           item.path,
           Some(importRequest.proxyType),
-          Region.of(item.region.getOrElse("eu-west-1"))
+          Region.of(item.region.getOrElse(config.get[String]("externalData.awsRegion")))
         ).flatMap({
           case Left(err)=>
             Future(InternalServerError(GenericErrorResponse("error",s"Could not get proxy location from s3 $err").asJson))

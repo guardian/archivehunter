@@ -11,6 +11,7 @@ import com.theguardian.multimedia.archivehunter.common.cmn_models._
 import models.{JobReportNew, JobReportStatus}
 import org.scanamo.{DynamoValue, NoPropertyOfType}
 import org.specs2.mock.Mockito
+import org.specs2.mock.mockito.MockitoMatchers
 import org.specs2.mutable.Specification
 import play.api.{Configuration, Logger}
 import services.ProxyFrameworkQueue.{HandleRunning, UpdateProblemsIndexSuccess}
@@ -21,7 +22,7 @@ import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration._
 import scala.util.Success
 
-class ProxyFrameworkQueueSpec extends Specification with Mockito {
+class ProxyFrameworkQueueSpec extends Specification with Mockito with MockitoMatchers {
   sequential
 
   "ProxyFrameworkQueue!HandleSuccessfulProxy" should {
@@ -47,7 +48,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
 
       val mockedEntry = mock[ArchiveEntry]
       val mockedUpdatedEntry = mock[ArchiveEntry]
-      mockedEntry.copy(any,any,any,any,any,any,any,any,any,any,any,any,any,any) returns mockedUpdatedEntry
+      mockedEntry.copy(any,any,any,any,any,any,any,any,any,any,any,any,any,any,any) returns mockedUpdatedEntry
 
       val mockedIndexer = mock[Indexer]
       mockedIndexer.getById(any)(any) returns Future(mockedEntry)
@@ -105,7 +106,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
 
       val mockedEntry = mock[ArchiveEntry]
       val mockedUpdatedEntry = mock[ArchiveEntry]
-      mockedEntry.copy(any,any,any,any,any,any,any,any,any,any,any,any,any,any) returns mockedUpdatedEntry
+      mockedEntry.copy(any,any,any,any,any,any,any,any,any,any,any,any,any,any,any) returns mockedUpdatedEntry
       val mockedIndexer = mock[Indexer]
       mockedIndexer.getById(any)(any) returns Future(mockedEntry)
       mockedIndexer.indexSingleItem(any,any,any)(any) returns Future(Right("fake-id"))
@@ -497,7 +498,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
 
       val mockedEntry = mock[ArchiveEntry]
       val mockedUpdatedEntry = mock[ArchiveEntry]
-      mockedEntry.copy(any,any,any,any,any,any,any,any,any,any,any,any,any,any) returns mockedUpdatedEntry
+      mockedEntry.copy(any,any,any,any,any,any,any,any,any,any,any,any,any,any,any) returns mockedUpdatedEntry
       val mockedIndexer = mock[Indexer]
       mockedIndexer.getById(any)(any) returns Future(mockedEntry)
       mockedIndexer.indexSingleItem(any,any,any)(any) returns Future(Right("fake-id"))
@@ -568,7 +569,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito {
 
       val mockedEntry = mock[ArchiveEntry]
       val mockedUpdatedEntry = mock[ArchiveEntry]
-      mockedEntry.copy(any,any,any,any,any,any,any,any,any,any,any,any,any,any) returns mockedUpdatedEntry
+      mockedEntry.copy(any,any,any,any,any,any,any,any,any,any,any,any,any,any,any) returns mockedUpdatedEntry
       val mockedIndexer = mock[Indexer]
       mockedIndexer.getById(any)(any) throws new RuntimeException("nothing existed")
       mockedIndexer.indexSingleItem(any,any,any)(any) returns Future(Right("fake-id"))

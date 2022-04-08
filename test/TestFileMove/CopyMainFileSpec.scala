@@ -10,7 +10,7 @@ import play.api.Configuration
 import services.FileMove.{CopyMainFile, ImprovedLargeFileCopier}
 import services.FileMove.GenericMoveActor._
 import software.amazon.awssdk.services.s3.S3Client
-import software.amazon.awssdk.services.s3.model.{CopyObjectRequest, CopyObjectResponse, CopyObjectResult, DeleteObjectRequest, DeleteObjectsRequest, DeleteObjectsResponse, HeadObjectResponse}
+import software.amazon.awssdk.services.s3.model.{CopyObjectRequest, CopyObjectResponse, CopyObjectResult, DeleteObjectRequest, DeleteObjectsRequest, DeleteObjectsResponse, HeadObjectRequest, HeadObjectResponse, NoSuchKeyException}
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -25,7 +25,7 @@ class CopyMainFileSpec extends Specification with Mockito with DocId {
     "tell S3 to copy the file with same path to given destination bucket" in new AkkaTestkitSpecs2Support {
       val mockedClientMgr = mock[S3ClientManager]
       val mockedS3Client = mock[S3Client]
-      val mockedCopyResult = CopyObjectResponse.builder().build()
+      val mockedCopyResult = CopyObjectResponse.builder().copyObjectResult(CopyObjectResult.builder().eTag("some-etag").build()).build()
       val mockedLargeFileCopier = mock[ImprovedLargeFileCopier]
 
       mockedClientMgr.getS3Client(any,any) returns mockedS3Client
@@ -43,10 +43,10 @@ class CopyMainFileSpec extends Specification with Mockito with DocId {
       result must beAnInstanceOf[StepSucceeded]
       result.asInstanceOf[StepSucceeded].updatedData.destFileId must beSome(makeDocId("destBucket","/path/to/file"))
       val expectedCopyRequest = CopyObjectRequest.builder()
-        .destinationBucket("sourcebucket")
-        .destinationKey("/path/to/file")
-        .sourceBucket("destBucket")
+        .sourceBucket("sourcebucket")
         .sourceKey("/path/to/file")
+        .destinationBucket("destBucket")
+        .destinationKey("/path/to/file")
         .build()
       there was one(mockedS3Client).copyObject(expectedCopyRequest)
     }
@@ -74,7 +74,7 @@ class CopyMainFileSpec extends Specification with Mockito with DocId {
       val expectedReq = CopyObjectRequest.builder()
         .sourceBucket("sourcebucket")
         .sourceKey("/path/to/file")
-        .destinationBucket("destbucket")
+        .destinationBucket("destBucket")
         .destinationKey("/path/to/file")
         .build()
       there was one(mockedS3Client).copyObject(expectedReq)
@@ -86,11 +86,9 @@ class CopyMainFileSpec extends Specification with Mockito with DocId {
       val mockedClientMgr = mock[S3ClientManager]
       val mockedS3Client = mock[S3Client]
       mockedClientMgr.getS3Client(any,any) returns mockedS3Client
-      val mockedGetResponse = mock[HeadObjectResponse]
-      val mockedDeleteResponse = mock[DeleteObjectsResponse]
       val mockedLargeFileCopier = mock[ImprovedLargeFileCopier]
 
-      mockedS3Client.doesObjectExist(any, any) returns Success(true)
+      mockedS3Client.headObject(org.mockito.ArgumentMatchers.any[HeadObjectRequest]) returns HeadObjectResponse.builder().build()
 
       val testItem = ArchiveEntry("fake-id","sourcebucket","/path/to/file",None,None,None,1234L,ZonedDateTime.now(),"fake-etag",
         MimeType.fromString("video/quicktime").right.get,true,StorageClass.STANDARD_IA,Seq(), false,None)
@@ -114,7 +112,7 @@ class CopyMainFileSpec extends Specification with Mockito with DocId {
       mockedClientMgr.getS3Client(any,any) returns mockedS3Client
       val mockedLargeFileCopier = mock[ImprovedLargeFileCopier]
 
-      mockedS3Client.doesObjectExist(any,any) returns Success(false)
+      mockedS3Client.headObject(org.mockito.ArgumentMatchers.any[HeadObjectRequest]) throws NoSuchKeyException.builder().build()
       val mockedCopyResult = CopyObjectResponse.builder().copyObjectResult(CopyObjectResult.builder().eTag("some-etag").build()).build()
       mockedS3Client.copyObject(org.mockito.ArgumentMatchers.any[CopyObjectRequest]) returns mockedCopyResult
 
@@ -132,10 +130,10 @@ class CopyMainFileSpec extends Specification with Mockito with DocId {
       there were two(mockedClientMgr).getS3Client(any,any)
       there was one(mockedS3Client).doesObjectExist("sourcebucket","/path/to/file")
       val expectedCopyRequest = CopyObjectRequest.builder()
-        .destinationBucket("destbucket")
-        .destinationKey("/path/to/file")
-        .sourceBucket("sourcebucket")
+        .sourceBucket("destBucket")
         .sourceKey("/path/to/file")
+        .destinationBucket("sourcebucket")
+        .destinationKey("/path/to/file")
         .build()
       there was one(mockedS3Client).copyObject(expectedCopyRequest)
 

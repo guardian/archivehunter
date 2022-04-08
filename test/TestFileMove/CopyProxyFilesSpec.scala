@@ -25,8 +25,8 @@ class CopyProxyFilesSpec extends Specification with Mockito with DocId {
     "copy all referenced proxies and update the state with new locations" in new AkkaTestkitSpecs2Support {
       val mockedClientMgr = mock[S3ClientManager]
       val mockedS3Client = mock[S3Client]
-      val mockedCopyResult = mock[CopyObjectResponse]
-      val mockedMetadata = mock[HeadObjectResponse]
+      val mockedCopyResult = CopyObjectResponse.builder().build()
+      val mockedMetadata = HeadObjectResponse.builder().build()
 
       mockedClientMgr.getS3Client(any,any) returns mockedS3Client
       mockedS3Client.headObject(org.mockito.ArgumentMatchers.any[HeadObjectRequest]) returns mockedMetadata
@@ -79,68 +79,16 @@ class CopyProxyFilesSpec extends Specification with Mockito with DocId {
       there were no(mockedS3Client).deleteObject(org.mockito.ArgumentMatchers.any[DeleteObjectRequest])
     }
 
-    "delete all potentially existing copies (continuing if anything errors) and signal error if one copy fails" in new AkkaTestkitSpecs2Support {
-      val mockedClientMgr = mock[S3ClientManager]
-      val mockedS3Client = mock[S3Client]
-      val mockedCopyResult = mock[CopyObjectResponse]
-      val mockedMetadata = mock[HeadObjectResponse]
-      mockedClientMgr.getS3Client(any,any) returns mockedS3Client
-      mockedS3Client.getObjectMetadata(any,any,any) returns Success(mockedMetadata)
-      mockedS3Client.deleteObject(DeleteObjectRequest.builder().bucket("dest-proxy-bucket").key("path/to/proxy2").build()) throws new RuntimeException("bleagh")
-      mockedS3Client.doesObjectExist(any, any) returns Success(true)
-      mockedS3Client.copyObject(org.mockito.ArgumentMatchers.any[CopyObjectRequest]) returns mockedCopyResult
-      mockedS3Client.copyObject(CopyObjectRequest.builder()
-        .sourceBucket("source-proxy-bucket")
-        .sourceKey("path/to/proxy3")
-        .destinationBucket("dest-proxy-bucket")
-        .destinationKey("path/to/proxy3")
-        .build()
-      ) throws new RuntimeException("something went ping")
-
-      val sourceProxyList = Seq(
-        ProxyLocation("source-file-id","proxyid1",ProxyType.VIDEO,"source-proxy-bucket","path/to/proxy1",None,StorageClass.STANDARD),
-        ProxyLocation("source-file-id","proxyid2",ProxyType.AUDIO,"source-proxy-bucket","path/to/proxy2",None,StorageClass.STANDARD),
-        ProxyLocation("source-file-id","proxyid3",ProxyType.THUMBNAIL,"source-proxy-bucket","path/to/proxy3",None,StorageClass.STANDARD),
-      )
-      val data = FileMoveTransientData("source-file-id",None,Some("dest-file-id"),Some(sourceProxyList),None,"dest-media-bucket","dest-proxy-bucket","dest-region")
-
-      val testMsg = PerformStep(data)
-
-      val actor = system.actorOf(Props(new CopyProxyFiles(mockedClientMgr, Configuration.empty)))
-
-      val result = Await.result(actor ? testMsg, 30 seconds).asInstanceOf[MoveActorMessage]
-      result must beAnInstanceOf[StepFailed]
-
-      val expectedCopyRequests = Seq(1,2,3).map(n=>CopyObjectRequest.builder()
-        .sourceBucket("source-proxy-bucket")
-        .sourceKey(s"path/to/proxy$n")
-        .destinationBucket("dest-proxy-bucket")
-        .destinationKey(s"path/to/proxy$n")
-        .build()
-      )
-      there was one(mockedS3Client).copyObject(expectedCopyRequests.head)
-      there was one(mockedS3Client).copyObject(expectedCopyRequests(1))
-      there was one(mockedS3Client).copyObject(expectedCopyRequests(2))
-
-      val expectedDeleteRequests = Seq(1,2,3).map(n=>DeleteObjectRequest.builder()
-        .bucket("dest-proxy-bucket")
-        .key(s"path/to/proxy$n")
-        .build()
-      )
-      there was one(mockedS3Client).deleteObject(expectedDeleteRequests.head)
-      there was one(mockedS3Client).deleteObject(expectedDeleteRequests(1))
-      there was one(mockedS3Client).deleteObject(expectedDeleteRequests(2))
-    }
+    //the behaviour is to no longer delete proxies if one copy fails but to flag it as a warning
   }
 
   "CopyFiles!RollbackStep" should {
     "delete the copied versions of any proxies available" in new AkkaTestkitSpecs2Support {
       val mockedClientMgr = mock[S3ClientManager]
       val mockedS3Client = mock[S3Client]
-      val mockedCopyResult = mock[CopyObjectResponse]
 
       mockedClientMgr.getS3Client(any,any) returns mockedS3Client
-      mockedS3Client.doesObjectExist(any, any) returns Success(true)
+      mockedS3Client.headObject(org.mockito.ArgumentMatchers.any[HeadObjectRequest]) returns HeadObjectResponse.builder().build()
 
       val sourceProxyList = Seq(
         ProxyLocation("source-file-id","proxyid1",ProxyType.VIDEO,"source-proxy-bucket","path/to/proxy1",None,StorageClass.STANDARD),
