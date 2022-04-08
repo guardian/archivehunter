@@ -108,10 +108,8 @@ class GlacierRestoreActor @Inject() (config:Configuration, esClientMgr:ESClientM
         if(lbEntry.isDefined) updateLightboxFull(lbEntry.get,RestoreStatus.RS_UNDERWAY,None)
         originalSender ! RestoreInProgress(entry)
       case Success(S3RestoreHeader(false, None)) => //restore not in progress, may be completed
-        if(lbEntry.isDefined) {
-          if (lbEntry.get.restoreStatus != RestoreStatus.RS_ERROR && lbEntry.get.restoreStatus != RestoreStatus.RS_SUCCESS) {
-            updateLightbox(lbEntry.get, None, Some(new RuntimeException("Item has already expired")))
-          }
+        if(! lbEntry.map(_.restoreStatus).contains(RestoreStatus.RS_ERROR) && ! lbEntry.map(_.restoreStatus).contains(RestoreStatus.RS_SUCCESS)) {
+          updateLightbox(lbEntry.get, None, Some(new RuntimeException("Item has already expired")))
         }
         originalSender ! RestoreNotRequested(entry)
       case Success(S3RestoreHeader(false, Some(expiry))) =>

@@ -1,13 +1,11 @@
 package services.FileMove
 
-import com.amazonaws.services.s3.AmazonS3
 import com.theguardian.multimedia.archivehunter.common.clientManagers.S3ClientManager
 import com.theguardian.multimedia.archivehunter.common.{DocId, Indexer, ProxyLocation}
-import org.lmdbjava.Dbi.KeyNotFoundException
 import play.api.Configuration
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.S3Client
-import software.amazon.awssdk.services.s3.model.DeleteObjectRequest
+import software.amazon.awssdk.services.s3.model.{DeleteObjectRequest, NoSuchKeyException}
 
 import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
@@ -33,9 +31,9 @@ class DeleteOriginalFiles(s3ClientMgr:S3ClientManager, indexer:Indexer, config:C
     */
   protected def verifyFile(srcBucket:String, srcPath:String, destBucket:String, destPath:String, sourceClient:S3Client, destClient:S3Client):Either[String, Unit] = {
     (destClient.getObjectMetadata(destBucket, destPath, None), sourceClient.getObjectMetadata(srcBucket, srcPath, None)) match {
-      case (Failure(err:KeyNotFoundException), _)=>
+      case (Failure(err:NoSuchKeyException), _)=>
         Left(s"Destination file s3://$destBucket/$destPath does not exist")
-      case (_, Failure(err:KeyNotFoundException))=>
+      case (_, Failure(err:NoSuchKeyException))=>
         Left(s"Source file s3://$srcBucket/$srcPath does not exist")
       case (Success(destFileMeta), Success(srcFileMeta))=>
         if(destFileMeta.contentLength()!=srcFileMeta.contentLength()){
@@ -146,30 +144,31 @@ class DeleteOriginalFiles(s3ClientMgr:S3ClientManager, indexer:Indexer, config:C
         val sourceClient:S3Client = s3ClientMgr.getS3Client(
           profileName=config.getOptional[String]("externalData.awsProfile"),
           region=state.entry.flatMap(_.region).map(Region.of))
-      val destClient:S3Client = s3ClientMgr.getS3Client(
-        profileName=config.getOptional[String]("externalData.awsProfile"),
-        region=Some(state.destRegion).map(Region.of))
-      verifyNewMedia(state, sourceClient, destClient).map(_=>verifyProxyFiles(state, sourceClient, destClient)) match {
-        case Left(problem)=>
-          sender() ! StepFailed(state, problem)
-        case Right(_)=> //media and proxies both verified, can proceed to deletion.
-          val originalSender = sender()
-          deleteAllFor(state)(sourceClient).onComplete({
-            case Success(Right(_))=>
-              logger.info(s"Deletion completed")
-              val updatedState = state.copy(sourceFileProxies = None)
-              originalSender ! StepSucceeded(updatedState)
-            case Success(Left(err))=>
-              logger.error(s"Some or all deletions failed")
-              originalSender ! StepFailed(state, err)
-            case Failure(err)=>
-              logger.error(s"Deletion thread(s) failed: ", err)
-              originalSender ! StepFailed(state, err.getMessage)
-          })
-      }
+        val destClient:S3Client = s3ClientMgr.getS3Client(
+          profileName=config.getOptional[String]("externalData.awsProfile"),
+          region=Some(state.destRegion).map(Region.of))
+        verifyNewMedia(state, sourceClient, destClient).map(_=>verifyProxyFiles(state, sourceClient, destClient)) match {
+          case Left(problem)=>
+            sender() ! StepFailed(state, problem)
+          case Right(_)=> //media and proxies both verified, can proceed to deletion.
+            val originalSender = sender()
+            deleteAllFor(state)(sourceClient).onComplete({
+              case Success(Right(_))=>
+                logger.info(s"Deletion completed")
+                val updatedState = state.copy(sourceFileProxies = None)
+                originalSender ! StepSucceeded(updatedState)
+              case Success(Left(err))=>
+                logger.error(s"Some or all deletions failed")
+                originalSender ! StepFailed(state, err)
+              case Failure(err)=>
+                logger.error(s"Deletion thread(s) failed: ", err)
+                originalSender ! StepFailed(state, err.getMessage)
+            })
+        }
       } catch {
         case err:Throwable=>
-          logger.error("aaaagh")
+          logger.error(s"Deletion of original files failed: ${err.getClass.getCanonicalName} ${err.getMessage}", err)
+          sender() ! StepFailed(state, err.getMessage)
       }
     case RollbackStep(state)=>
       logger.error(s"Can't roll back file deletion!")

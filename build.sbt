@@ -23,7 +23,6 @@ lazy val commonSettings = Seq(
   libraryDependencies ++= Seq("org.apache.logging.log4j" % "log4j-core" % "2.17.1",
     "com.beust" % "jcommander" % "1.75", //snyk identified as vulnerable
     "org.apache.logging.log4j" % "log4j-api" % "2.17.1",
-    //"com.amazonaws" % "aws-java-sdk-s3" % awsSdkVersion,
     "com.amazonaws" % "aws-java-sdk-elastictranscoder"% awsSdkVersion,
     "com.amazonaws" % "aws-java-sdk-sqs"% awsSdkVersion,
     "com.dripower" %% "play-circe" % "2812.0",

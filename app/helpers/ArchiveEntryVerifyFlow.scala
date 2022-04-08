@@ -42,7 +42,7 @@ class ArchiveEntryVerifyFlow @Inject() (s3ClientMgr: S3ClientManager, config:Con
           val elem = grab(in)
           implicit val s3Client = s3ClientMgr.getS3Client(awsProfile, elem.region.map(Region.of))
 
-          s3Client.doesObjectExist(elem.bucket, elem.path) match {
+          s3Client.doesObjectExist(elem.bucket, elem.path, elem.maybeVersion) match {
             case Success(true)=>
               logger.debug(s"Object s3://${elem.bucket}/${elem.path} still exists, not passing.")
               pull(in)
