@@ -28,18 +28,12 @@ object S3ClientExtensions {
 
     def doesObjectExist(bucket:String, path:String):Try[Boolean] = doesObjectExist(bucket, path, None)
 
-    def generatePresignedUrl(bucket:String, key:String, expireInSeconds:Option[Int], region:Region) = Try {
+    def generatePresignedUrl(bucket:String, key:String, expireInSeconds:Int, region:Region, maybeVersion:Option[String]=None) = Try {
       val presigner = S3Presigner.builder().region(region).build()
       val getReq = GetObjectRequest.builder().bucket(bucket).key(key).build()
-      val preReq = GetObjectPresignRequest.builder().getObjectRequest(getReq)
+      val req = GetObjectPresignRequest.builder().getObjectRequest(getReq).signatureDuration(Duration.ofSeconds(expireInSeconds))
 
-      val finalReq = expireInSeconds match {
-        case Some(expiry)=>
-          preReq.signatureDuration(Duration.ofSeconds(expiry.toLong))
-        case None=>
-          preReq
-      }
-      presigner.presignGetObject(finalReq.build()).url()
+      presigner.presignGetObject(req.build()).url()
     }
 
     def getObjectMetadata(bucket:String, path:String, maybeVersion:Option[String]) = {

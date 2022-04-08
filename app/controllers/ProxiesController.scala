@@ -67,7 +67,8 @@ class ProxiesController @Inject()(override val config:Configuration,
   implicit val timeout:Timeout = 55 seconds
   implicit val indexer = new Indexer(indexName)
 
-  private val s3conn = s3ClientMgr.getClient(awsProfile)
+  val proxyLinkExpiry = 900 //presigned links work for 15 minutes
+  val defaultRegion = Region.of(config.get[String]("externalData.awsRegion"))
 
   private implicit val ddbAsync = ddbClientMgr.getNewAsyncDynamoClient(awsProfile)
   private val scanamoAlpakka = ScanamoAlpakka(ddbAsync)
@@ -141,19 +142,25 @@ class ProxiesController @Inject()(override val config:Configuration,
             val expiration = new java.util.Date()
             expiration.setTime(expiration.getTime + (1000 * 60 * 60)) //expires in 1 hour
 
-            Try {
-              val req = HeadObjectRequest.builder().bucket(proxyLocation.bucketName).key(proxyLocation.bucketPath).build()
-              s3client.headObject(req)
-            } match {
-              case Success(meta)=>
+            val result = for {
+              meta <- Try {
+                val req = HeadObjectRequest.builder().bucket(proxyLocation.bucketName).key(proxyLocation.bucketPath).build()
+                s3client.headObject(req)
+              }
+              presignedUrl <- S3Helper.getPresignedURL(proxyLocation, proxyLinkExpiry, defaultRegion)
+              result <- Try {
                 val mimeType = MimeType.fromString(meta.contentType()) match {
                   case Left(str) =>
                     logger.warn(s"Could not get MIME type for s3://${proxyLocation.bucketName}/${proxyLocation.bucketPath}: $str")
                     MimeType("application", "octet-stream")
                   case Right(t) => t
                 }
-                val presignedUrl = S3Helper.getPresignedURL(proxyLocation)
                 Ok(PlayableProxyResponse("ok", presignedUrl.toString, mimeType).asJson)
+              }
+            } yield result
+
+            result match {
+              case Success(result)=>result
               case Failure(_:NoSuchKeyException)=>
                 logger.warn(s"Invalid proxy location: $proxyLocation does not point to an existing file")
                 NotFound(GenericErrorResponse("invalid_location",s"No proxy found for $proxyType on $fileId").asJson)
@@ -165,8 +172,6 @@ class ProxiesController @Inject()(override val config:Configuration,
             InternalServerError(GenericErrorResponse("db_error", err.toString).asJson)
         })
   }
-
-  lazy val defaultRegion = config.getOptional[String]("externalData.awsRegion").getOrElse("eu-west-1")
 
   /**
     * endpoint that performs a scan for potential proxies for the given file.
@@ -365,7 +370,8 @@ class ProxiesController @Inject()(override val config:Configuration,
     })
   }
 
-  def checkProxyExists(bucket:String, path:String):Try[Option[HeadObjectResponse]] = {
+  def checkProxyExists(bucket:String, path:String, region:Region):Try[Option[HeadObjectResponse]] = {
+    val s3conn = s3ClientMgr.getS3Client(config.getOptional[String]("externalData.awsProfile"), Some(region))
     try {
       val result = s3conn.headObject(HeadObjectRequest.builder().bucket(bucket).key(path).build())
       Success(Some(result))
@@ -399,7 +405,7 @@ class ProxiesController @Inject()(override val config:Configuration,
             case Some(existingProxy) =>
               Future(Conflict(responses.ObjectCreatedResponse("proxy_exists", "proxy_id", existingProxy.proxyId).asJson))
             case None =>
-              checkProxyExists(proxySetRequest.proxyBucket, proxySetRequest.proxyPath) match {
+              checkProxyExists(proxySetRequest.proxyBucket, proxySetRequest.proxyPath, Region.of(proxySetRequest.region)) match {
                 case Success(None) => //proxy does not exist
                   Future(NotFound(GenericErrorResponse("no_proxy", "Requested proxy file does not exist").asJson))
                 case Failure(err) =>
@@ -439,6 +445,7 @@ class ProxiesController @Inject()(override val config:Configuration,
   }
 
   def deleteProxyFile(proxyLocation:ProxyLocation) = Try {
+    val s3conn = s3ClientMgr.getS3Client(config.getOptional[String]("externalData.awsProfile"), proxyLocation.region.map(Region.of))
     s3conn.deleteObject(DeleteObjectRequest.builder().bucket(proxyLocation.bucketName).key(proxyLocation.bucketPath).build())
   }
 

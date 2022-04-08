@@ -84,7 +84,7 @@ class UserAvatarHelper @Inject() (config:Configuration, s3ClientManager: S3Clien
     config.getOptional[String]("externalData.avatarBucket").flatMap(avatarBucket=> {
       val result = for {
         rgn <- Try { Region.of(config.get[String]("externalData.awsRegion")) }
-        result <- s3Client.generatePresignedUrl(avatarBucket, sanitisedKey(username), Some(900), rgn)
+        result <- s3Client.generatePresignedUrl(avatarBucket, sanitisedKey(username), 900, rgn)
       } yield result
 
       result match {
@@ -126,7 +126,7 @@ class UserAvatarHelper @Inject() (config:Configuration, s3ClientManager: S3Clien
         } else {
           Try { Region.of(config.get[String]("externalData.awsRegion")) }.flatMap(rgn=> {
             val expiry = overrideExpiry.getOrElse(900) //link is valid for 15mins
-            s3Client.generatePresignedUrl(avatarBucket, s3Url.getPath.stripPrefix("/"), Some(expiry), rgn)
+            s3Client.generatePresignedUrl(avatarBucket, s3Url.getPath.stripPrefix("/"), expiry, rgn)
           })
         }
     }

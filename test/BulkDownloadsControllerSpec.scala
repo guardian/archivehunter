@@ -86,7 +86,7 @@ class BulkDownloadsControllerSpec extends Specification with Mockito with ZonedD
       )
 
       val fakeConfig = Configuration.from(Map(
-        "externalData"-> Map("indexName"->"archivehunter")
+        "externalData"-> Map("indexName"->"archivehunter", "awsRegion"->"ap-east-1")
       ))
       val toTest = new BulkDownloadsController(fakeConfig, mock[SyncCacheApi], mock[ServerTokenDAO], mock[LightboxBulkEntryDAO],
         mock[LightboxEntryDAO], mock[ESClientManager], mock[S3ClientManager], mock[ControllerComponents], mock[BearerTokenAuth], TestProbe().ref) {
@@ -123,7 +123,7 @@ class BulkDownloadsControllerSpec extends Specification with Mockito with ZonedD
     "update the existing token in the database and create a long-lived token" in {
 
       val fakeConfig = Configuration.from(Map(
-        "externalData"-> Map("indexName"->"archivehunter")
+        "externalData"-> Map("indexName"->"archivehunter", "awsRegion"->"ap-east-1")
       ))
 
       val mockServerTokenDAO = mock[ServerTokenDAO]

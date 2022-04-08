@@ -14,27 +14,21 @@ import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignReques
 import scala.util.Try
 
 object S3Helper {
+  import com.theguardian.multimedia.archivehunter.common.cmn_helpers.S3ClientExtensions._
   /**
     * Generates a presigned URL to read the given object
     * @param archiveEntry  archive entry that we want to read
     * @param s3Client implicitly provided S3 client
     * @return a Try, containing either the presigned URL or an error
     */
-  def getPresignedURL(archiveEntry:ArchiveEntry)(implicit s3Client:S3Client):Try[URL]= Try {
-    val presigner = archiveEntry.region match {
-      case Some(rgn)=>S3Presigner.builder().region(Region.of(rgn)).build()
-      case None=>S3Presigner.create()
-    }
+  def getPresignedURL(archiveEntry:ArchiveEntry, expireInSeconds:Int, defaultRegion:Region)(implicit s3Client:S3Client):Try[URL] =
+    s3Client.generatePresignedUrl(archiveEntry.bucket,
+      archiveEntry.path,
+      expireInSeconds,
+      archiveEntry.region.map(Region.of).getOrElse(defaultRegion),
+      archiveEntry.maybeVersion
+    )
 
-    val initial = GetObjectRequest.builder().bucket(archiveEntry.bucket).key(archiveEntry.path)
-    val finalReq = archiveEntry.maybeVersion match {
-      case Some(ver)=>initial.versionId(ver)
-      case None=>initial
-    }
-    presigner
-      .presignGetObject(GetObjectPresignRequest.builder().getObjectRequest(finalReq.build()).build())
-      .url()
-  }
 
   /**
     * Generates a presigned URL to read the given object
@@ -42,14 +36,6 @@ object S3Helper {
     * @param s3Client implicitly provided S3 client
     * @return a Try, containing either the presigned URL or an error
     */
-  def getPresignedURL(proxyLocation:ProxyLocation)(implicit s3Client:S3Client):Try[URL] = Try {
-    val presigner = proxyLocation.region match {
-      case Some(rgn)=>S3Presigner.builder().region(Region.of(rgn)).build()
-      case None=>S3Presigner.create()
-    }
-    val req = GetObjectRequest.builder().bucket(proxyLocation.bucketName).key(proxyLocation.bucketPath).build()
-    presigner
-      .presignGetObject(GetObjectPresignRequest.builder().getObjectRequest(req).build())
-      .url()
-  }
+  def getPresignedURL(proxyLocation:ProxyLocation, expireInSeconds:Int, defaultRegion:Region)(implicit s3Client:S3Client):Try[URL] =
+    s3Client.generatePresignedUrl(proxyLocation.bucketName, proxyLocation.bucketPath, expireInSeconds, proxyLocation.region.map(Region.of).getOrElse(defaultRegion))
 }
