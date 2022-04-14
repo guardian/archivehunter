@@ -25,6 +25,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import com.theguardian.multimedia.archivehunter.common.cmn_helpers.S3ClientExtensions._
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.model.{HeadObjectResponse, NoSuchKeyException}
+import software.amazon.awssdk.http.apache.ApacheHttpClient
 
 class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with ZonedDateTimeEncoder with StorageClassEncoder {
   private final val logger = LogManager.getLogger(getClass)
@@ -38,7 +39,7 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
     * these are extracted out as individual accessors to make over-riding them easier in unit tests
     * @return
     */
-  protected def getS3Client = S3Client.builder().build()
+  protected def getS3Client = S3Client.builder().httpClientBuilder(ApacheHttpClient.builder()).build()
   protected def getElasticClient(clusterEndpoint:String) = {
     val esClient = RestClient.builder(HttpHost.create(clusterEndpoint)).build()
     ElasticClient.fromRestClient(esClient)
@@ -127,6 +128,10 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
 
     println(s"going to update ${newCacheEntries.length} path cache entries")
     writePathCacheEntries(newCacheEntries).flatMap(_=> {
+      println(s"Got bucket ${rec.getS3.getBucket.getName}")
+      println(s"Got path $path")
+      println(s"Got version ID ${Option(rec.getS3.getObject.getVersionId)}")
+      println(s"Got region ${getRegionFromEnvironment.get.toString}")
       ArchiveEntry.fromS3(rec.getS3.getBucket.getName, path, Option(rec.getS3.getObject.getVersionId), getRegionFromEnvironment.get.toString).flatMap(entry => {
         println(s"Going to index $entry")
         i.indexSingleItem(entry).map({
