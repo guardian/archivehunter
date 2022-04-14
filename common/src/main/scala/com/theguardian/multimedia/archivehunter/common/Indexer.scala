@@ -2,21 +2,20 @@ package com.theguardian.multimedia.archivehunter.common
 
 import com.sksamuel.elastic4s.RefreshPolicy
 import com.sksamuel.elastic4s.http.index.CreateIndexResponse
-import com.sksamuel.elastic4s.http.search.SearchHit
-
 import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
 import scala.concurrent.ExecutionContext.Implicits.global
 import com.sksamuel.elastic4s.http.{ElasticClient, ElasticError, HttpClient, RequestFailure}
-import com.sksamuel.elastic4s.mappings.FieldType._
 import com.theguardian.multimedia.archivehunter.common.cmn_models._
 import io.circe.generic.auto._
 import io.circe.syntax._
-import org.slf4j.MDC
+import org.slf4j.{LoggerFactory, MDC}
 
 import scala.annotation.switch
 
 class Indexer(indexName:String) extends ZonedDateTimeEncoder with StorageClassEncoder with ArchiveEntryHitReader {
+  private val logger = LoggerFactory.getLogger(getClass)
+
   import com.sksamuel.elastic4s.http.ElasticDsl._
   import com.sksamuel.elastic4s.circe._
 
@@ -29,6 +28,7 @@ class Indexer(indexName:String) extends ZonedDateTimeEncoder with StorageClassEn
     */
   def indexSingleItem(entry:ArchiveEntry, entryId: Option[String]=None, refreshPolicy: RefreshPolicy=RefreshPolicy.WAIT_UNTIL)
                      (implicit client:ElasticClient):Future[Either[IndexerError,String]] = {
+    logger.debug(s"indexSingleItem - item is $entry")
     val idToUse = entryId match {
       case None => entry.id
       case Some(userSpecifiedId) => userSpecifiedId
@@ -38,12 +38,17 @@ class Indexer(indexName:String) extends ZonedDateTimeEncoder with StorageClassEn
       update(idToUse).in(s"$indexName/entry").docAsUpsert(entry)
     }.map(response=>{
       (response.status: @switch) match {
-        case 200|201|204=>Right(response.result.id)
-        case 409=>Left(ConflictError(idToUse,response.error.reason))
-        case _=>Left(UnexpectedReturnCode(idToUse, response.status, Some(response.error.reason)))
+        case 200|201|204=>
+          logger.debug(s"item indexed with id ${response.result.id}")
+          Right(response.result.id)
+        case 409=>
+          logger.warn(s"Could not index item $entry because of an index conflict: ${response.error.reason}")
+          Left(ConflictError(idToUse,response.error.reason))
+        case _=>
+          logger.error(s"Could not index tem $entry: ES returned ${response.status} error; ${response.error.reason}")
+          Left(UnexpectedReturnCode(idToUse, response.status, Some(response.error.reason)))
       }
     })
-      //.map(_.result.id)
   }
 
   /**
@@ -54,12 +59,15 @@ class Indexer(indexName:String) extends ZonedDateTimeEncoder with StorageClassEn
     * @return a Future contianing a String with summary info.  Future will fail on error, pick this up in the usual ways.
     */
   def removeSingleItem(entryId:String, refreshPolicy: RefreshPolicy=RefreshPolicy.WAIT_UNTIL)(implicit client:ElasticClient):Future[String] = {
+    logger.debug(s"Removing archive entry with ID $entryId")
     client.execute {
       delete(entryId).from(s"$indexName/entry")
     }.map(result=>{
       if(result.isError) {
+        logger.error(s"Could not remove archive entry $entryId: ${result.error.reason}")
         throw new RuntimeException(result.error.reason) //fail the future, this is handled by caller
       } else {
+        logger.debug(s"Removed $entryId - ${result.result.toString}")
         result.result.toString
       }
     })

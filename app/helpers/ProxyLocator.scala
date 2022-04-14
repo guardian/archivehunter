@@ -101,7 +101,7 @@ object ProxyLocator {
     */
   def setProxiedWithRetry(sourceId:String)(implicit indexer:Indexer, httpClient:ElasticClient):Future[Either[String,String]] =
     indexer.getById(sourceId).flatMap(entry=>{
-      println(s"setProxiedWithEntry: sourceId is $sourceId entry is $entry")
+      logger.debug(s"setProxiedWithEntry: sourceId is $sourceId entry is $entry")
       val updatedEntry = entry.copy(proxied = true)
       MDC.put("entry", updatedEntry.toString)
       indexer.indexSingleItem(updatedEntry)

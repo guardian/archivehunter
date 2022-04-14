@@ -1,10 +1,7 @@
 package com.theguardian.multimedia.archivehunter.common
 
-import com.amazonaws.services.s3.model.GetObjectMetadataRequest
-
 import java.time.{ZoneId, ZonedDateTime}
-import com.amazonaws.services.s3.{AmazonS3, AmazonS3Client}
-import com.sksamuel.elastic4s.http.{ElasticClient, HttpClient}
+import com.sksamuel.elastic4s.http.ElasticClient
 import com.theguardian.multimedia.archivehunter.common.StorageClass.StorageClass
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{IndexerError, MediaMetadata}
 
