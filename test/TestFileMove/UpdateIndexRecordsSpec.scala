@@ -33,7 +33,7 @@ class UpdateIndexRecordsSpec extends Specification with Mockito {
         MimeType.fromString("video/quicktime").right.get,true,StorageClass.STANDARD_IA,Seq(), false,None)
 
       mockedIndexer.getById(any)(any) returns Future(testItem)
-      mockedIndexer.indexSingleItem(any,any,any)(any) returns Future(Right("some-id"))
+      mockedIndexer.indexSingleItem(any,any)(any) returns Future(Right("some-id"))
       mockedIndexer.deleteById(any)(any) returns Future(mock[Response[DeleteResponse]])
 
       val mockedProxyLocationDAO = mock[ProxyLocationDAO]
@@ -58,7 +58,7 @@ class UpdateIndexRecordsSpec extends Specification with Mockito {
       result must beAnInstanceOf[StepSucceeded]
 
       there was one(mockedIndexer).getById("fake-id")
-      there was one(mockedIndexer).indexSingleItem(any,any,any)(any)
+      there was one(mockedIndexer).indexSingleItem(any,any)(any)
       there was one(mockedIndexer).deleteById("fake-id")
       there was one(mockedProxyLocationDAO).saveProxy(destProxyList.head)
       there was one(mockedProxyLocationDAO).saveProxy(destProxyList(1))
@@ -79,7 +79,7 @@ class UpdateIndexRecordsSpec extends Specification with Mockito {
         MimeType.fromString("video/quicktime").toOption.get,true,StorageClass.STANDARD_IA,Seq(), false,None)
 
       mockedIndexer.getById(any)(any) returns Future(testItem)
-      mockedIndexer.indexSingleItem(any,any,any)(any) returns Future(Left(ESError("some-item", ElasticError("kersplat","kersplat",None,None,None,Seq(),None))))
+      mockedIndexer.indexSingleItem(any,any)(any) returns Future(Left(ESError("some-item", ElasticError("kersplat","kersplat",None,None,None,Seq(),None))))
       mockedIndexer.deleteById(any)(any) returns Future(mock[Response[DeleteResponse]])
 
       val mockedProxyLocationDAO = mock[ProxyLocationDAO]
@@ -102,7 +102,7 @@ class UpdateIndexRecordsSpec extends Specification with Mockito {
       val result = Await.result(actor ? PerformStep(data), 30 seconds).asInstanceOf[MoveActorMessage]
 
       there was one(mockedIndexer).getById("fake-id")
-      there was one(mockedIndexer).indexSingleItem(any,any,any)(any)
+      there was one(mockedIndexer).indexSingleItem(any,any)(any)
       there was no(mockedIndexer).deleteById("fake-id")
 
       there was no(mockedProxyLocationDAO).saveProxy(any)(any)
@@ -122,7 +122,7 @@ class UpdateIndexRecordsSpec extends Specification with Mockito {
         MimeType.fromString("video/quicktime").right.get,true,StorageClass.STANDARD_IA,Seq(), false,None)
 
       mockedIndexer.getById(any)(any) returns Future(testItem)
-      mockedIndexer.indexSingleItem(any,any,any)(any) returns Future(Right("some-id"))
+      mockedIndexer.indexSingleItem(any,any)(any) returns Future(Right("some-id"))
       mockedIndexer.deleteById(any)(any) returns Future(mock[Response[DeleteResponse]])
 
       val mockedProxyLocationDAO = mock[ProxyLocationDAO]
@@ -145,7 +145,7 @@ class UpdateIndexRecordsSpec extends Specification with Mockito {
       val result = Await.result(actor ? PerformStep(data), 30 seconds).asInstanceOf[MoveActorMessage]
 
       there was one(mockedIndexer).getById("fake-id")
-      there was one(mockedIndexer).indexSingleItem(any,any,any)(any)
+      there was one(mockedIndexer).indexSingleItem(any,any)(any)
       there was no(mockedIndexer).deleteById("fake-id")
 
       there was one(mockedProxyLocationDAO).saveProxy(destProxyList.head)
@@ -167,7 +167,7 @@ class UpdateIndexRecordsSpec extends Specification with Mockito {
         MimeType.fromString("video/quicktime").right.get,true,StorageClass.STANDARD_IA,Seq(), false,None)
 
       mockedIndexer.getById(any)(any) returns Future(testItem)
-      mockedIndexer.indexSingleItem(any,any,any)(any) returns Future(Right("new-docid"))
+      mockedIndexer.indexSingleItem(any,any)(any) returns Future(Right("new-docid"))
 
       val mockedProxyLocationDAO = mock[ProxyLocationDAO]
       val pretendError = mock[DynamoReadError]
@@ -191,7 +191,7 @@ class UpdateIndexRecordsSpec extends Specification with Mockito {
       result must beAnInstanceOf[StepFailed]
 
       there was one(mockedIndexer).getById("fake-id")
-      there was one(mockedIndexer).indexSingleItem(any,any,any)(any)
+      there was one(mockedIndexer).indexSingleItem(any,any)(any)
       there was no(mockedIndexer).deleteById("fake-id")    //even though this is deleted here it's reconstituted by the rollback
 
       //these are done in parallel so will all get triggered even in failure
@@ -212,7 +212,7 @@ class UpdateIndexRecordsSpec extends Specification with Mockito {
         MimeType.fromString("video/quicktime").right.get,true,StorageClass.STANDARD_IA,Seq(), false,None)
 
       mockedIndexer.getById(any)(any) returns Future(testItem)
-      mockedIndexer.indexSingleItem(any,any,any)(any) returns Future(Right("some-id"))
+      mockedIndexer.indexSingleItem(any,any)(any) returns Future(Right("some-id"))
 
       val mockedProxyLocationDAO = mock[ProxyLocationDAO]
       mockedProxyLocationDAO.saveProxy(any)(any) returns Future(mock[ProxyLocation])

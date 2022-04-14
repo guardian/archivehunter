@@ -1,7 +1,8 @@
 package com.theguardian.multimedia.archivehunter.common
 
-import com.sksamuel.elastic4s.RefreshPolicy
+import com.sksamuel.elastic4s.{Indexable, RefreshPolicy}
 import com.sksamuel.elastic4s.http.index.CreateIndexResponse
+
 import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -17,8 +18,16 @@ class Indexer(indexName:String) extends ZonedDateTimeEncoder with StorageClassEn
   private val logger = LoggerFactory.getLogger(getClass)
 
   import com.sksamuel.elastic4s.http.ElasticDsl._
-  import com.sksamuel.elastic4s.circe._
+  //import com.sksamuel.elastic4s.circe._
 
+  implicit val manualIndexable:Indexable[ArchiveEntry] = new Indexable[ArchiveEntry] {
+    override def json(t: ArchiveEntry): String = {
+      println(s"DEBUG manualIndexable entry is $t")
+      val jsonstring = t.asJson.noSpaces
+      println(s"DEBUG json to dump into index: $jsonstring")
+      jsonstring
+    }
+  }
   /**
     * Requests that a single item be added to the index
     * @param entryId ID of the archive entry for upsert
@@ -26,7 +35,7 @@ class Indexer(indexName:String) extends ZonedDateTimeEncoder with StorageClassEn
     * @param client implicitly provided elastic4s HttpClient object
     * @return a Future containing either the ID of the new item or an IndexerError containing the failure
     */
-  def indexSingleItem(entry:ArchiveEntry, entryId: Option[String]=None, refreshPolicy: RefreshPolicy=RefreshPolicy.WAIT_UNTIL)
+  def indexSingleItem(entry:ArchiveEntry, entryId: Option[String]=None)
                      (implicit client:ElasticClient):Future[Either[IndexerError,String]] = {
     logger.debug(s"indexSingleItem - item is $entry")
     val idToUse = entryId match {
@@ -45,7 +54,7 @@ class Indexer(indexName:String) extends ZonedDateTimeEncoder with StorageClassEn
           logger.warn(s"Could not index item $entry because of an index conflict: ${response.error.reason}")
           Left(ConflictError(idToUse,response.error.reason))
         case _=>
-          logger.error(s"Could not index tem $entry: ES returned ${response.status} error; ${response.error.reason}")
+          logger.error(s"Could not index item $entry: ES returned ${response.status} error; ${response.error.reason}")
           Left(UnexpectedReturnCode(idToUse, response.status, Some(response.error.reason)))
       }
     })

@@ -447,6 +447,7 @@ class IngestProxyQueueSpec extends Specification with Mockito with ZonedDateTime
         mockDDBlientMgr, mockESClientMgr) {
         override protected val ownRef = mockedSelf.ref
         override lazy protected implicit val indexer = mock[Indexer]
+        indexer.getById(any)(any) returns Future(mock[ArchiveEntry])
         override lazy protected val sqsClient = mock[AmazonSQS]
         sqsClient.receiveMessage(anyString) returns fakeMessageContent
       }))

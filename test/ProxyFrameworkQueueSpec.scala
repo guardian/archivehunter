@@ -52,7 +52,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito with MockitoMat
 
       val mockedIndexer = mock[Indexer]
       mockedIndexer.getById(any)(any) returns Future(mockedEntry)
-      mockedIndexer.indexSingleItem(any,any,any)(any) returns Future(Right("fake-id"))
+      mockedIndexer.indexSingleItem(any,any)(any) returns Future(Right("fake-id"))
 
       implicit val fakeProxyLocationDAO = mock[ProxyLocationDAO]
       val toTest = system.actorOf(Props(new ProxyFrameworkQueue(
@@ -78,7 +78,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito with MockitoMat
 
       testProbe.expectMsg(10 seconds, akka.actor.Status.Success)
       there was one(mockedUpdateProxyRef).apply("output-uri", mockedArchiveEntry, ProxyType.VIDEO)
-      there was one(mockedIndexer).indexSingleItem(any,any,any)(any)
+      there was one(mockedIndexer).indexSingleItem(any,any)(any)
       there was one(mockedJobModelDAO).putJob(any)
       there was one(mockedSqsClient).deleteMessage(any)
     }
@@ -109,7 +109,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito with MockitoMat
       mockedEntry.copy(any,any,any,any,any,any,any,any,any,any,any,any,any,any,any) returns mockedUpdatedEntry
       val mockedIndexer = mock[Indexer]
       mockedIndexer.getById(any)(any) returns Future(mockedEntry)
-      mockedIndexer.indexSingleItem(any,any,any)(any) returns Future(Right("fake-id"))
+      mockedIndexer.indexSingleItem(any,any)(any) returns Future(Right("fake-id"))
 
       implicit val fakeProxyLocationDAO = mock[ProxyLocationDAO]
       val toTest = system.actorOf(Props(new ProxyFrameworkQueue(
@@ -501,7 +501,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito with MockitoMat
       mockedEntry.copy(any,any,any,any,any,any,any,any,any,any,any,any,any,any,any) returns mockedUpdatedEntry
       val mockedIndexer = mock[Indexer]
       mockedIndexer.getById(any)(any) returns Future(mockedEntry)
-      mockedIndexer.indexSingleItem(any,any,any)(any) returns Future(Right("fake-id"))
+      mockedIndexer.indexSingleItem(any,any)(any) returns Future(Right("fake-id"))
 
       val mockedEsClient = mock[com.sksamuel.elastic4s.http.ElasticClient]
       val mockedEsClientManager = mock[ESClientManager]
@@ -572,7 +572,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito with MockitoMat
       mockedEntry.copy(any,any,any,any,any,any,any,any,any,any,any,any,any,any,any) returns mockedUpdatedEntry
       val mockedIndexer = mock[Indexer]
       mockedIndexer.getById(any)(any) throws new RuntimeException("nothing existed")
-      mockedIndexer.indexSingleItem(any,any,any)(any) returns Future(Right("fake-id"))
+      mockedIndexer.indexSingleItem(any,any)(any) returns Future(Right("fake-id"))
 
       val mockedEsClient = mock[com.sksamuel.elastic4s.http.ElasticClient]
       val mockedEsClientManager = mock[ESClientManager]

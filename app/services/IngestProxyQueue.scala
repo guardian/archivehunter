@@ -193,6 +193,13 @@ class IngestProxyQueue @Inject()(config: Configuration,
 
     case HandleDomainMessage(finalMsg:IngestMessage, queueUrl, receiptHandle)=>
       logger.info(s"Received notification of new item: ${finalMsg.archiveEntry}")
+      indexer.getById(finalMsg.archiveEntry.id).onComplete({
+        case Success(entry)=>
+          logger.info(s"DEBUGGING - indexed entry for ${finalMsg.archiveEntry.id} was $entry at point of receive")
+        case Failure(err)=>
+          logger.error(s"Could not check indexed entry for ${finalMsg.archiveEntry.id}: ${err.getMessage}", err)
+      })
+
       ownRef ! CheckRegisteredThumb(finalMsg.archiveEntry)
       ownRef ! CheckRegisteredProxy(finalMsg.archiveEntry)
       ownRef ! StartAnalyse(finalMsg.archiveEntry)

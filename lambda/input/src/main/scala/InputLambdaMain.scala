@@ -9,6 +9,7 @@ import com.google.inject.Guice
 import com.theguardian.multimedia.archivehunter.common._
 import org.apache.logging.log4j.LogManager
 import com.sksamuel.elastic4s.http.ElasticClient
+import com.sksamuel.elastic4s.http.ElasticDsl.update
 import com.theguardian.multimedia.archivehunter.common.cmn_helpers.PathCacheExtractor
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{IngestMessage, ItemNotFound, JobModelDAO, JobStatus, PathCacheEntry, PathCacheIndexer}
 import org.apache.http.HttpHost
@@ -134,14 +135,17 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
       println(s"Got region ${getRegionFromEnvironment.get.toString}")
       ArchiveEntry.fromS3(rec.getS3.getBucket.getName, path, Option(rec.getS3.getObject.getVersionId), getRegionFromEnvironment.get.toString).flatMap(entry => {
         println(s"Going to index $entry")
-        i.indexSingleItem(entry).map({
+        i.indexSingleItem(entry).flatMap({
           case Right(indexid) =>
             println(s"Document indexed with ID $indexid")
             sendIngestedMessage(entry)
-            indexid
+            i.getById(indexid).map(entry=>{
+              println(s"DEBUGGING - read-back of entry $indexid gives $entry")
+              indexid
+            })
           case Left(err) =>
             println(s"Could not index document: ${err.toString}")
-            throw new RuntimeException(err.toString) //fail this future so we enter the recover block below
+            Future.failed(new RuntimeException(err.toString)) //fail this future so we enter the recover block below
         })
       })
     })

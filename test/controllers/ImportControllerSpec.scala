@@ -73,7 +73,7 @@ class ImportControllerSpec extends Specification with AfterAll with Mockito {
         1234L, ZonedDateTime.now(),"", MimeType("audio","wav"), false, StorageClass.STANDARD, Seq(), mediaMetadata=None)
 
       mockedIndexer.getById(any)(any) returns Future(item)
-      mockedIndexer.indexSingleItem(any,any,any)(any) returns Future(Right("some-item-id"))
+      mockedIndexer.indexSingleItem(any,any)(any) returns Future(Right("some-item-id"))
 
       val existingProxies = List()
       val result = Await.result(toTest.checkAndPerformProxyImport(req, item, "a-proxy-bucket", existingProxies), 2.seconds)
@@ -86,7 +86,7 @@ class ImportControllerSpec extends Specification with AfterAll with Mockito {
         "a-proxy-bucket","path/to/proxy.mp3", Some("ap-east-1"), StorageClass.STANDARD)
       there was one(proxyTargetDAO).saveProxy(org.mockito.ArgumentMatchers.eq(expectedProxyRecord))(org.mockito.ArgumentMatchers.eq(null))
       there was one(mockedIndexer).getById(org.mockito.ArgumentMatchers.eq("some-item-id"))(any)
-      there was one(mockedIndexer).indexSingleItem(any,any,any)(any)
+      there was one(mockedIndexer).indexSingleItem(any,any)(any)
     }
 
     "not save a new proxy record if there is one already present and overwrite is not set" in {
@@ -127,7 +127,7 @@ class ImportControllerSpec extends Specification with AfterAll with Mockito {
         1234L, ZonedDateTime.now(),"", MimeType("audio","wav"), false, StorageClass.STANDARD, Seq(), mediaMetadata=None)
 
       mockedIndexer.getById(any)(any) returns Future(item)
-      mockedIndexer.indexSingleItem(any,any,any)(any) returns Future(Right("some-item-id"))
+      mockedIndexer.indexSingleItem(any,any)(any) returns Future(Right("some-item-id"))
 
       val existingProxies = List(
         ProxyLocation("some-file-id","some-proxy-id",ProxyType.AUDIO,"a-proxy-bucket","path/to/proxy.mp3",Some("ap-east-1"), StorageClass.STANDARD)
@@ -139,7 +139,7 @@ class ImportControllerSpec extends Specification with AfterAll with Mockito {
       there was no(s3ClientMgr).getS3Client(null,Some(Region.AP_EAST_1))
       there was no(proxyTargetDAO).saveProxy(any)(org.mockito.ArgumentMatchers.eq(null))
       there was no(mockedIndexer).getById(org.mockito.ArgumentMatchers.eq("some-item-id"))(any)
-      there was no(mockedIndexer).indexSingleItem(any,any,any)(any)
+      there was no(mockedIndexer).indexSingleItem(any,any)(any)
     }
 
     "create and save a new proxy record if overwrite is allowed, even if one exists already" in {
@@ -180,7 +180,7 @@ class ImportControllerSpec extends Specification with AfterAll with Mockito {
         1234L, ZonedDateTime.now(),"", MimeType("audio","wav"), false, StorageClass.STANDARD, Seq(), mediaMetadata=None)
 
       mockedIndexer.getById(any)(any) returns Future(item)
-      mockedIndexer.indexSingleItem(any,any,any)(any) returns Future(Right("some-item-id"))
+      mockedIndexer.indexSingleItem(any,any)(any) returns Future(Right("some-item-id"))
 
       val existingProxies = List(
         ProxyLocation("some-file-id","some-proxy-id",ProxyType.AUDIO,"a-proxy-bucket","path/to/proxy.mp3",Some("region-name"), StorageClass.STANDARD)
@@ -193,7 +193,7 @@ class ImportControllerSpec extends Specification with AfterAll with Mockito {
       val expectedProxyRecord = ProxyLocation("c29tZS1idWNrZXQ6cGF0aC90by9tZWRpYS53YXY=","YS1wcm94eS1idWNrZXQ6cGF0aC90by9wcm94eS5tcDM=",ProxyType.AUDIO,"a-proxy-bucket","path/to/proxy.mp3", Some("ap-east-1"), StorageClass.STANDARD)
       there was one(proxyTargetDAO).saveProxy(org.mockito.ArgumentMatchers.eq(expectedProxyRecord))(org.mockito.ArgumentMatchers.eq(null))
       there was one(mockedIndexer).getById(org.mockito.ArgumentMatchers.eq("some-item-id"))(any)
-      there was one(mockedIndexer).indexSingleItem(any,any,any)(any)
+      there was one(mockedIndexer).indexSingleItem(any,any)(any)
     }
 
     "return a Conflict if the requested proxy bucket is not the one for the item's media bucket" in {
@@ -234,7 +234,7 @@ class ImportControllerSpec extends Specification with AfterAll with Mockito {
         1234L, ZonedDateTime.now(),"", MimeType("audio","wav"), false, StorageClass.STANDARD, Seq(), mediaMetadata=None)
 
       mockedIndexer.getById(any)(any) returns Future(item)
-      mockedIndexer.indexSingleItem(any,any,any)(any) returns Future(Right("some-item-id"))
+      mockedIndexer.indexSingleItem(any,any)(any) returns Future(Right("some-item-id"))
 
       val existingProxies = List()
       val result = Await.result(toTest.checkAndPerformProxyImport(req, item, "different-proxy-bucket", existingProxies), 2.seconds)
@@ -244,7 +244,7 @@ class ImportControllerSpec extends Specification with AfterAll with Mockito {
       there was no(s3ClientMgr).getS3Client(null,Some(Region.AP_EAST_1))
       there was no(proxyTargetDAO).saveProxy(any)(org.mockito.ArgumentMatchers.eq(null))
       there was no(mockedIndexer).getById(org.mockito.ArgumentMatchers.eq("some-item-id"))(any)
-      there was no(mockedIndexer).indexSingleItem(any,any,any)(any)
+      there was no(mockedIndexer).indexSingleItem(any,any)(any)
     }
 
     "return Bad Request if the requested proxy does not exist" in {
@@ -283,7 +283,7 @@ class ImportControllerSpec extends Specification with AfterAll with Mockito {
         1234L, ZonedDateTime.now(),"", MimeType("audio","wav"), false, StorageClass.STANDARD, Seq(), mediaMetadata=None)
 
       mockedIndexer.getById(any)(any) returns Future(item)
-      mockedIndexer.indexSingleItem(any,any,any)(any) returns Future(Right("some-item-id"))
+      mockedIndexer.indexSingleItem(any,any)(any) returns Future(Right("some-item-id"))
 
       val existingProxies = List()
       val result = Await.result(toTest.checkAndPerformProxyImport(req, item, "a-proxy-bucket", existingProxies), 2.seconds)
@@ -293,7 +293,7 @@ class ImportControllerSpec extends Specification with AfterAll with Mockito {
       there was one(s3ClientMgr).getS3Client(null,Some(Region.AP_EAST_1))
       there was no(proxyTargetDAO).saveProxy(any)(org.mockito.ArgumentMatchers.eq(null))
       there was no(mockedIndexer).getById(any)(any)
-      there was no(mockedIndexer).indexSingleItem(any,any,any)(any)
+      there was no(mockedIndexer).indexSingleItem(any,any)(any)
     }
 
   }

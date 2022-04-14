@@ -50,8 +50,8 @@ class InputLambdaMainSpec extends Specification with Mockito with ZonedDateTimeE
       val mockIndexer = mock[Indexer]
       val mockSendIngestedMessage = mock[ArchiveEntry=>Unit]
 
-      mockIndexer.indexSingleItem(any,any,any)(any).returns(Future(Right("fake-entry-id")))
-
+      mockIndexer.indexSingleItem(any,any)(any).returns(Future(Right("fake-entry-id")))
+      mockIndexer.getById(any)(any) returns Future(mock[ArchiveEntry])
       val mockWritePathCacheEntries = mock[Seq[PathCacheEntry]=>Future[Unit]]
       mockWritePathCacheEntries.apply(any) returns Future( () )
 
@@ -87,7 +87,7 @@ class InputLambdaMainSpec extends Specification with Mockito with ZonedDateTimeE
       }
       there was one(mockSendIngestedMessage).apply(any)
       there was one(mockWritePathCacheEntries).apply(any)
-      there was one(mockIndexer).indexSingleItem(any,any,any)(any)
+      there was one(mockIndexer).indexSingleItem(any,any)(any)
       there was one(mockClient).headObject(HeadObjectRequest.builder().bucket("my-bucket").key("path/to/object with spaces").versionId("v1").build())
     }
 
@@ -105,7 +105,8 @@ class InputLambdaMainSpec extends Specification with Mockito with ZonedDateTimeE
 
       val fakeContext = mock[Context]
       val mockIndexer = mock[Indexer]
-      mockIndexer.indexSingleItem(any,any,any)(any).returns(Future(Right("fake-entry-id")))
+      mockIndexer.indexSingleItem(any,any)(any).returns(Future(Right("fake-entry-id")))
+      mockIndexer.getById(any)(any) returns Future(mock[ArchiveEntry])
 
       val mockSendIngestedMessage = mock[ArchiveEntry=>Unit]
       val mockESClient = mock[ElasticClient]
@@ -148,7 +149,7 @@ class InputLambdaMainSpec extends Specification with Mockito with ZonedDateTimeE
       }
       there was one(mockSendIngestedMessage).apply(any)
       there was one(mockWritePathCacheEntries).apply(any)
-      there was one(mockIndexer).indexSingleItem(any,any,any)(any)
+      there was one(mockIndexer).indexSingleItem(any,any)(any)
       there was one(mockClient).headObject(HeadObjectRequest.builder().bucket("my-bucket").key("path/to/object").versionId("v1").build())
     }
   }

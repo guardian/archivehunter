@@ -112,7 +112,13 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
     */
   def thumbnailJobOriginalMedia(jobDesc:JobModel) = jobDesc.sourceType match {
     case SourceType.SRC_MEDIA=>
-      indexer.getById(jobDesc.sourceId).map(result=>Right(result))
+      logger.debug(s"Getting original media for $jobDesc")
+      indexer.getById(jobDesc.sourceId)
+        .map(result=>{
+          logger.debug(s"Original media for ${jobDesc.jobId} is $result")
+          result
+        })
+        .map(result=>Right(result))
     case SourceType.SRC_PROXY=>
       Future(Left("need original media!"))
     case SourceType.SRC_THUMBNAIL=>

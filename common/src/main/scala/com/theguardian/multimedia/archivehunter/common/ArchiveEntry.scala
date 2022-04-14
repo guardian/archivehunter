@@ -61,12 +61,14 @@ object ArchiveEntry extends ((String, String, String, Option[String], Option[Str
             logger.warn(s"s3://$bucket/$key has no storage class! Assuming STANDARD.")
             "STANDARD"
         }
+        println(s"version from head request is ${Option(meta.versionId())}, passed version is $maybeVersion")
         //prefer the version as obtained from s3 metadata over the one we are given
         val versionToStore = (Option(meta.versionId()), maybeVersion) match {
           case (Some(v), _)=>Some(v)
           case (_, Some(v))=>Some(v)
           case (None, None)=>None
         }
+        println(s"versionToStore is $versionToStore")
         ArchiveEntry(makeDocId(bucket, key), bucket, key, versionToStore, Some(region), getFileExtension(key), meta.contentLength(), ZonedDateTime.ofInstant(meta.lastModified(), ZoneId.systemDefault()), meta.eTag(), mimeType, proxied = false, StorageClass.withName(storageClass), Seq(), beenDeleted = false, None)
       case Failure(err) =>
         logger.error(s"Could not look up metadata for s3://$bucket/$key in region $region: ${err.getMessage}")
