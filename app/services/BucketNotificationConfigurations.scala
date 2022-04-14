@@ -1,10 +1,11 @@
 package services
 
-import com.amazonaws.services.s3.AmazonS3
-import com.amazonaws.services.s3.model.{BucketNotificationConfiguration, LambdaConfiguration, NotificationConfiguration, S3Event}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.S3ClientManager
 import org.slf4j.LoggerFactory
 import play.api.Configuration
+import software.amazon.awssdk.regions.Region
+import software.amazon.awssdk.services.s3.S3Client
+import software.amazon.awssdk.services.s3.model.{Event, GetBucketNotificationConfigurationRequest, GetBucketNotificationConfigurationResponse, LambdaFunctionConfiguration, NotificationConfiguration, NotificationConfigurationFilter, PutBucketNotificationConfigurationRequest}
 
 import java.util
 import javax.inject.{Inject, Singleton}
@@ -22,25 +23,16 @@ class BucketNotificationConfigurations @Inject()(s3ClientMgr:S3ClientManager, co
     * @param defn notificqtion definition, in the form of a tuple name:String->NotificationConfiguration
     * @return true if this is one of ours, otherwise false
     */
-  protected def findRelevantNotification(defn:(String, NotificationConfiguration)):Boolean = {
-    logger.debug(s"Notification with name ${defn._1}: ${defn._2.getClass.getName}")
-    defn._2 match {
-      case lambdaNotification:LambdaConfiguration=>
-        lambdaNotification.getFunctionARN.contains("archivehunter-input")
-      case _=>
-        logger.debug(s"Notification ${defn._1} is not a lambda function notification")
-        false
-    }
-  }
+  protected def findRelevantNotification(defn:LambdaFunctionConfiguration):Boolean = defn.lambdaFunctionArn().contains("archivehunter-input")
 
   private val expectedEvents = Set(
-    S3Event.ObjectCreated,
-    S3Event.ObjectRemoved,
-    S3Event.ObjectRestoreCompleted,
-    S3Event.ObjectRestoreDelete,
-    S3Event.ReducedRedundancyLostObject,
-    S3Event.LifecycleTransition,
-    S3Event.LifecycleExpiration
+    Event.S3_OBJECT_CREATED,
+    Event.S3_OBJECT_REMOVED,
+    Event.S3_OBJECT_RESTORE_COMPLETED,
+    Event.S3_OBJECT_RESTORE_DELETE,
+    Event.S3_REDUCED_REDUNDANCY_LOST_OBJECT,
+    Event.S3_LIFECYCLE_TRANSITION,
+    Event.S3_LIFECYCLE_EXPIRATION
   )
 
   /**
@@ -49,7 +41,10 @@ class BucketNotificationConfigurations @Inject()(s3ClientMgr:S3ClientManager, co
     * @return a new LambdaConfiguration
     */
   def createNewNotification(lambdaArn:String) = {
-    new LambdaConfiguration(lambdaArn, util.EnumSet.copyOf(expectedEvents.asJavaCollection))
+    LambdaFunctionConfiguration.builder
+      .lambdaFunctionArn(lambdaArn)
+      .events(util.EnumSet.copyOf(expectedEvents.asJavaCollection))
+      .build()
   }
 
   /**
@@ -58,90 +53,96 @@ class BucketNotificationConfigurations @Inject()(s3ClientMgr:S3ClientManager, co
     * @param configuration s3 notification configuration
     * @return
     */
-  protected def maybeUpdate(configuration: NotificationConfiguration):Option[NotificationConfiguration] = {
-    val events = configuration.getEvents.asScala
+  protected def maybeUpdate(configuration: LambdaFunctionConfiguration):Option[LambdaFunctionConfiguration] = {
+    val events = configuration.events().asScala.toSeq.toSet
     logger.debug(s"NotificationConfiguration has these events: ${events.mkString(";")}")
-    val missingEvents = expectedEvents.map(_.toString).diff(events)
+    val missingEvents = expectedEvents.diff(events)
+
+    val configBuilder = configuration.toBuilder
+    val emptyFilter = NotificationConfigurationFilter.builder().build()
 
     val firstUpdate = if(missingEvents.nonEmpty) {
       logger.info(s"NotificationConfiguration is missing the following events: ${missingEvents.mkString(";")}, it will be re-written")
-      Some(configuration.withEvents(expectedEvents.map(_.toString).asJava))
+      Some(configBuilder.events(expectedEvents.asJava))
     } else {
       None
     }
 
-    val secondUpdate = if(Option(configuration.getFilter).isDefined) {
-      logger.info(s"NotificationConfiguration has a filter present: ${configuration.getFilter}, removing")
-      Some(configuration.withFilter(null))
+    val secondUpdate = if(Option(configuration.filter()).isDefined) {
+      logger.info(s"NotificationConfiguration has a filter present: ${configuration.filter()}, removing")
+      Some(configBuilder.filter(emptyFilter))
     } else {
       None
     }
 
     (firstUpdate, secondUpdate) match {
       case (None, None) => None
-      case (Some(u), None)=> Some(u)
-      case (None, Some(u))=> Some(u)
-      case (Some(evts), Some(_)) => Some(evts.withFilter(null))
+      case (Some(u), None)=> Some(u.build())
+      case (None, Some(u))=> Some(u.build())
+      case (Some(evts), Some(_)) => Some(evts.filter(emptyFilter).build())
     }
   }
 
-  protected def maybeUpdateNotification(defn:(String, NotificationConfiguration)):Option[(String, NotificationConfiguration)] = {
-    logger.debug(s"Notification with name ${defn._1}: ${defn._2.getClass.getName}")
+  /**
+    * If we need to update the given LambdaFunctionConfiguration, returns Some() with the updated config.
+    * Otherwise returns None
+    * @param defn existing LambdaFunctionConfiguration
+    * @return either an updated configuration or None
+    */
+  protected def maybeUpdateNotification(defn:LambdaFunctionConfiguration):Option[LambdaFunctionConfiguration] = {
+    logger.debug(s"Found Lambda notification with name ${defn.id()}")
 
-    defn._2 match {
-      case lambdaNotification:LambdaConfiguration=>
-        if(lambdaNotification.getFunctionARN.contains("archivehunter-input")) {
-          maybeUpdate(defn._2).map(updated=>(defn._1, updated))
-        } else {
-          None
-        }
-      case _=>
-        logger.debug(s"Notification ${defn._1} is not a lambda function notification")
+    if(defn.lambdaFunctionArn().contains("archivehunter-input")) {
+      maybeUpdate(defn)
+    } else {
       None
     }
   }
 
+  protected def isAdditionRequired(f:java.util.List[LambdaFunctionConfiguration]):Boolean = {
+    ! f.asScala.exists(_.lambdaFunctionArn().contains("archivehunter-input"))
+  }
   /**
     * Returns true if there are none of our notifications found in the given configuration, therefore requiring
     * a new configuration to be added
     * @param config BucketNotificaitonConfiguration instance to test
     * @return a boolean value indicating whether we need to add one of our own configurations
     */
-  protected def isAdditionRequired(config:BucketNotificationConfigScalaWrapper):Boolean = {
-    config.getConfigurations.foldLeft(true)((prevValue, defn)=>{
-      defn._2 match {
-        case lambdaNotification: LambdaConfiguration=>
-          if(lambdaNotification.getFunctionARN.contains("archivehunter-input")) {
-            false
-          } else {
-            prevValue
-          }
-        case _=>
-          prevValue
-      }
-    })
+  protected def isAdditionRequired(config:NotificationConfiguration.Builder):Boolean = {
+    isAdditionRequired(config
+      .build()
+      .lambdaFunctionConfigurations()
+    )
   }
 
   /**
     * Gathers the additions and modifications, compares them to the previous values and writes to S3 if they differ
     * @param bucketName bucket name to write to
-    * @param initialConfiguration initial BucketNotificationConfiguration within a Scala wrapper
+    * @param configResponse initial BucketNotificationConfigurationResponse
     * @param maybeLambdaArn lambda ARN for creating a new notification if required
     * @param requiredUpdates list of updates required to existing notifications
-    * @param s3client implicitly provided AmazonS3 client object
+    * @param s3Client implicitly provided AmazonS3 client object
     * @return a Try, containing a tuple of two boolean values. The first is `true` if updates were required, the second is true if they were written.
     *         This is for compatibility with the return value of parent function verifyNotificationSetup
     */
   private def writeUpdatesIfRequired(bucketName:String,
-                                     initialConfiguration:BucketNotificationConfigScalaWrapper,
+                                     configResponse:GetBucketNotificationConfigurationResponse,
                                      maybeLambdaArn:Option[String],
-                                     requiredUpdates:Seq[(String, NotificationConfiguration)])(implicit s3client:AmazonS3) = {
+                                     requiredUpdates:Seq[LambdaFunctionConfiguration])(implicit s3Client:S3Client): Try[(Boolean, Boolean)] = {
+    val initialConfiguration = NotificationConfiguration.builder()
+      .lambdaFunctionConfigurations(configResponse.lambdaFunctionConfigurations())
+      .eventBridgeConfiguration(configResponse.eventBridgeConfiguration())
+      .queueConfigurations(configResponse.queueConfigurations())
+      .topicConfigurations(configResponse.topicConfigurations())
+
     //step one - do we need to add a new monitoring configuration? If so put it into the list
     val addedConfiguration = if (isAdditionRequired(initialConfiguration)) {
       logger.debug(s"$bucketName: No archivehunter lambda found, adding one...")
       maybeLambdaArn match {
         case Some(lambdaArn) =>
-          initialConfiguration.withConfiguration("ArchiveHunter", createNewNotification(lambdaArn))
+          val existingConfigs = configResponse.lambdaFunctionConfigurations().asScala
+          val updatedConfigs = existingConfigs :+ createNewNotification(lambdaArn)
+          initialConfiguration.lambdaFunctionConfigurations(updatedConfigs.asJava)
         case None =>
           throw new RuntimeException("Cannot add a lambda monitor because externalData.bucketMonitorLambdaARN is not set in the application config file")
       }
@@ -150,24 +151,23 @@ class BucketNotificationConfigurations @Inject()(s3ClientMgr:S3ClientManager, co
     }
 
     //step two - do we need to update any of the existing configurations? If so put them into the list
-    val updatedConfiguration = if (requiredUpdates.nonEmpty) {
-      requiredUpdates.foldLeft(addedConfiguration)((config, defn) => {
-        config
-          .withoutConfiguration(defn._1)
-          .withConfiguration(defn)
-      })
+    val updatedConfiguration = if(requiredUpdates.nonEmpty) {
+      addedConfiguration.lambdaFunctionConfigurations(requiredUpdates.asJava)
     } else {
       addedConfiguration
     }
 
     //step three - if the config we built has no changes then do nothing, otherwise write out the updated configuration to S3
-    if (!updatedConfiguration.isUpdated) {
-      logger.info(s"$bucketName - No monitoring configuration updates required")
+    if(updatedConfiguration==initialConfiguration) {
+      logger.info(s"$bucketName: No updates were required")
       Success((false, false))
     } else {
       Try {
-        s3client.setBucketNotificationConfiguration(bucketName, updatedConfiguration.wrapped)
-      }.map(_=>(true, true))
+        s3Client.putBucketNotificationConfiguration(PutBucketNotificationConfigurationRequest.builder()
+          .bucket(bucketName)
+          .notificationConfiguration(updatedConfiguration.build())
+          .build())
+      }.map(_ => (true, true))
     }
   }
 
@@ -180,17 +180,17 @@ class BucketNotificationConfigurations @Inject()(s3ClientMgr:S3ClientManager, co
     *         The first value is `true` if updates to the given bucket were _required_, and the second value
     *         is `true` if required updates to the bucket were _made_.
     */
-  def verifyNotificationSetup(bucketName:String, region:Option[String], shouldWriteUpdates:Boolean) = {
+  def verifyNotificationSetup(bucketName:String, region:Option[Region], shouldWriteUpdates:Boolean) = {
     val maybeLambdaArn = config.getOptional[String]("externalData.bucketMonitorLambdaARN")
 
     implicit val s3client = s3ClientMgr.getS3Client(maybeProfile, region)
     logger.debug(s"Looking for S3 notifications on bucket $bucketName in region ${region.getOrElse("default")}")
 
     for {
-      response <- Try { s3client.getBucketNotificationConfiguration(bucketName) }
+      response <- Try { s3client.getBucketNotificationConfiguration(GetBucketNotificationConfigurationRequest.builder().bucket(bucketName).build()) }
       requiredUpdates <- Try {
         response
-          .getConfigurations
+          .lambdaFunctionConfigurations()
           .asScala
           .map(maybeUpdateNotification)
           .collect({case Some(update)=>update})
@@ -198,9 +198,9 @@ class BucketNotificationConfigurations @Inject()(s3ClientMgr:S3ClientManager, co
       }
       result <- if(shouldWriteUpdates) {
         logger.info(s"$bucketName requires updates, writing the new version...")
-        writeUpdatesIfRequired(bucketName, BucketNotificationConfigScalaWrapper(response), maybeLambdaArn, requiredUpdates)
+        writeUpdatesIfRequired(bucketName, response, maybeLambdaArn, requiredUpdates)
       } else {
-        val needsUpdate = requiredUpdates.nonEmpty || isAdditionRequired(BucketNotificationConfigScalaWrapper(response))
+        val needsUpdate = requiredUpdates.nonEmpty || isAdditionRequired(response.lambdaFunctionConfigurations())
         if(needsUpdate) {
           logger.info(s"$bucketName configuration is incorrect and requires updates")
         } else {
