@@ -150,7 +150,19 @@ class SearchController @Inject()(override val config:Configuration,
             logger.error(s"Could not perform advanced search: ${response.status} ${response.error.reason}")
             InternalServerError(GenericErrorResponse("search_error", response.error.reason).asJson)
           } else {
-            Ok(ObjectListResponse("ok", "entry", fixupUserAvatars(response.result.to[ArchiveEntry]), response.result.totalHits.toInt).asJson)
+            try {
+              Ok(ObjectListResponse("ok", "entry", fixupUserAvatars(response.result.to[ArchiveEntry]), response.result.totalHits.toInt).asJson)
+            } catch {
+              case err:NullPointerException=>
+                logger.error(s"Caught null pointer exception responding to search request: ", err)
+                var i:Int=0
+                response.result.hits.hits.foreach(h=>{
+                  logger.error(s"$i / ${response.result.hits.hits.length}: $h")
+                  logger.error(s"$i / ${response.result.hits.hits.length}: ${h.to[ArchiveEntry]}")
+                  i+=1
+                })
+                InternalServerError(GenericErrorResponse("data_error", "An internal error occurred, please see the system logs").asJson)
+            }
           }
         })
       }
