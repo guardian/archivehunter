@@ -35,6 +35,7 @@ class IndexerSpec extends Specification with AfterAll {
         "sfdfsdjfsdhjfsd",
         "mybucket",
         "path/to/my/file",
+        Some("abcde"),
         Some("region"),
         Some("ext"),
         12345L,
@@ -49,7 +50,7 @@ class IndexerSpec extends Specification with AfterAll {
       )
 
       val i = new Indexer("testindex")
-      val result = Await.result(i.indexSingleItem(entry), 5 seconds)
+      val result = Await.result(i.indexSingleItem(entry), 5.seconds)
       result must beRight("sfdfsdjfsdhjfsd")
 
     }
@@ -60,8 +61,8 @@ class IndexerSpec extends Specification with AfterAll {
       implicit val client:ElasticClient = localNode.client(shutdownNodeOnClose = false)
 
       val i = new Indexer("testindexexisting")
-      Await.result(i.newIndex(2,3), 3 seconds)
-      val result = Await.result(i.newIndex(2,3), 3 seconds)
+      Await.result(i.newIndex(2,3), 3.seconds)
+      val result = Await.result(i.newIndex(2,3), 3.seconds)
       result must beFailedTry
     }
 
@@ -69,7 +70,7 @@ class IndexerSpec extends Specification with AfterAll {
       implicit val client:ElasticClient = localNode.client(shutdownNodeOnClose = false)
 
       val i = new Indexer("testindexnewname")
-      val result = Await.result(i.newIndex(2,3), 3 seconds)
+      val result = Await.result(i.newIndex(2,3), 3.seconds)
       result must beSuccessfulTry(CreateIndexResponse(true,true))
     }
   }

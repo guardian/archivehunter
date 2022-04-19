@@ -60,6 +60,7 @@ class ProxyLocatorSpec extends Specification with Mockito {
         "path/to/item",
         None,
         None,
+        None,
         1234L,
         ZonedDateTime.now(),
         "some-etag",
@@ -72,14 +73,14 @@ class ProxyLocatorSpec extends Specification with Mockito {
       )
 
       implicit val mockIndexer = mock[Indexer]
-      mockIndexer.indexSingleItem(any,any,any)(any) returns Future(Left(ConflictError("some-item-id","conflict"))) thenReturns Future(Left(ConflictError("some-item-id","conflict"))) thenReturns Future(Right("some-item-id"))
+      mockIndexer.indexSingleItem(any,any)(any) returns Future(Left(ConflictError("some-item-id","conflict"))) thenReturns Future(Left(ConflictError("some-item-id","conflict"))) thenReturns Future(Right("some-item-id"))
       mockIndexer.getById(any)(any) returns Future(fakeEntry)
 
       implicit val mockEsClient = mock[ElasticClient]
 
       val result = Await.result(ProxyLocator.setProxiedWithRetry("some-source-id"), 30 seconds)
       result must beRight("some-item-id")
-      there were three(mockIndexer).indexSingleItem(any, any, any)(any)
+      there were three(mockIndexer).indexSingleItem(any, any)(any)
       there were three(mockIndexer).getById(any)(any)
     }
 
@@ -91,6 +92,7 @@ class ProxyLocatorSpec extends Specification with Mockito {
         "path/to/item",
         None,
         None,
+        None,
         1234L,
         ZonedDateTime.now(),
         "some-etag",
@@ -103,13 +105,13 @@ class ProxyLocatorSpec extends Specification with Mockito {
       )
 
       implicit val mockIndexer = mock[Indexer]
-      mockIndexer.indexSingleItem(any,any,any)(any) returns Future(Right("someid"))
+      mockIndexer.indexSingleItem(any,any)(any) returns Future(Right("someid"))
       mockIndexer.getById(any)(any) returns Future(fakeEntry)
       implicit val mockEsClient = mock[ElasticClient]
 
       val result = Await.result(ProxyLocator.setProxiedWithRetry("some-source-id"), 30 seconds)
       result must beRight("someid")
-      there was one(mockIndexer).indexSingleItem(any, any, any)(any)
+      there was one(mockIndexer).indexSingleItem(any, any)(any)
       there was one(mockIndexer).getById(any)(any)
     }
 
@@ -121,6 +123,7 @@ class ProxyLocatorSpec extends Specification with Mockito {
         "path/to/item",
         None,
         None,
+        None,
         1234L,
         ZonedDateTime.now(),
         "some-etag",
@@ -133,14 +136,14 @@ class ProxyLocatorSpec extends Specification with Mockito {
       )
 
       implicit val mockIndexer = mock[Indexer]
-      mockIndexer.indexSingleItem(any,any,any)(any) returns Future(Left(UnexpectedReturnCode("some-item-id",1234,Some("something went splat"))))
+      mockIndexer.indexSingleItem(any,any)(any) returns Future(Left(UnexpectedReturnCode("some-item-id",1234,Some("something went splat"))))
       mockIndexer.getById(any)(any) returns Future(fakeEntry)
 
       implicit val mockEsClient = mock[ElasticClient]
 
       val result = Await.result(ProxyLocator.setProxiedWithRetry("some-source-id"), 30 seconds)
       result must beLeft
-      there was one(mockIndexer).indexSingleItem(any, any, any)(any)
+      there was one(mockIndexer).indexSingleItem(any, any)(any)
       there was one(mockIndexer).getById(any)(any)
     }
   }

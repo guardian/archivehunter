@@ -1,14 +1,26 @@
 package com.theguardian.multimedia.archivehunter.common.clientManagers
 
-import com.amazonaws.services.s3.{AmazonS3, AmazonS3ClientBuilder}
+import com.amazonaws.services.s3.AmazonS3
 import com.theguardian.multimedia.archivehunter.common.ArchiveHunterConfiguration
+import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider
+import software.amazon.awssdk.regions.Region
+import software.amazon.awssdk.services.s3.{S3Client, S3ClientBuilder}
+
 import javax.inject.{Inject, Singleton}
 
 @Singleton
-class S3ClientManager @Inject() (config:ArchiveHunterConfiguration) extends ClientManagerBase[AmazonS3]{
-  private var existingClientsMap:Map[String,AmazonS3] = Map()
+class S3ClientManager @Inject() (config:ArchiveHunterConfiguration) extends ClientManagerBase[S3Client]{
+  private var existingClientsMap:Map[Region,S3Client] = Map()
 
-  override def getClient(profileName:Option[String]=None): AmazonS3 = getS3Client(profileName)
+  override def getClient(profileName:Option[String]=None): S3Client = getS3Client(profileName)
+
+  private def getCredentialsProvider(profileName:Option[String]) = {
+    val b = DefaultCredentialsProvider.builder()
+    profileName match {
+      case Some(name)=> b.profileName(name).build()
+      case None=>b.build()
+    }
+  }
 
   /**
     * Obtain an S3 client object for the given region, optionally using profile credentials.  This will re-use previously created
@@ -17,20 +29,24 @@ class S3ClientManager @Inject() (config:ArchiveHunterConfiguration) extends Clie
     * @param region optional region to get the client for.  If not specified, then uses the default region from the confiuration.
     * @return the S3 client.
     */
-  def getS3Client(profileName:Option[String]=None, region:Option[String]=None):AmazonS3 = {
+  def getS3Client(profileName:Option[String]=None, region:Option[Region]=None):S3Client = {
     region match {
       case Some(rgn)=>
         existingClientsMap.get(rgn) match {
           case Some(client)=>client
           case None=>
-            val newClient = AmazonS3ClientBuilder.standard().withRegion(rgn).withCredentials(credentialsProvider(profileName)).build()
+            val newClient = S3Client
+              .builder()
+              .region(rgn)
+              .credentialsProvider(getCredentialsProvider(profileName))
+              .build()
             this.synchronized({
               existingClientsMap = existingClientsMap.updated(rgn, newClient)
             })
             newClient
         }
       case None=>
-        AmazonS3ClientBuilder.standard().withCredentials(credentialsProvider(profileName)).build()
+        S3Client.builder().credentialsProvider(getCredentialsProvider(profileName)).build()
     }
   }
 

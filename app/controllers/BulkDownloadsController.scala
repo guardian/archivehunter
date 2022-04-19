@@ -6,8 +6,6 @@ import java.util.UUID
 import akka.actor.{ActorRef, ActorSystem}
 import akka.stream.{ActorMaterializer, Materializer}
 import akka.stream.scaladsl.{Framing, Keep, Sink, Source}
-import com.amazonaws.HttpMethod
-import com.amazonaws.services.s3.model.{GeneratePresignedUrlRequest, ResponseHeaderOverrides}
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{LightboxBulkEntry, LightboxBulkEntryDAO, LightboxEntryDAO, RestoreStatus, RestoreStatusEncoder}
 
 import javax.inject.{Inject, Named, Singleton}
@@ -34,8 +32,8 @@ import com.sksamuel.elastic4s.streams.ScrollPublisher
 import org.slf4j.LoggerFactory
 import play.api.cache.SyncCacheApi
 import play.api.http.HttpEntity
-import requests.SearchRequest
 import services.GlacierRestoreActor
+import software.amazon.awssdk.regions.Region
 
 import scala.concurrent.duration._
 
@@ -66,6 +64,9 @@ class BulkDownloadsController @Inject()(override val config:Configuration,
   protected implicit val esClient = esClientManager.getClient()
 
   private val indexer = new Indexer(config.get[String]("externalData.indexName"))
+
+  val defaultLinkExpiry = 1800 //links expire after 30 minutes
+  val defaultRegion = Region.of(config.get[String]("externalData.awsRegion"))
 
   private def errorResponse(updatedToken:ServerTokenEntry) = serverTokenDAO
     .put(updatedToken)
@@ -266,15 +267,15 @@ class BulkDownloadsController @Inject()(override val config:Configuration,
         Future(Forbidden(GenericErrorResponse("forbidden", "invalid or expired token").asJson))
       case Some(Right(_))=>
         indexer.getById(fileId).flatMap(archiveEntry=>{
-          val s3Client = s3ClientManager.getS3Client(profileName,archiveEntry.region)
+          val s3Client = s3ClientManager.getS3Client(profileName,archiveEntry.region.map(software.amazon.awssdk.regions.Region.of))
           val response = (glacierRestoreActor ? GlacierRestoreActor.CheckRestoreStatusBasic(archiveEntry)).mapTo[GlacierRestoreActor.GRMsg]
 
           response.map({
             case GlacierRestoreActor.NotInArchive(entry)=>
-              getPresignedURL(archiveEntry)(s3Client)
+              getPresignedURL(archiveEntry, defaultLinkExpiry, defaultRegion)(s3Client)
                 .map(url=>Ok(RestoreStatusResponse("ok",entry.id, RestoreStatus.RS_UNNEEDED, None, Some(url.toString)).asJson))
             case GlacierRestoreActor.RestoreCompleted(entry, expiry)=>
-              getPresignedURL(archiveEntry)(s3Client)
+              getPresignedURL(archiveEntry, defaultLinkExpiry, defaultRegion)(s3Client)
                 .map(url=>Ok(RestoreStatusResponse("ok", entry.id, RestoreStatus.RS_SUCCESS, Some(expiry), Some(url.toString)).asJson))
             case GlacierRestoreActor.RestoreInProgress(entry)=>
               Success(Ok(RestoreStatusResponse("ok", entry.id, RestoreStatus.RS_UNDERWAY, None, None).asJson))

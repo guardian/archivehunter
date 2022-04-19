@@ -15,6 +15,7 @@ import javax.inject.{Inject, Singleton}
 import models.{AwsSqsMsg, JobReportNew, JobReportStatus, JobReportStatusEncoder}
 import org.slf4j.MDC
 import play.api.{Configuration, Logger}
+import software.amazon.awssdk.regions.Region
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
@@ -111,7 +112,13 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
     */
   def thumbnailJobOriginalMedia(jobDesc:JobModel) = jobDesc.sourceType match {
     case SourceType.SRC_MEDIA=>
-      indexer.getById(jobDesc.sourceId).map(result=>Right(result))
+      logger.debug(s"Getting original media for $jobDesc")
+      indexer.getById(jobDesc.sourceId)
+        .map(result=>{
+          logger.debug(s"Original media for ${jobDesc.jobId} is $result")
+          result
+        })
+        .map(result=>Right(result))
     case SourceType.SRC_PROXY=>
       Future(Left("need original media!"))
     case SourceType.SRC_THUMBNAIL=>
@@ -196,11 +203,12 @@ class ProxyFrameworkQueue @Inject() (config: Configuration,
     */
   def updateProxyRef(proxyUri:String, archiveEntry:ArchiveEntry, proxyType:ProxyType.Value) = {
     logger.debug(s"updateProxyRef: got $proxyUri in with archive entry in region ${archiveEntry.region}")
-    implicit val s3Client = s3ClientMgr.getS3Client(config.getOptional[String]("externalData.awsProfile"), archiveEntry.region)
+    implicit val s3Client = s3ClientMgr.getS3Client(config.getOptional[String]("externalData.awsProfile"), archiveEntry.region.map(Region.of))
     ProxyLocation.fromS3(
       proxyUri = proxyUri,
       mainMediaUri = s"s3://${archiveEntry.bucket}/${archiveEntry.path}",
-      proxyType = Some(proxyType)
+      proxyType = Some(proxyType),
+      region = Region.of(archiveEntry.region.getOrElse(config.get[String]("externalData.awsRegion")))
     )
       .flatMap({
         case Left(err) =>

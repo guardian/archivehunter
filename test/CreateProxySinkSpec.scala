@@ -64,9 +64,9 @@ class CreateProxySinkSpec extends Specification with Mockito {
 
       val cpSink = new CreateProxySink(stubProxyGenerators)
       val src = Source(Seq(
-        ArchiveEntry("shouldwork","mybucket","/path/to/actualFile.ext",None,None,1234L,ZonedDateTime.now(),"noEtag",MimeType("video","mp4"),false,StorageClass.STANDARD,Seq(),false,None),
-        ArchiveEntry("shouldwork","mybucket","/path/to/.dotfile.ext",None,None,1234L,ZonedDateTime.now(),"noEtag",MimeType("video","mp4"),false,StorageClass.STANDARD,Seq(),false,None),
-        ArchiveEntry("shouldwork","mybucket",".dotfile.ext",None,None,1234L,ZonedDateTime.now(),"noEtag",MimeType("video","mp4"),false,StorageClass.STANDARD,Seq(),false,None),
+        ArchiveEntry("shouldwork","mybucket","/path/to/actualFile.ext",None,None,None,1234L,ZonedDateTime.now(),"noEtag",MimeType("video","mp4"),false,StorageClass.STANDARD,Seq(),false,None),
+        ArchiveEntry("shouldwork","mybucket","/path/to/.dotfile.ext",None,None,None,1234L,ZonedDateTime.now(),"noEtag",MimeType("video","mp4"),false,StorageClass.STANDARD,Seq(),false,None),
+        ArchiveEntry("shouldwork","mybucket",".dotfile.ext",None,None,None,1234L,ZonedDateTime.now(),"noEtag",MimeType("video","mp4"),false,StorageClass.STANDARD,Seq(),false,None),
       ).toStream)
 
       src.via(eosDetect).to(cpSink).run()

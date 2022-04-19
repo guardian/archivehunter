@@ -23,7 +23,6 @@ lazy val commonSettings = Seq(
   libraryDependencies ++= Seq("org.apache.logging.log4j" % "log4j-core" % "2.17.1",
     "com.beust" % "jcommander" % "1.75", //snyk identified as vulnerable
     "org.apache.logging.log4j" % "log4j-api" % "2.17.1",
-    "com.amazonaws" % "aws-java-sdk-s3" % awsSdkVersion,
     "com.amazonaws" % "aws-java-sdk-elastictranscoder"% awsSdkVersion,
     "com.amazonaws" % "aws-java-sdk-sqs"% awsSdkVersion,
     "com.dripower" %% "play-circe" % "2812.0",
@@ -35,6 +34,7 @@ lazy val commonSettings = Seq(
     "com.sksamuel.elastic4s" %% "elastic4s-embedded" % elastic4sVersion % "test",
     "com.typesafe.akka" %% "akka-actor" % akkaVersion,
     "software.amazon.awssdk" % "dynamodb" % awsSdk2Version,
+    "software.amazon.awssdk" % "s3" % awsSdk2Version,
     "software.amazon.awssdk" % "aws-cbor-protocol" % awsSdk2Version,
     "com.lightbend.akka" %% "akka-stream-alpakka-dynamodb" % "2.0.2",
     "com.lightbend.akka" %% "akka-stream-alpakka-s3" % "2.0.2",

@@ -26,6 +26,7 @@ import com.theguardian.multimedia.archivehunter.common.cmn_models._
 import org.slf4j.LoggerFactory
 import play.api.cache.SyncCacheApi
 import services.{BucketNotificationConfigurations, BucketScanner, BulkThumbnailer, LegacyProxiesScanner}
+import software.amazon.awssdk.regions.Region
 
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -238,7 +239,8 @@ class ScanTargetController @Inject() (@Named("bucketScannerActor") bucketScanner
 
   def notificationConfiguration(targetName:String, shouldUpdate:Boolean) = IsAdmin { _=> _=>
     withLookup(targetName) { tgt=>
-      bucketNotifications.verifyNotificationSetup(tgt.bucketName, Some(tgt.region), shouldUpdate) match {
+      val rgn = Region.of(tgt.region)
+      bucketNotifications.verifyNotificationSetup(tgt.bucketName, Some(rgn), shouldUpdate) match {
         case Success((updatesRequired, didUpdate))=>
           Ok(CheckNotificationResponse("ok",updatesRequired,didUpdate).asJson)
         case Failure(err)=>

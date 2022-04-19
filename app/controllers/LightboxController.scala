@@ -34,6 +34,7 @@ import helpers.S3Helper.getPresignedURL
 import play.api.cache.SyncCacheApi
 import auth.ClaimsSetExtensions._
 import org.slf4j.LoggerFactory
+import software.amazon.awssdk.regions.Region
 
 @Singleton
 class LightboxController @Inject() (override val config:Configuration,
@@ -64,6 +65,8 @@ class LightboxController @Inject() (override val config:Configuration,
   implicit val timeout:akka.util.Timeout = 30 seconds
 
   val tokenShortDuration = config.getOptional[Int]("serverToken.shortLivedDuration").getOrElse(10)  //default value is 2 hours
+  val defaultLinkExpiry = 1800 //links expire after 30 minutes
+  val defaultRegion = Region.of(config.get[String]("externalData.awsRegion"))
 
   def withTargetUserProfile[T](request:Request[T], user:String)(block: (UserProfile=>Future[Result])) =
     targetUserProfile(request, user).flatMap({
@@ -216,7 +219,7 @@ class LightboxController @Inject() (override val config:Configuration,
       case Some(Right(userProfile))=>
         indexer.getById(fileId).map(archiveEntry=>{
           if(userProfile.allCollectionsVisible || userProfile.visibleCollections.contains(archiveEntry.bucket)){
-            getPresignedURL(archiveEntry)(s3Client) match {
+            getPresignedURL(archiveEntry, defaultLinkExpiry, defaultRegion)(s3Client) match {
               case Success(url)=>
                 Ok(ObjectGetResponse("ok","link",url.toString).asJson)
               case Failure(ex)=>

@@ -53,7 +53,7 @@
     <logger name="helpers.LightboxStreamComponents.SaveLightboxEntryFlow" level="INFO"/>
 
     <logger name="com.sksamuel.elastic4s.streams" level="WARN"/>
-    <logger name="controllers.SearchController" level="WARN"/>
+    <logger name="controllers.SearchController" level="DEBUG"/>
     <logger name="controllers.ProxyHealthController" level="WARN"/>
     <logger name="controllers.ScanTargetController" level="WARN"/>
     <logger name="controllers.JobController" level="WARN"/>
@@ -98,11 +98,14 @@
     <logger name="helpers.ProblemItemReproxySink" level="INFO"/>
 
     <logger name="helpers.ProxyFramework" level="INFO"/>
-    <logger name="services.ProxyFrameworkQueue" level="INFO"/>
+    <logger name="services.ProxyFrameworkQueue" level="DEBUG"/>
 
     <logger name="models.ChartFacet" level="INFO"/>
     <logger name="com.theguardian.multimedia.archivehunter.cmn_services.ProxyGenerators" level="INFO"/>
     <logger name="com.theguardian.multimedia.archivehunter.common.ProxyLocation$" level="INFO"/>
+
+    <logger name="com.theguardian.multimedia.archivehunter.common.Indexer" level="DEBUG"/>
+    <logger name="helpers.ProxyLocator" level="DEBUG"/>
 
     <logger name="services.GlacierRestoreActor" level="DEBUG"/>
 

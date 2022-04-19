@@ -11,6 +11,7 @@ import akka.util.ByteString
 import com.theguardian.multimedia.archivehunter.common.clientManagers.S3ClientManager
 import org.slf4j.LoggerFactory
 import play.api.Configuration
+import software.amazon.awssdk.regions.Region
 
 import java.net.{URI, URL}
 import java.nio.ByteBuffer
@@ -32,6 +33,7 @@ import scala.util.{Failure, Success, Try}
 class UserAvatarHelper @Inject() (config:Configuration, s3ClientManager: S3ClientManager)(implicit system:ActorSystem, mat:Materializer) {
   private val logger = LoggerFactory.getLogger(getClass)
 
+  import com.theguardian.multimedia.archivehunter.common.cmn_helpers.S3ClientExtensions._
   private val s3Client = s3ClientManager.getClient(config.getOptional[String]("externalData.awsProfile"))
   private val sanitiser = "[^\\w\\d-_]".r
 
@@ -80,10 +82,12 @@ class UserAvatarHelper @Inject() (config:Configuration, s3ClientManager: S3Clien
     */
   def getAvatarUrl(username: String):Option[URL] = {
     config.getOptional[String]("externalData.avatarBucket").flatMap(avatarBucket=> {
-      val expiry = Date.from(Instant.now().plusSeconds(900))  //link is valid for 15mins
-      Try {
-        s3Client.generatePresignedUrl(avatarBucket, sanitisedKey(username), expiry)
-      } match {
+      val result = for {
+        rgn <- Try { Region.of(config.get[String]("externalData.awsRegion")) }
+        result <- s3Client.generatePresignedUrl(avatarBucket, sanitisedKey(username), 900, rgn)
+      } yield result
+
+      result match {
         case Success(url)=>Some(url)
         case Failure(err)=>
           logger.error(s"Could not get avatar URL for user '$username': ${err.getMessage}", err)
@@ -110,7 +114,7 @@ class UserAvatarHelper @Inject() (config:Configuration, s3ClientManager: S3Clien
     * @param s3Url the S3 URL to translate
     * @return either a client-facing https presigned URL or a Failure indicating the problem
     */
-  def getPresignedUrl(s3Url:URI, overrideExpiry:Option[Date]=None):Try[URL] = {
+  def getPresignedUrl(s3Url:URI, overrideExpiry:Option[Int]=None):Try[URL] = {
     config.getOptional[String]("externalData.avatarBucket") match {
       case None=>
         Failure(new RuntimeException("externalData.avatarBucket is not set, you need this in order to store user avatars"))
@@ -120,10 +124,10 @@ class UserAvatarHelper @Inject() (config:Configuration, s3ClientManager: S3Clien
         } else if(s3Url.getHost!=avatarBucket){
           Failure(new RuntimeException("incorrect bucket name"))
         } else {
-          val expiry = overrideExpiry.getOrElse(Date.from(Instant.now().plusSeconds(900)))  //link is valid for 15mins
-          Try {
-            s3Client.generatePresignedUrl(avatarBucket, s3Url.getPath.stripPrefix("/"), expiry)
-          }
+          Try { Region.of(config.get[String]("externalData.awsRegion")) }.flatMap(rgn=> {
+            val expiry = overrideExpiry.getOrElse(900) //link is valid for 15mins
+            s3Client.generatePresignedUrl(avatarBucket, s3Url.getPath.stripPrefix("/"), expiry, rgn)
+          })
         }
     }
   }

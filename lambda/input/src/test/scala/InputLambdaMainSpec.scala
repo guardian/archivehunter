@@ -18,6 +18,9 @@ import org.junit.runner.RunWith
 import org.specs2.runner.JUnitRunner
 import io.circe.syntax._
 import io.circe.generic.auto._
+import software.amazon.awssdk.regions.Region
+import software.amazon.awssdk.services.s3.S3Client
+import software.amazon.awssdk.services.s3.model.{HeadObjectRequest, HeadObjectResponse}
 
 import collection.JavaConverters._
 import scala.concurrent.Future
@@ -47,12 +50,14 @@ class InputLambdaMainSpec extends Specification with Mockito with ZonedDateTimeE
       val mockIndexer = mock[Indexer]
       val mockSendIngestedMessage = mock[ArchiveEntry=>Unit]
 
-      mockIndexer.indexSingleItem(any,any,any)(any).returns(Future(Right("fake-entry-id")))
-
+      mockIndexer.indexSingleItem(any,any)(any).returns(Future(Right("fake-entry-id")))
+      mockIndexer.getById(any)(any) returns Future(mock[ArchiveEntry])
       val mockWritePathCacheEntries = mock[Seq[PathCacheEntry]=>Future[Unit]]
       mockWritePathCacheEntries.apply(any) returns Future( () )
 
+      val mockClient = mock[S3Client]
       val test = new InputLambdaMain {
+        override def getRegionFromEnvironment: Option[Region] = Some(Region.AP_EAST_1)
         override protected def getElasticClient(clusterEndpoint: String): ElasticClient = mock[ElasticClient]
 
         override def sendIngestedMessage(entry:ArchiveEntry) = mockSendIngestedMessage(entry)
@@ -66,15 +71,10 @@ class InputLambdaMainSpec extends Specification with Mockito with ZonedDateTimeE
         override def writePathCacheEntries(newCacheEntries: Seq[PathCacheEntry])(implicit pathCacheIndexer: PathCacheIndexer, elasticClient: ElasticClient): Future[Unit] =
           mockWritePathCacheEntries(newCacheEntries)
 
-        override protected def getS3Client: AmazonS3 = {
-          val m = mock[AmazonS3]
-          val fakeMd = new ObjectMetadata()
-          fakeMd.setContentType("video/mp4")
-          fakeMd.setContentLength(1234L)
-          fakeMd.setLastModified(Date.from(Instant.now()))
-
-          m.getObjectMetadata("my-bucket","path/to/object with spaces").returns(fakeMd)
-          m
+        override protected def getS3Client: S3Client = {
+          val fakeMd = HeadObjectResponse.builder().contentType("video/mp4").contentLength(1234L).lastModified(Instant.now()).build()
+          mockClient.headObject(org.mockito.ArgumentMatchers.any[HeadObjectRequest]).returns(fakeMd)
+          mockClient
         }
       }
 
@@ -87,7 +87,8 @@ class InputLambdaMainSpec extends Specification with Mockito with ZonedDateTimeE
       }
       there was one(mockSendIngestedMessage).apply(any)
       there was one(mockWritePathCacheEntries).apply(any)
-      there was one(mockIndexer).indexSingleItem(any,any,any)(any)
+      there was one(mockIndexer).indexSingleItem(any,any)(any)
+      there was one(mockClient).headObject(HeadObjectRequest.builder().bucket("my-bucket").key("path/to/object with spaces").versionId("v1").build())
     }
 
     "call to index an item delivered via an S3Event then call to dispatch a message to the main app" in {
@@ -104,7 +105,8 @@ class InputLambdaMainSpec extends Specification with Mockito with ZonedDateTimeE
 
       val fakeContext = mock[Context]
       val mockIndexer = mock[Indexer]
-      mockIndexer.indexSingleItem(any,any,any)(any).returns(Future(Right("fake-entry-id")))
+      mockIndexer.indexSingleItem(any,any)(any).returns(Future(Right("fake-entry-id")))
+      mockIndexer.getById(any)(any) returns Future(mock[ArchiveEntry])
 
       val mockSendIngestedMessage = mock[ArchiveEntry=>Unit]
       val mockESClient = mock[ElasticClient]
@@ -112,7 +114,10 @@ class InputLambdaMainSpec extends Specification with Mockito with ZonedDateTimeE
       val mockWritePathCacheEntries = mock[Seq[PathCacheEntry]=>Future[Unit]]
       mockWritePathCacheEntries.apply(any) returns Future( () )
 
+      val mockClient = mock[S3Client]
       val test = new InputLambdaMain {
+        override def getRegionFromEnvironment: Option[Region] = Some(Region.AP_EAST_1)
+
         override protected def getElasticClient(clusterEndpoint: String): ElasticClient = mockESClient
 
         override def sendIngestedMessage(entry:ArchiveEntry) = mockSendIngestedMessage(entry)
@@ -126,15 +131,12 @@ class InputLambdaMainSpec extends Specification with Mockito with ZonedDateTimeE
         override def writePathCacheEntries(newCacheEntries: Seq[PathCacheEntry])(implicit pathCacheIndexer: PathCacheIndexer, elasticClient: ElasticClient): Future[Unit] =
           mockWritePathCacheEntries(newCacheEntries)
 
-        override protected def getS3Client: AmazonS3 = {
-          val m = mock[AmazonS3]
-          val fakeMd = new ObjectMetadata()
-          fakeMd.setContentType("video/mp4")
-          fakeMd.setContentLength(1234L)
-          fakeMd.setLastModified(Date.from(Instant.now()))
+        override protected def getS3Client: S3Client = {
+          val fakeMd = HeadObjectResponse.builder().contentType("video/mp4").contentLength(1234L).lastModified(Instant.now()).build()
 
-          m.getObjectMetadata("my-bucket","path/to/object").returns(fakeMd)
-          m
+          //"my-bucket","path/to/object"
+          mockClient.headObject(org.mockito.ArgumentMatchers.any[HeadObjectRequest]).returns(fakeMd)
+          mockClient
         }
       }
 
@@ -147,7 +149,8 @@ class InputLambdaMainSpec extends Specification with Mockito with ZonedDateTimeE
       }
       there was one(mockSendIngestedMessage).apply(any)
       there was one(mockWritePathCacheEntries).apply(any)
-      there was one(mockIndexer).indexSingleItem(any,any,any)(any)
+      there was one(mockIndexer).indexSingleItem(any,any)(any)
+      there was one(mockClient).headObject(HeadObjectRequest.builder().bucket("my-bucket").key("path/to/object").versionId("v1").build())
     }
   }
 
@@ -177,7 +180,7 @@ class InputLambdaMainSpec extends Specification with Mockito with ZonedDateTimeE
         override def makeDocId(bucket:String,path:String) = "test-source-id"
       }
 
-      Await.ready(test.handleRestored(mockRecord,"somepath/to/media"), 5 seconds)
+      Await.ready(test.handleRestored(mockRecord,"somepath/to/media"), 5.seconds)
       there were two(mockDao).putJob(any[JobModel])
     }
 
@@ -191,6 +194,7 @@ class InputLambdaMainSpec extends Specification with Mockito with ZonedDateTimeE
         "/path/to/file",
         Some("region"),
         Some(".ext"),
+        None,
         1234L,
         ZonedDateTime.now(),
         "fake-etag",
@@ -206,13 +210,14 @@ class InputLambdaMainSpec extends Specification with Mockito with ZonedDateTimeE
       val mockedResult = new SendMessageResult().withMessageId("fake-message-id")
       mockSqsClient.sendMessage(any[SendMessageRequest]) returns mockedResult
 
-      val mockS3Client = mock[AmazonS3]
-      mockS3Client.getRegionName returns "region"
+      val mockS3Client = mock[S3Client]
 
       val test = new InputLambdaMain {
         override protected def getSqsClient() = mockSqsClient
         override protected def getS3Client() = mockS3Client
         override protected def getNotificationQueue() = "fake-queue"
+
+        override def getRegionFromEnvironment: Option[Region] = Some(Region.AP_EAST_1)
       }
 
       val expectedMessageRequest = new SendMessageRequest()

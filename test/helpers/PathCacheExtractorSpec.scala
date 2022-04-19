@@ -16,9 +16,9 @@ import scala.concurrent.Await
 class PathCacheExtractorSpec extends Specification with Mockito {
   "PathCacheExtractor" should {
     "yield a PathCacheEntry for every element of the path of the incoming ArchiveEntry" in new AkkaTestkitSpecs2Support {
-      implicit val mat:Materializer = ActorMaterializer()
+      implicit val mat:Materializer = Materializer.matFromSystem
 
-      val resultFut = Source.single(ArchiveEntry("aaa","testbucket","path/to/some/very/long/filename.wav",None, Some(".wav"),
+      val resultFut = Source.single(ArchiveEntry("aaa","testbucket","path/to/some/very/long/filename.wav",None, Some(".wav"), None,
         1234L, ZonedDateTime.now(),"",MimeType("application","octet-stream"), false, StorageClass.STANDARD,Seq(),
         false, None))
         .via(PathCacheExtractor())

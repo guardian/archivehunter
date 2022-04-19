@@ -1,17 +1,20 @@
 package services
 
-import java.time.temporal.{ChronoField, ChronoUnit, TemporalAdjusters, TemporalField}
-import java.time.{Instant, Period, ZoneId, ZonedDateTime}
+import java.time.temporal.{ChronoUnit, TemporalField}
+import java.time.{Instant, ZoneId, ZonedDateTime}
 import akka.actor.{Actor, ActorRef, ActorSystem}
-import com.amazonaws.services.s3.model.{ObjectMetadata, RestoreObjectRequest}
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer}
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{ESClientManager, S3ClientManager}
+import com.theguardian.multimedia.archivehunter.common.cmn_helpers.S3RestoreHeader
 import com.theguardian.multimedia.archivehunter.common.cmn_models._
 
 import javax.inject.{Inject, Singleton}
 import play.api.{Configuration, Logger}
+import software.amazon.awssdk.regions.Region
+import software.amazon.awssdk.services.s3.S3Client
+import software.amazon.awssdk.services.s3.model.{HeadObjectResponse, RestoreObjectRequest, RestoreRequest, StorageClass}
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 import scala.concurrent.duration._
 
@@ -47,10 +50,12 @@ object GlacierRestoreActor {
 class GlacierRestoreActor @Inject() (config:Configuration, esClientMgr:ESClientManager, s3ClientMgr:S3ClientManager,
                                      jobModelDAO: JobModelDAO, lbEntryDAO:LightboxEntryDAO, system:ActorSystem) extends Actor {
   import GlacierRestoreActor._
+  import com.theguardian.multimedia.archivehunter.common.cmn_helpers.S3ClientExtensions._
+
   private val logger = Logger(getClass)
 
   implicit val ec:ExecutionContext = system.getDispatcher
-  lazy val s3client = s3ClientMgr.getClient(config.getOptional[String]("externalData.awsProfile"))
+
   val defaultExpiry = config.getOptional[Int]("archive.restoresExpireAfter").getOrElse(3)
   logger.info(s"Glacier restores will expire after $defaultExpiry days")
   private val indexer = new Indexer(config.get[String]("externalData.indexName"))
@@ -86,39 +91,51 @@ class GlacierRestoreActor @Inject() (config:Configuration, esClientMgr:ESClientM
     lbEntryDAO.put(updatedEntry)
   }
 
-  private def checkStatus(result:ObjectMetadata, entry: ArchiveEntry, lbEntry: Option[LightboxEntry], jobs:Option[List[JobModel]], originalSender:ActorRef) = {
-    val isRestoring = Option(result.getOngoingRestore).map(_.booleanValue()) //true, false or null; see https://forums.aws.amazon.com/thread.jspa?threadID=141678. Also map java boolean to scala.
-    isRestoring match {
-      case None =>
+  private def checkStatus(result:HeadObjectResponse, entry: ArchiveEntry, lbEntry: Option[LightboxEntry], jobs:Option[List[JobModel]], originalSender:ActorRef) = {
+    S3RestoreHeader(result.restore()) match {
+      case Failure(_) =>
         logger.info(s"s3://${entry.bucket}/${entry.path} has not had any restore requested")
-        if(result.getStorageClass!="GLACIER"){
+        if(result.storageClass()!=StorageClass.GLACIER){
           originalSender ! NotInArchive(entry)
         } else {
           if(jobs.isDefined) jobs.get.foreach(job=>updateJob(job, JobStatus.ST_ERROR,Some("No restore record in S3")))
           if(lbEntry.isDefined) updateLightbox(lbEntry.get,None,error=Some(new RuntimeException("No restore record in S3")))
           originalSender ! RestoreNotRequested(entry)
         }
-      case Some(true) => //restore is in progress
+      case Success(S3RestoreHeader(true, _)) => //restore is in progress
         logger.info(s"s3://${entry.bucket}/${entry.path} is currently under restore")
         if(jobs.isDefined) jobs.get.foreach(job=>updateJob(job, JobStatus.ST_RUNNING, None))
         if(lbEntry.isDefined) updateLightboxFull(lbEntry.get,RestoreStatus.RS_UNDERWAY,None)
         originalSender ! RestoreInProgress(entry)
-      case Some(false) => //restore not in progress, may be completed
-        Option(result.getRestoreExpirationTime)
-          .map(date => ZonedDateTime.ofInstant(date.toInstant, ZoneId.systemDefault())) match {
-          case None => //no restore time, so it's gone back again
-            if(lbEntry.isDefined) {
-              if (lbEntry.get.restoreStatus != RestoreStatus.RS_ERROR && lbEntry.get.restoreStatus != RestoreStatus.RS_SUCCESS) {
-                updateLightbox(lbEntry.get, None, Some(new RuntimeException("Item has already expired")))
-              }
-            }
-            originalSender ! RestoreNotRequested(entry)
-          case Some(expiry) =>
-            if(jobs.isDefined) jobs.get.foreach(job=>updateJob(job,JobStatus.ST_SUCCESS,None))
-            if(lbEntry.isDefined) updateLightboxFull(lbEntry.get, RestoreStatus.RS_SUCCESS, Some(expiry))
-            originalSender ! RestoreCompleted(entry, expiry)
+      case Success(S3RestoreHeader(false, None)) => //restore not in progress, may be completed
+        if(! lbEntry.map(_.restoreStatus).contains(RestoreStatus.RS_ERROR) && ! lbEntry.map(_.restoreStatus).contains(RestoreStatus.RS_SUCCESS)) {
+          updateLightbox(lbEntry.get, None, Some(new RuntimeException("Item has already expired")))
         }
+        originalSender ! RestoreNotRequested(entry)
+      case Success(S3RestoreHeader(false, Some(expiry))) =>
+        if(jobs.isDefined) jobs.get.foreach(job=>updateJob(job,JobStatus.ST_SUCCESS,None))
+        if(lbEntry.isDefined) updateLightboxFull(lbEntry.get, RestoreStatus.RS_SUCCESS, Some(expiry))
+        originalSender ! RestoreCompleted(entry, expiry)
+      }
     }
+
+  private def initiateRestore(bucket:String,  key:String, maybeVersion:Option[String], maybeExpiry:Option[Int])(implicit client:S3Client) = {
+    val initialRequest = RestoreObjectRequest.builder().bucket(bucket).key(key)
+    val withExp = maybeExpiry match {
+      case Some(expiry)=>
+        val rs = RestoreRequest.builder().days(expiry).build()
+        initialRequest.restoreRequest(rs)
+      case None=>
+        val rs = RestoreRequest.builder().days(defaultExpiry).build()
+        initialRequest.restoreRequest(rs)
+    }
+    val withVersion = maybeVersion match {
+      case Some(ver)=>
+        withExp.versionId(ver)
+      case None=>
+        withExp
+    }
+    Try { client.restoreObject(withVersion.build()) }
   }
 
   override def receive: Receive = {
@@ -127,9 +144,8 @@ class GlacierRestoreActor @Inject() (config:Configuration, esClientMgr:ESClientM
       logger.info(s"From lightbox entry $lbEntry")
       logger.info(s"With jobs $jobs")
 
-      Try {
-        s3client.getObjectMetadata(entry.bucket, entry.path)
-      } match {
+      implicit val s3client = s3ClientMgr.getS3Client(config.getOptional[String]("externalData.awsProfile"), entry.region.map(Region.of))
+      s3client.getObjectMetadata(entry.bucket, entry.path,None) match {
         case Success(result)=>checkStatus(result, entry, lbEntry, jobs, originalSender)
         case Failure(s3err:com.amazonaws.services.s3.model.AmazonS3Exception)=>
           if(s3err.getStatusCode==404) {
@@ -168,7 +184,7 @@ class GlacierRestoreActor @Inject() (config:Configuration, esClientMgr:ESClientM
           if (failures.nonEmpty) {
             logger.error("Could not retrieve jobs records: ")
             failures.foreach(err => logger.error(err.toString))
-            sender ! RestoreFailure(new RuntimeException("could not retrieve job records"))
+            originalSender ! RestoreFailure(new RuntimeException("could not retrieve job records"))
           } else {
             val jobs = jobResults.collect({ case Right(x) => x })
               .filter(_.jobType == "RESTORE")
@@ -180,7 +196,7 @@ class GlacierRestoreActor @Inject() (config:Configuration, esClientMgr:ESClientM
       })
 
     case InitiateRestoreBasic(entry, maybeExpiry)=>
-      val rq = new RestoreObjectRequest(entry.bucket, entry.path, maybeExpiry.getOrElse(defaultExpiry))
+      implicit val s3client = s3ClientMgr.getS3Client(config.getOptional[String]("externalData.awsProfile"), entry.region.map(Region.of))
       val inst = Instant.now().plus(maybeExpiry.getOrElse(defaultExpiry).toLong, ChronoUnit.DAYS)
       val willExpire = ZonedDateTime.ofInstant(inst,ZoneId.systemDefault())
 
@@ -192,7 +208,7 @@ class GlacierRestoreActor @Inject() (config:Configuration, esClientMgr:ESClientM
       jobModelDAO.putJob(newJob).onComplete({
         case Success(_)=>
           logger.debug(s"${entry.location}: initiating restore")
-          Try { s3client.restoreObjectV2(rq) } match {
+          initiateRestore(entry.bucket, entry.path, entry.maybeVersion, maybeExpiry)match {
             case Success(_)=>originalSender ! RestoreInProgress
             case Failure(err)=>
               logger.error("S3 restore request failed: ", err)
@@ -204,7 +220,7 @@ class GlacierRestoreActor @Inject() (config:Configuration, esClientMgr:ESClientM
       })
 
     case InitiateRestore(entry, lbEntry, maybeExpiry)=>
-      val rq = new RestoreObjectRequest(entry.bucket, entry.path, maybeExpiry.getOrElse(defaultExpiry))
+      implicit val s3client = s3ClientMgr.getS3Client(config.getOptional[String]("externalData.awsProfile"), entry.region.map(Region.of))
       val inst = Instant.now().plus(maybeExpiry.getOrElse(defaultExpiry).toLong, ChronoUnit.DAYS)
       val willExpire = ZonedDateTime.ofInstant(inst,ZoneId.systemDefault())
 
@@ -212,31 +228,29 @@ class GlacierRestoreActor @Inject() (config:Configuration, esClientMgr:ESClientM
 
       val originalSender = sender()
 
-      //completion is detected by the inputLambda, and the job status will be updated there.
-      jobModelDAO.putJob(newJob)
-        .map(_=>{
+      val restoreResult = for {
+        _ <- jobModelDAO.putJob(newJob)
+        result <- Future.fromTry{
           logger.debug(s"${entry.location}: initiating restore")
-          Try { s3client.restoreObjectV2(rq) }
-        })
-        .map({
-          case Success(restoreObjectResult)=>
-            logger.info(s"Restore started for ${entry.location}, requestor charged? ${restoreObjectResult.isRequesterCharged}, output path ${restoreObjectResult.getRestoreOutputPath}")
-            updateLightbox(lbEntry, availableUntil=Some(willExpire)).andThen({ case _ =>
-              originalSender ! RestoreSuccess
-            })
+          initiateRestore(entry.bucket, entry.path, entry.maybeVersion, maybeExpiry)
+        }
+      } yield result
 
-          case Failure(ex)=>
-            logger.error(s"Could not restore ${entry.location}", ex)
-            updateLightbox(lbEntry, error=Some(ex)).andThen({
-              case _=>originalSender ! RestoreFailure(ex)
-            })
-      }).recover({
-        case ex:akka.stream.BufferOverflowException=>
+      restoreResult.onComplete({
+        case Success(restoreObjectResult)=>
+          logger.info(s"Restore started for ${entry.location}, requestor charged? ${restoreObjectResult.requestChargedAsString()}, output path ${restoreObjectResult.restoreOutputPath()}")
+          updateLightbox(lbEntry, availableUntil=Some(willExpire)).andThen({ case _ =>
+            originalSender ! RestoreSuccess
+          })
+        case Failure(ex:akka.stream.BufferOverflowException)=>
           logger.debug(ex.toString)
           logger.warn(s"Caught buffer overflow exception, retrying operation in 5s")
           system.scheduler.scheduleOnce(5.seconds,self,InitiateRestore(entry,lbEntry,maybeExpiry))
-        case ex:Throwable=>
-          logger.error(s"Unexpected exception while initiating restore of ${entry.location}: ${ex.getMessage}", ex)
+        case Failure(ex)=>
+          logger.error(s"Could not restore ${entry.location}", ex)
+          updateLightbox(lbEntry, error=Some(ex)).andThen({
+            case _=>originalSender ! RestoreFailure(ex)
+          })
       })
 
   }

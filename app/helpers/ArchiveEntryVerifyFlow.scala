@@ -5,8 +5,12 @@ import akka.stream.stage.{AbstractInHandler, AbstractOutHandler, GraphStage, Gra
 import com.theguardian.multimedia.archivehunter.common.clientManagers.S3ClientManager
 import com.amazonaws.services.s3.AmazonS3
 import com.theguardian.multimedia.archivehunter.common.ArchiveEntry
+
 import javax.inject.Inject
 import play.api.{Configuration, Logger}
+import software.amazon.awssdk.regions.Region
+
+import scala.util.{Failure, Success}
 
 /**
   * this is a Flow component for an Akka stream.
@@ -19,6 +23,7 @@ import play.api.{Configuration, Logger}
 class ArchiveEntryVerifyFlow @Inject() (s3ClientMgr: S3ClientManager, config:Configuration) extends GraphStage[FlowShape[ArchiveEntry, ArchiveEntry]]{
   final val in:Inlet[ArchiveEntry] = Inlet.create("ArchiveEntryVerifyFlow.in")
   final val out:Outlet[ArchiveEntry] = Outlet.create("ArchiveEntryVerifyFlow.out")
+  import com.theguardian.multimedia.archivehunter.common.cmn_helpers.S3ClientExtensions._
 
   override def shape: FlowShape[ArchiveEntry, ArchiveEntry] = {
     FlowShape.of(in,out)
@@ -35,21 +40,24 @@ class ArchiveEntryVerifyFlow @Inject() (s3ClientMgr: S3ClientManager, config:Con
       setHandler(in, new AbstractInHandler {
         override def onPush(): Unit = {
           val elem = grab(in)
-          implicit val s3Client = s3ClientMgr.getS3Client(awsProfile, elem.region)
+          implicit val s3Client = s3ClientMgr.getS3Client(awsProfile, elem.region.map(Region.of))
 
-          if(s3Client.doesObjectExist(elem.bucket, elem.path)){
-            logger.debug(s"Object s3://${elem.bucket}/${elem.path} still exists, not passing.")
-            pull(in)
-          } else {
-            logger.debug(s"Object s3://${elem.bucket}/${elem.path} does not exist - flagging as missing and passing on")
-            push(out, elem.copy(beenDeleted = true))
+          s3Client.doesObjectExist(elem.bucket, elem.path, elem.maybeVersion) match {
+            case Success(true)=>
+              logger.debug(s"Object s3://${elem.bucket}/${elem.path} still exists, not passing.")
+              pull(in)
+            case Success(false)=>
+              logger.debug(s"Object s3://${elem.bucket}/${elem.path} does not exist - flagging as missing and passing on")
+              push(out, elem.copy(beenDeleted = true))
+            case Failure(err)=>
+              logger.error(s"Could not check object s3://${elem.bucket}/${elem.path} - ${err.getMessage}", err)
+              failStage(err)
           }
         }
       })
 
       setHandler(out, new AbstractOutHandler {
         override def onPull(): Unit = {
-          logger.debug("pull from downstream")
           pull(in)
         }
       })

@@ -1,12 +1,14 @@
 package helpers
 
-import com.amazonaws.services.s3.AmazonS3
-import com.amazonaws.services.s3.model.ListObjectsV2Request
 import com.sksamuel.elastic4s.http.{ElasticClient, HttpClient}
+import com.theguardian.multimedia.archivehunter.common.cmn_helpers.S3ClientExtensions.S3ClientExtensions
 import com.theguardian.multimedia.archivehunter.common.cmn_models.{ConflictError, ItemNotFound, ScanTargetDAO, UnexpectedReturnCode}
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, Indexer, ProxyLocation, ProxyType}
 import org.slf4j.MDC
 import play.api.Logger
+import software.amazon.awssdk.regions.Region
+import software.amazon.awssdk.services.s3.S3Client
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Request
 
 import scala.jdk.CollectionConverters._
 import scala.concurrent.{ExecutionContext, Future}
@@ -14,9 +16,9 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 object ProxyLocator {
   private val logger = Logger(getClass)
-  def checkBucketLocation(bucket:String, key:String)(implicit s3Client:AmazonS3) = Future {
-    Tuple2(bucket, s3Client.doesObjectExist(bucket,key))
-  }
+  def checkBucketLocation(bucket:String, key:String)(implicit s3Client:S3Client) = Future.fromTry(
+    s3Client.doesObjectExist(bucket,key).map(exists=>(bucket, exists))
+  )
 
   private val fileEndingRegex = "^(.*)\\.(.*)$".r
 
@@ -52,22 +54,23 @@ object ProxyLocator {
     * @param s3Client implicitly provided AmazonS3 instance
     * @return a Future, containing a Sequence of ProxyLocation objects for each file that matches the given root
     */
-  def findProxyLocation(entry:ArchiveEntry)(implicit s3Client:AmazonS3, scanTargetDAO: ScanTargetDAO) = {
+  def findProxyLocation(entry:ArchiveEntry)(implicit s3Client:S3Client, scanTargetDAO: ScanTargetDAO) = {
     scanTargetDAO.targetForBucket(entry.bucket).flatMap({
       case None=>throw new RuntimeException(s"No scan target for ${entry.bucket}")
       case Some(Left(err))=>throw new RuntimeException(err.toString)  //fail the Future if we get an error. This is picked up with onComplete or recover.
       case Some(Right(st))=>
-        val rq = new ListObjectsV2Request()
-          .withBucketName(st.proxyBucket)
-          .withPrefix(stripFileEnding(entry.path))
+        val rq = ListObjectsV2Request.builder()
+          .bucket(st.proxyBucket)
+          .prefix(stripFileEnding(entry.path))
+          .build()
         val potentialProxies = s3Client.listObjectsV2(rq)
-        logger.debug(s"findProxyLocation got ${potentialProxies.getKeyCount} keys")
-        Future.sequence(potentialProxies.getObjectSummaries.asScala
+        logger.debug(s"findProxyLocation got ${potentialProxies.keyCount()} keys")
+        Future.sequence(potentialProxies.contents().asScala
           .map(summary=>{
-            if(summary.getKey.endsWith(".xml")) {
+            if(summary.key().endsWith(".xml")) {
               None
             } else {
-              Some(ProxyLocation.fromS3(summary.getBucketName, summary.getKey, entry.bucket, entry.path))
+              Some(ProxyLocation.fromS3(st.proxyBucket, summary.key(), entry.bucket, entry.path, None, Region.of(entry.region.getOrElse("eu-west-1"))))
             }
           }).collect({case Some(proxyLocation)=>proxyLocation})
         )
@@ -98,7 +101,7 @@ object ProxyLocator {
     */
   def setProxiedWithRetry(sourceId:String)(implicit indexer:Indexer, httpClient:ElasticClient):Future[Either[String,String]] =
     indexer.getById(sourceId).flatMap(entry=>{
-      println(s"setProxiedWithEntry: sourceId is $sourceId entry is $entry")
+      logger.debug(s"setProxiedWithEntry: sourceId is $sourceId entry is $entry")
       val updatedEntry = entry.copy(proxied = true)
       MDC.put("entry", updatedEntry.toString)
       indexer.indexSingleItem(updatedEntry)
