@@ -150,11 +150,6 @@ class SearchController @Inject()(override val config:Configuration,
             logger.error(s"Could not perform advanced search: ${response.status} ${response.error.reason}")
             InternalServerError(GenericErrorResponse("search_error", response.error.reason).asJson)
           } else {
-            logger.info(s"debugging, there are ${response.result.totalHits} hits to this search")
-            response.result.hits.hits.foreach(h=>{
-              logger.info(s"$h")
-              logger.info(s"${h.to[ArchiveEntry]}")
-            })
             Ok(ObjectListResponse("ok", "entry", fixupUserAvatars(response.result.to[ArchiveEntry]), response.result.totalHits.toInt).asJson)
           }
         })
