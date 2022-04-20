@@ -44,6 +44,7 @@ class BucketNotificationConfigurations @Inject()(s3ClientMgr:S3ClientManager, co
     LambdaFunctionConfiguration.builder
       .lambdaFunctionArn(lambdaArn)
       .events(util.EnumSet.copyOf(expectedEvents.asJavaCollection))
+      .id("ArchiveHunterNotification")
       .build()
   }
 
@@ -129,6 +130,8 @@ class BucketNotificationConfigurations @Inject()(s3ClientMgr:S3ClientManager, co
                                      configResponse:GetBucketNotificationConfigurationResponse,
                                      maybeLambdaArn:Option[String],
                                      requiredUpdates:Seq[LambdaFunctionConfiguration])(implicit s3Client:S3Client): Try[(Boolean, Boolean)] = {
+    var updateRequired = false
+
     val initialConfiguration = NotificationConfiguration.builder()
       .lambdaFunctionConfigurations(configResponse.lambdaFunctionConfigurations())
       .eventBridgeConfiguration(configResponse.eventBridgeConfiguration())
@@ -142,6 +145,7 @@ class BucketNotificationConfigurations @Inject()(s3ClientMgr:S3ClientManager, co
         case Some(lambdaArn) =>
           val existingConfigs = configResponse.lambdaFunctionConfigurations().asScala
           val updatedConfigs = existingConfigs :+ createNewNotification(lambdaArn)
+          updateRequired = true //the SDK builder is a _java_ object which returns a mutable "self" rather than an immutable copy reference.
           initialConfiguration.lambdaFunctionConfigurations(updatedConfigs.asJava)
         case None =>
           throw new RuntimeException("Cannot add a lambda monitor because externalData.bucketMonitorLambdaARN is not set in the application config file")
@@ -152,13 +156,14 @@ class BucketNotificationConfigurations @Inject()(s3ClientMgr:S3ClientManager, co
 
     //step two - do we need to update any of the existing configurations? If so put them into the list
     val updatedConfiguration = if(requiredUpdates.nonEmpty) {
+      updateRequired = true
       addedConfiguration.lambdaFunctionConfigurations(requiredUpdates.asJava)
     } else {
       addedConfiguration
     }
 
     //step three - if the config we built has no changes then do nothing, otherwise write out the updated configuration to S3
-    if(updatedConfiguration==initialConfiguration) {
+    if(!updateRequired) {
       logger.info(s"$bucketName: No updates were required")
       Success((false, false))
     } else {
@@ -166,6 +171,7 @@ class BucketNotificationConfigurations @Inject()(s3ClientMgr:S3ClientManager, co
         s3Client.putBucketNotificationConfiguration(PutBucketNotificationConfigurationRequest.builder()
           .bucket(bucketName)
           .notificationConfiguration(updatedConfiguration.build())
+          .skipDestinationValidation(true)
           .build())
       }.map(_ => (true, true))
     }
