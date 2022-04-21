@@ -44,11 +44,10 @@ class BulkDownloadsController @Inject()(override val config:Configuration,
                                         lightboxBulkEntryDAO: LightboxBulkEntryDAO,
                                         lightboxEntryDAO: LightboxEntryDAO,
                                         esClientManager: ESClientManager,
-                                        s3ClientManager: S3ClientManager,
                                         cc:ControllerComponents,
                                         override val bearerTokenAuth:BearerTokenAuth,
                                         @Named("glacierRestoreActor") glacierRestoreActor:ActorRef,
-                                       )(implicit system:ActorSystem, mat:Materializer)
+                                       )(implicit system:ActorSystem, mat:Materializer,s3ClientManager: S3ClientManager)
   extends AbstractController(cc) with Security with Circe with ArchiveEntryHitReader with ZonedDateTimeEncoder with RestoreStatusEncoder {
 
   override protected val logger=LoggerFactory.getLogger(getClass)
@@ -272,10 +271,10 @@ class BulkDownloadsController @Inject()(override val config:Configuration,
 
           response.map({
             case GlacierRestoreActor.NotInArchive(entry)=>
-              getPresignedURL(archiveEntry, defaultLinkExpiry, defaultRegion)(s3Client)
+              getPresignedURL(archiveEntry, defaultLinkExpiry, defaultRegion, profileName)
                 .map(url=>Ok(RestoreStatusResponse("ok",entry.id, RestoreStatus.RS_UNNEEDED, None, Some(url.toString)).asJson))
             case GlacierRestoreActor.RestoreCompleted(entry, expiry)=>
-              getPresignedURL(archiveEntry, defaultLinkExpiry, defaultRegion)(s3Client)
+              getPresignedURL(archiveEntry, defaultLinkExpiry, defaultRegion, profileName)
                 .map(url=>Ok(RestoreStatusResponse("ok", entry.id, RestoreStatus.RS_SUCCESS, Some(expiry), Some(url.toString)).asJson))
             case GlacierRestoreActor.RestoreInProgress(entry)=>
               Success(Ok(RestoreStatusResponse("ok", entry.id, RestoreStatus.RS_UNDERWAY, None, None).asJson))
