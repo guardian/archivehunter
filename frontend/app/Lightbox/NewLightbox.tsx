@@ -19,6 +19,8 @@ import EntryDetails from "../Entry/EntryDetails";
 import LightboxDetailsInsert from "./LightboxDetailsInsert";
 import {UserContext} from "../Context/UserContext";
 import BrowseFilter from "../browse/BrowseFilter";
+import {Simulate} from "react-dom/test-utils";
+import select = Simulate.select;
 
 const useStyles = makeStyles({
     browserWindow: {
@@ -116,7 +118,11 @@ const NewLightbox:React.FC<RouteComponentProps> = (props) => {
     const refreshData = async () => {
         setLoading(true);
         try {
-            console.log("debug: loading lightbox details");
+            if(selectedUser=="") {
+                console.log("Not trying to load lightbox for empty selectedUser string");
+                return;
+            }
+            console.log(`debug: loading lightbox details for '${selectedUser}'`);
             const results = await performLoad();
 
             const detailsResult = results[0].data as LightboxDetailsResponse;
