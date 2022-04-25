@@ -887,6 +887,8 @@ Resources:
             Action:
               - s3:ListBucket
               - s3:GetObject
+              - s3:GetObjectVersion
+              - s3:ListBucketVersions
               - s3:RestoreObject
               - s3:GetBucketNotification
               - s3:PutBucketNotification
