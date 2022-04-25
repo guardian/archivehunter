@@ -20,5 +20,21 @@ function extractFileInfo (fullpath:string):FileInfo {
     }
 }
 
+const baseNameXtractor = /\/([^\/]+)$/;
+const baseName = (str:string|undefined) => {
+    if(str && str.length>0) {
+        const result = baseNameXtractor.exec(str);
+        if(result) {
+            return result[1];
+        } else if(!str.includes("/")) {
+            return str;
+        } else {
+            throw `baseName extraction failed on ${str}, please fix`;
+        }
+    } else {
+        return undefined
+    }
+}
+
 export type {FileInfo};
-export {extractFileInfo};
+export {extractFileInfo, baseName};
