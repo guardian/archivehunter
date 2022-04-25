@@ -5,7 +5,7 @@ import TimestampFormatter from "../common/TimestampFormatter";
 import RestoreStatusComponent from "./RestoreStatusComponent";
 import {baseStyles} from "../BaseStyles";
 import RestoreStatusIndicator from "./RestoreStatusIndicator";
-import {AirportShuttle, GetApp, YoutubeSearchedFor} from "@material-ui/icons";
+import {AirportShuttle, CheckCircle, GetApp, YoutubeSearchedFor} from "@material-ui/icons";
 import axios, {AxiosResponse} from "axios";
 import {baseName} from "../common/Fileinfo";
 
@@ -31,6 +31,14 @@ const useStyles = makeStyles((theme)=>Object.assign({
     nicelyAlignedIcon: {
         marginTop: "auto",
         marginBottom: "auto"
+    },
+    successIcon: {
+        color: theme.palette.success.main,
+        marginRight: "0.4em",
+        verticalAlign: "middle"
+    },
+    smallText: {
+        fontSize: "0.8em"
     }
 } as StylesMap, baseStyles));
 
@@ -40,6 +48,7 @@ const useStyles = makeStyles((theme)=>Object.assign({
 const LightboxDetailsInsertImpl:React.FC<LightboxDetailsInsertProps> = (props) => {
     const [downloadUrl, setDownloadUrl] = useState<string|undefined>();
     const [downloading, setDownloading] = useState(false);
+    const [downloadedTo, setDownloadedTo] = useState<string|undefined>();
 
     const classes = useStyles();
 
@@ -74,6 +83,8 @@ const LightboxDetailsInsertImpl:React.FC<LightboxDetailsInsertProps> = (props) =
             setDownloading(true);
             //the pipeTo method will automatically close the writable stream
             await content.body.pipeTo(writable);
+            const targetFile:File = await handle.getFile();
+            setDownloadedTo(targetFile.name);
             setDownloading(false);
         } else {
             alert("No content was available to download");
@@ -184,6 +195,9 @@ const LightboxDetailsInsertImpl:React.FC<LightboxDetailsInsertProps> = (props) =
                 </Typography>
                 <TimestampFormatter relative={true} value={props.lightboxEntry.availableUntil} className={classes.runOnText}/>
             </> : <Typography className={classes.runOnText}>Available indefinitely</Typography>
+        }
+        {
+            downloadedTo ? <Typography className={classes.smallText}><CheckCircle className={classes.successIcon}/>Downloaded to {downloadedTo}</Typography> : undefined
         }
     </div>;
 }
