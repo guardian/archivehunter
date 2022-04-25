@@ -42,7 +42,6 @@ class LightboxController @Inject() (override val config:Configuration,
                                     override val bearerTokenAuth: BearerTokenAuth,
                                     override val cache:SyncCacheApi,
                                     esClientMgr:ESClientManager,
-                                    s3ClientMgr:S3ClientManager,
                                     @Named("glacierRestoreActor") glacierRestoreActor:ActorRef,
                                     lightboxBulkEntryDAO: LightboxBulkEntryDAO,
                                     serverTokenDAO: ServerTokenDAO,
@@ -51,6 +50,7 @@ class LightboxController @Inject() (override val config:Configuration,
                                    (implicit val system:ActorSystem,
                                     mat:Materializer,
                                     injector:Injector,
+                                    s3ClientMgr:S3ClientManager,
                                     lightboxEntryDAO: LightboxEntryDAO,
                                     userProfileDAO: UserProfileDAO)
   extends AbstractController(controllerComponents) with Security with Circe with ZonedDateTimeEncoder with RestoreStatusEncoder {
@@ -58,7 +58,6 @@ class LightboxController @Inject() (override val config:Configuration,
   private implicit val indexer = new Indexer(config.get[String]("externalData.indexName"))
   private val awsProfile = config.getOptional[String]("externalData.awsProfile")
   private implicit val esClient = esClientMgr.getClient()
-  private val s3Client = s3ClientMgr.getClient(awsProfile)
   private implicit val ec:ExecutionContext  = controllerComponents.executionContext
   private val indexName = config.get[String]("externalData.indexName")
 
@@ -219,7 +218,7 @@ class LightboxController @Inject() (override val config:Configuration,
       case Some(Right(userProfile))=>
         indexer.getById(fileId).map(archiveEntry=>{
           if(userProfile.allCollectionsVisible || userProfile.visibleCollections.contains(archiveEntry.bucket)){
-            getPresignedURL(archiveEntry, defaultLinkExpiry, defaultRegion)(s3Client) match {
+            getPresignedURL(archiveEntry, defaultLinkExpiry, defaultRegion, awsProfile) match {
               case Success(url)=>
                 Ok(ObjectGetResponse("ok","link",url.toString).asJson)
               case Failure(ex)=>

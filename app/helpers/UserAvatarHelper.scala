@@ -3,7 +3,7 @@ package helpers
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model.ContentTypes
 import akka.stream.Materializer
-import akka.stream.alpakka.s3.S3Headers
+import akka.stream.alpakka.s3.{S3Attributes, S3Headers}
 import akka.stream.alpakka.s3.headers.CannedAcl
 import akka.stream.alpakka.s3.scaladsl.S3
 import akka.stream.scaladsl.{Sink, Source}
@@ -59,6 +59,7 @@ class UserAvatarHelper @Inject() (config:Configuration, s3ClientManager: S3Clien
 
     config.getOptional[String]("externalData.avatarBucket") match {
       case Some(avatarBucket)=>
+        val credentials = s3ClientManager.getAlpakkaCredentials(config.getOptional[String]("externalData.awsProfile"))
         S3.putObject(
           avatarBucket,
           sanitisedKey(username),
@@ -66,7 +67,9 @@ class UserAvatarHelper @Inject() (config:Configuration, s3ClientManager: S3Clien
           content.remaining(),  //we should be at the start of the buffer
           ContentTypes.NoContentType, //FIXME: should determine content type of buffer somehow
           S3Headers.empty.withCannedAcl(CannedAcl.Private)
-        ).runWith(Sink.head)
+        )
+          .withAttributes(S3Attributes.settings(credentials))
+          .runWith(Sink.head)
       case None=>
         logger.error("There is nothing configured for `externalData.avatarBucket` so user avatars will not work. Please update the configuration.")
         Future.failed(new RuntimeException("Invalid configuration, please see server logs"))
@@ -82,9 +85,10 @@ class UserAvatarHelper @Inject() (config:Configuration, s3ClientManager: S3Clien
     */
   def getAvatarUrl(username: String):Option[URL] = {
     config.getOptional[String]("externalData.avatarBucket").flatMap(avatarBucket=> {
+      val credentials = s3ClientManager.newCredentialsProvider(config.getOptional[String]("externalData.awsProfile"))
       val result = for {
         rgn <- Try { Region.of(config.get[String]("externalData.awsRegion")) }
-        result <- s3Client.generatePresignedUrl(avatarBucket, sanitisedKey(username), 900, rgn)
+        result <- s3Client.generatePresignedUrl(avatarBucket, sanitisedKey(username), 900, rgn, None, credentials)
       } yield result
 
       result match {
@@ -125,8 +129,9 @@ class UserAvatarHelper @Inject() (config:Configuration, s3ClientManager: S3Clien
           Failure(new RuntimeException("incorrect bucket name"))
         } else {
           Try { Region.of(config.get[String]("externalData.awsRegion")) }.flatMap(rgn=> {
+            val credentials = s3ClientManager.newCredentialsProvider(config.getOptional[String]("externalData.awsProfile"))
             val expiry = overrideExpiry.getOrElse(900) //link is valid for 15mins
-            s3Client.generatePresignedUrl(avatarBucket, s3Url.getPath.stripPrefix("/"), expiry, rgn)
+            s3Client.generatePresignedUrl(avatarBucket, s3Url.getPath.stripPrefix("/"), expiry, rgn, None, credentials)
           })
         }
     }

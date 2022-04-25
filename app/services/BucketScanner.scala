@@ -5,6 +5,7 @@ import akka.NotUsed
 import akka.actor.{Actor, ActorSystem, Timers}
 import akka.stream.scaladsl.{GraphDSL, Keep, RunnableGraph, Sink, Source}
 import akka.stream._
+import akka.stream.alpakka.s3.{S3Attributes, S3Ext}
 import akka.stream.alpakka.s3.scaladsl.S3
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager}
 import com.amazonaws.regions.{Region, Regions}
@@ -131,7 +132,11 @@ class BucketScanner @Inject()(override val config:Configuration, ddbClientMgr:Dy
 
     val indexSink = getElasticSearchSink(esclient, completionPromise)
 
-    keySource.via(converterFlow).named(target.region).log("S3ToArchiveEntryFlow").to(indexSink).run()
+    val properCredentials = s3ClientMgr.getAlpakkaCredentials(config.getOptional[String]("externalData.awsProfile"))
+
+    keySource
+      .withAttributes(S3Attributes.settings(properCredentials))
+      .via(converterFlow).named(target.region).log("S3ToArchiveEntryFlow").to(indexSink).run()
 
     completionPromise
   }

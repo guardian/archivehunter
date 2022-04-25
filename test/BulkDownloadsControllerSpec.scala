@@ -88,8 +88,10 @@ class BulkDownloadsControllerSpec extends Specification with Mockito with ZonedD
       val fakeConfig = Configuration.from(Map(
         "externalData"-> Map("indexName"->"archivehunter", "awsRegion"->"ap-east-1")
       ))
+      implicit val s3ClientMgr = mock[S3ClientManager]
+
       val toTest = new BulkDownloadsController(fakeConfig, mock[SyncCacheApi], mock[ServerTokenDAO], mock[LightboxBulkEntryDAO],
-        mock[LightboxEntryDAO], mock[ESClientManager], mock[S3ClientManager], mock[ControllerComponents], mock[BearerTokenAuth], TestProbe().ref) {
+        mock[LightboxEntryDAO], mock[ESClientManager], mock[ControllerComponents], mock[BearerTokenAuth], TestProbe().ref) {
         override protected def getSearchSource(p: ScrollPublisher): Source[ArchiveEntry, NotUsed] = fakeInputData
 
         def callFunc(bulkEntry:LightboxBulkEntry) =  streamingEntriesForBulk(bulkEntry)
@@ -129,9 +131,10 @@ class BulkDownloadsControllerSpec extends Specification with Mockito with ZonedD
       val mockServerTokenDAO = mock[ServerTokenDAO]
 
       mockServerTokenDAO.put(any) returns Future(mock[ServerTokenEntry])
+      implicit val s3ClientMgr = mock[S3ClientManager]
 
       val toTest = new BulkDownloadsController(fakeConfig, mock[SyncCacheApi], mockServerTokenDAO, mock[LightboxBulkEntryDAO],
-        mock[LightboxEntryDAO], mock[ESClientManager], mock[S3ClientManager], mock[ControllerComponents], mock[BearerTokenAuth], TestProbe().ref)  {
+        mock[LightboxEntryDAO], mock[ESClientManager], mock[ControllerComponents], mock[BearerTokenAuth], TestProbe().ref)  {
         def callFunc(updatedToken:ServerTokenEntry, bulkEntry:LightboxBulkEntry) = saveTokenOnly(updatedToken, bulkEntry)
       }
 

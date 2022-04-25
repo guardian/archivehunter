@@ -46,12 +46,16 @@ class ProxiesController @Inject()(override val config:Configuration,
                                   override val controllerComponents:ControllerComponents,
                                   ddbClientMgr: DynamoClientManager,
                                   esClientMgr:ESClientManager,
-                                  s3ClientMgr:S3ClientManager,
                                   proxyGenerators: ProxyGenerators,
                                   override val bearerTokenAuth:BearerTokenAuth,
                                   override val cache:SyncCacheApi,
                                   @Named("proxiesRelinker") proxiesRelinker:ActorRef)
-                                 (implicit actorSystem:ActorSystem, mat:Materializer, scanTargetDAO:ScanTargetDAO, jobModelDAO:JobModelDAO, proxyLocationDAO:ProxyLocationDAO)
+                                 (implicit actorSystem:ActorSystem,
+                                  mat:Materializer,
+                                  scanTargetDAO:ScanTargetDAO,
+                                  jobModelDAO:JobModelDAO,
+                                  proxyLocationDAO:ProxyLocationDAO,
+                                  s3ClientMgr:S3ClientManager)
   extends AbstractController(controllerComponents) with Circe with ProxyLocationEncoder with Security {
   import akka.pattern.ask
   import com.theguardian.multimedia.archivehunter.common.cmn_helpers.S3ClientExtensions._
@@ -147,7 +151,7 @@ class ProxiesController @Inject()(override val config:Configuration,
                 val req = HeadObjectRequest.builder().bucket(proxyLocation.bucketName).key(proxyLocation.bucketPath).build()
                 s3client.headObject(req)
               }
-              presignedUrl <- S3Helper.getPresignedURL(proxyLocation, proxyLinkExpiry, defaultRegion)
+              presignedUrl <- S3Helper.getPresignedURL(proxyLocation, proxyLinkExpiry, defaultRegion, awsProfile)
               result <- Try {
                 val mimeType = MimeType.fromString(meta.contentType()) match {
                   case Left(str) =>

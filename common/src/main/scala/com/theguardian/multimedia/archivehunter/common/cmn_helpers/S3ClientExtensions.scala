@@ -1,5 +1,6 @@
 package com.theguardian.multimedia.archivehunter.common.cmn_helpers
 
+import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.S3Client
 import software.amazon.awssdk.services.s3.model.{GetObjectRequest, HeadObjectRequest, NoSuchKeyException}
@@ -28,10 +29,16 @@ object S3ClientExtensions {
 
     def doesObjectExist(bucket:String, path:String):Try[Boolean] = doesObjectExist(bucket, path, None)
 
-    def generatePresignedUrl(bucket:String, key:String, expireInSeconds:Int, region:Region, maybeVersion:Option[String]=None) = Try {
-      val presigner = S3Presigner.builder().region(region).build()
-      val getReq = GetObjectRequest.builder().bucket(bucket).key(key).build()
-      val req = GetObjectPresignRequest.builder().getObjectRequest(getReq).signatureDuration(Duration.ofSeconds(expireInSeconds))
+    def generatePresignedUrl(bucket:String, key:String, expireInSeconds:Int, region:Region, maybeVersion:Option[String]=None, credentialsProvider:AwsCredentialsProvider) = Try {
+      val presigner = S3Presigner.builder().credentialsProvider(credentialsProvider).region(region).build()
+      val getReq = GetObjectRequest.builder().bucket(bucket).key(key)
+
+      val finalReq = maybeVersion match {
+        case None=>getReq
+        case Some(ver)=>getReq.versionId(ver)
+      }
+
+      val req = GetObjectPresignRequest.builder().getObjectRequest(finalReq.build()).signatureDuration(Duration.ofSeconds(expireInSeconds))
 
       presigner.presignGetObject(req.build()).url()
     }

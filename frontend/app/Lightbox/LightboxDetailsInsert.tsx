@@ -1,15 +1,13 @@
-import React, {useState} from "react";
+import React, {createRef, useState} from "react";
 import {LightboxEntry, ObjectGetResponse, RestoreStatus, StylesMap} from "../types";
 import {CircularProgress, Divider, Grid, Icon, IconButton, makeStyles, Tooltip, Typography} from "@material-ui/core";
 import TimestampFormatter from "../common/TimestampFormatter";
 import RestoreStatusComponent from "./RestoreStatusComponent";
 import {baseStyles} from "../BaseStyles";
-import {IconProp} from "@fortawesome/fontawesome-svg-core";
-import clsx from "clsx";
 import RestoreStatusIndicator from "./RestoreStatusIndicator";
-import {AirportShuttle, GetApp, YoutubeSearchedFor} from "@material-ui/icons";
-import axios from "axios";
-import {formatError} from "../common/ErrorViewComponent";
+import {AirportShuttle, CheckCircle, GetApp, YoutubeSearchedFor} from "@material-ui/icons";
+import axios, {AxiosResponse} from "axios";
+import {baseName} from "../common/Fileinfo";
 
 interface LightboxDetailsInsertProps {
     lightboxEntry: LightboxEntry;
@@ -33,6 +31,14 @@ const useStyles = makeStyles((theme)=>Object.assign({
     nicelyAlignedIcon: {
         marginTop: "auto",
         marginBottom: "auto"
+    },
+    successIcon: {
+        color: theme.palette.success.main,
+        marginRight: "0.4em",
+        verticalAlign: "middle"
+    },
+    smallText: {
+        fontSize: "0.8em"
     }
 } as StylesMap, baseStyles));
 
@@ -41,16 +47,10 @@ const useStyles = makeStyles((theme)=>Object.assign({
  */
 const LightboxDetailsInsertImpl:React.FC<LightboxDetailsInsertProps> = (props) => {
     const [downloadUrl, setDownloadUrl] = useState<string|undefined>();
+    const [downloading, setDownloading] = useState(false);
+    const [downloadedTo, setDownloadedTo] = useState<string|undefined>();
 
     const classes = useStyles();
-
-    // const displayInfo = (status:string) => {
-    //     if(status=='RS_UNNEEDED') {
-    //         return "Not in deep freeze";
-    //     } else {
-    //         return undefined;
-    //     }
-    // }
 
     const displayRedo = (status:RestoreStatus) => {
         switch(status) {
@@ -69,20 +69,72 @@ const LightboxDetailsInsertImpl:React.FC<LightboxDetailsInsertProps> = (props) =
         return props.lightboxEntry.restoreStatus=="RS_SUCCESS" || props.lightboxEntry.restoreStatus=="RS_UNNEEDED" || props.lightboxEntry.restoreStatus=="RS_ALREADY"
     }
 
-    const doDownload  = async () => {
-        try {
-            const response = await axios.get<ObjectGetResponse<string>>("/api/download/" + props.archiveEntryId);
-            setDownloadUrl(response.data.entry);
-        } catch(err) {
-            console.error("Could not get download URL: ", err);
-            props.onError ? props.onError(formatError(err, false)) : null;
+
+    const newStyleDownload = async (response: AxiosResponse<ObjectGetResponse<string>>) => {
+        console.log("Using new file picker")
+        // @ts-ignore
+        const handle = await window.showSaveFilePicker({
+            suggestedName: baseName(props.archiveEntryPath)
+        });
+        const writable = await handle.createWritable();
+        const content = await fetch(response.data.entry);
+
+        if(content.body) {
+            setDownloading(true);
+            //the pipeTo method will automatically close the writable stream
+            await content.body.pipeTo(writable);
+            const targetFile:File = await handle.getFile();
+            setDownloadedTo(targetFile.name);
+            setDownloading(false);
+        } else {
+            alert("No content was available to download");
         }
     }
 
-    return <div className={classes.centered}>
-        {
-            downloadUrl ? <iframe src={downloadUrl} style={{display:"none"}}/> : null
+    const oldStyleDownload = (response:AxiosResponse<ObjectGetResponse<string>>) => {
+        console.log("Using legacy output");
+        setDownloadUrl(response.data.entry);
+        const triggerDownload = (ctr:number)=> window.setTimeout(()=>{
+            if(oldStyleDownloadRef.current) {
+                oldStyleDownloadRef.current.click();
+            } else {
+                if(ctr>10) {
+                    console.error("Could not trigger download after 5 seconds, something has gone wrong.");
+                } else {
+                    triggerDownload(ctr+1);
+                }
+            }
+        }, 500);
+
+        triggerDownload(0);
+    }
+
+    const doDownload = async () => {
+        try {
+            const response = await axios.get<ObjectGetResponse<string>>(`/api/download/${props.archiveEntryId}`);
+            // @ts-ignore
+            if(window.showSaveFilePicker) {
+                //the new style uses the File System Access API, which also requires a secure context to work.
+                await newStyleDownload(response);
+            } else {
+                alert("Downloading like this works best in Chrome. If the download does not work, please load Chrome and try again in that.");
+                await oldStyleDownload(response);
+            }
+        } catch(err)  {
+            if(err.name && err.name==="AbortError") {
+                //the user aborted the download, so don't alert them
+                console.log("User cancelled download");
+            } else {
+                console.error("Could not download content: ", err);
+                alert("Could not download, see browser console for details");
+            }
         }
+    }
+
+    const oldStyleDownloadRef = createRef<HTMLAnchorElement>();
+
+    return <div className={classes.centered}>
+        <a ref={oldStyleDownloadRef} href={downloadUrl ?? "#"} style={{display:"none"}}/>
         <span style={{display: "block"}}>
             <Typography className={classes.runOnText}>Added to lightbox&nbsp;</Typography>
             <TimestampFormatter className={classes.runOnText} relative={true} value={props.lightboxEntry.addedAt}/>
@@ -123,10 +175,13 @@ const LightboxDetailsInsertImpl:React.FC<LightboxDetailsInsertProps> = (props) =
                     </Grid>
                     <Grid item>
                         {
-                            isDownloadable() ? <Tooltip title="Download just this file">
-                                <IconButton onClick={doDownload}>
-                                    <GetApp/>
-                                </IconButton>
+                            isDownloadable() ? <Tooltip title={downloading ? "Download in progress..." : "Download just this file"}>
+                                {
+                                    downloading ? <CircularProgress/> :
+                                        <IconButton onClick={doDownload}>
+                                            <GetApp/>
+                                        </IconButton>
+                                }
                             </Tooltip> : null
                         }
                     </Grid>
@@ -136,33 +191,14 @@ const LightboxDetailsInsertImpl:React.FC<LightboxDetailsInsertProps> = (props) =
         {
             props.lightboxEntry.availableUntil ? <>
                 <Typography className={classes.runOnText}>
-                    Available for
+                    Available for{" "}
                 </Typography>
                 <TimestampFormatter relative={true} value={props.lightboxEntry.availableUntil} className={classes.runOnText}/>
             </> : <Typography className={classes.runOnText}>Available indefinitely</Typography>
         }
-
-        {/*<Typography className={clsx(classes.centered, classes.small)}>*/}
-        {/*    <a style={{cursor: "pointer"}} onClick={props.checkArchiveStatusClicked}>Re-check</a>*/}
-        {/*</Typography>*/}
-        {/*<Typography className={clsx(classes.centered, classes.small)}>*/}
-        {/*    <a style={{cursor: "pointer"}} onClick={()=>props.archiveEntryId ? props.redoRestoreClicked(props.archiveEntryId) : null}>*/}
-        {/*        {displayRedo(props.lightboxEntry.restoreStatus)}*/}
-        {/*    </a>*/}
-        {/*    {*/}
-        {/*        props.showingArchiveSpinner ? <CircularProgress className={classes.smallSpinner}/> : null*/}
-        {/*    }*/}
-        {/*</Typography>*/}
-        {/*<AvailabilityInsert status={props.lightboxEntry.restoreStatus}*/}
-        {/*                    availableUntil={props.lightboxEntry.availableUntil}*/}
-        {/*                    hidden={shouldHideAvailability()}*/}
-        {/*                    fileId={props.archiveEntryId}*/}
-        {/*                    fileNameOnly={extractPath()}*/}
-        {/*/>*/}
-        {/*<Typography className={clsx(classes.centered, classes.small, classes.information)}>*/}
-        {/*    {props.lightboxEntry.restoreStatus}*/}
-        {/*</Typography>*/}
-        {/*<Divider style={{display: shouldHideAvailability() ? "inherit" : "none" }}/>*/}
+        {
+            downloadedTo ? <Typography className={classes.smallText}><CheckCircle className={classes.successIcon}/>Downloaded to {downloadedTo}</Typography> : undefined
+        }
     </div>;
 }
 
