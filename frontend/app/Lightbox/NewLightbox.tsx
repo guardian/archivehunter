@@ -116,13 +116,14 @@ const NewLightbox:React.FC<RouteComponentProps> = (props) => {
     const refreshData = async () => {
         setLoading(true);
         try {
+            console.log("debug: loading lightbox details");
             const results = await performLoad();
 
             const detailsResult = results[0].data as LightboxDetailsResponse;
             const configResult = results[1].data as ObjectListResponse<string>;
-            setLightboxDetails(detailsResult.entries)
+            setLightboxDetails(detailsResult.entries);
+            console.log("debug: lightbox details loaded");
             setExpiryDays(configResult.entries.length>0 ? parseInt(configResult.entries[0]) : 10);
-
         } catch(err) {
             console.error("Could not load in lightbox data: ", err);
             setLastError(formatError(err, false));
@@ -130,6 +131,14 @@ const NewLightbox:React.FC<RouteComponentProps> = (props) => {
         }
     }
 
+    useEffect(()=>{
+        console.log("LightboxDetails are changing", lightboxDetails);
+        console.log("LightboxDetails are ", Object.keys(lightboxDetails).length, " records long");
+
+        return ()=>{
+            console.log("Old LightboxDetails are ", Object.keys(lightboxDetails).length, " records long")
+        }
+    }, [lightboxDetails]);
     /**
      * updates our record of the archive status for the currently selected item
      */
