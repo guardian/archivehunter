@@ -85,7 +85,7 @@ class GlacierRestoreActor @Inject() (config:Configuration, esClientMgr:ESClientM
         lbEntry.copy(restoreStatus = newStatus, restoreCompleted = Some(ZonedDateTime.now()), availableUntil = expiryTime)
       case RestoreStatus.RS_ERROR=>
         lbEntry.copy(restoreStatus = newStatus, restoreCompleted = Some(ZonedDateTime.now()))
-      case RestoreStatus.RS_UNDERWAY=>
+      case _=>
         lbEntry.copy(restoreStatus = newStatus)
     }
     lbEntryDAO.put(updatedEntry)
