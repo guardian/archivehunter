@@ -60,6 +60,7 @@ const LightboxDetailsInsertImpl:React.FC<LightboxDetailsInsertProps> = (props) =
             case "RS_UNNEEDED":
                 return false;
             case "RS_ERROR":
+            case "RS_EXPIRED":
             case "RS_ALREADY":
             case "RS_SUCCESS":
                 return true;
@@ -145,7 +146,7 @@ const LightboxDetailsInsertImpl:React.FC<LightboxDetailsInsertProps> = (props) =
             startTime={props.lightboxEntry.restoreStarted}
             completed={props.lightboxEntry.restoreCompleted}
             expires={props.lightboxEntry.availableUntil}
-            hidden={props.lightboxEntry.restoreStatus==="RS_UNNEEDED"}
+            hidden={props.lightboxEntry.restoreStatus==="RS_UNNEEDED"||props.lightboxEntry.restoreStatus==="RS_EXPIRED"}
         />
         <Grid container direction="row" justify="space-between" spacing={3}>
             <Grid item className={classes.nicelyAlignedIcon} style={{marginLeft: "auto"}}>

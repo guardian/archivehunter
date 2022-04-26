@@ -34,7 +34,7 @@ const LightboxAvailability:React.FC<LightboxAvailabilityProps> = (props) => {
     }, [props.maybeAvailableUntil]);
 
     if(expiryDate) {
-        if(expiryDate.isAfter(moment())) {
+        if(expiryDate.isBefore(moment())) {
             return <Typography className={classes.runOnText}>Expired {expiryDate.fromNow(false)}</Typography>
         } else {
             return <Typography className={classes.runOnText}>Available for {expiryDate.fromNow(false)}</Typography>
@@ -45,6 +45,8 @@ const LightboxAvailability:React.FC<LightboxAvailabilityProps> = (props) => {
                 return <Typography className={classes.runOnText}>Available indefinitely</Typography>
             case "RS_ERROR":
                 return <Typography className={classes.runOnText}>Not available</Typography>
+            case "RS_EXPIRED":
+                return <Typography className={classes.runOnText}>Returned to archive</Typography>
             default:
                 return <></>
         }
