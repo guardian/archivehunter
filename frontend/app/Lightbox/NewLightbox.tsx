@@ -19,6 +19,8 @@ import EntryDetails from "../Entry/EntryDetails";
 import LightboxDetailsInsert from "./LightboxDetailsInsert";
 import {UserContext} from "../Context/UserContext";
 import BrowseFilter from "../browse/BrowseFilter";
+import {Simulate} from "react-dom/test-utils";
+import select = Simulate.select;
 
 const useStyles = makeStyles({
     browserWindow: {
@@ -85,7 +87,7 @@ const NewLightbox:React.FC<RouteComponentProps> = (props) => {
     //general state
     const [lastError, setLastError] = useState<string|undefined>(undefined);
     const [showingAlert, setShowingAlert] = useState(false);
-    const [bulkSelectionsCount, setBulkSelectionsCount] = useState(0);
+
     const [loading, setLoading] = useState(false);
     //lightbox-related information for every entry associated with
     const [lightboxDetails, setLightboxDetails] = useState<Record<string, LightboxEntry>>({});
@@ -107,28 +109,46 @@ const NewLightbox:React.FC<RouteComponentProps> = (props) => {
         return undefined;
     }
 
-    const performLoad = () => {
-        const detailsRequest = axios.get<LightboxDetailsResponse>("/api/lightbox/" + selectedUser+"/details");
-        const configRequest = axios.get<ObjectListResponse<string>>("/api/config");
+    const performLoad = (controller:AbortController) => {
+        const detailsRequest = axios.get<LightboxDetailsResponse>("/api/lightbox/" + selectedUser+"/details", {signal: controller.signal});
+        const configRequest = axios.get<ObjectListResponse<string>>("/api/config", {signal: controller.signal});
         return Promise.all([detailsRequest, configRequest]);
     }
 
-    const refreshData = async () => {
+    const refreshData = async (controller:AbortController) => {
         setLoading(true);
         try {
-            const results = await performLoad();
+            if(selectedUser=="") {
+                console.log("Not trying to load lightbox for empty selectedUser string");
+                return;
+            }
+            console.log(`debug: loading lightbox details for '${selectedUser}'`);
+            const results = await performLoad(controller);
 
             const detailsResult = results[0].data as LightboxDetailsResponse;
             const configResult = results[1].data as ObjectListResponse<string>;
-            setLightboxDetails(detailsResult.entries)
+            setLightboxDetails(detailsResult.entries);
+            console.log("debug: lightbox details loaded");
             setExpiryDays(configResult.entries.length>0 ? parseInt(configResult.entries[0]) : 10);
-
         } catch(err) {
-            console.error("Could not load in lightbox data: ", err);
-            setLastError(formatError(err, false));
-            setShowingAlert(true);
+            if(err.name && (err.name==="CanceledError" || err.name==="Aborted")) {
+                console.log("Canceled data load because user changed")
+            } else {
+                console.error("Could not load in lightbox data: ", err);
+                setLastError(formatError(err, false));
+                setShowingAlert(true);
+            }
         }
     }
+
+    /**
+     * ensure that we de-select any item that was selected when we change the user, because it isn't valid for the
+     * new user's lightbox
+     */
+    useEffect(()=>{
+        setSelectedEntry(undefined);
+        setSelectedBulk(undefined);
+    }, [selectedUser]);
 
     /**
      * updates our record of the archive status for the currently selected item
@@ -153,10 +173,14 @@ const NewLightbox:React.FC<RouteComponentProps> = (props) => {
                 setShowingAlert(true);
             }
         } catch(err) {
-            console.error(err);
-            setLastError(formatError(err, false));
-            setShowingAlert(true);
-            setShowingArchiveSpinner(false);
+            if(err.name && (err.name==="AbortError" || err.name==="CanceledError") ) {
+                console.log("Cancelled previous load");
+            } else {
+                console.error(err);
+                setLastError(formatError(err, false));
+                setShowingAlert(true);
+                setShowingArchiveSpinner(false);
+            }
         }
     }
 
@@ -192,7 +216,12 @@ const NewLightbox:React.FC<RouteComponentProps> = (props) => {
 
     //reload the search if the currently selected bulk changes
     useEffect(()=>{
-        refreshData();
+        const controller = new AbortController();
+        refreshData(controller);
+
+        return ()=>{
+            controller.abort();
+        }
     }, [selectedBulk, selectedUser]);
 
     const handleComponentError = (desc:string) => {
