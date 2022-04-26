@@ -8,6 +8,7 @@ import RestoreStatusIndicator from "./RestoreStatusIndicator";
 import {AirportShuttle, CheckCircle, GetApp, YoutubeSearchedFor} from "@material-ui/icons";
 import axios, {AxiosResponse} from "axios";
 import {baseName} from "../common/Fileinfo";
+import LightboxAvailability from "./LightboxAvailability";
 
 interface LightboxDetailsInsertProps {
     lightboxEntry: LightboxEntry;
@@ -59,6 +60,7 @@ const LightboxDetailsInsertImpl:React.FC<LightboxDetailsInsertProps> = (props) =
             case "RS_UNNEEDED":
                 return false;
             case "RS_ERROR":
+            case "RS_EXPIRED":
             case "RS_ALREADY":
             case "RS_SUCCESS":
                 return true;
@@ -144,7 +146,7 @@ const LightboxDetailsInsertImpl:React.FC<LightboxDetailsInsertProps> = (props) =
             startTime={props.lightboxEntry.restoreStarted}
             completed={props.lightboxEntry.restoreCompleted}
             expires={props.lightboxEntry.availableUntil}
-            hidden={props.lightboxEntry.restoreStatus==="RS_UNNEEDED"}
+            hidden={props.lightboxEntry.restoreStatus==="RS_UNNEEDED"||props.lightboxEntry.restoreStatus==="RS_EXPIRED"}
         />
         <Grid container direction="row" justify="space-between" spacing={3}>
             <Grid item className={classes.nicelyAlignedIcon} style={{marginLeft: "auto"}}>
@@ -188,14 +190,7 @@ const LightboxDetailsInsertImpl:React.FC<LightboxDetailsInsertProps> = (props) =
                 </Grid>
             </Grid>
         </Grid>
-        {
-            props.lightboxEntry.availableUntil ? <>
-                <Typography className={classes.runOnText}>
-                    Available for{" "}
-                </Typography>
-                <TimestampFormatter relative={true} value={props.lightboxEntry.availableUntil} className={classes.runOnText}/>
-            </> : <Typography className={classes.runOnText}>Available indefinitely</Typography>
-        }
+        <LightboxAvailability maybeAvailableUntil={props.lightboxEntry.availableUntil} restoreStatus={props.lightboxEntry.restoreStatus}/>
         {
             downloadedTo ? <Typography className={classes.smallText}><CheckCircle className={classes.successIcon}/>Downloaded to {downloadedTo}</Typography> : undefined
         }
