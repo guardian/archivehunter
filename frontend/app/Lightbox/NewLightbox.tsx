@@ -87,7 +87,7 @@ const NewLightbox:React.FC<RouteComponentProps> = (props) => {
     //general state
     const [lastError, setLastError] = useState<string|undefined>(undefined);
     const [showingAlert, setShowingAlert] = useState(false);
-    const [bulkSelectionsCount, setBulkSelectionsCount] = useState(0);
+
     const [loading, setLoading] = useState(false);
     //lightbox-related information for every entry associated with
     const [lightboxDetails, setLightboxDetails] = useState<Record<string, LightboxEntry>>({});
@@ -131,20 +131,24 @@ const NewLightbox:React.FC<RouteComponentProps> = (props) => {
             console.log("debug: lightbox details loaded");
             setExpiryDays(configResult.entries.length>0 ? parseInt(configResult.entries[0]) : 10);
         } catch(err) {
-            console.error("Could not load in lightbox data: ", err);
-            setLastError(formatError(err, false));
-            setShowingAlert(true);
+            if(err.name && (err.name==="CanceledError" || err.name==="Aborted")) {
+                console.log("Canceled data load because user changed")
+            } else {
+                console.error("Could not load in lightbox data: ", err);
+                setLastError(formatError(err, false));
+                setShowingAlert(true);
+            }
         }
     }
 
+    /**
+     * ensure that we de-select any item that was selected when we change the user, because it isn't valid for the
+     * new user's lightbox
+     */
     useEffect(()=>{
-        console.log("LightboxDetails are changing", lightboxDetails);
-        console.log("LightboxDetails are ", Object.keys(lightboxDetails).length, " records long");
-
-        return ()=>{
-            console.log("Old LightboxDetails are ", Object.keys(lightboxDetails).length, " records long")
-        }
-    }, [lightboxDetails]);
+        setSelectedEntry(undefined);
+        setSelectedBulk(undefined);
+    }, [selectedUser]);
 
     /**
      * updates our record of the archive status for the currently selected item
@@ -169,7 +173,7 @@ const NewLightbox:React.FC<RouteComponentProps> = (props) => {
                 setShowingAlert(true);
             }
         } catch(err) {
-            if(err.name && err.name==="AbortError") {
+            if(err.name && (err.name==="AbortError" || err.name==="CanceledError") ) {
                 console.log("Cancelled previous load");
             } else {
                 console.error(err);
