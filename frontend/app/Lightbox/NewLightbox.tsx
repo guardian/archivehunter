@@ -109,13 +109,13 @@ const NewLightbox:React.FC<RouteComponentProps> = (props) => {
         return undefined;
     }
 
-    const performLoad = () => {
-        const detailsRequest = axios.get<LightboxDetailsResponse>("/api/lightbox/" + selectedUser+"/details");
-        const configRequest = axios.get<ObjectListResponse<string>>("/api/config");
+    const performLoad = (controller:AbortController) => {
+        const detailsRequest = axios.get<LightboxDetailsResponse>("/api/lightbox/" + selectedUser+"/details", {signal: controller.signal});
+        const configRequest = axios.get<ObjectListResponse<string>>("/api/config", {signal: controller.signal});
         return Promise.all([detailsRequest, configRequest]);
     }
 
-    const refreshData = async () => {
+    const refreshData = async (controller:AbortController) => {
         setLoading(true);
         try {
             if(selectedUser=="") {
@@ -123,7 +123,7 @@ const NewLightbox:React.FC<RouteComponentProps> = (props) => {
                 return;
             }
             console.log(`debug: loading lightbox details for '${selectedUser}'`);
-            const results = await performLoad();
+            const results = await performLoad(controller);
 
             const detailsResult = results[0].data as LightboxDetailsResponse;
             const configResult = results[1].data as ObjectListResponse<string>;
@@ -145,6 +145,7 @@ const NewLightbox:React.FC<RouteComponentProps> = (props) => {
             console.log("Old LightboxDetails are ", Object.keys(lightboxDetails).length, " records long")
         }
     }, [lightboxDetails]);
+
     /**
      * updates our record of the archive status for the currently selected item
      */
@@ -168,10 +169,14 @@ const NewLightbox:React.FC<RouteComponentProps> = (props) => {
                 setShowingAlert(true);
             }
         } catch(err) {
-            console.error(err);
-            setLastError(formatError(err, false));
-            setShowingAlert(true);
-            setShowingArchiveSpinner(false);
+            if(err.name && err.name==="AbortError") {
+                console.log("Cancelled previous load");
+            } else {
+                console.error(err);
+                setLastError(formatError(err, false));
+                setShowingAlert(true);
+                setShowingArchiveSpinner(false);
+            }
         }
     }
 
@@ -207,7 +212,12 @@ const NewLightbox:React.FC<RouteComponentProps> = (props) => {
 
     //reload the search if the currently selected bulk changes
     useEffect(()=>{
-        refreshData();
+        const controller = new AbortController();
+        refreshData(controller);
+
+        return ()=>{
+            controller.abort();
+        }
     }, [selectedBulk, selectedUser]);
 
     const handleComponentError = (desc:string) => {
