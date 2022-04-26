@@ -91,6 +91,13 @@ class GlacierRestoreActor @Inject() (config:Configuration, esClientMgr:ESClientM
     lbEntryDAO.put(updatedEntry)
   }
 
+  def updateLightboxExpired(maybeLBEntry:Option[LightboxEntry], bucket:String, path:String) = maybeLBEntry match {
+      case Some(lb)=>
+        updateLightboxFull(lb, RestoreStatus.RS_EXPIRED, None).map(Some.apply)
+      case None=>
+        Future(None)
+    }
+
   private def checkStatus(result:HeadObjectResponse, entry: ArchiveEntry, lbEntry: Option[LightboxEntry], jobs:Option[List[JobModel]], originalSender:ActorRef) = {
     logger.info(s"Got metadata for s3://${entry.bucket}/${entry.path} @${entry.maybeVersion.getOrElse("LATEST")}. Archive status is ${result.archiveStatusAsString()}")
     val maybeRestoreStatus = Option(result.restore()).map(S3RestoreHeader.apply)
@@ -99,6 +106,7 @@ class GlacierRestoreActor @Inject() (config:Configuration, esClientMgr:ESClientM
     maybeRestoreStatus match {
       case None=>
         logger.info(s"s3://${entry.bucket}/${entry.path} @${entry.maybeVersion.getOrElse("LATEST")} - there is no restore header in the head response")
+        updateLightboxExpired(lbEntry, entry.bucket, entry.path) //will only update if there _is_ a lightbox entry to update
         originalSender ! RestoreNotRequested(entry)
       case Some(Failure(err)) =>
         logger.info(s"s3://${entry.bucket}/${entry.path} could not check restore status: ${err.getMessage}")
@@ -116,13 +124,11 @@ class GlacierRestoreActor @Inject() (config:Configuration, esClientMgr:ESClientM
         if(jobs.isDefined) jobs.get.foreach(job=>updateJob(job, JobStatus.ST_RUNNING, None))
         if(lbEntry.isDefined) updateLightboxFull(lbEntry.get,RestoreStatus.RS_UNDERWAY,None)
         originalSender ! RestoreInProgress(entry)
-      case Some(Success(S3RestoreHeader(false, None))) => //restore not in progress, may be completed
+      case Some(Success(S3RestoreHeader(false, None))) => //restore not in progress, but no expiry time - expiry time is probably passed
         logger.info(s"s3://${entry.bucket}/${entry.path} is not currently under restore and probably expired: $maybeRestoreStatus")
-        if(! lbEntry.map(_.restoreStatus).contains(RestoreStatus.RS_ERROR) && ! lbEntry.map(_.restoreStatus).contains(RestoreStatus.RS_SUCCESS)) {
-          updateLightbox(lbEntry.get, None, Some(new RuntimeException("Item has already expired")))
-        }
+        updateLightboxExpired(lbEntry, entry.bucket, entry.path)
         originalSender ! RestoreNotRequested(entry)
-      case Some(Success(S3RestoreHeader(false, Some(expiry)))) =>
+      case Some(Success(S3RestoreHeader(false, Some(expiry)))) => //restore not in progress, it's available unless the expiry time is already passed
         logger.info(s"s3://${entry.bucket}/${entry.path} has completed restore: ${maybeRestoreStatus}")
         if(jobs.isDefined) jobs.get.foreach(job=>updateJob(job,JobStatus.ST_SUCCESS,None))
         if(lbEntry.isDefined) updateLightboxFull(lbEntry.get, RestoreStatus.RS_SUCCESS, Some(expiry))

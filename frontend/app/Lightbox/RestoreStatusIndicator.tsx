@@ -1,7 +1,7 @@
 import React from "react";
 import {LightboxEntry} from "../types";
 import {Tooltip} from "@material-ui/core";
-import {AcUnit, Check} from "@material-ui/icons";
+import {AcUnit, Check, RemoveShoppingCartRounded} from "@material-ui/icons";
 
 interface RestoreStatusIndicatorProps {
     entry: LightboxEntry;
@@ -22,6 +22,8 @@ const RestoreStatusIndicator:React.FC<RestoreStatusIndicatorProps> = (props) => 
                 return "Not in deep-freeze";
             case "RS_UNDERWAY":
                 return "Restore in progress";
+            case "RS_EXPIRED":
+                return "Restore has expired";
         }
     }
 
@@ -36,6 +38,8 @@ const RestoreStatusIndicator:React.FC<RestoreStatusIndicatorProps> = (props) => 
                 return <Check className={props.className} style={{color: "green"}}/>;
             case "RS_UNDERWAY":
                 return <AcUnit className={props.className} style={{color: "orange"}}/>;
+            case "RS_EXPIRED":
+                return <RemoveShoppingCartRounded className={props.className}/>;
         }
     }
 

@@ -11,9 +11,10 @@ import io.circe.{Decoder, Encoder}
   * underway - restore request has been sent and is being processed
   * success - item has been restored
   * error - item could not be restored for some reason
+  * expired - item was restored but is now archived again
   */
 object RestoreStatus extends Enumeration {
-  val RS_UNNEEDED,RS_ALREADY,RS_PENDING,RS_UNDERWAY,RS_SUCCESS,RS_ERROR=Value
+  val RS_UNNEEDED,RS_ALREADY,RS_PENDING,RS_UNDERWAY,RS_SUCCESS,RS_ERROR,RS_EXPIRED=Value
 }
 
 trait RestoreStatusEncoder {

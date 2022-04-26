@@ -270,7 +270,7 @@ interface LightboxBulk {
 
 type LightboxBulkResponse = ObjectListResponse<LightboxBulk>;
 
-type RestoreStatus = "RS_UNNEEDED"|"RS_ALREADY"|"RS_PENDING"|"RS_UNDERWAY"|"RS_SUCCESS"|"RS_ERROR";
+type RestoreStatus = "RS_UNNEEDED"|"RS_ALREADY"|"RS_PENDING"|"RS_UNDERWAY"|"RS_SUCCESS"|"RS_ERROR"|"RS_EXPIRED";
 
 interface LightboxEntry {
     userEmail: string;
