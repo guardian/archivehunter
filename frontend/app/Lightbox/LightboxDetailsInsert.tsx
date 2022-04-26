@@ -8,6 +8,7 @@ import RestoreStatusIndicator from "./RestoreStatusIndicator";
 import {AirportShuttle, CheckCircle, GetApp, YoutubeSearchedFor} from "@material-ui/icons";
 import axios, {AxiosResponse} from "axios";
 import {baseName} from "../common/Fileinfo";
+import LightboxAvailability from "./LightboxAvailability";
 
 interface LightboxDetailsInsertProps {
     lightboxEntry: LightboxEntry;
@@ -188,14 +189,7 @@ const LightboxDetailsInsertImpl:React.FC<LightboxDetailsInsertProps> = (props) =
                 </Grid>
             </Grid>
         </Grid>
-        {
-            props.lightboxEntry.availableUntil ? <>
-                <Typography className={classes.runOnText}>
-                    Available for{" "}
-                </Typography>
-                <TimestampFormatter relative={true} value={props.lightboxEntry.availableUntil} className={classes.runOnText}/>
-            </> : <Typography className={classes.runOnText}>Available indefinitely</Typography>
-        }
+        <LightboxAvailability maybeAvailableUntil={props.lightboxEntry.availableUntil} restoreStatus={props.lightboxEntry.restoreStatus}/>
         {
             downloadedTo ? <Typography className={classes.smallText}><CheckCircle className={classes.successIcon}/>Downloaded to {downloadedTo}</Typography> : undefined
         }
