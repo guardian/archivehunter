@@ -286,7 +286,7 @@ class InputLambdaMainSpec extends Specification with Mockito with ZonedDateTimeE
       val entry2 = LightboxEntry("test2@test.org", "test-file-id", date2, RestoreStatus.RS_SUCCESS, date1, date1, date1, None, None)
       val entry3 = LightboxEntry("test3@test.org", "test-file-id", date2, RestoreStatus.RS_SUCCESS, date1, date1, date1, None, None)
 
-      mockDao.getForFileId("test-file-id") returns Future(List(Right(entry1), Right(entry2), Right(entry3)))
+      mockDao.getFilesForId("test-file-id") returns Future(List(Right(entry1), Right(entry2), Right(entry3)))
 
       val test = new InputLambdaMain {
         override protected def getLightboxEntryDAO: LightboxEntryDAO = mockDao

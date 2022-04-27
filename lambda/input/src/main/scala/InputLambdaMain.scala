@@ -304,7 +304,7 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
     val lightboxEntryDAO = getLightboxEntryDAO
     val docId = makeDocId(rec.getS3.getBucket.getName, path)
 
-    lightboxEntryDAO.getForFileId(docId).flatMap(resultList=>{
+    lightboxEntryDAO.getFilesForId(docId).flatMap(resultList=>{
       val failures = resultList.collect({case Left(err)=>err})
       if(failures.nonEmpty){
         logger.error(s"Could not look up lightbox entries for $docId: ")
@@ -315,12 +315,12 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
         val boxEntries = success
         logger.info(s"Found light box entries: $boxEntries")
 
-        val updateFutures = boxEntries.map(boxEntry=>{
-          val updatedEntry = boxEntry.copy(restoreStatus = RestoreStatus.RS_EXPIRED)
-          lightboxEntryDAO.put(updatedEntry)
-        })
-
-        Future ()
+        Future.sequence(
+          boxEntries.map(boxEntry=>{
+            val updatedEntry = boxEntry.copy(restoreStatus = RestoreStatus.RS_EXPIRED)
+            lightboxEntryDAO.put(updatedEntry)
+          })
+        )
       }
     })
   }
