@@ -11,7 +11,7 @@ import org.apache.logging.log4j.LogManager
 import com.sksamuel.elastic4s.http.ElasticClient
 import com.sksamuel.elastic4s.http.ElasticDsl.update
 import com.theguardian.multimedia.archivehunter.common.cmn_helpers.PathCacheExtractor
-import com.theguardian.multimedia.archivehunter.common.cmn_models.{IngestMessage, ItemNotFound, JobModelDAO, JobStatus, PathCacheEntry, PathCacheIndexer}
+import com.theguardian.multimedia.archivehunter.common.cmn_models.{IngestMessage, ItemNotFound, JobModelDAO, JobStatus, PathCacheEntry, PathCacheIndexer, LightboxEntryDAO, RestoreStatus}
 import org.apache.http.HttpHost
 import org.elasticsearch.client.RestClient
 import io.circe.syntax._
@@ -53,6 +53,8 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
   protected def getPathCacheIndexer(indexName: String, elasticClient:ElasticClient) = new PathCacheIndexer(indexName, elasticClient)
 
   protected def getJobModelDAO = injector.getInstance(classOf[JobModelDAO])
+
+  protected def getLightboxEntryDAO = injector.getInstance(classOf[LightboxEntryDAO])
 
   def sendIngestedMessage(entry:ArchiveEntry) = {
     val client = getSqsClient()
@@ -292,6 +294,37 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
     })
   }
 
+  /**
+    * handle an "object restore expired" message.
+    * This is as simple as updating the database to tell the UI that the restore has expired.
+    * @param rec S3EventNotification.S3EventNotificationRecord instance
+    * @return a Future.
+    */
+  def handleExpired(rec:S3EventNotification.S3EventNotificationRecord,path: String) = {
+    val lightboxEntryDAO = getLightboxEntryDAO
+    val docId = makeDocId(rec.getS3.getBucket.getName, path)
+
+    lightboxEntryDAO.getForFileId(docId).flatMap(resultList=>{
+      val failures = resultList.collect({case Left(err)=>err})
+      if(failures.nonEmpty){
+        logger.error(s"Could not look up lightbox entries for $docId: ")
+        failures.foreach(err=>logger.error(err))
+        Future (())
+      } else {
+        val success = resultList.collect({case Right(result)=>result})
+        val boxEntries = success
+        logger.info(s"Found light box entries: $boxEntries")
+
+        val updateFutures = boxEntries.map(boxEntry=>{
+          val updatedEntry = boxEntry.copy(restoreStatus = RestoreStatus.RS_EXPIRED)
+          lightboxEntryDAO.put(updatedEntry)
+        })
+
+        Future ()
+      }
+    })
+  }
+
   override def handleRequest(event:S3Event, context:Context): Unit = {
     val indexName = getIndexName
 
@@ -347,8 +380,7 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
         case "ObjectRestore:Completed"=>  //restore has been completed
           handleRestored(rec, path)
         case "ObjectRestore:Delete"=>     //restore has expired and been dropped back
-          println("ERROR ObjectRestore:Delete not implemented")
-          throw new RuntimeException("event was not implemented")
+          handleExpired(rec, path)
 
         /*
         This relates to Standard -> IA -> Glacier -> Glacier Deep transitions

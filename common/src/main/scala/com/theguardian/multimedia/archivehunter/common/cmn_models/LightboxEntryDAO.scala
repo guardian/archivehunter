@@ -61,4 +61,9 @@ class LightboxEntryDAO @Inject()(config:ArchiveHunterConfiguration, ddbClientMgr
       .exec(table.put(entry))
       .runWith(Sink.head)
       .map(_=>entry)
+
+  def getForFileId(fileId:String)(implicit ec:ExecutionContext) =
+    scanamoAlpakka
+      .exec(table.query("fileId"===fileId))
+      .runWith(MakeLightboxEntrySink)
 }

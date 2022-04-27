@@ -264,4 +264,40 @@ class InputLambdaMainSpec extends Specification with Mockito with ZonedDateTimeE
       there was one(mockDao).putJob(JobModel("test-job-3","RESTORE",date3,None,JobStatus.ST_RUNNING,None,"test-source-id",None,SourceType.SRC_MEDIA,None))
     }
   }
+
+  "InputLambdaMain.handleExpired" should {
+    "update any lightbox entries that refer to the file in question with the RS_EXPIRED status" in {
+      val mockBucketEntity = mock[S3EventNotification.S3BucketEntity]
+      mockBucketEntity.getName returns "test-bucket"
+      val mockObjectEntity = mock[S3EventNotification.S3ObjectEntity]
+      mockObjectEntity.getKey returns "path/to/file"
+      val mockDao = mock[LightboxEntryDAO]
+      val mockEntity = mock[S3EventNotification.S3Entity]
+      mockEntity.getBucket returns mockBucketEntity
+      mockEntity.getObject returns mockObjectEntity
+
+      val mockRecord = mock[S3EventNotification.S3EventNotificationRecord]
+      mockRecord.getS3 returns mockEntity
+
+      val date1 = Some(ZonedDateTime.now())
+      val date2 = ZonedDateTime.now()
+
+      val entry1 = LightboxEntry("test@test.org", "test-file-id", date2, RestoreStatus.RS_SUCCESS, date1, date1, date1, None, None)
+      val entry2 = LightboxEntry("test2@test.org", "test-file-id", date2, RestoreStatus.RS_SUCCESS, date1, date1, date1, None, None)
+      val entry3 = LightboxEntry("test3@test.org", "test-file-id", date2, RestoreStatus.RS_SUCCESS, date1, date1, date1, None, None)
+
+      mockDao.getForFileId("test-file-id") returns Future(List(Right(entry1), Right(entry2), Right(entry3)))
+
+      val test = new InputLambdaMain {
+        override protected def getLightboxEntryDAO: LightboxEntryDAO = mockDao
+
+        override def makeDocId(bucket: String, path: String) = "test-file-id"
+      }
+
+      Await.ready(test.handleExpired(mockRecord, "somepath/to/media"), 5.seconds)
+      there was one(mockDao).put(LightboxEntry("test@test.org", "test-file-id", date2, RestoreStatus.RS_EXPIRED, date1, date1, date1, None, None))
+      there was one(mockDao).put(LightboxEntry("test2@test.org", "test-file-id", date2, RestoreStatus.RS_EXPIRED, date1, date1, date1, None, None))
+      there was one(mockDao).put(LightboxEntry("test3@test.org", "test-file-id", date2, RestoreStatus.RS_EXPIRED, date1, date1, date1, None, None))
+    }
+  }
 }
