@@ -253,6 +253,45 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
       }
   }
 
+  /**
+    * handle an "object restore started" message.
+    * This is as simple as updating the database to tell the UI that the restore is running.
+    * @param rec S3EventNotification.S3EventNotificationRecord instance
+    * @return a Future that completes when the operations have finished. No useful contents.
+    */
+  def handleStarted(rec:S3EventNotification.S3EventNotificationRecord,path: String) = {
+    val jobModelDAO = getJobModelDAO
+    val docId = makeDocId(rec.getS3.getBucket.getName, path)
+
+    jobModelDAO.jobsForSource(docId).flatMap(resultList=>{
+      val failures = resultList.collect({case Left(err)=>err})
+      if(failures.nonEmpty){
+        logger.error(s"Could not look up jobs for source ID $docId: ")
+        failures.foreach(err=>logger.error(err))
+        Future (())
+      } else {
+        val success = resultList.collect({case Right(result)=>result})
+        val restoreJobs = success
+          .filter(_.jobType=="RESTORE").filter(_.completedAt.isEmpty)
+        logger.info(s"Found restore jobs: $restoreJobs")
+
+        val updateFutures = restoreJobs.map(job=>{
+          val updatedJob = job.copy(jobStatus = JobStatus.ST_RUNNING)
+          jobModelDAO.putJob(updatedJob)
+        })
+
+        Future.sequence(updateFutures)
+          .map(_=>{
+            logger.info(s"Updated jobs for source ID $docId")
+            ()
+          }).recover({
+          case err:Throwable=>
+            logger.error(s"Could not update jobs for source ID $docId:${err.getMessage}", err)
+        })
+      }
+    })
+  }
+
   override def handleRequest(event:S3Event, context:Context): Unit = {
     val indexName = getIndexName
 
@@ -304,8 +343,7 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
         All of these events relate to Glacier restores
          */
         case "ObjectRestore:Post"=> //restore has been initiated
-          println("ERROR ObjectRestore:Post not implemented")
-          throw new RuntimeException("event was not implemented")
+          handleStarted(rec, path)
         case "ObjectRestore:Completed"=>  //restore has been completed
           handleRestored(rec, path)
         case "ObjectRestore:Delete"=>     //restore has expired and been dropped back

@@ -228,4 +228,40 @@ class InputLambdaMainSpec extends Specification with Mockito with ZonedDateTimeE
       there was one(mockSqsClient).sendMessage(expectedMessageRequest)
     }
   }
+
+  "InputLambdaMain.handleStarted" should {
+    "update any open/pending jobs that refer to the file in question with the ST_RUNNING status" in {
+      val mockBucketEntity = mock[S3EventNotification.S3BucketEntity]
+      mockBucketEntity.getName returns "test-bucket"
+      val mockObjectEntity = mock[S3EventNotification.S3ObjectEntity]
+      mockObjectEntity.getKey returns "path/to/file"
+      val mockDao = mock[JobModelDAO]
+      val mockEntity = mock[S3EventNotification.S3Entity]
+      mockEntity.getBucket returns mockBucketEntity
+      mockEntity.getObject returns mockObjectEntity
+
+      val mockRecord = mock[S3EventNotification.S3EventNotificationRecord]
+      mockRecord.getS3 returns mockEntity
+
+      val date1 = Some(ZonedDateTime.now())
+      val date3 = Some(ZonedDateTime.now())
+
+      val job1 = JobModel("test-job-1", "RESTORE", date1, None, JobStatus.ST_PENDING, None, "test-source-id", None, SourceType.SRC_MEDIA, None)
+      val job2 = JobModel("test-job-2", "TRANSCODE", Some(ZonedDateTime.now()), None, JobStatus.ST_RUNNING, None, "test-source-id", None, SourceType.SRC_MEDIA, None)
+      val job3 = JobModel("test-job-3", "RESTORE", date3, None, JobStatus.ST_PENDING, None, "test-source-id", None, SourceType.SRC_MEDIA, None)
+
+      mockDao.jobsForSource("test-source-id") returns Future(List(Right(job1), Right(job2), Right(job3)))
+      mockDao.putJob(any[JobModel]) returns Future(None)
+
+      val test = new InputLambdaMain {
+        override protected def getJobModelDAO: JobModelDAO = mockDao
+
+        override def makeDocId(bucket: String, path: String) = "test-source-id"
+      }
+
+      Await.ready(test.handleStarted(mockRecord, "somepath/to/media"), 5.seconds)
+      there was one(mockDao).putJob(JobModel("test-job-1","RESTORE",date1,None,JobStatus.ST_RUNNING,None,"test-source-id",None,SourceType.SRC_MEDIA,None))
+      there was one(mockDao).putJob(JobModel("test-job-3","RESTORE",date3,None,JobStatus.ST_RUNNING,None,"test-source-id",None,SourceType.SRC_MEDIA,None))
+    }
+  }
 }
