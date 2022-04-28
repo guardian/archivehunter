@@ -28,10 +28,15 @@ import scala.util.Success
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Await
 import scala.concurrent.duration._
+import akka.actor.ActorSystem
+import akka.stream.Materializer
 
 @RunWith(classOf[JUnitRunner])
 class InputLambdaMainSpec extends Specification with Mockito with ZonedDateTimeEncoder with StorageClassEncoder {
   sequential
+
+  implicit val system:ActorSystem = ActorSystem("root")
+  implicit val mat:Materializer = Materializer.matFromSystem
 
   "InputLambdaMain" should {
     "handle paths with spaces encoded to +" in {

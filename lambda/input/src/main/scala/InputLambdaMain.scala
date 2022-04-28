@@ -11,7 +11,7 @@ import org.apache.logging.log4j.LogManager
 import com.sksamuel.elastic4s.http.ElasticClient
 import com.sksamuel.elastic4s.http.ElasticDsl.update
 import com.theguardian.multimedia.archivehunter.common.cmn_helpers.PathCacheExtractor
-import com.theguardian.multimedia.archivehunter.common.cmn_models.{IngestMessage, ItemNotFound, JobModelDAO, JobStatus, PathCacheEntry, PathCacheIndexer, LightboxEntryDAO, RestoreStatus}
+import com.theguardian.multimedia.archivehunter.common.cmn_models.{IngestMessage, ItemNotFound, JobModelDAO, JobStatus, LightboxEntryDAO, PathCacheEntry, PathCacheIndexer, RestoreStatus}
 import org.apache.http.HttpHost
 import org.elasticsearch.client.RestClient
 import io.circe.syntax._
@@ -27,11 +27,13 @@ import com.theguardian.multimedia.archivehunter.common.cmn_helpers.S3ClientExten
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.model.{HeadObjectResponse, NoSuchKeyException}
 import software.amazon.awssdk.http.apache.ApacheHttpClient
+import akka.actor.ActorSystem
+import akka.stream.Materializer
 
-class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with ZonedDateTimeEncoder with StorageClassEncoder {
+class InputLambdaMain (implicit actorSystem:ActorSystem, mat:Materializer) extends RequestHandler[S3Event, Unit] with DocId with ZonedDateTimeEncoder with StorageClassEncoder {
   private final val logger = LogManager.getLogger(getClass)
 
-  private val injector = Guice.createInjector(new Module)
+  private val injector = Guice.createInjector(new Module(actorSystem, mat))
   val maxRetries = 20
 
   def getRegionFromEnvironment:Option[Region] = Option(System.getenv("AWS_REGION")).map(Region.of)

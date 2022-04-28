@@ -28,6 +28,7 @@ class LightboxEntryDAO @Inject()(config:ArchiveHunterConfiguration, ddbClientMgr
 
   protected val table = Table[LightboxEntry](lightboxTableName)
   protected val statusIndex = table.index("statusIndex")
+  protected val fileIdIndex = table.index("fileIdIndex")
 
   private val MakeLightboxEntrySink = Sink.fold[List[Either[DynamoReadError, LightboxEntry]], List[Either[DynamoReadError, LightboxEntry]]](List())(_ ++ _)
 
@@ -64,6 +65,6 @@ class LightboxEntryDAO @Inject()(config:ArchiveHunterConfiguration, ddbClientMgr
 
   def getFilesForId(fileId:String)(implicit ec:ExecutionContext) =
     scanamoAlpakka
-      .exec(table.query("fileId"===fileId))
+      .exec(fileIdIndex.query("fileId"===fileId))
       .runWith(MakeLightboxEntrySink)
 }

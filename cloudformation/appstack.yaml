@@ -283,6 +283,17 @@ Resources:
           ProvisionedThroughput:
             WriteCapacityUnits: 1
             ReadCapacityUnits: 4
+        - IndexName: fileIdIndex
+          KeySchema:
+            - AttributeName: fileId
+              KeyType: HASH
+            - AttributeName: userEmail
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+          ProvisionedThroughput:
+            WriteCapacityUnits: 1
+            ReadCapacityUnits: 4
 
   LightboxBulkEntryTable:
     Type: AWS::DynamoDB::Table
