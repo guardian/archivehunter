@@ -48,6 +48,10 @@ Resources:
               - ":443"
           NOTIFICATION_QUEUE:
             Fn::ImportValue: !Sub ${ArchiveHunterAppStack}-IngestTranscodeMsg
+          JOB_TABLE:
+            Fn::ImportValue: !Sub ${ArchiveHunterAppStack}-JobHistoryTable
+          LIGHTBOX_TABLE:
+            Fn::ImportValue: !Sub ${ArchiveHunterAppStack}-LightboxTable
       Handler: InputLambdaMain
       FunctionName: !Sub archivehunter-input-${Stage}
       MemorySize: 768
@@ -121,3 +125,41 @@ Resources:
                 - logs:CreateLogStream
                 - logs:PutLogEvents
               Resource: "*"
+            - Effect: Allow
+              Action:
+                - dynamodb:BatchGetItem
+                - dynamodb:BatchWriteItem
+                - dynamodb:ConditionCheckItem
+                - dynamodb:PutItem
+                - dynamodb:DescribeTable
+                - dynamodb:DeleteItem
+                - dynamodb:GetItem
+                - dynamodb:Scan
+                - dynamodb:Query
+                - dynamodb:UpdateItem
+                - dynamodb:GetShardIterator
+                - dynamodb:DescribeStream
+                - dynamodb:GetRecords
+                - dynamodb:ListStreams
+                - dynamodb:DescribeLimits
+              Resource:
+                - Fn::ImportValue: !Sub ${ArchiveHunterAppStack}-JobHistoryTable
+            - Effect: Allow
+              Action:
+                - dynamodb:BatchGetItem
+                - dynamodb:BatchWriteItem
+                - dynamodb:ConditionCheckItem
+                - dynamodb:PutItem
+                - dynamodb:DescribeTable
+                - dynamodb:DeleteItem
+                - dynamodb:GetItem
+                - dynamodb:Scan
+                - dynamodb:Query
+                - dynamodb:UpdateItem
+                - dynamodb:GetShardIterator
+                - dynamodb:DescribeStream
+                - dynamodb:GetRecords
+                - dynamodb:ListStreams
+                - dynamodb:DescribeLimits
+              Resource:
+                - Fn::ImportValue: !Sub ${ArchiveHunterAppStack}-LightboxTable
