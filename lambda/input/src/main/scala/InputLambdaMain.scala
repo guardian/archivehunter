@@ -327,6 +327,31 @@ class InputLambdaMain (implicit actorSystem:ActorSystem, mat:Materializer) exten
     })
   }
 
+
+
+  /**
+    * handle an "object restore expired" message.
+    * This is as simple as updating the database to tell the UI that the restore has expired.
+    * @param rec S3EventNotification.S3EventNotificationRecord instance
+    * @return a Future.
+    */
+  def handleTransition(rec:S3EventNotification.S3EventNotificationRecord,path: String) = {
+    logger.info(rec.getS3)
+    logger.info(rec.getAwsRegion)
+    logger.info(rec.getEventName)
+    logger.info(rec.getUserIdentity)
+    logger.info(rec.getEventNameAsEnum)
+    logger.info(rec.getEventSource)
+    logger.info(rec.getEventTime)
+    logger.info(rec.getEventVersion)
+    logger.info(rec.getGlacierEventData)
+    logger.info(rec.getRequestParameters)
+    logger.info(rec.getResponseElements)
+
+    Future ()
+
+  }
+
   override def handleRequest(event:S3Event, context:Context): Unit = {
     val indexName = getIndexName
 
@@ -388,8 +413,9 @@ class InputLambdaMain (implicit actorSystem:ActorSystem, mat:Materializer) exten
         This relates to Standard -> IA -> Glacier -> Glacier Deep transitions
          */
         case "LifecycleTransition"=>      //s3 changed the storage tier
-          println("ERROR LifecycleTransition not implemented")
-          throw new RuntimeException("event was not implemented")
+          handleTransition(rec, path)
+          //println("ERROR LifecycleTransition not implemented")
+          //throw new RuntimeException("event was not implemented")
 
         /*
         Default catch-all that shows an error
