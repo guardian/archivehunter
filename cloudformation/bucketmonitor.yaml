@@ -127,39 +127,14 @@ Resources:
               Resource: "*"
             - Effect: Allow
               Action:
-                - dynamodb:BatchGetItem
-                - dynamodb:BatchWriteItem
-                - dynamodb:ConditionCheckItem
                 - dynamodb:PutItem
-                - dynamodb:DescribeTable
-                - dynamodb:DeleteItem
                 - dynamodb:GetItem
-                - dynamodb:Scan
-                - dynamodb:Query
-                - dynamodb:UpdateItem
-                - dynamodb:GetShardIterator
-                - dynamodb:DescribeStream
-                - dynamodb:GetRecords
-                - dynamodb:ListStreams
-                - dynamodb:DescribeLimits
               Resource:
                 - Fn::ImportValue: !Sub ${ArchiveHunterAppStack}-JobHistoryTable
             - Effect: Allow
               Action:
-                - dynamodb:BatchGetItem
-                - dynamodb:BatchWriteItem
-                - dynamodb:ConditionCheckItem
                 - dynamodb:PutItem
-                - dynamodb:DescribeTable
-                - dynamodb:DeleteItem
                 - dynamodb:GetItem
-                - dynamodb:Scan
                 - dynamodb:Query
-                - dynamodb:UpdateItem
-                - dynamodb:GetShardIterator
-                - dynamodb:DescribeStream
-                - dynamodb:GetRecords
-                - dynamodb:ListStreams
-                - dynamodb:DescribeLimits
               Resource:
                 - Fn::ImportValue: !Sub ${ArchiveHunterAppStack}-LightboxTable

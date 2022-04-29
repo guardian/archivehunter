@@ -272,7 +272,7 @@ class InputLambdaMain (implicit actorSystem:ActorSystem, mat:Materializer) exten
       if(failures.nonEmpty){
         logger.error(s"Could not look up jobs for source ID $docId: ")
         failures.foreach(err=>logger.error(err))
-        Future (())
+        Future.failed(new RuntimeException(s"Could not look up jobs for source ID $docId"))
       } else {
         val success = resultList.collect({case Right(result)=>result})
         val restoreJobs = success
@@ -288,9 +288,10 @@ class InputLambdaMain (implicit actorSystem:ActorSystem, mat:Materializer) exten
           .map(_=>{
             logger.info(s"Updated jobs for source ID $docId")
             ()
-          }).recover({
+          }).recoverWith({
           case err:Throwable=>
             logger.error(s"Could not update jobs for source ID $docId:${err.getMessage}", err)
+            Future.failed(err)
         })
       }
     })
@@ -311,7 +312,7 @@ class InputLambdaMain (implicit actorSystem:ActorSystem, mat:Materializer) exten
       if(failures.nonEmpty){
         logger.error(s"Could not look up lightbox entries for $docId: ")
         failures.foreach(err=>logger.error(err))
-        Future (())
+        Future.failed(new RuntimeException(s"Could not look up lightbox entries for $docId"))
       } else {
         val success = resultList.collect({case Right(result)=>result})
         val boxEntries = success
