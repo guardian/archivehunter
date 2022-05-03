@@ -358,6 +358,31 @@ class InputLambdaMain (implicit actorSystem:ActorSystem, mat:Materializer) exten
     })
   }
 
+  /**
+    * Deal with a notification that the item has a delete marker by setting hasDeleteMarker to Some(true).
+    * If the item does not exist, do not treat it as a failure, simply note in the log.
+    * @param rec S3EventNotificationRecord describing the event
+    * @param i implictly provided [[Indexer]] instance
+    * @param elasticElasticClient implicitly provided ElasticClient instance for ElasticSearch
+    * @return a Future, containing a summary string if successful. The Future fails if the operation fails.
+    */
+  def handleDeleteMarker(rec: S3EventNotification.S3EventNotificationRecord,path: String)(implicit i:Indexer, elasticElasticClient:ElasticClient):Future[String] = {
+    ArchiveEntry.fromIndexFull(rec.getS3.getBucket.getName, path).flatMap({
+      case Right(entry)=>
+        println(s"$entry has a delete marker, updating record.")
+        i.indexSingleItem(entry.copy(hasDeleteMarker = Some(true)),Some(entry.id)).map({
+          case Right(result)=>result
+          case Left(err)=> throw new RuntimeException(err.toString)
+        })
+      case Left(ItemNotFound(docId))=>
+        val msg = s"$docId did not exist in the index, returning."
+        println(msg)
+        Future(msg)
+      case Left(other)=>
+        throw new RuntimeException(other.toString)
+    })
+  }
+
   override def handleRequest(event:S3Event, context:Context): Unit = {
     val indexName = getIndexName
 
@@ -399,11 +424,9 @@ class InputLambdaMain (implicit actorSystem:ActorSystem, mat:Materializer) exten
         case "LifecycleExpiration:Delete"=>
           handleRemoved(rec, path)
         case "ObjectRemoved:DeleteMarkerCreated"=> //object was _apparently_ deleted, leaving versions behind
-          println("ERROR ObjectRemoved:DeleteMarkerCreated not implemented")
-          throw new RuntimeException("event was not implemented")
+          handleDeleteMarker(rec, path)
         case "LifecycleExpiration:DeleteMarkerCreated"=>  //lifecycle rule 'deleted' the object, leaving versions behind
-          println("ERROR LifecycleExpiration:DeleteMarkerCreated not implemented")
-          throw new RuntimeException("event was not implemented")
+          handleDeleteMarker(rec, path)
 
         /*
         All of these events relate to Glacier restores

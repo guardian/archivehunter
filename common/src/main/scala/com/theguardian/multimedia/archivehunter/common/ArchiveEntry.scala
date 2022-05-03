@@ -14,7 +14,7 @@ import software.amazon.awssdk.services.s3.model.HeadObjectRequest
 
 import scala.util.{Failure, Success, Try}
 
-object ArchiveEntry extends ((String, String, String, Option[String], Option[String], Option[String], Long, ZonedDateTime, String, MimeType, Boolean, StorageClass, Seq[LightboxIndex], Boolean, Option[MediaMetadata])=>ArchiveEntry) with DocId {
+object ArchiveEntry extends ((String, String, String, Option[String], Option[String], Option[String], Long, ZonedDateTime, String, MimeType, Boolean, StorageClass, Seq[LightboxIndex], Boolean, Option[MediaMetadata], Option[Boolean])=>ArchiveEntry) with DocId {
   private val logger = LogManager.getLogger(getClass)
 
   def getFileExtension(str: String):Option[String] = {
@@ -87,7 +87,7 @@ object ArchiveEntry extends ((String, String, String, Option[String], Option[Str
     indexer.getByIdFull(makeDocId(bucket, key))
 }
 
-case class ArchiveEntry(id:String, bucket: String, path: String, maybeVersion:Option[String], region:Option[String], file_extension: Option[String], size: scala.Long, last_modified: ZonedDateTime, etag: String, mimeType: MimeType, proxied: Boolean, storageClass:StorageClass, lightboxEntries:Seq[LightboxIndex], beenDeleted:Boolean=false, mediaMetadata:Option[MediaMetadata]) {
+case class ArchiveEntry(id:String, bucket: String, path: String, maybeVersion:Option[String], region:Option[String], file_extension: Option[String], size: scala.Long, last_modified: ZonedDateTime, etag: String, mimeType: MimeType, proxied: Boolean, storageClass:StorageClass, lightboxEntries:Seq[LightboxIndex], beenDeleted:Boolean=false, mediaMetadata:Option[MediaMetadata], hasDeleteMarker:Option[Boolean]=None) {
   private val logger = LogManager.getLogger(getClass)
   def getProxy(proxyType: ProxyType.Value)(implicit proxyLocationDAO:ProxyLocationDAO, client:DynamoDbAsyncClient) = proxyLocationDAO.getProxy(id,proxyType)
 

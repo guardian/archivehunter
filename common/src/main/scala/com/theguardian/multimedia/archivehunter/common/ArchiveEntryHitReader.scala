@@ -66,7 +66,8 @@ trait ArchiveEntryHitReader extends MediaMetadataMapConverters {
                   ownLogger.error(s"Class Cast exception converting metadata for ${hit.sourceField("id").asInstanceOf[String]}: ",err)
                   None
               }
-          }
+          },
+          hit.sourceFieldOpt("hasDeleteMarker").asInstanceOf[Option[Boolean]]
         )
       }
     }
