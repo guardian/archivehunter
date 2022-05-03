@@ -25,7 +25,7 @@ import scala.util.{Failure, Success, Try}
 import scala.concurrent.ExecutionContext.Implicits.global
 import com.theguardian.multimedia.archivehunter.common.cmn_helpers.S3ClientExtensions._
 import software.amazon.awssdk.regions.Region
-import software.amazon.awssdk.services.s3.model.{HeadObjectResponse, NoSuchKeyException}
+import software.amazon.awssdk.services.s3.model.{HeadObjectResponse, NoSuchKeyException, HeadObjectRequest}
 import software.amazon.awssdk.http.apache.ApacheHttpClient
 import akka.actor.ActorSystem
 import akka.stream.Materializer
@@ -329,28 +329,33 @@ class InputLambdaMain (implicit actorSystem:ActorSystem, mat:Materializer) exten
   }
 
 
-
   /**
-    * handle an "object restore expired" message.
-    * This is as simple as updating the database to tell the UI that the restore has expired.
-    * @param rec S3EventNotification.S3EventNotificationRecord instance
-    * @return a Future.
+    * Deal with a lifecycle transition notification by attempting to update the item's ArchiveEntry storageClass value.
+    * If the item does not exist, do not treat it as a failure, simply note in the log.
+    * @param rec S3EventNotificationRecord describing the event.
+    * @param i implictly provided Indexer instance.
+    * @param elasticElasticClient implicitly provided ElasticClient instance for ElasticSearch.
+    * @param s3client implictly provided S3Client used to get the current storage class of the item.
+    * @return a Future, containing a summary string if successful. The Future fails if the operation fails.
     */
-  def handleTransition(rec:S3EventNotification.S3EventNotificationRecord,path: String) = {
-    logger.info(rec.getS3)
-    logger.info(rec.getAwsRegion)
-    logger.info(rec.getEventName)
-    logger.info(rec.getUserIdentity)
-    logger.info(rec.getEventNameAsEnum)
-    logger.info(rec.getEventSource)
-    logger.info(rec.getEventTime)
-    logger.info(rec.getEventVersion)
-    logger.info(rec.getGlacierEventData)
-    logger.info(rec.getRequestParameters)
-    logger.info(rec.getResponseElements)
+  def handleTransition(rec:S3EventNotification.S3EventNotificationRecord,path: String)(implicit i:Indexer, elasticElasticClient:ElasticClient, s3Client:S3Client) = {
+    val req = HeadObjectRequest.builder().bucket(rec.getS3.getBucket.getName).key(path).versionId(rec.getS3.getObject.getVersionId).build()
+    val result = s3Client.headObject(req)
 
-    Future ()
-
+    ArchiveEntry.fromIndexFull(rec.getS3.getBucket.getName, path).flatMap({
+      case Right(entry)=>
+        println(s"$entry has had its storage class changed, updating record.")
+        i.indexSingleItem(entry.copy(storageClass = StorageClass.withName(result.storageClassAsString())),Some(entry.id)).map({
+          case Right(result)=>result
+          case Left(err)=> throw new RuntimeException(err.toString)
+        })
+      case Left(ItemNotFound(docId))=>
+        val msg = s"$docId did not exist in the index, returning."
+        println(msg)
+        Future(msg)
+      case Left(other)=>
+        throw new RuntimeException(other.toString)
+    })
   }
 
   override def handleRequest(event:S3Event, context:Context): Unit = {
@@ -415,8 +420,6 @@ class InputLambdaMain (implicit actorSystem:ActorSystem, mat:Materializer) exten
          */
         case "LifecycleTransition"=>      //s3 changed the storage tier
           handleTransition(rec, path)
-          //println("ERROR LifecycleTransition not implemented")
-          //throw new RuntimeException("event was not implemented")
 
         /*
         Default catch-all that shows an error
