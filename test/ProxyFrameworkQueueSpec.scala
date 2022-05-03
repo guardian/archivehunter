@@ -48,7 +48,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito with MockitoMat
 
       val mockedEntry = mock[ArchiveEntry]
       val mockedUpdatedEntry = mock[ArchiveEntry]
-      mockedEntry.copy(any,any,any,any,any,any,any,any,any,any,any,any,any,any,any) returns mockedUpdatedEntry
+      mockedEntry.copy(any,any,any,any,any,any,any,any,any,any,any,any,any,any,any,any) returns mockedUpdatedEntry
 
       val mockedIndexer = mock[Indexer]
       mockedIndexer.getById(any)(any) returns Future(mockedEntry)
@@ -106,7 +106,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito with MockitoMat
 
       val mockedEntry = mock[ArchiveEntry]
       val mockedUpdatedEntry = mock[ArchiveEntry]
-      mockedEntry.copy(any,any,any,any,any,any,any,any,any,any,any,any,any,any,any) returns mockedUpdatedEntry
+      mockedEntry.copy(any,any,any,any,any,any,any,any,any,any,any,any,any,any,any,any) returns mockedUpdatedEntry
       val mockedIndexer = mock[Indexer]
       mockedIndexer.getById(any)(any) returns Future(mockedEntry)
       mockedIndexer.indexSingleItem(any,any)(any) returns Future(Right("fake-id"))
@@ -498,7 +498,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito with MockitoMat
 
       val mockedEntry = mock[ArchiveEntry]
       val mockedUpdatedEntry = mock[ArchiveEntry]
-      mockedEntry.copy(any,any,any,any,any,any,any,any,any,any,any,any,any,any,any) returns mockedUpdatedEntry
+      mockedEntry.copy(any,any,any,any,any,any,any,any,any,any,any,any,any,any,any,any) returns mockedUpdatedEntry
       val mockedIndexer = mock[Indexer]
       mockedIndexer.getById(any)(any) returns Future(mockedEntry)
       mockedIndexer.indexSingleItem(any,any)(any) returns Future(Right("fake-id"))
@@ -569,7 +569,7 @@ class ProxyFrameworkQueueSpec extends Specification with Mockito with MockitoMat
 
       val mockedEntry = mock[ArchiveEntry]
       val mockedUpdatedEntry = mock[ArchiveEntry]
-      mockedEntry.copy(any,any,any,any,any,any,any,any,any,any,any,any,any,any,any) returns mockedUpdatedEntry
+      mockedEntry.copy(any,any,any,any,any,any,any,any,any,any,any,any,any,any,any,any) returns mockedUpdatedEntry
       val mockedIndexer = mock[Indexer]
       mockedIndexer.getById(any)(any) throws new RuntimeException("nothing existed")
       mockedIndexer.indexSingleItem(any,any)(any) returns Future(Right("fake-id"))
