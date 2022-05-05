@@ -1298,3 +1298,13 @@ Outputs:
     Value: !GetAtt IngestTranscodeMsg.Arn
     Export:
       Name: !Sub ${AWS::StackName}-IngestTranscodeMsgArn
+  JobHistoryTable:
+    Description: Add this
+    Value: !GetAtt JobHistoryTable.Arn
+    Export:
+      Name: !Sub ${AWS::StackName}-JobHistoryTable
+  LightboxTable:
+    Description: Add this
+    Value: !GetAtt LightboxTable.Arn
+    Export:
+      Name: !Sub ${AWS::StackName}-LightboxTable
