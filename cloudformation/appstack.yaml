@@ -1299,12 +1299,12 @@ Outputs:
     Export:
       Name: !Sub ${AWS::StackName}-IngestTranscodeMsgArn
   JobHistoryTable:
-    Description: Add this
+    Description: ARN of the JobHistoryTable
     Value: !GetAtt JobHistoryTable.Arn
     Export:
       Name: !Sub ${AWS::StackName}-JobHistoryTable
   LightboxTable:
-    Description: Add this
+    Description: ARN of the LightboxTable
     Value: !GetAtt LightboxTable.Arn
     Export:
       Name: !Sub ${AWS::StackName}-LightboxTable
