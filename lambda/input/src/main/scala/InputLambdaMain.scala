@@ -30,8 +30,10 @@ import software.amazon.awssdk.http.apache.ApacheHttpClient
 import akka.actor.ActorSystem
 import akka.stream.Materializer
 
-class InputLambdaMain (implicit actorSystem:ActorSystem, mat:Materializer) extends RequestHandler[S3Event, Unit] with DocId with ZonedDateTimeEncoder with StorageClassEncoder {
+class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with ZonedDateTimeEncoder with StorageClassEncoder {
   private final val logger = LogManager.getLogger(getClass)
+  implicit val actorSystem:ActorSystem = ActorSystem("root")
+  implicit val mat:Materializer = Materializer.matFromSystem
 
   private val injector = Guice.createInjector(new Module(actorSystem, mat))
   val maxRetries = 20
