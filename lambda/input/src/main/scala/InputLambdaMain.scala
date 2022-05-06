@@ -115,6 +115,12 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
     })
   }
 
+  def getObjectVersion(rec:S3EventNotification.S3EventNotificationRecord) = rec.getS3.getObject.getVersionId match {
+    case "" => None
+    case null => None
+    case _=> Some(rec.getS3.getObject.getVersionId)
+  }
+
   /**
     * deal with an item created notification by adding it to the index
     * @param rec S3EventNotification record describing the event
@@ -139,7 +145,7 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
       println(s"Got path $path")
       println(s"Got version ID ${Option(rec.getS3.getObject.getVersionId)}")
       println(s"Got region ${getRegionFromEnvironment.get.toString}")
-      ArchiveEntry.fromS3(rec.getS3.getBucket.getName, path, Option(rec.getS3.getObject.getVersionId), getRegionFromEnvironment.get.toString).flatMap(entry => {
+      ArchiveEntry.fromS3(rec.getS3.getBucket.getName, path, getObjectVersion(rec), getRegionFromEnvironment.get.toString).flatMap(entry => {
         println(s"Going to index $entry")
         i.indexSingleItem(entry).flatMap({
           case Right(indexid) =>
