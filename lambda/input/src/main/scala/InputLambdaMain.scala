@@ -118,7 +118,7 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
   def getObjectVersion(rec:S3EventNotification.S3EventNotificationRecord) = rec.getS3.getObject.getVersionId match {
     case "" => None
     case null => None
-    case _=> Some(rec.getS3.getObject.getVersionId)
+    case _ => Some(rec.getS3.getObject.getVersionId)
   }
 
   /**
@@ -336,6 +336,13 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
     })
   }
 
+   def getHeadObjectRequest(rec:S3EventNotification.S3EventNotificationRecord, path: String):HeadObjectRequest = {
+    if (rec.getS3.getObject.getVersionId != null) {
+      HeadObjectRequest.builder().bucket(rec.getS3.getBucket.getName).key(path).versionId(rec.getS3.getObject.getVersionId).build()
+    } else {
+      HeadObjectRequest.builder().bucket(rec.getS3.getBucket.getName).key(path).build()
+    }
+  }
 
   /**
     * Deal with a lifecycle transition notification by attempting to update the item's ArchiveEntry storageClass value.
@@ -347,7 +354,7 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
     * @return a Future, containing a summary string if successful. The Future fails if the operation fails.
     */
   def handleTransition(rec:S3EventNotification.S3EventNotificationRecord,path: String)(implicit i:Indexer, elasticElasticClient:ElasticClient, s3Client:S3Client) = {
-    val req = HeadObjectRequest.builder().bucket(rec.getS3.getBucket.getName).key(path).versionId(rec.getS3.getObject.getVersionId).build()
+    val req = getHeadObjectRequest(rec, path)
     val result = s3Client.headObject(req)
 
     ArchiveEntry.fromIndexFull(rec.getS3.getBucket.getName, path).flatMap({
