@@ -337,11 +337,11 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
   }
 
    def getHeadObjectRequest(rec:S3EventNotification.S3EventNotificationRecord, path: String):HeadObjectRequest = {
-    if (rec.getS3.getObject.getVersionId != null) {
-      HeadObjectRequest.builder().bucket(rec.getS3.getBucket.getName).key(path).versionId(rec.getS3.getObject.getVersionId).build()
-    } else {
-      HeadObjectRequest.builder().bucket(rec.getS3.getBucket.getName).key(path).build()
-    }
+     val baseReq = HeadObjectRequest.builder().bucket(rec.getS3.getBucket.getName).key(path)
+     getObjectVersion(rec) match {
+       case None => baseReq.build
+       case Some(versionId) => baseReq.versionId(versionId).build
+     }
   }
 
   /**
