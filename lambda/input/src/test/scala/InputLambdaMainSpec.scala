@@ -305,4 +305,46 @@ class InputLambdaMainSpec extends Specification with Mockito with ZonedDateTimeE
       there was one(mockDao).put(LightboxEntry("test3@test.org", "test-file-id", date2, RestoreStatus.RS_EXPIRED, date1, date1, date1, None, None))
     }
   }
+
+  "InputLambdaMain.getObjectVersion" should {
+    "return a Some populated with the correct string if the version identity is present" in {
+      val fakeEvent = new S3EventNotificationRecord("aws-fake-region","ObjectCreated:Put","unit_test",
+          "2018-01-01T11:12:13.000Z","1",
+          new RequestParametersEntity("localhost"),
+          new ResponseElementsEntity("none","fake-req-id"),
+          new S3Entity("fake-config-id",
+            new S3BucketEntity("my-bucket", new UserIdentityEntity("owner"),"arn"),
+            new S3ObjectEntity("path/to/object",1234L,"fakeEtag","v1"),"1"),
+          new UserIdentityEntity("no-principal"))
+      val test = new InputLambdaMain
+      val maybeVersionId = test.getObjectVersion(fakeEvent)
+      maybeVersionId must beSome("v1")
+    }
+    "return a None if the version identity is an empty string" in {
+      val fakeEvent = new S3EventNotificationRecord("aws-fake-region","ObjectCreated:Put","unit_test",
+        "2018-01-01T11:12:13.000Z","1",
+        new RequestParametersEntity("localhost"),
+        new ResponseElementsEntity("none","fake-req-id"),
+        new S3Entity("fake-config-id",
+          new S3BucketEntity("my-bucket", new UserIdentityEntity("owner"),"arn"),
+          new S3ObjectEntity("path/to/object",1234L,"fakeEtag",""),"1"),
+        new UserIdentityEntity("no-principal"))
+      val test = new InputLambdaMain
+      val maybeVersionId = test.getObjectVersion(fakeEvent)
+      maybeVersionId must beNone
+    }
+    "return a None if the version identity is set to null" in {
+      val fakeEvent = new S3EventNotificationRecord("aws-fake-region","ObjectCreated:Put","unit_test",
+        "2018-01-01T11:12:13.000Z","1",
+        new RequestParametersEntity("localhost"),
+        new ResponseElementsEntity("none","fake-req-id"),
+        new S3Entity("fake-config-id",
+          new S3BucketEntity("my-bucket", new UserIdentityEntity("owner"),"arn"),
+          new S3ObjectEntity("path/to/object",1234L,"fakeEtag",null),"1"),
+        new UserIdentityEntity("no-principal"))
+      val test = new InputLambdaMain
+      val maybeVersionId = test.getObjectVersion(fakeEvent)
+      maybeVersionId must beNone
+    }
+  }
 }
