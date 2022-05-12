@@ -28,10 +28,15 @@ import scala.util.Success
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Await
 import scala.concurrent.duration._
+import akka.actor.ActorSystem
+import akka.stream.Materializer
 
 @RunWith(classOf[JUnitRunner])
 class InputLambdaMainSpec extends Specification with Mockito with ZonedDateTimeEncoder with StorageClassEncoder {
   sequential
+
+  implicit val system:ActorSystem = ActorSystem("root")
+  implicit val mat:Materializer = Materializer.matFromSystem
 
   "InputLambdaMain" should {
     "handle paths with spaces encoded to +" in {
@@ -226,6 +231,120 @@ class InputLambdaMainSpec extends Specification with Mockito with ZonedDateTimeE
 
       test.sendIngestedMessage(testEntry)
       there was one(mockSqsClient).sendMessage(expectedMessageRequest)
+    }
+  }
+
+  "InputLambdaMain.handleStarted" should {
+    "update any open/pending jobs that refer to the file in question with the ST_RUNNING status" in {
+      val mockBucketEntity = mock[S3EventNotification.S3BucketEntity]
+      mockBucketEntity.getName returns "test-bucket"
+      val mockObjectEntity = mock[S3EventNotification.S3ObjectEntity]
+      mockObjectEntity.getKey returns "path/to/file"
+      val mockDao = mock[JobModelDAO]
+      val mockEntity = mock[S3EventNotification.S3Entity]
+      mockEntity.getBucket returns mockBucketEntity
+      mockEntity.getObject returns mockObjectEntity
+
+      val mockRecord = mock[S3EventNotification.S3EventNotificationRecord]
+      mockRecord.getS3 returns mockEntity
+
+      val date1 = Some(ZonedDateTime.now())
+      val date3 = Some(ZonedDateTime.now())
+
+      val job1 = JobModel("test-job-1", "RESTORE", date1, None, JobStatus.ST_PENDING, None, "test-source-id", None, SourceType.SRC_MEDIA, None)
+      val job2 = JobModel("test-job-2", "TRANSCODE", Some(ZonedDateTime.now()), None, JobStatus.ST_RUNNING, None, "test-source-id", None, SourceType.SRC_MEDIA, None)
+      val job3 = JobModel("test-job-3", "RESTORE", date3, None, JobStatus.ST_PENDING, None, "test-source-id", None, SourceType.SRC_MEDIA, None)
+
+      mockDao.jobsForSource("test-source-id") returns Future(List(Right(job1), Right(job2), Right(job3)))
+      mockDao.putJob(any[JobModel]) returns Future(None)
+
+      val test = new InputLambdaMain {
+        override protected def getJobModelDAO: JobModelDAO = mockDao
+
+        override def makeDocId(bucket: String, path: String) = "test-source-id"
+      }
+
+      Await.ready(test.handleStarted(mockRecord, "somepath/to/media"), 5.seconds)
+      there was one(mockDao).putJob(JobModel("test-job-1","RESTORE",date1,None,JobStatus.ST_RUNNING,None,"test-source-id",None,SourceType.SRC_MEDIA,None))
+      there was one(mockDao).putJob(JobModel("test-job-3","RESTORE",date3,None,JobStatus.ST_RUNNING,None,"test-source-id",None,SourceType.SRC_MEDIA,None))
+    }
+  }
+
+  "InputLambdaMain.handleExpired" should {
+    "update any lightbox entries that refer to the file in question with the RS_EXPIRED status" in {
+      val mockBucketEntity = mock[S3EventNotification.S3BucketEntity]
+      mockBucketEntity.getName returns "test-bucket"
+      val mockObjectEntity = mock[S3EventNotification.S3ObjectEntity]
+      mockObjectEntity.getKey returns "path/to/file"
+      val mockDao = mock[LightboxEntryDAO]
+      val mockEntity = mock[S3EventNotification.S3Entity]
+      mockEntity.getBucket returns mockBucketEntity
+      mockEntity.getObject returns mockObjectEntity
+
+      val mockRecord = mock[S3EventNotification.S3EventNotificationRecord]
+      mockRecord.getS3 returns mockEntity
+
+      val date1 = Some(ZonedDateTime.now())
+      val date2 = ZonedDateTime.now()
+
+      val entry1 = LightboxEntry("test@test.org", "test-file-id", date2, RestoreStatus.RS_SUCCESS, date1, date1, date1, None, None)
+      val entry2 = LightboxEntry("test2@test.org", "test-file-id", date2, RestoreStatus.RS_SUCCESS, date1, date1, date1, None, None)
+      val entry3 = LightboxEntry("test3@test.org", "test-file-id", date2, RestoreStatus.RS_SUCCESS, date1, date1, date1, None, None)
+
+      mockDao.getFilesForId("test-file-id") returns Future(List(Right(entry1), Right(entry2), Right(entry3)))
+
+      val test = new InputLambdaMain {
+        override protected def getLightboxEntryDAO: LightboxEntryDAO = mockDao
+
+        override def makeDocId(bucket: String, path: String) = "test-file-id"
+      }
+
+      Await.ready(test.handleExpired(mockRecord, "somepath/to/media"), 5.seconds)
+      there was one(mockDao).put(LightboxEntry("test@test.org", "test-file-id", date2, RestoreStatus.RS_EXPIRED, date1, date1, date1, None, None))
+      there was one(mockDao).put(LightboxEntry("test2@test.org", "test-file-id", date2, RestoreStatus.RS_EXPIRED, date1, date1, date1, None, None))
+      there was one(mockDao).put(LightboxEntry("test3@test.org", "test-file-id", date2, RestoreStatus.RS_EXPIRED, date1, date1, date1, None, None))
+    }
+  }
+
+  "InputLambdaMain.getObjectVersion" should {
+    "return a Some populated with the correct string if the version identity is present" in {
+      val fakeEvent = new S3EventNotificationRecord("aws-fake-region","ObjectCreated:Put","unit_test",
+          "2018-01-01T11:12:13.000Z","1",
+          new RequestParametersEntity("localhost"),
+          new ResponseElementsEntity("none","fake-req-id"),
+          new S3Entity("fake-config-id",
+            new S3BucketEntity("my-bucket", new UserIdentityEntity("owner"),"arn"),
+            new S3ObjectEntity("path/to/object",1234L,"fakeEtag","v1"),"1"),
+          new UserIdentityEntity("no-principal"))
+      val test = new InputLambdaMain
+      val maybeVersionId = test.getObjectVersion(fakeEvent)
+      maybeVersionId must beSome("v1")
+    }
+    "return a None if the version identity is an empty string" in {
+      val fakeEvent = new S3EventNotificationRecord("aws-fake-region","ObjectCreated:Put","unit_test",
+        "2018-01-01T11:12:13.000Z","1",
+        new RequestParametersEntity("localhost"),
+        new ResponseElementsEntity("none","fake-req-id"),
+        new S3Entity("fake-config-id",
+          new S3BucketEntity("my-bucket", new UserIdentityEntity("owner"),"arn"),
+          new S3ObjectEntity("path/to/object",1234L,"fakeEtag",""),"1"),
+        new UserIdentityEntity("no-principal"))
+      val test = new InputLambdaMain
+      val maybeVersionId = test.getObjectVersion(fakeEvent)
+      maybeVersionId must beNone
+    }
+    "return a None if the version identity is set to null" in {
+      val fakeEvent = new S3EventNotificationRecord("aws-fake-region","ObjectCreated:Put","unit_test",
+        "2018-01-01T11:12:13.000Z","1",
+        new RequestParametersEntity("localhost"),
+        new ResponseElementsEntity("none","fake-req-id"),
+        new S3Entity("fake-config-id",
+          new S3BucketEntity("my-bucket", new UserIdentityEntity("owner"),"arn"),
+          new S3ObjectEntity("path/to/object",1234L,"fakeEtag",null),"1"),
+        new UserIdentityEntity("no-principal"))
+      val test = new InputLambdaMain
+      val maybeVersionId = test.getObjectVersion(fakeEvent)
+      maybeVersionId must beNone
     }
   }
 }

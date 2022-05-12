@@ -125,6 +125,11 @@ lazy val inputLambda = (project in file("lambda/input"))
     "com.amazonaws" % "aws-java-sdk-lambda" % awsSdkVersion,
     "com.amazonaws" % "aws-lambda-java-events" % "2.1.0",
     "com.amazonaws" % "aws-lambda-java-core" % "1.0.0",
+    "com.typesafe.akka" %% "akka-actor-typed" % akkaVersion,
+    "com.typesafe.akka" %% "akka-serialization-jackson" % akkaVersion,
+    "com.typesafe.akka" %% "akka-stream" % akkaVersion,
+    "com.typesafe.akka" %% "akka-protobuf" % akkaVersion,
+    "com.typesafe.akka" %% "akka-protobuf-v3" % akkaVersion,
   ),
   assembly / assemblyJarName:= "inputLambda.jar",
   assembly / assemblyMergeStrategy:= {

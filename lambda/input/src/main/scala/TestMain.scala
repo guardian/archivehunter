@@ -8,6 +8,8 @@ import software.amazon.awssdk.services.s3.model.{HeadObjectRequest, NoSuchKeyExc
 import java.time.{LocalDateTime, ZonedDateTime}
 import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success, Try}
+import akka.actor.ActorSystem
+import akka.stream.Materializer
 
 object TestMain {
   private val logger = LoggerFactory.getLogger(getClass)
@@ -30,6 +32,8 @@ object TestMain {
   }
 
   def main(args:Array[String]) = {
+    implicit val system:ActorSystem = ActorSystem("root")
+    implicit val mat:Materializer = Materializer.matFromSystem
     val m = new InputLambdaMain
 
     if(args.length<2) {

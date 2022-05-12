@@ -11,7 +11,7 @@ import org.apache.logging.log4j.LogManager
 import com.sksamuel.elastic4s.http.ElasticClient
 import com.sksamuel.elastic4s.http.ElasticDsl.update
 import com.theguardian.multimedia.archivehunter.common.cmn_helpers.PathCacheExtractor
-import com.theguardian.multimedia.archivehunter.common.cmn_models.{IngestMessage, ItemNotFound, JobModelDAO, JobStatus, PathCacheEntry, PathCacheIndexer}
+import com.theguardian.multimedia.archivehunter.common.cmn_models.{IngestMessage, ItemNotFound, JobModelDAO, JobStatus, LightboxEntryDAO, PathCacheEntry, PathCacheIndexer, RestoreStatus}
 import org.apache.http.HttpHost
 import org.elasticsearch.client.RestClient
 import io.circe.syntax._
@@ -25,13 +25,17 @@ import scala.util.{Failure, Success, Try}
 import scala.concurrent.ExecutionContext.Implicits.global
 import com.theguardian.multimedia.archivehunter.common.cmn_helpers.S3ClientExtensions._
 import software.amazon.awssdk.regions.Region
-import software.amazon.awssdk.services.s3.model.{HeadObjectResponse, NoSuchKeyException}
+import software.amazon.awssdk.services.s3.model.{HeadObjectResponse, NoSuchKeyException, HeadObjectRequest}
 import software.amazon.awssdk.http.apache.ApacheHttpClient
+import akka.actor.ActorSystem
+import akka.stream.Materializer
 
 class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with ZonedDateTimeEncoder with StorageClassEncoder {
   private final val logger = LogManager.getLogger(getClass)
+  implicit val actorSystem:ActorSystem = ActorSystem("root")
+  implicit val mat:Materializer = Materializer.matFromSystem
 
-  private val injector = Guice.createInjector(new Module)
+  private val injector = Guice.createInjector(new Module(actorSystem, mat))
   val maxRetries = 20
 
   def getRegionFromEnvironment:Option[Region] = Option(System.getenv("AWS_REGION")).map(Region.of)
@@ -53,6 +57,8 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
   protected def getPathCacheIndexer(indexName: String, elasticClient:ElasticClient) = new PathCacheIndexer(indexName, elasticClient)
 
   protected def getJobModelDAO = injector.getInstance(classOf[JobModelDAO])
+
+  protected def getLightboxEntryDAO = injector.getInstance(classOf[LightboxEntryDAO])
 
   def sendIngestedMessage(entry:ArchiveEntry) = {
     val client = getSqsClient()
@@ -109,6 +115,12 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
     })
   }
 
+  def getObjectVersion(rec:S3EventNotification.S3EventNotificationRecord) = rec.getS3.getObject.getVersionId match {
+    case "" => None
+    case null => None
+    case _ => Some(rec.getS3.getObject.getVersionId)
+  }
+
   /**
     * deal with an item created notification by adding it to the index
     * @param rec S3EventNotification record describing the event
@@ -133,7 +145,7 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
       println(s"Got path $path")
       println(s"Got version ID ${Option(rec.getS3.getObject.getVersionId)}")
       println(s"Got region ${getRegionFromEnvironment.get.toString}")
-      ArchiveEntry.fromS3(rec.getS3.getBucket.getName, path, Option(rec.getS3.getObject.getVersionId), getRegionFromEnvironment.get.toString).flatMap(entry => {
+      ArchiveEntry.fromS3(rec.getS3.getBucket.getName, path, getObjectVersion(rec), getRegionFromEnvironment.get.toString).flatMap(entry => {
         println(s"Going to index $entry")
         i.indexSingleItem(entry).flatMap({
           case Right(indexid) =>
@@ -253,6 +265,139 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
       }
   }
 
+  /**
+    * handle an "object restore started" message.
+    * This is as simple as updating the database to tell the UI that the restore is running.
+    * @param rec S3EventNotification.S3EventNotificationRecord instance
+    * @return a Future that completes when the operations have finished. No useful contents.
+    */
+  def handleStarted(rec:S3EventNotification.S3EventNotificationRecord,path: String) = {
+    val jobModelDAO = getJobModelDAO
+    val docId = makeDocId(rec.getS3.getBucket.getName, path)
+
+    jobModelDAO.jobsForSource(docId).flatMap(resultList=>{
+      val failures = resultList.collect({case Left(err)=>err})
+      if(failures.nonEmpty){
+        logger.error(s"Could not look up jobs for source ID $docId: ")
+        failures.foreach(err=>logger.error(err))
+        Future.failed(new RuntimeException(s"Could not look up jobs for source ID $docId"))
+      } else {
+        val success = resultList.collect({case Right(result)=>result})
+        val restoreJobs = success
+          .filter(_.jobType=="RESTORE").filter(_.completedAt.isEmpty)
+        logger.info(s"Found restore jobs: $restoreJobs")
+
+        val updateFutures = restoreJobs.map(job=>{
+          val updatedJob = job.copy(jobStatus = JobStatus.ST_RUNNING)
+          jobModelDAO.putJob(updatedJob)
+        })
+
+        Future.sequence(updateFutures)
+          .map(_=>{
+            logger.info(s"Updated jobs for source ID $docId")
+            ()
+          }).recoverWith({
+          case err:Throwable=>
+            logger.error(s"Could not update jobs for source ID $docId:${err.getMessage}", err)
+            Future.failed(err)
+        })
+      }
+    })
+  }
+
+  /**
+    * handle an "object restore expired" message.
+    * This is as simple as updating the database to tell the UI that the restore has expired.
+    * @param rec S3EventNotification.S3EventNotificationRecord instance
+    * @return a Future.
+    */
+  def handleExpired(rec:S3EventNotification.S3EventNotificationRecord,path: String) = {
+    val lightboxEntryDAO = getLightboxEntryDAO
+    val docId = makeDocId(rec.getS3.getBucket.getName, path)
+
+    lightboxEntryDAO.getFilesForId(docId).flatMap(resultList=>{
+      val failures = resultList.collect({case Left(err)=>err})
+      if(failures.nonEmpty){
+        logger.error(s"Could not look up lightbox entries for $docId: ")
+        failures.foreach(err=>logger.error(err))
+        Future.failed(new RuntimeException(s"Could not look up lightbox entries for $docId"))
+      } else {
+        val success = resultList.collect({case Right(result)=>result})
+        val boxEntries = success
+        logger.info(s"Found light box entries: $boxEntries")
+
+        Future.sequence(
+          boxEntries.map(boxEntry=>{
+            val updatedEntry = boxEntry.copy(restoreStatus = RestoreStatus.RS_EXPIRED)
+            lightboxEntryDAO.put(updatedEntry)
+          })
+        )
+      }
+    })
+  }
+
+   def getHeadObjectRequest(rec:S3EventNotification.S3EventNotificationRecord, path: String):HeadObjectRequest = {
+     val baseReq = HeadObjectRequest.builder().bucket(rec.getS3.getBucket.getName).key(path)
+     getObjectVersion(rec) match {
+       case None => baseReq.build
+       case Some(versionId) => baseReq.versionId(versionId).build
+     }
+  }
+
+  /**
+    * Deal with a lifecycle transition notification by attempting to update the item's ArchiveEntry storageClass value.
+    * If the item does not exist, do not treat it as a failure, simply note in the log.
+    * @param rec S3EventNotificationRecord describing the event.
+    * @param i implictly provided Indexer instance.
+    * @param elasticElasticClient implicitly provided ElasticClient instance for ElasticSearch.
+    * @param s3client implictly provided S3Client used to get the current storage class of the item.
+    * @return a Future, containing a summary string if successful. The Future fails if the operation fails.
+    */
+  def handleTransition(rec:S3EventNotification.S3EventNotificationRecord,path: String)(implicit i:Indexer, elasticElasticClient:ElasticClient, s3Client:S3Client) = {
+    val req = getHeadObjectRequest(rec, path)
+    val result = s3Client.headObject(req)
+
+    ArchiveEntry.fromIndexFull(rec.getS3.getBucket.getName, path).flatMap({
+      case Right(entry)=>
+        println(s"$entry has had its storage class changed, updating record.")
+        i.indexSingleItem(entry.copy(storageClass = StorageClass.withName(result.storageClassAsString())),Some(entry.id)).map({
+          case Right(result)=>result
+          case Left(err)=> throw new RuntimeException(err.toString)
+        })
+      case Left(ItemNotFound(docId))=>
+        val msg = s"$docId did not exist in the index, returning."
+        println(msg)
+        Future(msg)
+      case Left(other)=>
+        throw new RuntimeException(other.toString)
+    })
+  }
+
+  /**
+    * Deal with a notification that the item has a delete marker by setting hasDeleteMarker to Some(true).
+    * If the item does not exist, do not treat it as a failure, simply note in the log.
+    * @param rec S3EventNotificationRecord describing the event
+    * @param i implictly provided [[Indexer]] instance
+    * @param elasticElasticClient implicitly provided ElasticClient instance for ElasticSearch
+    * @return a Future, containing a summary string if successful. The Future fails if the operation fails.
+    */
+  def handleDeleteMarker(rec: S3EventNotification.S3EventNotificationRecord,path: String)(implicit i:Indexer, elasticElasticClient:ElasticClient):Future[String] = {
+    ArchiveEntry.fromIndexFull(rec.getS3.getBucket.getName, path).flatMap({
+      case Right(entry)=>
+        println(s"$entry has a delete marker, updating record.")
+        i.indexSingleItem(entry.copy(hasDeleteMarker = Some(true)),Some(entry.id)).map({
+          case Right(result)=>result
+          case Left(err)=> throw new RuntimeException(err.toString)
+        })
+      case Left(ItemNotFound(docId))=>
+        val msg = s"$docId did not exist in the index, returning."
+        println(msg)
+        Future(msg)
+      case Left(other)=>
+        throw new RuntimeException(other.toString)
+    })
+  }
+
   override def handleRequest(event:S3Event, context:Context): Unit = {
     val indexName = getIndexName
 
@@ -268,20 +413,55 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
 
       val path = URLDecoder.decode(rec.getS3.getObject.getKey,"UTF-8")
 
-      println(s"Source object is s3://${rec.getS3.getBucket.getName}/$path in ${rec.getAwsRegion}")
+      println(s"Source object is s3://${rec.getS3.getBucket.getName}/$path version ${rec.getS3.getObject.getVersionId} in ${rec.getAwsRegion}")
       println(s"Event was sent by ${rec.getUserIdentity.getPrincipalId}")
 
       rec.getEventName match {
+        /*
+        All of these events indicate new content
+         */
         case "ObjectCreated:Put"=>
+          handleCreated(rec, path)
+        case "ObjectCreated:Post"=>
           handleCreated(rec, path)
         case "ObjectCreated:CompleteMultipartUpload"=>
           handleCreated(rec, path)
         case "ObjectCreated:Copy"=>
           handleCreated(rec, path)
-        case "ObjectRemoved:Delete"=>
+
+        /*
+        All of these events indicate something was deleted, or an deletion attempt
+         */
+        case "ObjectRemoved:Delete"=> //object was _actually_ deleted
           handleRemoved(rec, path)
-        case "ObjectRestore:Completed"=>
+        case "ReducedRedundancyLostObject"=>
+          handleRemoved(rec, path)
+        case "LifecycleExpiration:Delete"=>
+          handleRemoved(rec, path)
+        case "ObjectRemoved:DeleteMarkerCreated"=> //object was _apparently_ deleted, leaving versions behind
+          handleDeleteMarker(rec, path)
+        case "LifecycleExpiration:DeleteMarkerCreated"=>  //lifecycle rule 'deleted' the object, leaving versions behind
+          handleDeleteMarker(rec, path)
+
+        /*
+        All of these events relate to Glacier restores
+         */
+        case "ObjectRestore:Post"=> //restore has been initiated
+          handleStarted(rec, path)
+        case "ObjectRestore:Completed"=>  //restore has been completed
           handleRestored(rec, path)
+        case "ObjectRestore:Delete"=>     //restore has expired and been dropped back
+          handleExpired(rec, path)
+
+        /*
+        This relates to Standard -> IA -> Glacier -> Glacier Deep transitions
+         */
+        case "LifecycleTransition"=>      //s3 changed the storage tier
+          handleTransition(rec, path)
+
+        /*
+        Default catch-all that shows an error
+         */
         case other:String=>
           println(s"ERROR: received unknown event $other")
           throw new RuntimeException(s"unknown event $other received")

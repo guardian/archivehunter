@@ -10,7 +10,9 @@ class ArchiveHunterConfigurationExt extends ArchiveHunterConfiguration {
     "externalData.awsProfile"->"AWS_PROFILE",
     "elasticsearch.hostname"->"ES_HOST_NAME",
     "proxies.tableName" -> "PROXIES_TABLE_NAME",
-    "instances.tableName" -> "INSTANCES_TABLE"
+    "instances.tableName" -> "INSTANCES_TABLE",
+    "externalData.jobTable" -> "JOB_TABLE",
+    "lightbox.tableName" -> "LIGHTBOX_TABLE",
   )
 
   override def getOptional[T](key: String)(implicit converter: String=>T): Option[T] = {
