@@ -168,8 +168,7 @@ class ProxyGenerators @Inject() (config:ArchiveHunterConfiguration,
     }
 
     targetFuture.flatMap(target=> {
-      val shouldProxy = (target.proxyEnabled.contains(true) || requestType==RequestType.THUMBNAIL)
-      if(shouldProxy) {
+      if(target.proxyEnabled.isDefined && target.proxyEnabled.get) {
         val jobDesc = JobModel(jobUuid.toString, jobTypeString, Some(ZonedDateTime.now()), None, JobStatus.ST_PENDING, None, entry.id, None, SourceType.SRC_MEDIA, None)
         val uriToProxyFuture = getUriToProxy(entry)
 
