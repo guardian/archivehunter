@@ -129,7 +129,7 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
     * @param elasticElasticClient implicitly provided ElasticClient instance for Elastic Search
     * @return a Future, containing the ID of the new/updated record as a String.  If the operation fails, the Future will fail; pick this up with .onComplete or .recover
     */
-  def handleCreated(rec:S3EventNotification.S3EventNotificationRecord,path: String)(implicit i:Indexer, pathCacheIndexer:PathCacheIndexer, s3Client:S3Client, elasticElasticClient:ElasticClient):Future[String] = {
+  def handleCreated(rec:S3EventNotification.S3EventNotificationRecord,path: String):Future[String] = {
     //build a list of entries to add to the path cache
     val pathParts = path.split("/").init  //the last element is the filename, which we are not interested in.
 
@@ -171,7 +171,7 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
     * @param elasticElasticClient implicitly provided ElasticClient instance for ElasticSearch
     * @return a Future, containing a summary string if successful. The Future fails if the operation fails.
     */
-  def handleRemoved(rec: S3EventNotification.S3EventNotificationRecord,path: String)(implicit i:Indexer, elasticElasticClient:ElasticClient):Future[String] = {
+  def handleRemoved(rec: S3EventNotification.S3EventNotificationRecord,path: String):Future[String] = {
     ArchiveEntry.fromIndexFull(rec.getS3.getBucket.getName, path).flatMap({
       case Right(entry)=>
         println(s"$entry has been removed, updating record to tombstone")
@@ -353,7 +353,7 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
     * @param s3client implictly provided S3Client used to get the current storage class of the item.
     * @return a Future, containing a summary string if successful. The Future fails if the operation fails.
     */
-  def handleTransition(rec:S3EventNotification.S3EventNotificationRecord,path: String)(implicit i:Indexer, elasticElasticClient:ElasticClient, s3Client:S3Client) = {
+  def handleTransition(rec:S3EventNotification.S3EventNotificationRecord,path: String) = {
     val req = getHeadObjectRequest(rec, path)
     val result = s3Client.headObject(req)
 
@@ -381,7 +381,7 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
     * @param elasticElasticClient implicitly provided ElasticClient instance for ElasticSearch
     * @return a Future, containing a summary string if successful. The Future fails if the operation fails.
     */
-  def handleDeleteMarker(rec: S3EventNotification.S3EventNotificationRecord,path: String)(implicit i:Indexer, elasticElasticClient:ElasticClient):Future[String] = {
+  def handleDeleteMarker(rec: S3EventNotification.S3EventNotificationRecord,path: String):Future[String] = {
     ArchiveEntry.fromIndexFull(rec.getS3.getBucket.getName, path).flatMap({
       case Right(entry)=>
         println(s"$entry has a delete marker, updating record.")
@@ -398,16 +398,16 @@ class InputLambdaMain extends RequestHandler[S3Event, Unit] with DocId with Zone
     })
   }
 
+  val indexName = getIndexName
+
+  val clusterEndpoint = getClusterEndpoint
+
+  implicit val s3Client:S3Client = getS3Client
+  implicit val elasticClient:ElasticClient = getElasticClient(clusterEndpoint)
+  implicit val i:Indexer = getIndexer(indexName)
+  implicit val pc:PathCacheIndexer = getPathCacheIndexer(getPathCacheIndexName, elasticClient)
+  
   override def handleRequest(event:S3Event, context:Context): Unit = {
-    val indexName = getIndexName
-
-    val clusterEndpoint = getClusterEndpoint
-
-    implicit val s3Client:S3Client = getS3Client
-    implicit val elasticClient:ElasticClient = getElasticClient(clusterEndpoint)
-    implicit val i:Indexer = getIndexer(indexName)
-    implicit val pc:PathCacheIndexer = getPathCacheIndexer(getPathCacheIndexName, elasticClient)
-
     println(s"Lambda was triggered with: \n${dumpEventData(event, Some("\t"))}")
     val resultList = event.getRecords.asScala.map(rec=>{
 

@@ -180,6 +180,8 @@ class InputLambdaMainSpec extends Specification with Mockito with ZonedDateTimeE
       mockDao.jobsForSource("test-source-id") returns Future(List(Right(job1),Right(job2),Right(job3)))
       mockDao.putJob(any[JobModel]) returns Future(None)
       val test = new InputLambdaMain {
+        override protected def getIndexName: String = "test-index"
+        override protected def getClusterEndpoint: String = "localhost:9200"
         override protected def getJobModelDAO: JobModelDAO = mockDao
 
         override def makeDocId(bucket:String,path:String) = "test-source-id"
@@ -218,6 +220,8 @@ class InputLambdaMainSpec extends Specification with Mockito with ZonedDateTimeE
       val mockS3Client = mock[S3Client]
 
       val test = new InputLambdaMain {
+        override protected def getIndexName: String = "test-index"
+        override protected def getClusterEndpoint: String = "localhost:9200"
         override protected def getSqsClient() = mockSqsClient
         override protected def getS3Client() = mockS3Client
         override protected def getNotificationQueue() = "fake-queue"
@@ -259,6 +263,8 @@ class InputLambdaMainSpec extends Specification with Mockito with ZonedDateTimeE
       mockDao.putJob(any[JobModel]) returns Future(None)
 
       val test = new InputLambdaMain {
+        override protected def getIndexName: String = "test-index"
+        override protected def getClusterEndpoint: String = "localhost:9200"
         override protected def getJobModelDAO: JobModelDAO = mockDao
 
         override def makeDocId(bucket: String, path: String) = "test-source-id"
@@ -294,6 +300,8 @@ class InputLambdaMainSpec extends Specification with Mockito with ZonedDateTimeE
       mockDao.getFilesForId("test-file-id") returns Future(List(Right(entry1), Right(entry2), Right(entry3)))
 
       val test = new InputLambdaMain {
+        override protected def getIndexName: String = "test-index"
+        override protected def getClusterEndpoint: String = "localhost:9200"
         override protected def getLightboxEntryDAO: LightboxEntryDAO = mockDao
 
         override def makeDocId(bucket: String, path: String) = "test-file-id"
@@ -316,7 +324,10 @@ class InputLambdaMainSpec extends Specification with Mockito with ZonedDateTimeE
             new S3BucketEntity("my-bucket", new UserIdentityEntity("owner"),"arn"),
             new S3ObjectEntity("path/to/object",1234L,"fakeEtag","v1"),"1"),
           new UserIdentityEntity("no-principal"))
-      val test = new InputLambdaMain
+      val test = new InputLambdaMain {
+        override protected def getIndexName: String = "test-index"
+        override protected def getClusterEndpoint: String = "localhost:9200"
+      }
       val maybeVersionId = test.getObjectVersion(fakeEvent)
       maybeVersionId must beSome("v1")
     }
@@ -329,7 +340,10 @@ class InputLambdaMainSpec extends Specification with Mockito with ZonedDateTimeE
           new S3BucketEntity("my-bucket", new UserIdentityEntity("owner"),"arn"),
           new S3ObjectEntity("path/to/object",1234L,"fakeEtag",""),"1"),
         new UserIdentityEntity("no-principal"))
-      val test = new InputLambdaMain
+      val test = new InputLambdaMain {
+        override protected def getIndexName: String = "test-index"
+        override protected def getClusterEndpoint: String = "localhost:9200"
+      }
       val maybeVersionId = test.getObjectVersion(fakeEvent)
       maybeVersionId must beNone
     }
@@ -342,7 +356,10 @@ class InputLambdaMainSpec extends Specification with Mockito with ZonedDateTimeE
           new S3BucketEntity("my-bucket", new UserIdentityEntity("owner"),"arn"),
           new S3ObjectEntity("path/to/object",1234L,"fakeEtag",null),"1"),
         new UserIdentityEntity("no-principal"))
-      val test = new InputLambdaMain
+      val test = new InputLambdaMain {
+        override protected def getIndexName: String = "test-index"
+        override protected def getClusterEndpoint: String = "localhost:9200"
+      }
       val maybeVersionId = test.getObjectVersion(fakeEvent)
       maybeVersionId must beNone
     }
