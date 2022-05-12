@@ -257,9 +257,7 @@ Resources:
           KeyType: HASH
         - AttributeName: fileId
           KeyType: RANGE
-      ProvisionedThroughput:
-        WriteCapacityUnits: 1
-        ReadCapacityUnits: 4
+      BillingMode: PAY_PER_REQUEST
       GlobalSecondaryIndexes:
         - IndexName: statusIndex
           KeySchema:
@@ -269,9 +267,6 @@ Resources:
               KeyType: RANGE
           Projection:
             ProjectionType: ALL
-          ProvisionedThroughput:
-            WriteCapacityUnits: 1
-            ReadCapacityUnits: 4
         - IndexName: memberOfBulkIndex
           KeySchema:
             - AttributeName: memberOfBulk
@@ -280,9 +275,6 @@ Resources:
               KeyType: RANGE
           Projection:
             ProjectionType: ALL
-          ProvisionedThroughput:
-            WriteCapacityUnits: 1
-            ReadCapacityUnits: 4
         - IndexName: fileIdIndex
           KeySchema:
             - AttributeName: fileId
@@ -291,9 +283,6 @@ Resources:
               KeyType: RANGE
           Projection:
             ProjectionType: ALL
-          ProvisionedThroughput:
-            WriteCapacityUnits: 1
-            ReadCapacityUnits: 4
 
   LightboxBulkEntryTable:
     Type: AWS::DynamoDB::Table
