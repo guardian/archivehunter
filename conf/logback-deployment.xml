@@ -70,7 +70,7 @@
     <logger name="controllers.BulkDownloadsController" level="INFO"/>
 
     <logger name="auth.HMAC" level="DEBUG"/>
-    <logger name="auth" level="INFO"/>
+    <logger name="auth" level="DEBUG"/>
 
     <logger name="helpers.DDBSink" level="INFO"/>
     <logger name="helpers.S3ToProxyLocationFlow" level="INFO"/>
