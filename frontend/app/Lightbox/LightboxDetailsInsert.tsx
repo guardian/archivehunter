@@ -117,7 +117,7 @@ const LightboxDetailsInsertImpl:React.FC<LightboxDetailsInsertProps> = (props) =
             // @ts-ignore
             if(window.showSaveFilePicker) {
                 //the new style uses the File System Access API, which also requires a secure context to work.
-                await newStyleDownload(response);
+                await oldStyleDownload(response);
             } else {
                 alert("Downloading like this works best in Chrome. If the download does not work, please load Chrome and try again in that.");
                 await oldStyleDownload(response);
