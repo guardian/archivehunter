@@ -1,4 +1,4 @@
-import React, {useState} from "react";
+import React, {useEffect, useState} from "react";
 import {Button, Grid, makeStyles, Tooltip} from "@material-ui/core";
 import {GetApp, Help, WbIncandescent, WbIncandescentOutlined} from "@material-ui/icons";
 import axios from "axios";
@@ -33,16 +33,6 @@ const ItemActions:React.FC<ItemActionsProps> = (props) => {
 
     const classes = useStyles();
 
-    const doDownload  = async () => {
-        try {
-            const response = await axios.get<ObjectGetResponse<string>>("/api/download/" + props.itemId);
-            setDownloadUrl(response.data.entry);
-        } catch(err) {
-            console.error("Could not get download URL: ", err);
-            props.onError ? props.onError(formatError(err, false)) : null;
-        }
-    }
-
     const putToLightbox = async () =>{
         try {
             await axios.put("/api/lightbox/my/" + props.itemId);
@@ -64,29 +54,52 @@ const ItemActions:React.FC<ItemActionsProps> = (props) => {
         }
     }
 
-    return <Grid container spacing={1} className={classes.mainContainer}>
-        {
-            downloadUrl ? <iframe src={downloadUrl} style={{display:"none"}}/> : null
+    const getDownloadURL = async () => {
+        try {
+            const response = await axios.get<ObjectGetResponse<string>>("/api/download/" + props.itemId);
+            setDownloadUrl(response.data.entry);
+        } catch(err) {
+            console.error("Could not get download URL: ", err);
         }
+    }
+
+    useEffect(() => {
+        getDownloadURL();
+    });
+
+    return <Grid container spacing={1} className={classes.mainContainer}>
         <Grid item>
             <>
-                <Button startIcon={<GetApp/>}
-                        variant="outlined"
-                        disabled={props.storageClass!="STANDARD" && props.storageClass!="STANDARD_IA"}
-                        onClick={doDownload}
-                >
-                    Download
-                </Button>
                 {
-                    props.storageClass!="STANDARD" && props.storageClass!="STANDARD_IA" ?
-                        <Tooltip title={`An item in deep storage must be restored before you can access it. 
-                        This process normally takes four hours or more.  
-                        You must add the item to your Lightbox, using the Lightbox button, to start the restore process and then download
-                        the item from your Lightbox when it is completed`}>
-                            <div className={classes.helpContainer}>
-                                <Help className={classes.inlineIcon}/>Why can't I download this item?
-                            </div>
-                        </Tooltip> : undefined
+                    downloadUrl ? (
+                            <Tooltip title="To download the file, right click on this button and select 'Save Link As...'">
+                                <a href={downloadUrl} download>
+                                    <Button startIcon={<GetApp/>}
+                                            variant="outlined"
+                                    >
+                                        Download
+                                    </Button>
+                                </a>
+                            </Tooltip>
+                        )
+                        : (
+                            <>
+                                <Button startIcon={<GetApp/>}
+                                        variant="outlined"
+                                        disabled={true}
+                                >
+                                    Download
+                                </Button>
+                                <Tooltip title={`An item in deep storage must be restored before you can access it. 
+                                    This process normally takes four hours or more.  
+                                    You must add the item to your Lightbox, using the Lightbox button, to start the restore process and then download
+                                    the item from your Lightbox when it is completed`}>
+                                    <div className={classes.helpContainer}>
+                                        <Help className={classes.inlineIcon}/>Why can't I download this item?
+                                    </div>
+                                </Tooltip>
+                            </>
+                        )
                 }
             </>
         </Grid>
