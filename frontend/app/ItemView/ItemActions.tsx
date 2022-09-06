@@ -2,7 +2,7 @@ import React, {useEffect, useState} from "react";
 import {Button, Grid, makeStyles, Tooltip} from "@material-ui/core";
 import {GetApp, Help, WbIncandescent, WbIncandescentOutlined} from "@material-ui/icons";
 import axios from "axios";
-import {ObjectGetResponse, StorageClasses} from "../types";
+import {ObjectGetResponse, RestoreStatusResponse, StorageClasses} from "../types";
 import {formatError} from "../common/ErrorViewComponent";
 
 interface ItemActionsProps {
@@ -30,6 +30,7 @@ const useStyles = makeStyles((theme)=>({
 
 const ItemActions:React.FC<ItemActionsProps> = (props) => {
     const [downloadUrl, setDownloadUrl] = useState<string|undefined>(undefined);
+    const [restoreStatus, setRestoreStatus] = useState<string|undefined>(undefined);
 
     const classes = useStyles();
 
@@ -63,7 +64,22 @@ const ItemActions:React.FC<ItemActionsProps> = (props) => {
         }
     }
 
+    const getArchiveStatus = async () => {
+        try {
+            const response = await axios.get<RestoreStatusResponse>(`/api/archive/status/${props.itemId}`)
+
+            if (response.data.restoreStatus) {
+                setRestoreStatus(response.data.restoreStatus.toString());
+            } else {
+                console.error("Could not get the restore status.");
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    }
+
     useEffect(() => {
+        getArchiveStatus();
         getDownloadURL();
     });
 
@@ -71,7 +87,7 @@ const ItemActions:React.FC<ItemActionsProps> = (props) => {
         <Grid item>
             <>
                 {
-                    downloadUrl ? (
+                    restoreStatus=="RS_SUCCESS" || restoreStatus=="RS_UNNEEDED" || restoreStatus=="RS_ALREADY" ? (
                             <Tooltip title="To download the file, right click on this button and select 'Save Link As...'">
                                 <a href={downloadUrl} download>
                                     <Button startIcon={<GetApp/>}
