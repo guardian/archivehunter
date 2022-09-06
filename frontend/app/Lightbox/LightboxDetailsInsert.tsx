@@ -1,4 +1,4 @@
-import React, {createRef, useState} from "react";
+import React, {createRef, useState, useEffect} from "react";
 import {LightboxEntry, ObjectGetResponse, RestoreStatus, StylesMap} from "../types";
 import {CircularProgress, Divider, Grid, Icon, IconButton, makeStyles, Tooltip, Typography} from "@material-ui/core";
 import TimestampFormatter from "../common/TimestampFormatter";
@@ -135,6 +135,19 @@ const LightboxDetailsInsertImpl:React.FC<LightboxDetailsInsertProps> = (props) =
 
     const oldStyleDownloadRef = createRef<HTMLAnchorElement>();
 
+    const getDownloadURL = async () => {
+        try {
+            const response = await axios.get<ObjectGetResponse<string>>("/api/download/" + props.archiveEntryId);
+            setDownloadUrl(response.data.entry);
+        } catch(err) {
+            console.error("Could not get download URL: ", err);
+        }
+    }
+
+    useEffect(() => {
+        getDownloadURL();
+    });
+
     return <div className={classes.centered}>
         <a ref={oldStyleDownloadRef} href={downloadUrl ?? "#"} style={{display:"none"}}/>
         <span style={{display: "block"}}>
@@ -177,12 +190,14 @@ const LightboxDetailsInsertImpl:React.FC<LightboxDetailsInsertProps> = (props) =
                     </Grid>
                     <Grid item>
                         {
-                            isDownloadable() ? <Tooltip title={downloading ? "Download in progress..." : "Download just this file"}>
+                            isDownloadable() ? <Tooltip title={downloading ? "Download in progress..." : "To download the file, right click on this button and select 'Save Link As...'"}>
                                 {
                                     downloading ? <CircularProgress/> :
-                                        <IconButton onClick={doDownload}>
-                                            <GetApp/>
-                                        </IconButton>
+                                        <a href={downloadUrl} download>
+                                            <IconButton>
+                                                <GetApp/>
+                                            </IconButton>
+                                        </a>
                                 }
                             </Tooltip> : null
                         }
