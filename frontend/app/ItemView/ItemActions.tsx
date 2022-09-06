@@ -87,7 +87,7 @@ const ItemActions:React.FC<ItemActionsProps> = (props) => {
         <Grid item>
             <>
                 {
-                    restoreStatus=="RS_SUCCESS" || restoreStatus=="RS_UNNEEDED" || restoreStatus=="RS_ALREADY" ? (
+                    restoreStatus=="RS_SUCCESS" || restoreStatus=="RS_UNNEEDED" || restoreStatus=="RS_ALREADY" || props.storageClass=="STANDARD" || props.storageClass=="STANDARD_IA" ? (
                             <Tooltip title="To download the file, right click on this button and select 'Save Link As...'">
                                 <a href={downloadUrl} download>
                                     <Button startIcon={<GetApp/>}
