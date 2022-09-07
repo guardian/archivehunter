@@ -81,7 +81,7 @@ const ItemActions:React.FC<ItemActionsProps> = (props) => {
     useEffect(() => {
         getArchiveStatus();
         getDownloadURL();
-    });
+    }, []);
 
     return <Grid container spacing={1} className={classes.mainContainer}>
         <Grid item>

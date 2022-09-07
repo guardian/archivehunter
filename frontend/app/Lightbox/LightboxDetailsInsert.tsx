@@ -146,7 +146,7 @@ const LightboxDetailsInsertImpl:React.FC<LightboxDetailsInsertProps> = (props) =
 
     useEffect(() => {
         getDownloadURL();
-    });
+    }, []);
 
     return <div className={classes.centered}>
         <a ref={oldStyleDownloadRef} href={downloadUrl ?? "#"} style={{display:"none"}}/>
