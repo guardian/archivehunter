@@ -190,4 +190,32 @@ class UserController @Inject()(override val controllerComponents:ControllerCompo
         NotFound(GenericErrorResponse("error","not found").asJson)
     }
   }
+
+  case class UserDeleteRequest (user:String)
+
+  def deleteUser = IsAdminAsync(circe.json(2048)) { _=> request=>
+    request.body.as[UserDeleteRequest] match {
+      case Left(err)=>
+        logger.error(err.toString)
+        Future(BadRequest(GenericErrorResponse("bad_request", err.toString).asJson))
+      case Right(deleteRq)=>
+        userProfileDAO.userProfileForEmail(deleteRq.user).flatMap({
+          case None=>
+            Future(BadRequest(GenericErrorResponse("not_found", s"user ${deleteRq.user} not found").asJson))
+          case Some(Left(err))=>
+            logger.error(err.toString)
+            Future(InternalServerError(GenericErrorResponse("db_error", err.toString).asJson))
+          case Some(Right(originalProfile))=> {
+            userProfileDAO
+              .delete(originalProfile.userEmail)
+              .map(_ => Ok(ObjectGetResponse("deleted", "profile", originalProfile).asJson))
+              .recover({
+                case err: Throwable =>
+                  logger.error(s"Could not delete user profile for ${deleteRq.user}: ${err.getMessage}", err)
+                  InternalServerError(GenericErrorResponse("db_error", err.getMessage).asJson)
+              })
+            }
+        })
+    }
+  }
 }

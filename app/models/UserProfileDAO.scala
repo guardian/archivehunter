@@ -38,4 +38,8 @@ class UserProfileDAO @Inject() (config:Configuration, ddbClientMgr:DynamoClientM
   def allUsers() = scanamoAlpakka
     .exec(table.scan())
     .runWith(MakeUserProfileSink)
+
+  def delete(userEmail:String) = scanamoAlpakka
+    .exec(table.delete("userEmail"===userEmail))
+    .runWith(Sink.head)
 }
