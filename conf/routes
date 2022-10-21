@@ -77,6 +77,7 @@ DELETE  /api/deleted/:collection         @controllers.DeletedItemsController.bul
 GET     /api/user                       @controllers.UserController.allUsers
 PUT     /api/user/update                @controllers.UserController.updateUserProfileField
 GET     /api/user/myProfile             @controllers.UserController.myProfile
+PUT     /api/user/delete                @controllers.UserController.deleteUser
 
 DELETE  /api/lightbox/:user/bulk/:bulkId              @controllers.LightboxController.deleteBulk(user, bulkId)
 PUT     /api/lightbox/:user/bulk/query                @controllers.LightboxController.haveBulkEntryFor(user)

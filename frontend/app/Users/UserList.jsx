@@ -1,6 +1,6 @@
 import React from 'react';
 import axios from 'axios';
-import {createStyles, Paper, Snackbar, withStyles} from "@material-ui/core";
+import {createStyles, Paper, Snackbar, withStyles, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle} from "@material-ui/core";
 import {baseStyles} from "../BaseStyles";
 import AdminContainer from "../admin/AdminContainer";
 import {makeUserListColumns} from "./UserListContent";
@@ -26,7 +26,9 @@ class UserList extends React.Component {
             showingAlert: false,
             collectionsList: [],
             lastError: null,
-            knownDepartments: []
+            knownDepartments: [],
+            open: false,
+            userToDelete: ""
         };
 
         this.handleClose = this.handleClose.bind(this);
@@ -35,6 +37,9 @@ class UserList extends React.Component {
         this.loadUsers = this.loadUsers.bind(this);
         this.userCollectionsUpdated = this.userCollectionsUpdated.bind(this);
         this.quotaChanged = this.quotaChanged.bind(this);
+        this.deleteClicked = this.deleteClicked.bind(this);
+        this.handleCloseDialogue = this.handleCloseDialogue.bind(this);
+        this.handleDelete = this.handleDelete.bind(this);
     }
 
     /**
@@ -150,6 +155,26 @@ class UserList extends React.Component {
         this.setState({showingAlert: false},()=>this.setState({saveCompleted: false, lastError: null}));
     }
 
+    deleteClicked(entry){
+        this.setState({open: true, userToDelete: entry.userEmail});
+    }
+
+    handleCloseDialogue() {
+        this.setState({open: false});
+    };
+
+    handleDelete() {
+        this.setState({open: false});
+        const deleteRq = {
+            user: this.state.userToDelete
+        };
+        axios.put("/api/user/delete",deleteRq).then(response=>{
+        }).then(res => {
+            this.loadUsers();
+        }).catch(err=>{
+            console.error(err);
+        })
+    };
 
     render(){
         const columns = makeUserListColumns(
@@ -158,7 +183,8 @@ class UserList extends React.Component {
             this.stringFieldChanged,
             this.boolFieldChanged,
             this.userCollectionsUpdated,
-            this.quotaChanged
+            this.quotaChanged,
+            this.deleteClicked
         );
 
         const targetRowHeight = (this.state.collectionsList && this.state.collectionsList.length>0) ?
@@ -195,6 +221,27 @@ class UserList extends React.Component {
                     />
                 </Paper>
             </AdminContainer>
+            <Dialog
+                open={this.state.open}
+                onClose={this.handleCloseDialogue}
+                aria-labelledby="alert-dialog-title"
+                aria-describedby="alert-dialog-description"
+            >
+                <DialogTitle id="alert-dialog-title">
+                    {"Delete User?"}
+                </DialogTitle>
+                <DialogContent>
+                    <DialogContentText id="alert-dialog-description">
+                        Are you sure you want to delete the user {this.state.userToDelete}?
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={this.handleCloseDialogue}>No</Button>
+                    <Button onClick={this.handleDelete} autoFocus>
+                        Yes
+                    </Button>
+                </DialogActions>
+            </Dialog>
             </>
     }
 }

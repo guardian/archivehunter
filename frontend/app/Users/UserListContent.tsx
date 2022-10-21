@@ -2,11 +2,12 @@ import React, {ChangeEvent} from "react";
 import {ColDef} from "@material-ui/data-grid";
 import GenericDropdown from "../common/GenericDropdown";
 import Autocomplete from "@material-ui/lab/Autocomplete";
-import {makeStyles, Switch, TextField} from "@material-ui/core";
+import {makeStyles, Switch, TextField, IconButton} from "@material-ui/core";
 import CollectionSelector from "./CollectionSelector";
 import {UserProfile, UserProfileRow} from "../types";
 import RestoreLimitComponent from "./RestoreLimitComponent";
 import DepartmentSelector from "./DepartmentSelector";
+import { default as DeleteIcon } from '@material-ui/icons/Delete'
 
 function makeUserListColumns(
     knownDepartments: string[],
@@ -14,7 +15,8 @@ function makeUserListColumns(
     stringFieldChanged: (entry:UserProfileRow, fieldName:string, newString:string)=>void,
     boolFieldChanged: (entry:UserProfileRow, fieldName:string, currentValue:boolean)=>void,
     userCollectionsUpdated: (entry:UserProfileRow, newValues:string[])=>void,
-    quotaChanged: (entry:UserProfileRow, fieldName:string, newValue:number)=>void
+    quotaChanged: (entry:UserProfileRow, fieldName:string, newValue:number)=>void,
+    deleteClicked: (entry:UserProfileRow)=>void
 ):ColDef[] {
     return [
         {
@@ -70,6 +72,12 @@ function makeUserListColumns(
             headerName: "Restore limits",
             width:600,
             renderCell: (params)=><RestoreLimitComponent row={params.row as UserProfileRow} quotaChanged={quotaChanged}/>
+        },
+        {
+            field: "delete",
+            headerName: "Delete",
+            width:100,
+            renderCell: (params)=><IconButton onClick={()=>deleteClicked(params.row as UserProfileRow)}><DeleteIcon /></IconButton>
         }
     ]
 }
