@@ -7,7 +7,7 @@ enablePlugins(RiffRaffArtifact, DockerPlugin, SystemdPlugin)
 
 ThisBuild / libraryDependencySchemes += "org.scala-lang.modules" % "scala-java8-compat" % "pvp"
 scalacOptions := Seq("-unchecked", "-deprecation", "-feature", "-language:postfixOps")
-scalaVersion := "2.13.8"
+scalaVersion := "2.13.9"
 
 val akkaVersion = "2.6.18"
 val akkaClusterVersion = "1.1.3"
