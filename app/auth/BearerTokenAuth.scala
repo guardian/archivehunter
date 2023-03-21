@@ -3,9 +3,9 @@ package auth
 import java.time.Instant
 import java.util.Date
 import com.nimbusds.jose.crypto.RSASSAVerifier
-import com.nimbusds.jose.jwk.{ECKey, JWK}
+import com.nimbusds.jose.jwk.{ECKey, JWK, JWKSet}
 import com.nimbusds.jwt.{JWTClaimsSet, SignedJWT}
-
+import java.net.URL
 import javax.inject.{Inject, Singleton}
 import org.slf4j.LoggerFactory
 import play.api.mvc.RequestHeader
@@ -38,6 +38,22 @@ object ClaimsSetExtensions {
       * @return
       */
     def getIsMMAdmin:Boolean = scalaSafeGetClaim[String]("multimedia_admin").exists(value => value.toLowerCase == "true")
+
+    def getIsMMAdminFromRole: Boolean = {
+      (Option(s.getStringArrayClaim("roles")), Option(s.getStringClaim("multimedia_admin"))) match {
+        case (Some(roles), _) =>
+          logger.debug(s"Administrative rights check via roles claim")
+          if (roles.contains("multimedia_admin")) {
+            true
+          } else {
+            false
+          }
+        case (_, Some(_)) =>
+          true
+        case (_, None) =>
+          false
+      }
+    }
 
     /**
       * returns a boolean indicating if the multimedia_creator field is set and is true
@@ -100,12 +116,12 @@ class BearerTokenAuth @Inject() (config:Configuration) {
   //see https://stackoverflow.com/questions/475074/regex-to-parse-or-validate-base64-data
   //it is not the best option but is the simplest that will work here
   private val authXtractor = "^Bearer\\s+([a-zA-Z0-9+/._-]*={0,3})$".r
-  private val maybeVerifier = loadInKey() match {
+  private val maybeVerifiers = loadInKey() match {
     case Failure(err)=>
       if(!sys.env.contains("CI")) logger.warn(s"No token validation cert in config so bearer token auth will not work. Error was ${err.getMessage}")
       None
     case Success(jwk)=>
-      Some(getVerifier(jwk))
+      Some(jwk)
   }
 
   protected def getVerifier(jwk:JWK) = new RSASSAVerifier(jwk.toRSAKey)
@@ -134,19 +150,57 @@ class BearerTokenAuth @Inject() (config:Configuration) {
         Left(LoginResultInvalid("No token presented, this is probably a frontend bug"))
     }
 
-  /**
-   * loads in the public certificate used for validating the bearer tokens from configuration
-   * @return either the passed JWK object or a Failure indicating why it would not load.
-   */
-  def loadInKey() = Try {
-    val pemCertLocation = config.get[String]("oAuth.tokenSigningCertPath")
+  private def signingCertPath = config.get[String]("auth.tokenSigningCertPath")
+
+  protected def loadRemoteJWKSet(remotePath:String) = JWKSet.load(new URL(remotePath))
+
+  protected def loadLocalJWKSet(pemCertLocation:String) = {
     val s = Source.fromFile(pemCertLocation, "UTF-8")
     try {
       val pemCertData = s.getLines().reduce(_ + _)
-      JWK.parseFromPEMEncodedX509Cert(pemCertData)
+      new JWKSet(JWK.parseFromPEMEncodedX509Cert(pemCertData))
     } finally {
       s.close()
     }
+  }
+
+  /**
+    * Loads in the public certificate(s) used for validating the bearer tokens from configuration.
+    * @return Either an initialised JWKSet or a Failure indicating why it would not load.
+    */
+  def loadInKey():Try[JWKSet] = Try {
+    val isRemoteMatcher = "^https*:".r.unanchored
+
+    if(isRemoteMatcher.matches(signingCertPath)) {
+      logger.info(s"Loading JWKS from $signingCertPath")
+
+      val set = loadRemoteJWKSet(signingCertPath)
+      logger.info(s"Loaded in ${set.getKeys.toArray.length} keys from endpoint")
+      set
+    } else {
+      logger.info(s"Loading JWKS from local path $signingCertPath")
+      loadLocalJWKSet(signingCertPath)
+    }
+  }
+
+  def getVerifier(maybeKeyId:Option[String]) = maybeVerifiers match {
+    case Some(verifiers) =>
+      maybeKeyId match {
+        case Some(kid) =>
+          logger.info(s"Provided JWT is signed with key ID $kid")
+          val list = verifiers.getKeys
+          if (list.size > 1) {
+            Option(verifiers.getKeyByKeyId(kid))
+              .map(jwk=>new RSASSAVerifier(jwk.toRSAKey))
+          } else {
+            if (list.isEmpty) None else Some(new RSASSAVerifier(list.get(0).toRSAKey))
+          }
+        case None =>
+          logger.info(s"Provided JWT has no key ID, using first available cert")
+          val list = verifiers.getKeys
+          if (list.isEmpty) None else Some(new RSASSAVerifier(list.get(0).toRSAKey))
+      }
+    case None=>None
   }
 
   def checkAudience(claimsSet:JWTClaimsSet) = {
@@ -174,6 +228,31 @@ class BearerTokenAuth @Inject() (config:Configuration) {
     }
   }
 
+  def checkUserRoles(claimsSet: JWTClaimsSet): Either[LoginResultInvalid[String], LoginResultOK[JWTClaimsSet]] = {
+    (Option(claimsSet.getStringArrayClaim("roles")), Option(claimsSet.getStringClaim(isAdminClaimName())), Option(claimsSet.getStringClaim("multimedia_creator"))) match {
+      case (Some(roles), _, _) =>
+        if (roles.contains(isAdminClaimName()) || roles.contains("multimedia_creator")) {
+          Right(LoginResultOK(claimsSet))
+        } else {
+          Left(LoginResultInvalid("You do not have access to this system.  Contact Multimediatech if you think this is an error."))
+        }
+      case (_, Some(_), _) =>
+        if(!claimsSet.getIsMMAdmin) {
+          Left(LoginResultInvalid("You do not have access to this system.  Contact Multimediatech if you think this is an error."))
+        } else {
+          Right(LoginResultOK(claimsSet))
+        }
+      case (_, _, Some(_)) =>
+        if(!claimsSet.getIsMMCreator) {
+          Left(LoginResultInvalid("You do not have access to this system.  Contact Multimediatech if you think this is an error."))
+        } else {
+          Right(LoginResultOK(claimsSet))
+        }
+      case (_, None, None) =>
+        Left(LoginResultInvalid("You do not have access to this system.  Contact Multimediatech if you think this is an error."))
+    }
+  }
+
   protected def parseTokenContent(content:String) = Try {
     SignedJWT.parse(content)
   }
@@ -188,14 +267,14 @@ class BearerTokenAuth @Inject() (config:Configuration) {
     logger.debug(s"validating token $token")
     parseTokenContent(token.content) match {
       case Success(signedJWT) =>
-        maybeVerifier match {
+        getVerifier(Option(signedJWT.getHeader.getKeyID)) match {
           case Some(verifier) =>
             if (signedJWT.verify(verifier)) {
               logger.debug("verified JWT")
               //logger.debug(s"${signedJWT.getJWTClaimsSet.toJSONObject(true).toJSONString}")
 
               val claimsSet = signedJWT.getJWTClaimsSet
-              (checkAudience(claimsSet), checkUserGroup(claimsSet)) match {
+              (checkAudience(claimsSet), checkUserRoles(claimsSet)) match {
                 case (Left(audErr), Left(userErr))=>
                   logger.error(s"JWT is not valid: $audErr, $userErr")
                   Left(audErr)

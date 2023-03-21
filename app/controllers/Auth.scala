@@ -2,7 +2,7 @@ package controllers
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.headers.Accept
+import akka.http.scaladsl.model.headers._
 import akka.http.scaladsl.model.{ContentType, ContentTypes, HttpEntity, HttpMethods, HttpRequest, MediaRange, MediaTypes, ResponseEntity, StatusCodes}
 import akka.stream.scaladsl.{Keep, Sink}
 import akka.util.ByteString
@@ -59,21 +59,34 @@ class Auth @Inject() (config:Configuration,
     * builds a URL to the oauth IdP and redirects the user there
     * @return
     */
-  def login(state:Option[String]) = Action { request=>
-    val args = Map(
-      "response_type"->"code",
-      "client_id"->config.get[String]("oAuth.clientId"),
-      "resource"->config.get[String]("oAuth.resource"),
-      "redirect_uri"->redirectUri(request),
-      "state"->state.getOrElse("/")
-    )
+  def login(state:Option[String],code_challenge:Option[String]) = Action { request=>
+
+    var args = Map(""->"")
+    if (config.get[String]("oAuth.type") != "Azure") {
+      args = Map(
+        "response_type"->"code",
+        "client_id"->config.get[String]("oAuth.clientId"),
+        "resource"->config.get[String]("oAuth.resource"),
+        "redirect_uri"->redirectUri(request),
+        "state"->state.getOrElse("/")
+      )
+    } else {
+      args = Map(
+        "response_type"->"code",
+        "client_id"->config.get[String]("oAuth.clientId"),
+        "redirect_uri"->redirectUri(request),
+        "state"->state.getOrElse("/"),
+        "scope"->config.get[String]("oAuth.scope"),
+        "code_challenge"->code_challenge.getOrElse("nothing")
+      )
+    }
 
     logger.debug(s"OAuth arguments before encoding: $args")
     val queryArgs = assembleFromMap(args)
     logger.debug(s"OAuth arguments after decoding: $queryArgs")
 
     val finalUrl = config.get[String]("oAuth.oAuthUri") + "?" + queryArgs
-    TemporaryRedirect(finalUrl)
+    TemporaryRedirect(finalUrl).withSession(request.session + ("code_verifier" -> code_challenge.getOrElse("nothing")))
   }
 
   /**
@@ -134,10 +147,10 @@ class Auth @Inject() (config:Configuration,
         userProfileDAO.userProfileForEmail(oAuthResponse.getUserID).flatMap({
           case None=>
             logger.info(s"No user profile existing for ${oAuthResponse.getUserID}, creating one")
-            val newUserProfile = UserProfile(
+            var newUserProfile = UserProfile(
               oAuthResponse.getUserID,
-              oAuthResponse.getIsMMAdmin,
-              Option(oAuthResponse.getStringClaim("first_name")),
+              oAuthResponse.getIsMMAdminFromRole,
+              Option(oAuthResponse.getStringClaim("given_name")),
               Option(oAuthResponse.getStringClaim("family_name")),
               Seq(),
               allCollectionsVisible=true,
@@ -148,6 +161,22 @@ class Auth @Inject() (config:Configuration,
               None,
               None
             )
+            if (config.get[String]("oAuth.type") != "Azure") {
+              newUserProfile = UserProfile(
+                oAuthResponse.getUserID,
+                oAuthResponse.getIsMMAdmin,
+                Option(oAuthResponse.getStringClaim("first_name")),
+                Option(oAuthResponse.getStringClaim("family_name")),
+                Seq(),
+                allCollectionsVisible=true,
+                None,
+                Option(oAuthResponse.getStringClaim("location")),
+                None,
+                None,
+                None,
+                None
+              )
+            }
             userProfileDAO
               .put(newUserProfile)
               .map(Right.apply)
@@ -171,11 +200,19 @@ class Auth @Inject() (config:Configuration,
   private def validateContent(response: Either[String, OAuthResponse]) = Future(
     response
       .flatMap(oAuthResponse=>{
-        bearerTokenAuth
-          .validateToken(LoginResultOK(oAuthResponse.access_token.get)) match {
+        if (config.get[String]("oAuth.type") != "Azure") {
+          bearerTokenAuth
+            .validateToken(LoginResultOK(oAuthResponse.access_token.get)) match {
             case Left(err)=>Left(err.toString)
             case Right(response)=>Right(response.content)
           }
+        } else {
+          bearerTokenAuth
+            .validateToken(LoginResultOK(oAuthResponse.id_token.get)) match {
+            case Left(err)=>Left(err.toString)
+            case Right(response)=>Right(response.content)
+          }
+        }
       })
   )
 
@@ -259,7 +296,7 @@ class Auth @Inject() (config:Configuration,
     (code, error) match {
       case (Some(actualCode), _)=>
         for {
-          maybeOauthResponse    <- stageTwo(actualCode, redirectUri(request))
+          maybeOauthResponse    <- stageTwo(actualCode, redirectUri(request), request)
           maybeValidatedContent <- validateContent(maybeOauthResponse)
           _                     <- profilePicFromJWT(maybeValidatedContent)
           maybeUserProfile      <- userProfileFromJWT(maybeValidatedContent)
@@ -299,18 +336,30 @@ class Auth @Inject() (config:Configuration,
       .map(_.flatMap(_.as[T]))
   }
 
-  protected def stageTwo(code:String, redirectUri:String) = {
-    val postdata = Map(
-      "grant_type"->"authorization_code",
-      "client_id"->config.get[String]("oAuth.clientId"),
-      "redirect_uri"->redirectUri,
-      "code"->code
-    )
+  protected def stageTwo(code:String, redirectUri:String,request: Request[Any]) = {
+    var postdata = Map(""->"")
+    if (config.get[String]("oAuth.type") != "Azure") {
+      postdata = Map(
+        "grant_type"->"authorization_code",
+        "client_id"->config.get[String]("oAuth.clientId"),
+        "redirect_uri"->redirectUri,
+        "code"->code
+      )
+    } else {
+      postdata = Map(
+        "grant_type"->"authorization_code",
+        "client_id"->config.get[String]("oAuth.clientId"),
+        "redirect_uri"->redirectUri,
+        "code"->code,
+        "code_verifier"->request.session.get("code_verifier").getOrElse("none")
+      )
+    }
 
     val contentBody = HttpEntity(ContentType(MediaTypes.`application/x-www-form-urlencoded`) ,assembleFromMap(postdata))
 
     val headers = List(
-      Accept(MediaRange(MediaTypes.`application/json`))
+      Accept(MediaRange(MediaTypes.`application/json`)),
+      Origin(config.get[String]("oAuth.origin"))
     )
 
     logger.debug(s"oauth step2 exchange server url is ${config.get[String]("oAuth.tokenUrl")} and unformatted request content is $postdata")
@@ -471,7 +520,7 @@ class Auth @Inject() (config:Configuration,
 object Auth {
   private val logger = LoggerFactory.getLogger(getClass)
 
-  case class OAuthResponse(access_token:Option[String], refresh_token:Option[String], error:Option[String])
+  case class OAuthResponse(access_token:Option[String], refresh_token:Option[String], id_token:Option[String], error:Option[String])
 
   /**
     * returns a boolean indicating if the given claims set either has expired or is about to

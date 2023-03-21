@@ -28,11 +28,19 @@ const useStyles = makeStyles((theme)=>({
     },
 }));
 
+function generateCodeChallenge() {
+    const array = new Uint8Array(32);
+    crypto.getRandomValues(array);
+    const str = array.reduce<string>((acc:string, x) => acc + x.toString(16).padStart(2, '0'), "");
+    sessionStorage.setItem("cx", str);
+    return str;
+}
+
 const LoginComponent = ()=>{
     const classes = useStyles();
     const [lastError, setLastError] = useState<string|undefined>(undefined);
 
-    const doLogin = ()=>window.location.href = "/login";
+    const doLogin = ()=>window.location.href = "/login?code_challenge=" + generateCodeChallenge();
 
     useEffect(() => {
         const dataToTest = new URLSearchParams(window.location.search).get("error");
