@@ -43,6 +43,9 @@ Parameters:
   OAuthLoginUri:
     Type: String
     Description: Login endpoint provided by the OAuth IdP
+  OAuthSigningCertPath:
+    Type: String
+    Description: Path to the signing cert
   OAuthTokenUri:
     Type: String
     Description: Token endpoint provided by the OAuth IdP
@@ -54,6 +57,9 @@ Parameters:
     Type: String
     Description: JSON style list of audience names, one of which must be the current "aud" field in a token in order for it to be considered valid
     Default: "[\"archivehunter\"]"
+  OAuthScope:
+    Type: String
+    Description: OAuth scope to request
   AvatarBucket:
     Type: String
     Description: Name of a bucket which will hold user avatars. Public access is not required; the primary proxy bucket usually makes a good choice.
@@ -1110,20 +1116,24 @@ Resources:
              deployedUrl = "https://${App}.${DeploymentDomain}"
              domain = "${DeploymentDomain}"
              userProfileTable = "${UserProfileTable}"
+             tokenSigningCertPath: "${OAuthSigningCertPath}"
           }
 
           oAuth {
             clientId: "${OAuthClientId}"
             resource: "${OAuthClientName}"
+            scope: "${OAuthScope}"
             oAuthUri: "${OAuthLoginUri}"
             tokenUrl: "${OAuthTokenUri}"
             adminClaimName: "${OAuthAdminClaimName}"
             authCookieName: "archivehunterAuth"
             refreshCookieName: "archivehunterRefresh"
             enforceSecure: true    //You can turn this off to make development simpler but always turn it on for production!
-            tokenSigningCertPath: "/usr/share/archivehunter/conf/oauth-signing.pem"
+            tokenSigningCertPath: "${OAuthSigningCertPath}"
             validAudiences: ${OAuthValidAudiences}
             oAuthTokensTable: "${OAuthTokensTable}"
+            origin: "http://localhost:9001"
+            type: "Azure"
           }
 
           serverToken {
