@@ -60,6 +60,9 @@ Parameters:
   OAuthScope:
     Type: String
     Description: OAuth scope to request
+  Origin:
+    Type: String
+    Description: Origin to allow CORS requests from
   AvatarBucket:
     Type: String
     Description: Name of a bucket which will hold user avatars. Public access is not required; the primary proxy bucket usually makes a good choice.
@@ -1132,7 +1135,7 @@ Resources:
             tokenSigningCertPath: "${OAuthSigningCertPath}"
             validAudiences: ${OAuthValidAudiences}
             oAuthTokensTable: "${OAuthTokensTable}"
-            origin: "http://localhost:9001"
+            origin: "$(Origin)"
             type: "Azure"
           }
 
