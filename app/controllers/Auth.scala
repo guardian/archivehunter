@@ -368,11 +368,12 @@ class Auth @Inject() (config:Configuration,
       bodyContent <- consumeBody[OAuthResponse](response.entity)
       } yield (response, bodyContent)
     ).map({
-      case (response, Right(oAuthResponse))=>
-        if(response.status==StatusCodes.OK) {
+      case (response, Right(oAuthResponse)) =>
+        if (response.status == StatusCodes.OK) {
           Right(oAuthResponse)
         } else {
-          Left(s"Server responded with an error ${response.status} ${oAuthResponse.error.toString}")
+          val errorMsg = oAuthResponse.error.map(_).getOrElse("Unknown error")
+          Left(s"Server responded with an error ${response.status} $errorMsg")
         }
       case (_, Left(decodingError))=>
         Left(s"Could not decode response from oauth server: $decodingError")
