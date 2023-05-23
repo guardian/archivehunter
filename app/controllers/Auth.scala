@@ -372,7 +372,7 @@ class Auth @Inject() (config:Configuration,
         if (response.status == StatusCodes.OK) {
           Right(oAuthResponse)
         } else {
-          val errorMsg = oAuthResponse.error.map(_).getOrElse("Unknown error")
+          val errorMsg = oAuthResponse.error.map(_.toString).getOrElse("Unknown error")
           Left(s"Server responded with an error ${response.status} $errorMsg")
         }
       case (_, Left(decodingError))=>
