@@ -1,35 +1,33 @@
 package controllers
 
 import akka.actor.ActorSystem
-import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.headers._
-import akka.http.scaladsl.model.{ContentType, ContentTypes, HttpEntity, HttpMethods, HttpRequest, MediaRange, MediaTypes, ResponseEntity, StatusCodes}
+import akka.http.scaladsl.model._
 import akka.stream.scaladsl.{Keep, Sink}
 import akka.util.ByteString
+import auth.ClaimsSetExtensions._
 import auth.{BearerTokenAuth, LoginResultOK}
 import com.nimbusds.jwt.JWTClaimsSet
-import org.slf4j.LoggerFactory
-import play.api.Configuration
-import play.api.mvc.{AbstractController, ControllerComponents, Cookie, DiscardingCookie, Request, ResponseHeader, Result, Session}
-import scala.util.matching.Regex
-import java.net.{URL, URLEncoder}
-import java.nio.charset.StandardCharsets
-import javax.inject.{Inject, Singleton}
-import scala.concurrent.{ExecutionContext, Future}
+import helpers.{HttpClientFactory, UserAvatarHelper}
 import io.circe.generic.auto._
 import io.circe.syntax._
 import models.{OAuthTokenEntry, OAuthTokenEntryDAO, UserProfile, UserProfileDAO}
+import org.slf4j.LoggerFactory
+import play.api.Configuration
 import play.api.libs.circe.Circe
-import play.api.mvc.Cookie.SameSite
+import play.api.mvc.{Cookie, ResponseHeader, _}
 import responses.GenericErrorResponse
-import auth.ClaimsSetExtensions._
-import helpers.{HttpClientFactory, UserAvatarHelper}
 
+import java.net.URLEncoder
 import java.nio.ByteBuffer
+import java.nio.charset.StandardCharsets
 import java.time.format.DateTimeFormatter
 import java.time.{Duration, Instant, ZoneId, ZonedDateTime}
-import java.util.{Base64}
+import java.util.Base64
+import javax.inject.{Inject, Singleton}
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
+import scala.util.matching.Regex
 
 @Singleton
 class Auth @Inject() (config:Configuration,
@@ -374,7 +372,7 @@ class Auth @Inject() (config:Configuration,
         if(response.status==StatusCodes.OK) {
           Right(oAuthResponse)
         } else {
-          Left(s"Server responded with an error ${response.status} ${oAuthResponse.toString}")
+          Left(s"Server responded with an error ${response.status} ${oAuthResponse.error.toString}")
         }
       case (_, Left(decodingError))=>
         Left(s"Could not decode response from oauth server: $decodingError")
