@@ -360,7 +360,7 @@ class Auth @Inject() (config:Configuration,
       Origin(config.get[String]("oAuth.origin"))
     )
 
-    logger.debug(s"oauth step2 exchange server url is ${config.get[String]("oAuth.tokenUrl")} and unformatted request content is $postdata")
+    logger.info(s"oauth step2 exchange server url is ${config.get[String]("oAuth.tokenUrl")} and unformatted request content is $postdata")
     val rq = HttpRequest(HttpMethods.POST, uri=config.get[String]("oAuth.tokenUrl"), headers=headers, entity=contentBody)
 
     ( for {
