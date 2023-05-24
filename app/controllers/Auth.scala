@@ -369,6 +369,7 @@ class Auth @Inject() (config:Configuration,
       } yield (response, bodyContent)
     ).map({
       case (response, Right(oAuthResponse)) =>
+        logger.info(s"Response: ${response.toString()}")
         if (response.status == StatusCodes.OK) {
           Right(oAuthResponse)
         } else {
