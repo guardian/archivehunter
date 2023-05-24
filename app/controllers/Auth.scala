@@ -370,11 +370,12 @@ class Auth @Inject() (config:Configuration,
     ).map({
       case (response, Right(oAuthResponse)) =>
         logger.info(s"Response: ${response.toString()}")
+        logger.info(s"Response Body: ${response.entity}")
+        logger.info(s"OAuthResponse: ${oAuthResponse.toString}")
         if (response.status == StatusCodes.OK) {
           Right(oAuthResponse)
         } else {
-          val errorMsg = oAuthResponse.error.map(_.toString).getOrElse("Unknown error")
-          Left(s"Server responded with an error ${response.status} ${errorMsg}")
+          Left(s"Server responded with an error ${response.status} ${oAuthResponse.toString()}")
         }
       case (_, Left(decodingError))=>
         Left(s"Could not decode response from oauth server: $decodingError")
