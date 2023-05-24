@@ -284,7 +284,7 @@ class Auth @Inject() (config:Configuration,
     response match {
       case Left(err)=>
         val stringPattern: Regex = "(?<=\\().*(?=\\))".r
-        Future("?error=%s".format((stringPattern findFirstIn err).getOrElse("Unknown error")))
+        Future("?error=%s".format((stringPattern findFirstIn err).getOrElse("Unknown error..")))
       case Right(claims)=>
         Future(s"")
     }
