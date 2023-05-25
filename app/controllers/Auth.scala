@@ -1,33 +1,35 @@
 package controllers
 
 import akka.actor.ActorSystem
+import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.headers._
-import akka.http.scaladsl.model._
+import akka.http.scaladsl.model.{ContentType, ContentTypes, HttpEntity, HttpMethods, HttpRequest, MediaRange, MediaTypes, ResponseEntity, StatusCodes}
 import akka.stream.scaladsl.{Keep, Sink}
 import akka.util.ByteString
-import auth.ClaimsSetExtensions._
 import auth.{BearerTokenAuth, LoginResultOK}
 import com.nimbusds.jwt.JWTClaimsSet
-import helpers.{HttpClientFactory, UserAvatarHelper}
+import org.slf4j.LoggerFactory
+import play.api.Configuration
+import play.api.mvc.{AbstractController, ControllerComponents, Cookie, DiscardingCookie, Request, ResponseHeader, Result, Session}
+import scala.util.matching.Regex
+import java.net.{URL, URLEncoder}
+import java.nio.charset.StandardCharsets
+import javax.inject.{Inject, Singleton}
+import scala.concurrent.{ExecutionContext, Future}
 import io.circe.generic.auto._
 import io.circe.syntax._
 import models.{OAuthTokenEntry, OAuthTokenEntryDAO, UserProfile, UserProfileDAO}
-import org.slf4j.LoggerFactory
-import play.api.Configuration
 import play.api.libs.circe.Circe
-import play.api.mvc.{Cookie, ResponseHeader, _}
+import play.api.mvc.Cookie.SameSite
 import responses.GenericErrorResponse
+import auth.ClaimsSetExtensions._
+import helpers.{HttpClientFactory, UserAvatarHelper}
 
-import java.net.URLEncoder
 import java.nio.ByteBuffer
-import java.nio.charset.StandardCharsets
 import java.time.format.DateTimeFormatter
 import java.time.{Duration, Instant, ZoneId, ZonedDateTime}
-import java.util.Base64
-import javax.inject.{Inject, Singleton}
-import scala.concurrent.{ExecutionContext, Future}
+import java.util.{Base64}
 import scala.util.Try
-import scala.util.matching.Regex
 
 @Singleton
 class Auth @Inject() (config:Configuration,
@@ -360,7 +362,7 @@ class Auth @Inject() (config:Configuration,
       Origin(config.get[String]("oAuth.origin"))
     )
 
-    logger.info(s"oauth step2 exchange server url is ${config.get[String]("oAuth.tokenUrl")} and unformatted request content is $postdata")
+    logger.debug(s"oauth step2 exchange server url is ${config.get[String]("oAuth.tokenUrl")} and unformatted request content is $postdata")
     val rq = HttpRequest(HttpMethods.POST, uri=config.get[String]("oAuth.tokenUrl"), headers=headers, entity=contentBody)
 
     ( for {
@@ -368,14 +370,11 @@ class Auth @Inject() (config:Configuration,
       bodyContent <- consumeBody[OAuthResponse](response.entity)
       } yield (response, bodyContent)
     ).map({
-      case (response, Right(oAuthResponse)) =>
-        logger.info(s"Response: ${response.toString()}")
-        logger.info(s"Response Body: ${response.entity}")
-        logger.info(s"OAuthResponse: ${oAuthResponse.toString}")
-        if (response.status == StatusCodes.OK) {
+      case (response, Right(oAuthResponse))=>
+        if (response.status==StatusCodes.OK) {
           Right(oAuthResponse)
         } else {
-          Left(s"Server responded with an error ${response.status} ${oAuthResponse.toString()}")
+          Left(s"Server responded with an error ${response.status} ${oAuthResponse.toString}")
         }
       case (_, Left(decodingError))=>
         Left(s"Could not decode response from oauth server: $decodingError")
