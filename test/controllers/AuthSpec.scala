@@ -154,7 +154,7 @@ class AuthSpec extends Specification with Mockito {
       val mockBearerToken = mock[BearerTokenAuth]
       val mockOAuthTokenDAO = mock[OAuthTokenEntryDAO]
 
-      val returnedContent = OAuthResponse(Some("access-token"),Some("refresh-token"),None,None).asJson.noSpaces
+      val returnedContent = OAuthResponse(Some("access-token"),Some("refresh-token"),None,None,None).asJson.noSpaces
       val entity = HttpEntity(returnedContent)
       mockHttp.singleRequest(any,any,any,any) returns Future(HttpResponse(StatusCodes.OK, entity=entity))
 
@@ -194,7 +194,7 @@ class AuthSpec extends Specification with Mockito {
       val mockBearerToken = mock[BearerTokenAuth]
       val mockOAuthTokenDAO = mock[OAuthTokenEntryDAO]
 
-      val returnedContent = OAuthResponse(Some("access-token"),Some("refresh-token"),None,None).asJson.noSpaces
+      val returnedContent = OAuthResponse(Some("access-token"),Some("refresh-token"),None,None,None).asJson.noSpaces
       val entity = HttpEntity(returnedContent)
       mockHttp.singleRequest(any,any,any,any) returns Future(HttpResponse(StatusCodes.OK, entity=entity))
 
@@ -221,45 +221,45 @@ class AuthSpec extends Specification with Mockito {
       }
     }
 
-//    "return an error if the IdP returns an error" in {
-//      val mockHttp = mock[HttpExt]
-//      val mockClientFactory = new HttpClientFactory {
-//        override def build: HttpExt = mockHttp
-//      }
-//      val mockUserProfileDAO = mock[UserProfileDAO]
-//      val mockBearerToken = mock[BearerTokenAuth]
-//
-//      val returnedContent = OAuthResponse(None,None,None,Some("I don't like you")).asJson.noSpaces
-//      val entity = HttpEntity(returnedContent)
-//      mockHttp.singleRequest(any,any,any,any) returns Future(HttpResponse(StatusCodes.BadRequest, entity=entity))
-//
-//      val mockClaims = new JWTClaimsSet.Builder()
-//        .audience("archivehunter")
-//        .subject("testuser")
-//        .expirationTime(Date.from(Instant.now().plusSeconds(300)))
-//        .build()
-//
-//      val fakeUserProfile = UserProfile("userEmail@company.org",false,Some("test"),Some("test"),Seq(),true,None,None,Some(12345678L),None,None,None)
-//
-//      mockBearerToken.validateToken(any) returns Right(LoginResultOK(mockClaims))
-//      mockUserProfileDAO.userProfileForEmail(any) returns Future(Some(Right(fakeUserProfile)))
-//      new WithApplication(buildMyApp(Some(mockClientFactory), mockUserProfileDAO, Some(mockBearerToken))) {
-//        val result = route(app, FakeRequest(GET, "/oauthCallback?code=some-code-here&state=%2Fpath%2Fyou%2Fwere%2Fat"))
-//        result must beSome
-//
-//        status(result.get) mustEqual INTERNAL_SERVER_ERROR
-//        header("Location",result.get) must beNone
-//
-//        val resultCookies = cookies(result.get)
-//        resultCookies.get("authtoken") must beNone
-//        resultCookies.get("refreshtoken") must beNone
-//        session(result.get).get("userProfile") must beNone
-//
-//        there was one(mockHttp).singleRequest(any, any, any, any)
-//        there was no(mockUserProfileDAO).userProfileForEmail(any)
-//        there was no(mockUserProfileDAO).put(any)
-//      }
-//    }
+    "return an error if the IdP returns an error" in {
+      val mockHttp = mock[HttpExt]
+      val mockClientFactory = new HttpClientFactory {
+        override def build: HttpExt = mockHttp
+      }
+      val mockUserProfileDAO = mock[UserProfileDAO]
+      val mockBearerToken = mock[BearerTokenAuth]
+
+      val returnedContent = OAuthResponse(None,None,None,Some("I don't like you"),Some("Test")).asJson.noSpaces
+      val entity = HttpEntity(returnedContent)
+      mockHttp.singleRequest(any,any,any,any) returns Future(HttpResponse(StatusCodes.BadRequest, entity=entity))
+
+      val mockClaims = new JWTClaimsSet.Builder()
+        .audience("archivehunter")
+        .subject("testuser")
+        .expirationTime(Date.from(Instant.now().plusSeconds(300)))
+        .build()
+
+      val fakeUserProfile = UserProfile("userEmail@company.org",false,Some("test"),Some("test"),Seq(),true,None,None,Some(12345678L),None,None,None)
+
+      mockBearerToken.validateToken(any) returns Right(LoginResultOK(mockClaims))
+      mockUserProfileDAO.userProfileForEmail(any) returns Future(Some(Right(fakeUserProfile)))
+      new WithApplication(buildMyApp(Some(mockClientFactory), mockUserProfileDAO, Some(mockBearerToken))) {
+        val result = route(app, FakeRequest(GET, "/oauthCallback?code=some-code-here&state=%2Fpath%2Fyou%2Fwere%2Fat"))
+        result must beSome
+
+        status(result.get) mustEqual INTERNAL_SERVER_ERROR
+        header("Location",result.get) must beNone
+
+        val resultCookies = cookies(result.get)
+        resultCookies.get("authtoken") must beNone
+        resultCookies.get("refreshtoken") must beNone
+        session(result.get).get("userProfile") must beNone
+
+        there was one(mockHttp).singleRequest(any, any, any, any)
+        there was no(mockUserProfileDAO).userProfileForEmail(any)
+        there was no(mockUserProfileDAO).put(any)
+      }
+    }
   }
 
   "Auth.refreshIfRequired" should {
@@ -272,7 +272,7 @@ class AuthSpec extends Specification with Mockito {
       val mockBearerToken = mock[BearerTokenAuth]
       val mockOAuthTokenDAO = mock[OAuthTokenEntryDAO]
 
-      val returnedContent = OAuthResponse(Some("new-access-token"),Some("new-refresh-token"),None,None).asJson.noSpaces
+      val returnedContent = OAuthResponse(Some("new-access-token"),Some("new-refresh-token"),None,None,None).asJson.noSpaces
       val entity = HttpEntity(returnedContent)
       mockHttp.singleRequest(any,any,any,any) returns Future(HttpResponse(StatusCodes.OK, entity=entity))
 
@@ -325,7 +325,7 @@ class AuthSpec extends Specification with Mockito {
       val mockUserProfileDAO = mock[UserProfileDAO]
       val mockBearerToken = mock[BearerTokenAuth]
 
-      val returnedContent = OAuthResponse(Some("new-access-token"),Some("new-refresh-token"),None,None).asJson.noSpaces
+      val returnedContent = OAuthResponse(Some("new-access-token"),Some("new-refresh-token"),None,None,None).asJson.noSpaces
       val entity = HttpEntity(returnedContent)
       mockHttp.singleRequest(any,any,any,any) returns Future(HttpResponse(StatusCodes.OK, entity=entity))
 
@@ -375,7 +375,7 @@ class AuthSpec extends Specification with Mockito {
       val mockUserProfileDAO = mock[UserProfileDAO]
       val mockBearerToken = mock[BearerTokenAuth]
 
-      val returnedContent = OAuthResponse(Some("new-access-token"),Some("new-refresh-token"),None,None).asJson.noSpaces
+      val returnedContent = OAuthResponse(Some("new-access-token"),Some("new-refresh-token"),None,None,None).asJson.noSpaces
       val entity = HttpEntity(returnedContent)
       mockHttp.singleRequest(any,any,any,any) returns Future(HttpResponse(StatusCodes.OK, entity=entity))
 

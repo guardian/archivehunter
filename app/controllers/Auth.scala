@@ -521,7 +521,7 @@ class Auth @Inject() (config:Configuration,
 object Auth {
   private val logger = LoggerFactory.getLogger(getClass)
 
-  case class OAuthResponse(access_token:Option[String], refresh_token:Option[String], id_token:Option[String], error:Option[String])
+  case class OAuthResponse(access_token:Option[String], refresh_token:Option[String], id_token:Option[String], error:Option[String], error_description:Option[String])
 
   /**
     * returns a boolean indicating if the given claims set either has expired or is about to
