@@ -1,28 +1,29 @@
 package controllers
 
 import akka.http.scaladsl.HttpExt
-import akka.http.scaladsl.model.{HttpEntity, HttpResponse, StatusCodes}
+import akka.http.scaladsl.model.{HttpEntity, HttpRequest, HttpResponse, StatusCodes}
 import auth.{BearerTokenAuth, LoginResultOK}
 import com.nimbusds.jwt.JWTClaimsSet
 import com.theguardian.multimedia.archivehunter.common.clientManagers.DynamoClientManager
 import controllers.Auth.OAuthResponse
 import helpers.HttpClientFactory
-import io.circe.generic.auto._
-import io.circe.syntax._
 import models.{OAuthTokenEntry, OAuthTokenEntryDAO, UserProfile, UserProfileDAO}
 import org.specs2.mock.Mockito
 import org.specs2.mutable.Specification
-import play.api.inject.guice.GuiceApplicationBuilder
-import play.api.mvc.Cookie
-import play.api.test.Helpers._
+import play.api.inject.guice.{GuiceApplicationBuilder, GuiceableModule}
+import play.api.test.WithApplication
 import play.api.test._
+import play.api.test.Helpers._
+import io.circe.syntax._
+import io.circe.generic.auto._
+import play.api.mvc.Cookie
 
 import java.time.format.DateTimeFormatter
 import java.time.{Instant, ZoneId, ZonedDateTime}
 import java.util.Date
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
+import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
+import scala.concurrent.ExecutionContext.Implicits.global
 
 class AuthSpec extends Specification with Mockito {
   sequential

@@ -371,7 +371,7 @@ class Auth @Inject() (config:Configuration,
       } yield (response, bodyContent)
     ).map({
       case (response, Right(oAuthResponse))=>
-        if (response.status==StatusCodes.OK) {
+        if(response.status==StatusCodes.OK) {
           Right(oAuthResponse)
         } else {
           Left(s"Server responded with an error ${response.status} ${oAuthResponse.toString}")
