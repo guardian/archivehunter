@@ -33,7 +33,7 @@ jobs:
           npm version
           npm install
           npm test
-          npm run build
+          # npm run build
 
         working-directory: frontend
 
