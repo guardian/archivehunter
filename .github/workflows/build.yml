@@ -21,7 +21,7 @@ jobs:
         uses: actions/setup-java@v2
         with:
           distribution: temurin
-          java-version: 8
+          java-version: 11
 
       - name: Setup node.js
         uses: actions/setup-node@v2
@@ -33,14 +33,16 @@ jobs:
           npm version
           npm install
           npm test
-          npm run-script build
+          npm build
         working-directory: frontend
 
       - name: Set build info
         run: bash ./ci_scripts/setbuildinfo.sh
 
       - name: Test and build backend
-        run: echo "TODO"
+        env:
+          JAVA_OPTS: -Xmx1024m -XX:ReservedCodeCacheSize=128m -DINDEX_NAME=testindex -DELASTICSEARCH=localhost:9200
+        run: sbt test
       
       - name: AWS Auth
         uses: aws-actions/configure-aws-credentials@v2
