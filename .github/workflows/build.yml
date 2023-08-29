@@ -28,13 +28,12 @@ jobs:
         with:
           node-version: "16.18.0"
       
-      - name: Test and build frontend
-        run: |
-          npm version
+      - name: Install dependencies
+        run: npm version
           npm install
-          npm test
-          # npm run build
-
+        working-directory: frontend
+      - name: Test and build frontend
+        run: npm run test
         working-directory: frontend
 
       - name: Set build info
