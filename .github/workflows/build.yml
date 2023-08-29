@@ -48,16 +48,16 @@ jobs:
       - name: Set build info
         run: bash ./ci_scripts/setbuildinfo.sh
 
-      - name: Test and build backend
-        env:
-          JAVA_OPTS: -Xmx1024m -XX:ReservedCodeCacheSize=128m -DINDEX_NAME=testindex -DELASTICSEARCH=localhost:9200
-        run: sbt test
-      
       - name: AWS Auth
         uses: aws-actions/configure-aws-credentials@v2
         with:
           role-to-assume: ${{ secrets.GU_RIFF_RAFF_ROLE_ARN }}
           aws-region: eu-west-1
+
+      - name: Test and build backend
+        env:
+          JAVA_OPTS: -Xmx1024m -XX:ReservedCodeCacheSize=128m -DINDEX_NAME=testindex -DELASTICSEARCH=localhost:9200
+        run: sbt test
 
       # - name: Upload to riff-raff
       #   uses: guardian/actions-riff-raff@v2
