@@ -1,0 +1,61 @@
+name: build
+
+on:
+  push:
+    branches:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    permissions: # required by aws-actions/configure-aws-credentials
+      id-token: write
+      contents: read
+      checks: write
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Setup JDK
+        uses: actions/setup-java@v2
+        with:
+          distribution: temurin
+          java-version: 8
+
+      - name: Setup node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: "16.14.1"
+      
+      - name: Test and build frontend
+        run: |
+          npm version
+          npm install
+          npm test
+          npm run-script build
+        working-directory: frontend
+
+      - name: Set build info
+        run: bash ./ci_scripts/setbuildinfo.sh
+
+      - name: Test and build backend
+        run: echo "TODO"
+      
+      - name: AWS Auth
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ secrets.GU_RIFF_RAFF_ROLE_ARN }}
+          aws-region: eu-west-1
+
+      # - name: Upload to riff-raff
+      #   uses: guardian/actions-riff-raff@v2
+      #   with:
+      #     configPath: riff-raff.yaml
+      #     projectName: Multimedia::archivehunter
+      #     buildNumberOffset: 579
+      #     contentDirectories: |
+        
+
+
+
