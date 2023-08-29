@@ -29,12 +29,16 @@ jobs:
           node-version: "16.18.0"
       
       - name: Install dependencies
-        run: |
-          npm version
-          npm install
+        run: npm install
         working-directory: frontend
+      - name: Debug Node and npm version
+        run: |
+          node -v
+          npm -v
       - name: Test and build frontend
-        run: npm run test
+        run: |
+          npm run test
+          echo "Jest exit code $?"
         working-directory: frontend
 
       - name: Set build info
