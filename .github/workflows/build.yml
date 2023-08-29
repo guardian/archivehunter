@@ -37,8 +37,11 @@ jobs:
           npm -v
       - name: Test and build frontend
         run: |
-          npm run test
-          echo "Jest exit code $?"
+          npm run test || exit_code=$?
+          echo "Jest exit code ${exit_code:-0}"
+          if [[ $exit_code -ne 0 ]]; then
+            exit $exit_code
+          fi
         working-directory: frontend
 
       - name: Set build info
