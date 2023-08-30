@@ -2,4 +2,4 @@
 
 set -e
 
-sbt clean compile test riffRaffUpload
+sbt clean compile test debian:packageBin
