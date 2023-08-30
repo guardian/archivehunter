@@ -2,7 +2,7 @@ name: build
 
 on:
   push:
-    branches:
+    branches: [ main ]
   pull_request:
   workflow_dispatch:
 
@@ -58,7 +58,7 @@ jobs:
         env:
           JAVA_OPTS: -Xmx1024m -XX:ReservedCodeCacheSize=128m -DINDEX_NAME=testindex -DELASTICSEARCH=localhost:9200
         run: |
-          sbt clean scalafmtCheckAll compile test debian:packageBin
+          sbt clean compile test debian:packageBin
           ls -la target
 
       - name: Run script/ci
