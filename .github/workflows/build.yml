@@ -54,13 +54,25 @@ jobs:
           role-to-assume: ${{ secrets.GU_RIFF_RAFF_ROLE_ARN }}
           aws-region: eu-west-1
 
-      - name: Run script/ci
+      - name: Test and build backend
         env:
           JAVA_OPTS: -Xmx1024m -XX:ReservedCodeCacheSize=128m -DINDEX_NAME=testindex -DELASTICSEARCH=localhost:9200
         run: |
-          LAST_TEAMCITY_BUILD=1263
-          export GITHUB_RUN_NUMBER=$(( $GITHUB_RUN_NUMBER + $LAST_TEAMCITY_BUILD ))
           ./ci_scripts/ci
+          ls -la target/archivehunter_1.0
+          ls -la target/scala-2.13
+
+
+      - name: Upload to riff-raff
+        uses: guardian/actions-riff-raff@v2
+        with:
+          configPath: riff-raff.yaml
+          projectName: multimedia::ArchiveHunter
+          buildNumberOffset: 1263
+          contentDirectories: |
+            archivehunter-webapp:
+              - target/archivehunter_1.0_all.deb
+            archivehunter-input-lambda:
 
 
 
