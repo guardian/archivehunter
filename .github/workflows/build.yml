@@ -59,8 +59,7 @@ jobs:
           JAVA_OPTS: -Xmx1024m -XX:ReservedCodeCacheSize=128m -DINDEX_NAME=testindex -DELASTICSEARCH=localhost:9200
         run: |
           ./ci_scripts/ci
-          ls -la target/archivehunter_1.0
-          ls -la target/scala-2.13
+          ls -Rla target
 
 
       - name: Upload to riff-raff
@@ -72,7 +71,6 @@ jobs:
           contentDirectories: |
             archivehunter-webapp:
               - target/archivehunter_1.0_all.deb
-            archivehunter-input-lambda:
 
 
 
