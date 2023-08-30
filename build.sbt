@@ -198,15 +198,15 @@ lazy val autoDowningLambda = (project in file("lambda/autodowning")).settings(co
 
 val jsTargetDir = "target/riffraff/packages"
 
-// riffRaffUploadArtifactBucket := Option("riffraff-artifact")
-// riffRaffUploadManifestBucket := Option("riffraff-builds")
-// riffRaffManifestProjectName := "multimedia:ArchiveHunter"
-// riffRaffArtifactResources := Seq(
-//   (archivehunter / Debian / packageBin).value -> s"archivehunter-webapp/${(archivehunter / name).value}.deb",
-//   (inputLambda / Universal / assembly).value -> s"archivehunter-input-lambda/${(inputLambda / Universal / assembly).value.getName}",
-//   (autoDowningLambda / Universal / assembly).value -> s"archivehunter-autodowning-lambda/${(autoDowningLambda / Universal / assembly).value.getName}",
-//   (archivehunter / baseDirectory).value / "riff-raff.yaml" -> "riff-raff.yaml",
-// )
+riffRaffUploadArtifactBucket := Option("riffraff-artifact")
+riffRaffUploadManifestBucket := Option("riffraff-builds")
+riffRaffManifestProjectName := "multimedia:ArchiveHunter"
+riffRaffArtifactResources := Seq(
+  (archivehunter / Debian / packageBin).value -> s"archivehunter-webapp/${(archivehunter / name).value}.deb",
+  (inputLambda / Universal / assembly).value -> s"archivehunter-input-lambda/${(inputLambda / Universal / assembly).value.getName}",
+  (autoDowningLambda / Universal / assembly).value -> s"archivehunter-autodowning-lambda/${(autoDowningLambda / Universal / assembly).value.getName}",
+  (archivehunter / baseDirectory).value / "riff-raff.yaml" -> "riff-raff.yaml",
+)
 
 
 resolvers += "scalaz-bintray" at "https://dl.bintray.com/scalaz/releases"
