@@ -54,18 +54,13 @@ jobs:
           role-to-assume: ${{ secrets.GU_RIFF_RAFF_ROLE_ARN }}
           aws-region: eu-west-1
 
-      - name: Test and build backend
+      - name: Run script/ci
         env:
           JAVA_OPTS: -Xmx1024m -XX:ReservedCodeCacheSize=128m -DINDEX_NAME=testindex -DELASTICSEARCH=localhost:9200
         run: |
-          sbt clean compile test debian:packageBin
-          ls -la target
-
-      - name: Run script/ci
-        run: |
           LAST_TEAMCITY_BUILD=1263
           export GITHUB_RUN_NUMBER=$(( $GITHUB_RUN_NUMBER + $LAST_TEAMCITY_BUILD ))
-          ./script/ci
+          ./ci_scripts/ci
 
 
 
