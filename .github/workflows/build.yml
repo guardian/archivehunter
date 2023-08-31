@@ -59,19 +59,3 @@ jobs:
           JAVA_OPTS: -Xmx1024m -XX:ReservedCodeCacheSize=128m -DINDEX_NAME=testindex -DELASTICSEARCH=localhost:9200
         run: |
           ./ci_scripts/ci
-          ls -Rla target
-
-
-      - name: Upload to riff-raff
-        uses: guardian/actions-riff-raff@v2
-        with:
-          configPath: riff-raff.yaml
-          projectName: multimedia::ArchiveHunter
-          buildNumberOffset: 1263
-          contentDirectories: |
-            archivehunter-webapp:
-              - target/archivehunter_1.0_all.deb
-
-
-
-

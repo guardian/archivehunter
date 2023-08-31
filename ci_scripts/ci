@@ -2,4 +2,4 @@
 
 set -e
 
-sbt "clean" "compile" "test" "assembly"
+sbt "clean" "compile" "test" "riffRaffUpload"
