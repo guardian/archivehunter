@@ -99,6 +99,7 @@ const NewBrowseComponent:React.FC<RouteComponentProps> = (props) => {
 
     const classes = useStyles();
     const [filterString, setFilterString] = useState<string>("");
+    const [typeString, setTypeString] = useState<string>("Any");
 
     const refreshCollectionNames = async () => {
         try {
@@ -257,7 +258,9 @@ const NewBrowseComponent:React.FC<RouteComponentProps> = (props) => {
         </div>
         <div className={classes.filterArea}>
             <BrowseFilter filterString={filterString}
-                             filterStringChanged={(newString)=>setFilterString(newString)}/>
+                          filterStringChanged={(newString)=>setFilterString(newString)}
+                          typeString={typeString}
+                          typeStringChanged={(newString)=>setTypeString(newString)}/>
         </div>
         <div className={classes.pathSelector} style={{gridColumnEnd: leftDividerPos}}>
             <BoxSizing justify="right"
@@ -294,6 +297,7 @@ const NewBrowseComponent:React.FC<RouteComponentProps> = (props) => {
                                 onLoadingFinished={loadingDidComplete}
                                 extraRequiredItemId={urlRequestedItem}
                                 filterString={filterString}
+                                typeString={typeString}
             />
         </div>
         <div className={classes.detailsArea} style={{gridColumnStart: rightDividerPos}}>

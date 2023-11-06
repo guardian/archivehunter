@@ -19,6 +19,7 @@ interface NewSearchComponentProps {
     onLoadingFinished?: (loadedData:ArchiveEntry[])=>void;
     extraRequiredItemId?: string;         //if the container wants to be sure certain items are loaded, given that they exist, put the id here
     filterString?: string;
+    typeString?: string;
 }
 
 const useStyles = makeStyles({
@@ -47,12 +48,24 @@ const NewSearchComponent:React.FC<NewSearchComponentProps> = (props) => {
     const [cancelToken, setCancelToken] = useState<CancelToken|undefined>(undefined);
     const classes = useStyles();
     const [localFilter, setLocalFilter] = useState<string>("");
+    const [localTypeMajor, setLocalTypeMajor] = useState<string>("");
+    const [localTypeMinor, setLocalTypeMinor] = useState<string>("");
 
     useEffect(()=>{
         if((props.filterString) || (props.filterString == "")) {
             setLocalFilter(props.filterString);
         }
     }, [props.filterString]);
+
+    useEffect(()=>{
+        if((props.typeString) && (props.typeString != "Any")) {
+            setLocalTypeMajor(props.typeString.split('/')[0]);
+            setLocalTypeMinor(props.typeString.split('/')[1]);
+        } else {
+            setLocalTypeMajor("");
+            setLocalTypeMinor("");
+        }
+    }, [props.typeString]);
 
     const makeSearchRequest = (token:CancelToken, startAt: number):Promise<AxiosResponse<SearchResponse>> => {
         if(props.advancedSearch) {
@@ -223,7 +236,7 @@ const NewSearchComponent:React.FC<NewSearchComponentProps> = (props) => {
 
     return <Grid container className={classes.searchResultsContainer}>
         {
-            entries.filter(entry => entry.path.toLowerCase().includes(localFilter.toLowerCase())).map((entry,idx)=><EntryView
+            entries.filter(entry => entry.path.toLowerCase().includes(localFilter.toLowerCase())).filter(entry => entry.mimeType.major.includes(localTypeMajor)).filter(entry => entry.mimeType.minor.includes(localTypeMinor)).map((entry,idx)=><EntryView
                                                 key={idx}
                                                 isSelected={ props.selectedEntry ? props.selectedEntry.id===entry.id : false}
                                                 entry={entry}
