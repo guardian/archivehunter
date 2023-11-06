@@ -45,7 +45,7 @@ jobs:
           fi
         working-directory: frontend
 
-      - name: Build frontend
+      - name: Build Frontend
         run: npm run build
         working-directory: frontend
 
