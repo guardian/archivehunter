@@ -26,7 +26,7 @@ const useStyles = makeStyles({
     browserWindow: {
         display: "grid",
         gridTemplateColumns: "repeat(20, 5%)",
-        gridTemplateRows: "[top] 40px [title-area] 200px [filter-area] 80px [info-area] auto [bottom]",
+        gridTemplateRows: "[top] 40px [title-area] 200px [filter-area] 120px [info-area] auto [bottom]",
         height: "95vh"
     },
     userNameBox: {
@@ -100,6 +100,7 @@ const NewLightbox:React.FC<RouteComponentProps> = (props) => {
     const [basicSearchUrl, setBasicSearchUrl] = useState<string|undefined>(undefined);
     const [showingArchiveSpinner, setShowingArchiveSpinner] = useState(false);
     const [filterString, setFilterString] = useState<string>("");
+    const [typeString, setTypeString] = useState<string>("Any");
 
     const userContext = useContext(UserContext);
 
@@ -255,8 +256,10 @@ const NewLightbox:React.FC<RouteComponentProps> = (props) => {
             />
         </div>
         <div className={classes.filterArea}>
-        <BrowseFilter filterString={filterString}
-                      filterStringChanged={(newString)=>setFilterString(newString)}/>
+            <BrowseFilter filterString={filterString}
+                          filterStringChanged={(newString)=>setFilterString(newString)}
+                          typeString={typeString}
+                          typeStringChanged={(newString)=>setTypeString(newString)}/>
         </div>
         <div className={classes.itemsArea}>
             <NewSearchComponent pageSize={pageSize}
@@ -267,6 +270,7 @@ const NewLightbox:React.FC<RouteComponentProps> = (props) => {
                                 onEntryClicked={(newEntry)=>setSelectedEntry(newEntry)}
                                 onErrorOccurred={handleComponentError}
                                 filterString={filterString}
+                                typeString={typeString}
             />
         </div>
 
