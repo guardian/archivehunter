@@ -28,7 +28,7 @@ POST    /api/scanTarget/:id/createPipelines @controllers.ScanTargetController.cr
 GET     /api/scanTarget/:id/monitoringConfiguration @controllers.ScanTargetController.checkNotificationConfiguration(id)
 POST     /api/scanTarget/:id/monitoringConfiguration @controllers.ScanTargetController.fixNotificationConfiguration(id)
 
-GET     /api/search/basic      @controllers.SearchController.simpleStringSearch(q:Option[String],start:Option[Int],length:Option[Int])
+GET     /api/search/basic      @controllers.SearchController.simpleStringSearch(q:Option[String],start:Option[Int],length:Option[Int],mimeMajor:Option[String],mimeMinor:Option[String])
 GET     /api/entry/:id                  @controllers.SearchController.getEntry(id)
 PUT     /api/search/suggestions         @controllers.SearchController.suggestions
 POST    /api/search/browser             @controllers.SearchController.browserSearch(start:Int ?= 0, size:Int ?=100)
