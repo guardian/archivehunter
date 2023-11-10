@@ -85,7 +85,7 @@ class SearchController @Inject()(override val config:Configuration,
             } from actualStart size actualLength sortBy fieldSort("path.keyword")
           } else {
             search(indexName) query {
-              boolQuery().must(searchTerms, not(regexQuery("path.keyword", ".*/+\\.[^\\.]+")), regexQuery("mimeType.major", mIMEMajor), regexQuery("mimeType.minor", mIMEMinor))
+              boolQuery().must(searchTerms, not(regexQuery("path.keyword", ".*/+\\.[^\\.]+")), termQuery("mimeType.major.keyword", mIMEMajor), termQuery("mimeType.minor.keyword", mIMEMinor))
             } from actualStart size actualLength sortBy fieldSort("path.keyword")
           }
         }
