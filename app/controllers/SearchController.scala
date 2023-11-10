@@ -68,16 +68,26 @@ class SearchController @Inject()(override val config:Configuration,
     })
   }
 
-  def simpleStringSearch(q:Option[String],start:Option[Int],length:Option[Int]) = IsAuthenticatedAsync { _=> _=>
+  def simpleStringSearch(q:Option[String],start:Option[Int],length:Option[Int],mimeMajor:Option[String],mimeMinor:Option[String]) = IsAuthenticatedAsync { _=> _=>
     val cli = esClientManager.getClient()
 
     val actualStart=start.getOrElse(0)
     val actualLength=length.getOrElse(50)
+    val mIMEMajor = mimeMajor.getOrElse("Any")
+    val mIMEMinor = mimeMinor.getOrElse("")
 
     q match {
       case Some(searchTerms) =>
         val responseFuture = esClient.execute {
-          search(indexName) query { boolQuery().must(searchTerms, not(regexQuery("path.keyword",".*/+\\.[^\\.]+"))) } from actualStart size actualLength sortBy fieldSort("path.keyword")
+          if (mIMEMajor == "Any") {
+            search(indexName) query {
+              boolQuery().must(searchTerms, not(regexQuery("path.keyword", ".*/+\\.[^\\.]+")))
+            } from actualStart size actualLength sortBy fieldSort("path.keyword")
+          } else {
+            search(indexName) query {
+              boolQuery().must(searchTerms, not(regexQuery("path.keyword", ".*/+\\.[^\\.]+")), termQuery("mimeType.major.keyword", mIMEMajor), termQuery("mimeType.minor.keyword", mIMEMinor))
+            } from actualStart size actualLength sortBy fieldSort("path.keyword")
+          }
         }
 
         responseFuture.map(response=>{

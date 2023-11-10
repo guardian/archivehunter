@@ -20,6 +20,7 @@ interface NewSearchComponentProps {
     extraRequiredItemId?: string;         //if the container wants to be sure certain items are loaded, given that they exist, put the id here
     filterString?: string;
     typeString?: string;
+    typeQuery?: string;
 }
 
 const useStyles = makeStyles({
@@ -78,8 +79,8 @@ const NewSearchComponent:React.FC<NewSearchComponentProps> = (props) => {
             return axios.get<SearchResponse>(props.basicQueryUrl + `${separator}start=${startAt}&length=${props.pageSize}`, {
                 cancelToken: token
             })
-        } else if(props.basicQuery) {
-            return axios.get<SearchResponse>("/api/search/basic?q=" + encodeURIComponent(props.basicQuery as string) + "&start=" + startAt + "&length=" + props.pageSize,
+        } else if(props.basicQuery && props.typeQuery) {
+            return axios.get<SearchResponse>("/api/search/basic?q=" + encodeURIComponent(props.basicQuery as string) + "&start=" + startAt + "&length=" + props.pageSize + "&mimeMajor=" + encodeURIComponent(props.typeQuery.split('/')[0] as string) + "&mimeMinor=" + encodeURIComponent(props.typeQuery.split('/')[1] as string),
                 {
                     cancelToken: token
                 });
