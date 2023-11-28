@@ -405,7 +405,7 @@ class Auth @Inject() (config:Configuration,
     val encodedParams = assembleFromMap(params)
     val contentBody = HttpEntity(ContentTypes.`application/x-www-form-urlencoded`, encodedParams)
     val headers = scala.collection.immutable.Seq(
-      Accept(MediaRange(MediaTypes.`application/json`))
+      Accept(MediaRange(MediaTypes.`application/json`)), Origin(HttpOrigin(config.get[String]("oAuth.origin")))
     )
     val req = HttpRequest(HttpMethods.POST, config.get[String]("oAuth.tokenUrl"), headers, contentBody)
 
