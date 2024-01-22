@@ -9,7 +9,7 @@ ThisBuild / libraryDependencySchemes += "org.scala-lang.modules" % "scala-java8-
 scalacOptions := Seq("-unchecked", "-deprecation", "-feature", "-language:postfixOps")
 scalaVersion := "2.13.9"
 
-val akkaVersion = "2.8.1"
+val akkaVersion = "2.6.18"
 val akkaClusterVersion = "1.1.3"
 val elastic4sVersion = "6.7.8"
 val awsSdkVersion = "1.12.641"
@@ -128,7 +128,7 @@ lazy val inputLambda = (project in file("lambda/input"))
     "com.typesafe.akka" %% "akka-actor-typed" % akkaVersion,
     "com.typesafe.akka" %% "akka-serialization-jackson" % akkaVersion,
     "com.typesafe.akka" %% "akka-stream" % akkaVersion,
-    "com.typesafe.akka" %% "akka-protobuf" % "2.7.0",
+    "com.typesafe.akka" %% "akka-protobuf" % akkaVersion,
     "com.typesafe.akka" %% "akka-protobuf-v3" % akkaVersion,
   ),
   assembly / assemblyJarName:= "inputLambda.jar",
