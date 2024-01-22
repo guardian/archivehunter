@@ -128,7 +128,7 @@ lazy val inputLambda = (project in file("lambda/input"))
     "com.typesafe.akka" %% "akka-actor-typed" % akkaVersion,
     "com.typesafe.akka" %% "akka-serialization-jackson" % akkaVersion,
     "com.typesafe.akka" %% "akka-stream" % akkaVersion,
-    "com.typesafe.akka" %% "akka-protobuf" % akkaVersion,
+    "com.typesafe.akka" %% "akka-protobuf" % "2.7.0",
     "com.typesafe.akka" %% "akka-protobuf-v3" % akkaVersion,
   ),
   assembly / assemblyJarName:= "inputLambda.jar",
