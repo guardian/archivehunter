@@ -90,7 +90,7 @@ lazy val `archivehunter` = (project in file("."))
 val lambdaDeps = Seq(
 )
 
-val circeVersion = "0.14.2" //required for compatibility with elastic4s-circe
+val circeVersion = "0.12.0-M3" //required for compatibility with elastic4s-circe
 
 lazy val common = (project in file("common"))
   .settings(commonSettings,
@@ -100,7 +100,7 @@ lazy val common = (project in file("common"))
       "io.circe" %% "circe-core" % circeVersion,
       "io.circe" %% "circe-generic" % circeVersion,
       "io.circe" %% "circe-parser" % circeVersion,
-      "org.scanamo" %% "scanamo" % "1.0.0-M26",
+      "org.scanamo" %% "scanamo" % "1.0.0-M16",
       "com.google.inject" % "guice" % "4.2.3",  //keep this in sync with play version
       "com.amazonaws" % "aws-java-sdk-sns" % awsSdkVersion,
       "com.amazonaws" % "aws-java-sdk-sts" % awsSdkVersion,
@@ -182,7 +182,7 @@ lazy val autoDowningLambda = (project in file("lambda/autodowning")).settings(co
       "io.circe" %% "circe-core" % circeVersion,
       "io.circe" %% "circe-generic" % circeVersion,
       "io.circe" %% "circe-parser" % circeVersion,
-      "org.scanamo" %% "scanamo" % "1.0.0-M26",
+      "org.scanamo" %% "scanamo" % "1.0.0-M16",
       specs2 % Test
     ),
     assembly / assemblyJarName := "autoDowningLambda.jar",
