@@ -12,10 +12,10 @@ scalaVersion := "2.13.9"
 val akkaVersion = "2.6.18"
 val akkaClusterVersion = "1.1.3"
 val elastic4sVersion = "6.7.8"
-val awsSdkVersion = "1.12.641"
+val awsSdkVersion = "1.12.153"
 val awsSdk2Version = "2.20.162"
-val jacksonVersion = "2.15.0"
-val jacksonCoreVersion = "2.15.0"
+val jacksonVersion = "2.11.4"
+val jacksonCoreVersion = "2.13.1"
 
 lazy val commonSettings = Seq(
   version := "1.0",
@@ -26,7 +26,7 @@ lazy val commonSettings = Seq(
     "com.amazonaws" % "aws-java-sdk-elastictranscoder"% awsSdkVersion,
     "com.amazonaws" % "aws-java-sdk-sqs"% awsSdkVersion,
     "com.dripower" %% "play-circe" % "2812.0",
-    "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.15.0",
+    "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.13.1",
     "com.sksamuel.elastic4s" %% "elastic4s-http" % elastic4sVersion  exclude("com.fasterxml.jackson.module","jackson-module-scala"),
     "com.sksamuel.elastic4s" %% "elastic4s-circe" % elastic4sVersion,
     "com.sksamuel.elastic4s" %% "elastic4s-http-streams" % elastic4sVersion,
@@ -42,7 +42,7 @@ lazy val commonSettings = Seq(
     "com.fasterxml.jackson.dataformat" % "jackson-dataformat-yaml" % jacksonVersion,
     "com.fasterxml.jackson.dataformat" % "jackson-dataformat-cbor" % jacksonVersion,
     "com.fasterxml.jackson.core" % "jackson-databind" % jacksonCoreVersion,
-    "com.google.guava" % "guava" % "32.0.0-jre",
+    "com.google.guava" % "guava" % "30.0-jre",
       specs2 % Test)
 )
 
