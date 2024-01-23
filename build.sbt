@@ -42,7 +42,7 @@ lazy val commonSettings = Seq(
     "com.fasterxml.jackson.dataformat" % "jackson-dataformat-yaml" % jacksonVersion,
     "com.fasterxml.jackson.dataformat" % "jackson-dataformat-cbor" % jacksonVersion,
     "com.fasterxml.jackson.core" % "jackson-databind" % jacksonCoreVersion,
-    "com.google.guava" % "guava" % "32.0.0-jre",
+    "com.google.guava" % "guava" % "30.0-jre",
       specs2 % Test)
 )
 
