@@ -40,7 +40,7 @@ const loadInPaths = async (collectionName:string, from:string)=> {
     const nameExtractor = /\/([^\/]+)\/$/;
 
     const result = await axios.get<BrowseDirectoryResponse>(`/api/browse/${collectionName}?prefix=${from}`);
-    const pathsToAdd: PathEntry[] = result.data.entries.map((fullpath, idx) => {
+    const pathsToAdd: PathEntry[] = result.data.entries.sort().map((fullpath, idx) => {
         const extracted = nameExtractor.exec("/"+fullpath);
 
         const name = extracted ? extracted[1] : "";
