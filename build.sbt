@@ -12,9 +12,9 @@ scalaVersion := "2.13.9"
 val akkaVersion = "2.6.18"
 val akkaClusterVersion = "1.1.3"
 val elastic4sVersion = "6.7.8"
-val awsSdkVersion = "1.12.641"
+val awsSdkVersion = "1.12.681"
 val awsSdk2Version = "2.17.124"
-val jacksonVersion = "2.15.0"
+val jacksonVersion = "2.25.10"
 val jacksonCoreVersion = "2.15.0"
 
 lazy val commonSettings = Seq(
@@ -59,7 +59,7 @@ lazy val `archivehunter` = (project in file("."))
       "com.sksamuel.elastic4s" %% "elastic4s-embedded" % elastic4sVersion % "test",
       "com.fasterxml.jackson.core" % "jackson-databind" % jacksonCoreVersion,
       "com.typesafe.akka" %% "akka-cluster-tools" % akkaVersion,
-      "com.lightbend.akka" %% "akka-stream-alpakka-s3" % "3.0.2",
+      "com.lightbend.akka" %% "akka-stream-alpakka-s3" % "6.0.2",
       "com.lightbend.akka.management" %% "akka-management-cluster-http" % akkaClusterVersion,
       "com.lightbend.akka.management" %% "akka-management-cluster-bootstrap" % akkaClusterVersion,
       "com.lightbend.akka.discovery" %% "akka-discovery-kubernetes-api" % akkaClusterVersion,
