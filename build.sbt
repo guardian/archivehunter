@@ -19,7 +19,7 @@ val jacksonCoreVersion = "2.15.0"
 
 lazy val commonSettings = Seq(
   version := "1.0",
-  scalaVersion := "2.13.8",
+  scalaVersion := "2.13.9",
   libraryDependencies ++= Seq("org.apache.logging.log4j" % "log4j-core" % "2.17.1",
     "com.beust" % "jcommander" % "1.75", //snyk identified as vulnerable
     "org.apache.logging.log4j" % "log4j-api" % "2.17.1",
@@ -118,6 +118,7 @@ lazy val inputLambda = (project in file("lambda/input"))
     "org.apache.logging.log4j" % "log4j-core" % "2.17.1",
     "org.apache.logging.log4j" % "log4j-api" % "2.17.1",
     "org.apache.logging.log4j" % "log4j-1.2-api" % "2.17.1",
+    "org.scala-lang.modules" %% "scala-xml" % "2.1.0",
     "com.sksamuel.elastic4s" %% "elastic4s-http" % elastic4sVersion,
     "com.sksamuel.elastic4s" %% "elastic4s-circe" % elastic4sVersion,
     "com.sksamuel.elastic4s" %% "elastic4s-testkit" % elastic4sVersion % "test",
