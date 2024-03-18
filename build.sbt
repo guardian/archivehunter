@@ -14,7 +14,7 @@ val akkaClusterVersion = "1.1.3"
 val elastic4sVersion = "6.7.8"
 val awsSdkVersion = "1.12.681"
 val awsSdk2Version = "2.17.124"
-val jacksonVersion = "2.25.10"
+val jacksonVersion = "2.15.0"
 val jacksonCoreVersion = "2.15.0"
 
 lazy val commonSettings = Seq(
