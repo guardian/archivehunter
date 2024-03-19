@@ -9,24 +9,24 @@ ThisBuild / libraryDependencySchemes += "org.scala-lang.modules" % "scala-java8-
 scalacOptions := Seq("-unchecked", "-deprecation", "-feature", "-language:postfixOps")
 scalaVersion := "2.13.9"
 
-val akkaVersion = "2.8.5"
-val akkaClusterVersion = "1.4.1"
-val elastic4sVersion = "8.11.3"
-val awsSdkVersion = "1.12.681"
-val awsSdk2Version = "2.23.4"
-val jacksonVersion = "2.15.3"
-val jacksonCoreVersion = "2.16.1"
+val akkaVersion = "2.6.18"
+val akkaClusterVersion = "1.1.3"
+val elastic4sVersion = "6.7.8"
+val awsSdkVersion = "1.12.641"
+val awsSdk2Version = "2.17.124"
+val jacksonVersion = "2.15.0"
+val jacksonCoreVersion = "2.15.0"
 
 lazy val commonSettings = Seq(
   version := "1.0",
-  scalaVersion := "2.13.9",
-  libraryDependencies ++= Seq("org.apache.logging.log4j" % "log4j-core" % "2.22.1",
-    "com.beust" % "jcommander" % "1.82",
-    "org.apache.logging.log4j" % "log4j-api" % "2.22.1",
+  scalaVersion := "2.13.8",
+  libraryDependencies ++= Seq("org.apache.logging.log4j" % "log4j-core" % "2.17.1",
+    "com.beust" % "jcommander" % "1.75", //snyk identified as vulnerable
+    "org.apache.logging.log4j" % "log4j-api" % "2.17.1",
     "com.amazonaws" % "aws-java-sdk-elastictranscoder"% awsSdkVersion,
     "com.amazonaws" % "aws-java-sdk-sqs"% awsSdkVersion,
-    "com.dripower" %% "play-circe" % "3014.1",
-    "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.16.1",
+    "com.dripower" %% "play-circe" % "2812.0",
+    "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.15.0",
     "com.sksamuel.elastic4s" %% "elastic4s-http" % elastic4sVersion  exclude("com.fasterxml.jackson.module","jackson-module-scala"),
     "com.sksamuel.elastic4s" %% "elastic4s-circe" % elastic4sVersion,
     "com.sksamuel.elastic4s" %% "elastic4s-http-streams" % elastic4sVersion,
@@ -36,32 +36,30 @@ lazy val commonSettings = Seq(
     "software.amazon.awssdk" % "dynamodb" % awsSdk2Version,
     "software.amazon.awssdk" % "s3" % awsSdk2Version,
     "software.amazon.awssdk" % "aws-cbor-protocol" % awsSdk2Version,
-    "com.lightbend.akka" %% "akka-stream-alpakka-dynamodb" % "6.0.2",
-    "com.lightbend.akka" %% "akka-stream-alpakka-s3" % "6.0.2",
+    "com.lightbend.akka" %% "akka-stream-alpakka-dynamodb" % "3.0.4",
+    "com.lightbend.akka" %% "akka-stream-alpakka-s3" % "3.0.4",
     "org.scanamo" %% "scanamo-alpakka" % "1.0.0-M16",
     "com.fasterxml.jackson.dataformat" % "jackson-dataformat-yaml" % jacksonVersion,
     "com.fasterxml.jackson.dataformat" % "jackson-dataformat-cbor" % jacksonVersion,
     "com.fasterxml.jackson.core" % "jackson-databind" % jacksonCoreVersion,
     "com.google.guava" % "guava" % "30.0-jre",
-      specs2 % Test)
+    specs2 % Test)
 )
-
-dependencyOverrides += "org.scala-lang.modules" %% "scala-xml" % "2.2.0"
 
 lazy val `archivehunter` = (project in file("."))
   .enablePlugins(PlayScala)
   .dependsOn(common)
   .settings(commonSettings,
     libraryDependencies ++= Seq(
-      "com.dripower" %% "play-circe" % "3014.1",
-      "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.16.1",
+      "com.dripower" %% "play-circe" % "2812.0",
+      "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.13.1",
       "com.sksamuel.elastic4s" %% "elastic4s-http" % elastic4sVersion exclude("com.fasterxml.jackson.module","jackson-module-scala"),
       "com.sksamuel.elastic4s" %% "elastic4s-circe" % elastic4sVersion,
       "com.sksamuel.elastic4s" %% "elastic4s-testkit" % elastic4sVersion % "test",
       "com.sksamuel.elastic4s" %% "elastic4s-embedded" % elastic4sVersion % "test",
       "com.fasterxml.jackson.core" % "jackson-databind" % jacksonCoreVersion,
       "com.typesafe.akka" %% "akka-cluster-tools" % akkaVersion,
-      "com.lightbend.akka" %% "akka-stream-alpakka-s3" % "6.0.2",
+      "com.lightbend.akka" %% "akka-stream-alpakka-s3" % "3.0.4",
       "com.lightbend.akka.management" %% "akka-management-cluster-http" % akkaClusterVersion,
       "com.lightbend.akka.management" %% "akka-management-cluster-bootstrap" % akkaClusterVersion,
       "com.lightbend.akka.discovery" %% "akka-discovery-kubernetes-api" % akkaClusterVersion,
@@ -79,20 +77,20 @@ lazy val `archivehunter` = (project in file("."))
       "com.typesafe.akka" %% "akka-serialization-jackson" % akkaVersion,
       "com.typesafe.akka" %% "akka-http-spray-json" % "10.2.7",
       "com.typesafe.akka" %% "akka-http-xml" % "10.2.7",
-      "com.typesafe.akka" %% "akka-http" % "10.6.0",
+      "com.typesafe.akka" %% "akka-http" % "10.2.7",
       "com.nimbusds" % "nimbus-jose-jwt" % "9.18",
-      "com.gu" % "kinesis-logback-appender" % "2.1.3",
+      "com.gu" % "kinesis-logback-appender" % "2.0.3",
       "com.fasterxml.jackson.dataformat" % "jackson-dataformat-cbor" % jacksonVersion,
-      "org.apache.logging.log4j" % "log4j-api" % "2.22.1",
+      "org.apache.logging.log4j" % "log4j-api" % "2.17.1",
       "com.typesafe.akka" %% "akka-testkit" % akkaVersion,
-      "io.sentry" % "sentry-logback" % "7.2.0",
+      "io.sentry" % "sentry-logback" % "6.25.2",
       guice, ehcache, ws)
   )
 
 val lambdaDeps = Seq(
 )
 
-val circeVersion = "0.14.6" //required for compatibility with elastic4s-circe
+val circeVersion = "0.12.0-M3" //required for compatibility with elastic4s-circe
 
 lazy val common = (project in file("common"))
   .settings(commonSettings,
@@ -115,40 +113,39 @@ val meta = """META.INF(.)*""".r
 lazy val inputLambda = (project in file("lambda/input"))
   .dependsOn(common)
   .settings(commonSettings,
-  // https://mvnrepository.com/artifact/com.amazonaws/aws-java-sdk-lambda
-  libraryDependencies ++= Seq(
-    "org.apache.logging.log4j" % "log4j-core" % "2.22.1",
-    "org.apache.logging.log4j" % "log4j-api" % "2.22.1",
-    "org.apache.logging.log4j" % "log4j-1.2-api" % "2.17.1",
-    "org.scala-lang.modules" %% "scala-xml" % "2.2.0",
-    "com.sksamuel.elastic4s" %% "elastic4s-http" % elastic4sVersion,
-    "com.sksamuel.elastic4s" %% "elastic4s-circe" % elastic4sVersion,
-    "com.sksamuel.elastic4s" %% "elastic4s-testkit" % elastic4sVersion % "test",
-    "com.sksamuel.elastic4s" %% "elastic4s-embedded" % elastic4sVersion % "test",
-    "com.amazonaws" % "aws-java-sdk-lambda" % awsSdkVersion,
-    "com.amazonaws" % "aws-lambda-java-events" % "2.1.0",
-    "com.amazonaws" % "aws-lambda-java-core" % "1.0.0",
-    "com.typesafe.akka" %% "akka-actor-typed" % akkaVersion,
-    "com.typesafe.akka" %% "akka-serialization-jackson" % akkaVersion,
-    "com.typesafe.akka" %% "akka-stream" % akkaVersion,
-    "com.typesafe.akka" %% "akka-protobuf" % akkaVersion,
-    "com.typesafe.akka" %% "akka-protobuf-v3" % akkaVersion,
-  ),
-  assembly / assemblyJarName:= "inputLambda.jar",
-  assembly / assemblyMergeStrategy:= {
-    case PathList("javax", "servlet", xs @ _*)         => MergeStrategy.first
-    case PathList(ps @ _*) if ps.last endsWith ".html" => MergeStrategy.first
-    case "application.conf" => MergeStrategy.concat
-    case PathList("META-INF","org","apache","logging","log4j","core","config","plugins","Log4j2Plugins.dat") => MergeStrategy.last
-    case PathList(ps @ _*) if ps.last == "module-info.class" => MergeStrategy.discard
-    case PathList(ps @ _*) if ps.last=="mime.types" => MergeStrategy.last
-    case meta(_)=>MergeStrategy.discard
-    case x=>
-      val oldStrategy = (assembly / assemblyMergeStrategy).value
-      oldStrategy(x)
+    // https://mvnrepository.com/artifact/com.amazonaws/aws-java-sdk-lambda
+    libraryDependencies ++= Seq(
+      "org.apache.logging.log4j" % "log4j-core" % "2.17.1",
+      "org.apache.logging.log4j" % "log4j-api" % "2.17.1",
+      "org.apache.logging.log4j" % "log4j-1.2-api" % "2.17.1",
+      "com.sksamuel.elastic4s" %% "elastic4s-http" % elastic4sVersion,
+      "com.sksamuel.elastic4s" %% "elastic4s-circe" % elastic4sVersion,
+      "com.sksamuel.elastic4s" %% "elastic4s-testkit" % elastic4sVersion % "test",
+      "com.sksamuel.elastic4s" %% "elastic4s-embedded" % elastic4sVersion % "test",
+      "com.amazonaws" % "aws-java-sdk-lambda" % awsSdkVersion,
+      "com.amazonaws" % "aws-lambda-java-events" % "2.1.0",
+      "com.amazonaws" % "aws-lambda-java-core" % "1.0.0",
+      "com.typesafe.akka" %% "akka-actor-typed" % akkaVersion,
+      "com.typesafe.akka" %% "akka-serialization-jackson" % akkaVersion,
+      "com.typesafe.akka" %% "akka-stream" % akkaVersion,
+      "com.typesafe.akka" %% "akka-protobuf" % akkaVersion,
+      "com.typesafe.akka" %% "akka-protobuf-v3" % akkaVersion,
+    ),
+    assembly / assemblyJarName:= "inputLambda.jar",
+    assembly / assemblyMergeStrategy:= {
+      case PathList("javax", "servlet", xs @ _*)         => MergeStrategy.first
+      case PathList(ps @ _*) if ps.last endsWith ".html" => MergeStrategy.first
+      case "application.conf" => MergeStrategy.concat
+      case PathList("META-INF","org","apache","logging","log4j","core","config","plugins","Log4j2Plugins.dat") => MergeStrategy.last
+      case PathList(ps @ _*) if ps.last == "module-info.class" => MergeStrategy.discard
+      case PathList(ps @ _*) if ps.last=="mime.types" => MergeStrategy.last
+      case meta(_)=>MergeStrategy.discard
+      case x=>
+        val oldStrategy = (assembly / assemblyMergeStrategy).value
+        oldStrategy(x)
 
-  }
-)
+    }
+  )
 
 lazy val proxyStatsGathering = (project in file("ProxyStatsGathering"))
   .dependsOn(common)
@@ -215,4 +212,3 @@ riffRaffArtifactResources := Seq(
 resolvers += "scalaz-bintray" at "https://dl.bintray.com/scalaz/releases"
 
 Test / unmanagedResourceDirectories +=  { baseDirectory ( _ /"target/web/public/test" ).value }
-
