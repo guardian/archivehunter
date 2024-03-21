@@ -3,9 +3,9 @@ package services
 import java.time.ZonedDateTime
 import akka.NotUsed
 import akka.actor.{Actor, ActorSystem, Timers}
-import akka.stream.scaladsl.{GraphDSL, Keep, RunnableGraph, Sink, Source}
+import akka.stream.scaladsl.{FlowOps, GraphDSL, Keep, RunnableGraph, Sink, Source}
 import akka.stream._
-import akka.stream.alpakka.s3.{S3Attributes, S3Ext}
+import akka.stream.alpakka.s3.{S3Attributes, S3Ext, S3Settings}
 import akka.stream.alpakka.s3.scaladsl.S3
 import com.theguardian.multimedia.archivehunter.common.clientManagers.{DynamoClientManager, ESClientManager, S3ClientManager}
 import com.amazonaws.regions.{Region, Regions}
@@ -20,6 +20,8 @@ import play.api.{Configuration, Logger}
 import com.sksamuel.elastic4s.streams.{RequestBuilder, ResponseListener, SubscriberConfig}
 import com.theguardian.multimedia.archivehunter.common.cmn_helpers.ZonedTimeFormat
 import com.theguardian.multimedia.archivehunter.common.{ArchiveEntry, ArchiveEntryRequestBuilder}
+import software.amazon.awssdk.regions
+import software.amazon.awssdk.regions.providers.AwsRegionProvider
 
 import scala.concurrent.{Await, ExecutionContext, Future, Promise}
 import scala.concurrent.duration._
@@ -115,6 +117,19 @@ class BucketScanner @Inject()(override val config:Configuration, ddbClientMgr:Dy
     Sink.fromSubscriber(subscriber)
   }
 
+  private implicit class ExtendedFlowOps[+Out, +Mat](op: FlowOps[Out, Mat]) {
+    //Define a  private extension method so that we can factor our this rather cumbersome code for re-use
+    def withS3Region(rgn:String):op.Repr[Out] = op.withAttributes(
+      Attributes(
+        S3Attributes.settings(
+          S3Settings().withS3RegionProvider(new AwsRegionProvider {
+            override def getRegion: regions.Region = regions.Region.of(rgn)
+          })
+        ).attributeList
+      )
+    )
+  }
+
   /**
     * Performs a scan of the given target.  The scan is done asynchronously using Akka streaming, so this method returns a Promise
     * which completes when the scan is done.
@@ -127,7 +142,16 @@ class BucketScanner @Inject()(override val config:Configuration, ddbClientMgr:Dy
     logger.info(s"Started scan for $target")
     val esclient = esClientMgr.getClient()
 
-    val keySource = S3.listBucket(target.bucketName, None)
+    val keySource = S3.listBucket(target.bucketName, None).withAttributes(
+      Attributes(
+        S3Attributes.settings(
+          S3Settings().withS3RegionProvider(new AwsRegionProvider {
+            override def getRegion: regions.Region = regions.Region.of(target.region)
+          })
+        ).attributeList
+      )
+    )//.withS3Region(target.region)
+
     val converterFlow = injector.getInstance(classOf[S3ToArchiveEntryFlow])
 
     val indexSink = getElasticSearchSink(esclient, completionPromise)
@@ -157,7 +181,7 @@ class BucketScanner @Inject()(override val config:Configuration, ddbClientMgr:Dy
 
     val source = new ParanoidS3Source(target.bucketName,region, s3ClientMgr.newCredentialsProvider(config.getOptional[String]("externalData.awsProfile")))
     val processor = new S3XMLProcessor()
-    val converterFlow = injector.getInstance(classOf[S3ToArchiveEntryFlow])
+    val converterFlow = injector.getInstance(classOf[S3ToArchiveEntryFlow]).named(target.region)
 
     val indexSink = getElasticSearchSink(esclient, completionPromise)
 
