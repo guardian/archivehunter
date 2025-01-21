@@ -1138,6 +1138,7 @@ Resources:
             oAuthTokensTable: "${OAuthTokensTable}"
             origin: "${Origin}"
             type: "Azure"
+            keyTimeOut = 86400
           }
 
           serverToken {

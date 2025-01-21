@@ -116,7 +116,8 @@ class BearerTokenAuth @Inject() (config:Configuration) {
   //see https://stackoverflow.com/questions/475074/regex-to-parse-or-validate-base64-data
   //it is not the best option but is the simplest that will work here
   private val authXtractor = "^Bearer\\s+([a-zA-Z0-9+/._-]*={0,3})$".r
-  private val maybeVerifiers = loadInKey() match {
+  var loadTime: Long = System.currentTimeMillis / 1000
+  private var maybeVerifiers = loadInKey() match {
     case Failure(err)=>
       if(!sys.env.contains("CI")) logger.warn(s"No token validation cert in config so bearer token auth will not work. Error was ${err.getMessage}")
       None
@@ -169,6 +170,7 @@ class BearerTokenAuth @Inject() (config:Configuration) {
     * @return Either an initialised JWKSet or a Failure indicating why it would not load.
     */
   def loadInKey():Try[JWKSet] = Try {
+    loadTime = System.currentTimeMillis / 1000
     val isRemoteMatcher = "^https*:".r.unanchored
 
     if(isRemoteMatcher.matches(signingCertPath)) {
@@ -267,6 +269,16 @@ class BearerTokenAuth @Inject() (config:Configuration) {
     logger.debug(s"validating token $token")
     parseTokenContent(token.content) match {
       case Success(signedJWT) =>
+        if ((System.currentTimeMillis / 1000) - loadTime > config.get[Int]("oAuth.keyTimeOut")) {
+          logger.debug(s"Keys too old. Attempting key refresh.")
+          maybeVerifiers = loadInKey() match {
+            case Failure(err)=>
+              if(!sys.env.contains("CI")) logger.warn(s"Could not load keys. Error was ${err.getMessage}")
+              None
+            case Success(jwk)=>
+              Some(jwk)
+          }
+        }
         getVerifier(Option(signedJWT.getHeader.getKeyID)) match {
           case Some(verifier) =>
             if (signedJWT.verify(verifier)) {
