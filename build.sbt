@@ -52,7 +52,7 @@ lazy val `archivehunter` = (project in file("."))
   .settings(commonSettings,
     libraryDependencies ++= Seq(
       "com.dripower" %% "play-circe" % "2812.0",
-      "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.13.1",
+      "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.15.0",
       "com.sksamuel.elastic4s" %% "elastic4s-http" % elastic4sVersion exclude("com.fasterxml.jackson.module","jackson-module-scala"),
       "com.sksamuel.elastic4s" %% "elastic4s-circe" % elastic4sVersion,
       "com.sksamuel.elastic4s" %% "elastic4s-testkit" % elastic4sVersion % "test",
@@ -78,7 +78,7 @@ lazy val `archivehunter` = (project in file("."))
       "com.typesafe.akka" %% "akka-http-spray-json" % "10.2.7",
       "com.typesafe.akka" %% "akka-http-xml" % "10.2.7",
       "com.typesafe.akka" %% "akka-http" % "10.2.7",
-      "com.nimbusds" % "nimbus-jose-jwt" % "9.18",
+      "com.nimbusds" % "nimbus-jose-jwt" % "9.37.2",
       "com.gu" % "kinesis-logback-appender" % "2.0.3",
       "com.fasterxml.jackson.dataformat" % "jackson-dataformat-cbor" % jacksonVersion,
       "org.apache.logging.log4j" % "log4j-api" % "2.17.1",
