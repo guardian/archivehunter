@@ -78,7 +78,7 @@
     "js-yaml": "^4.0.0",
     "lodash": "^4.17.21",
     "lodash.omit": "^4.5.0",
-    "moment": "^2.29.2",
+    "moment": "^2.29.4",
     "moment-duration-format": "2.2.2",
     "panda-session": "^0.1.6",
     "process": "^0.11.10",
@@ -90,9 +90,9 @@
     "react-router": "^4.1.1",
     "react-router-dom": "^4.1.1",
     "uuid": "^3.4.0",
-    "webpack": "^5.61.0",
-    "webpack-cli": "^4.5.0",
-    "yarn": "^1.22.10"
+    "webpack": "^5.98.0",
+    "webpack-cli": "^4.10.0",
+    "yarn": "^1.22.13"
   },
   "license": "ISC"
 }
