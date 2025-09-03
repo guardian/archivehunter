@@ -13,7 +13,7 @@ val akkaVersion = "2.6.18"
 val akkaClusterVersion = "1.1.3"
 val elastic4sVersion = "6.7.8"
 val awsSdkVersion = "1.12.641"
-val awsSdk2Version = "2.17.124"
+val awsSdk2Version = "2.32.33"
 val jacksonVersion = "2.15.0"
 val jacksonCoreVersion = "2.15.0"
 
