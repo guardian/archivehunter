@@ -46,7 +46,7 @@
     <logger name="application" level="ERROR" />
 
     <logger name="services.AppStartup" level="INFO"/>
-    <logger name="services.BucketScanner" level="INFO"/>
+    <logger name="services.BucketScanner" level="DEBUG"/>
     <logger name="akka.cluster" level="ERROR"/>
     <logger name="helpers.LightboxStreamComponents" level="INFO"/>
     <logger name="helpers.S3ToArchiveEntryFlow" level="INFO"/>
@@ -57,7 +57,7 @@
     <logger name="com.sksamuel.elastic4s.streams" level="WARN"/>
     <logger name="controllers.SearchController" level="WARN"/>
     <logger name="controllers.ProxyHealthController" level="INFO"/>
-    <logger name="controllers.ScanTargetController" level="INFO"/>
+    <logger name="controllers.ScanTargetController" level="DEBUG"/>
     <logger name="controllers.JobController" level="INFO"/>
     <logger name="controllers.BrowseCollectionController" level="INFO"/>
     <logger name="controllers.DeletedItemsController" level="DEBUG"/>
