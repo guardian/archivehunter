@@ -1020,6 +1020,9 @@ Resources:
       KeyName: !Ref KeyPair
       SecurityGroups:
       - !Ref InstanceSecurityGroup
+      MetadataOptions:
+        HttpTokens: required
+        HttpEndpoint: enabled
       UserData: !Base64
         "Fn::Sub": |
           #!/bin/bash -e
