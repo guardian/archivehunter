@@ -56,9 +56,10 @@ object ImprovedLargeFileCopier {
   /**
     * returns a path suitable for the `x-amz-copy-source` header. This is URL-encoded.
     */
-  def copySourcePath(bucket:String, key:String, version:Option[String]) = {
-    URLEncoder.encode(s"$bucket/$key${version.map(v=>s"?versionId=$v").getOrElse("")}", StandardCharsets.UTF_8)
+  def copySourcePath(bucket: String, key: String, version: Option[String]) = {
+    URLEncoder.encode(s"$bucket/$key${version.map(v => s"?versionId=$v").getOrElse("")}", "UTF-8")
   }
+
 
   case class HeadInfo(
                      bucket:String,
@@ -515,7 +516,7 @@ class ImprovedLargeFileCopier @Inject() (implicit actorSystem:ActorSystem, overr
       .single(createRequest(HttpMethods.DELETE, region, sourceBucket, sourceKey, None) { partialRequest=>
         partialRequest.withUri(
           partialRequest.uri
-            .withRawQueryString(s"uploadId=${URLEncoder.encode(uploadId, StandardCharsets.UTF_8)}")
+            .withRawQueryString(s"uploadId=${URLEncoder.encode(uploadId, "UTF-8")}")
         )
       })
       .mapAsync(1)(reqparts=>doRequestSigning(reqparts._1, region, credentialsProvider).map(rq=>(rq, ())))
